@@ -30,6 +30,14 @@ jobs:
         run: |
           sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libsqlite3-dev sqlite3
           make bench-smoke
+      - name: Benchmark harness smoke test under address and undefined behavior sanitizers
+        # a tool killed by a sanitizer can still leave the expected (empty) answer behind, so the
+        # step also fails on any sanitizer report in the output, not only on the exit status
+        run: |
+          make bench-smoke CC=clang BUILD=build/asan-bench \
+            CFLAGS='-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer' \
+            LDFLAGS='-fsanitize=address,undefined' 2>&1 | tee /tmp/bench-smoke-asan.log
+          if grep -qE 'runtime error|ERROR: AddressSanitizer|ERROR: LeakSanitizer' /tmp/bench-smoke-asan.log; then exit 1; fi
       - name: Validate site links
         run: python3 scripts/check-site.py
   lint:

@@ -243,7 +243,8 @@ int main(int argc, char **argv)
 		perror("nftw");
 		return 1;
 	}
-	qsort(hits, nhits, sizeof *hits, order_name[0] ? by_order : by_ino);
+	if (nhits)	/* hits is NULL when nothing matched, and qsort's base must not be NULL */
+		qsort(hits, nhits, sizeof *hits, order_name[0] ? by_order : by_ino);
 	if (out_limit >= 0 && (size_t)out_limit < nhits)
 		nhits = (size_t)out_limit;
 	for (i = 0; i < nhits; i++)
