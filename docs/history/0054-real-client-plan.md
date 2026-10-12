@@ -20,3 +20,10 @@ a prototype.
 
 Build ai-memory at a pinned commit on the Mac mini host and run stage 1 (requires the maintainer's
 go-ahead to build and run third-party code on that host).
+
+## Stage 1a result (2026-10-12)
+
+The first stage 1a run found a layer bug: renaming over a just-deleted name returned `EINVAL`
+(journal 0057, fixed on `fix/rename-over-deleted-name`). With the fixed module both runs pass the
+same 1 147 tests with no failure (`bench/results/2026-10-12-macmini-aimem-stage1a/`). Stage 1b on
+the old module was stopped before its layer half and is rerun with the fixed module.
