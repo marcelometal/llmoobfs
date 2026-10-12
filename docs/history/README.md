@@ -90,3 +90,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0060 — S1: threat and credential model proposed (ADR-0011)](0060-threat-model-adr.md)
 - [0061 — `GET_INFO` counters only for administrators (ADR-0011, F1)](0061-get-info-counters.md)
 - [0063 — Real-client test, stage 2: design from ai-memory's code](0063-client-stage2-design.md)
+- [0064 — Real-client test, stage 2: tools and first small run](0064-client-stage2-first-run.md)

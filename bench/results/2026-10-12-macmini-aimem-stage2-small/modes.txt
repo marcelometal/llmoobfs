@@ -1,0 +1,3 @@
+600 debian /srv/moob/ext4/aim2/data/wiki/01a1322f-4a2b-73d0-bd8b-e67e38e27a3e/_meta.md
+600 debian <wiki>/<ws>/<proj>/_meta.md
+600 debian <wiki>/<ws>/<proj>/_slots/slots-00025.md
