@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- KASAN workflow: `virtme-ng` 1.41 and its dependencies are installed from
+  `vm/kasan-requirements.txt` with `pip --require-hashes` instead of a version-only pin
+  (journal 0046; OpenSSF Scorecard Pinned-Dependencies).
 - CodeQL triage (journal 0045): every one of the 30 open alerts has a decision. Fixed in
   `bench/`: manifest fields are copied with `memcpy` of the length already checked against the
   destination (the three `cpp/unbounded-write` alerts were false positives), and record files
