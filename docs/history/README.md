@@ -65,3 +65,5 @@ Preservação depende de commits e cópias: nenhum disco ou serviço garante ret
 - [0046 — Dependências Python do workflow KASAN fixadas por hash](0046-kasan-pip-hashes.md)
 - [0047 — `QUERY2` contra o SQLite no mesmo hardware](0047-sqlite-baseline-macmini.md)
 - [0048 — Otimização do "N mais recentes" no `QUERY2`](0048-recent-optimization.md)
+- [0049 — `QUERY2`, v1 e SQLite em btrfs e XFS](0049-q2-btrfs-xfs.md)
+- [0050 — Pendências de código recebidas do lote de experiência do desenvolvedor](0050-dx-code-items.md)
