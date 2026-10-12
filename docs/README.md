@@ -59,6 +59,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 | --- | --- | --- |
 | [value-assessment.md](value-assessment.md) | EN | Critical assessment of usefulness and value; the English summary is when-not-to-use.md |
 | [research-originality.md](research-originality.md) | EN | Prior-art audit (SFS, BFS, YoloFS and others) and what may be claimed |
+| [references.md](references.md) | EN | Verified list of the papers, projects and tools MoobFS builds on, includes, compares against or used to decide |
 | [research-metadata-search.md](research-metadata-search.md) | EN | State of the art in file-metadata search, authorization and change feeds (for ADR-0009) |
 | [research-metadata-search-addendum.md](research-metadata-search-addendum.md) | EN | Addendum checking the items left unverified in the previous document |
 | [research-academic-survey.md](research-academic-survey.md) | EN | Systematic literature survey behind ADR-0009 |
