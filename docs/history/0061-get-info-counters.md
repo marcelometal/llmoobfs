@@ -1,6 +1,6 @@
 # 0061 — `GET_INFO` counters only for administrators (ADR-0011, F1)
 
-Date: 2026-10-12. Status: implemented; `make vm-test` passes; KASAN pending (local series).
+Date: 2026-10-12. Status: implemented; `make vm-test` passes; local KASAN passes (local series).
 
 ## Problem
 
@@ -37,6 +37,9 @@ owner index the layer does not keep, and no client asked for it.
 old whole-word check, now root's reply carries 0x20); after the fix, every marker through
 `DEMO_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS`.
 
+Local KASAN (`vm/kasan-local.sh` on the benchmark host, tree at 63149ad): `MOOBFS_KASAN_PASS` on the
+first attempt in 18 minutes, no kernel diagnostics.
+
 ## Compatibility
 
 A UAPI behaviour change for unprivileged callers: fields that were filled are now zero. The UAPI is
@@ -45,4 +48,4 @@ tools run them as root.
 
 ## Next step
 
-KASAN for the local series on the benchmark host before publishing.
+The CI KASAN check runs when the series is published.
