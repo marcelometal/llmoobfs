@@ -1714,7 +1714,7 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 	long err = 0;
 
 	if (!ix->enabled)
-		return -ENOSYS;
+		return -EOPNOTSUPP;	/* noindex (ENOSYS until journal 0050) */
 	if (ix->domain_depth && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	q = memdup_user(arg, sizeof(*q));
@@ -1891,10 +1891,8 @@ static long query2_target(struct super_block *sb, struct file *file, u64 *domain
 {
 	struct moobl_index *ix = IX(sb);
 
-	if (!ix->enabled)
-		return -ENOSYS;
-	if (!ix->domain_depth)
-		return -EOPNOTSUPP;
+	if (!ix->enabled || !ix->domain_depth)
+		return -EOPNOTSUPP;	/* noindex (ENOSYS until journal 0050) or domains off */
 	if (!d_is_dir(file->f_path.dentry) ||
 	    !depth_and_domain(ix, file->f_path.dentry, depth, domain) ||
 	    *depth != ix->domain_depth)

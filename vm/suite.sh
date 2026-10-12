@@ -128,7 +128,9 @@ run_lower() {
     grep -q 'r/g1$' /tmp/k.txt || fail "query-after-remount-path-$fs"
     umount $LAYER || fail "q-umount2-$fs"
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0,noindex none $LAYER || fail "q-noindex-mount-$fs"
-    $BIN/query $LAYER score ge int64 10 > /dev/null 2>&1 && fail "query-noindex-answered-$fs"
+    $BIN/query $LAYER score ge int64 10 > /tmp/noindex.txt 2>&1 && fail "query-noindex-answered-$fs"
+    grep -q 'Operation not supported' /tmp/noindex.txt || { cat /tmp/noindex.txt; fail "query-noindex-errno-$fs"; }
+    [ "$($BIN/query $LAYER q2errno kind exists x x)" = "q2 95" ] || fail "query2-noindex-errno-$fs"   # EOPNOTSUPP
     $BIN/query $LAYER info | grep -q 'flags=0x2' || fail "query-noindex-flag-$fs"
     umount $LAYER || fail "q-umount3-$fs"
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0,index_budget=1M none $LAYER || fail "q-budget-mount-$fs"
