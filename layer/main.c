@@ -785,6 +785,13 @@ static int moobl_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
 		return err;
 	if (ia->ia_valid & ATTR_FILE)
 		lower_ia.ia_file = ia->ia_file->private_data;
+	/*
+	 * A write or truncate of a set-user-ID or set-group-ID file arrives with
+	 * ATTR_KILL_S*ID and the ATTR_MODE the VFS derived from it. notify_change()
+	 * refuses that pair with BUG(); the lower call derives the mode again.
+	 */
+	if (lower_ia.ia_valid & (ATTR_KILL_SUID | ATTR_KILL_SGID))
+		lower_ia.ia_valid &= ~ATTR_MODE;
 	inode_lock(lower_inode);
 	err = notify_change(&nop_mnt_idmap, lower_dentry, &lower_ia, NULL);
 	inode_unlock(lower_inode);
@@ -1176,6 +1183,7 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	struct moobl_sb *sbi;
 	struct inode *root_inode;
 	struct dentry *root;
+	struct cred *cred;
 	int err;
 
 	if (!ctx->lower)
@@ -1195,9 +1203,12 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	sb->s_stack_depth = sbi->lower.dentry->d_sb->s_stack_depth + 1;
 	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH)
 		return invalfc(fc, "maximum filesystem stacking depth exceeded");
-	sbi->creds = prepare_creds();
-	if (!sbi->creds)
+	cred = prepare_creds();
+	if (!cred)
 		return -ENOMEM;
+	/* Delegated work never overrides disk quota limits or uses reserved space. */
+	cap_lower(cred->cap_effective, CAP_SYS_RESOURCE);
+	sbi->creds = cred;
 	sbi->nolinks = ctx->nolinks;
 	sb->s_xattr = moobl_xattr_handlers;
 	{

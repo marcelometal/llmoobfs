@@ -738,6 +738,15 @@ grep -q 'memory ok.md' $LAYER/ok.md || fail fl-ok-content
 $BIN/moobfs-check $LOWER > /dev/null || fail fl-check
 umount $LAYER && umount $LOWER || fail fl-final-umount
 echo "IO_ERROR_INJECTION_PASS"
+# Reserved space: the mounter credentials carry no CAP_SYS_RESOURCE (as overlayfs), so an ordinary
+# user writing through the layer cannot spend the blocks ext4 reserves. The lower is mounted with a
+# reserve owner other than root: with resuid=0, ext4 itself grants the reserve to the mounter's
+# fsuid, whatever its capabilities (journal 0069).
+$TOOLS/mke2fs -q -F -t ext4 -b 4096 $SCRATCH || fail rs-mkfs
+mount -t ext4 -o resuid=4242 $SCRATCH $LOWER || fail rs-lower-mount
+mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail rs-layer-mount
+$BIN/layer reserve $LAYER $LOWER || fail rs-reserve
+umount $LAYER && umount $LOWER || fail rs-final-umount
 rmmod moobfs_layer || fail layer-unload
 if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
 echo "MOOBFS_ACCEPTANCE_PASS: git, sqlite wal, memory client, dm-log-writes replay, dm-flakey"
