@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Fix** (journal 0057): renaming a file or directory over a name whose previous file was just
+  deleted failed with `EINVAL` (the atomic "write a temporary file, rename it over" pattern). Found
+  by running ai-memory's own tests on the layer; regression test in `tests/layer.c`.
 - Everything in the repository is in English (ADR-0010, journal 0051): 82 documents, ADRs and
   journals written in Portuguese were translated in place; `README.pt-BR.md` stays as a mirror.
 - **UAPI change:** with `noindex`, `MOOB_IOC_QUERY` and `MOOB_IOC_QUERY2` return `EOPNOTSUPP`
