@@ -13,6 +13,7 @@
  * and the entry itself.
  * --order lists only entries whose NAME attribute has TYPE, sorted by (value, ino) ascending
  * or descending (the QUERY2 order); terms may then be empty. --limit keeps the first N.
+ * An operator ending in '?' (for example "gt?") also matches files without the attribute.
  */
 #define _GNU_SOURCE
 #include <ftw.h>
@@ -115,8 +116,9 @@ static int term_matches(const char *path, const struct moob_query_term *t)
 
 	snprintf(full, sizeof full, "%s%s", MOOB_ATTR_PREFIX, t->name);
 	n = lgetxattr(path, full, v, sizeof v);
+	/* absent, invalid and raw values are not indexed: for the index they are missing */
 	if (n <= 0 || moob_attr_validate(v, (size_t)n) != MOOB_ATTR_OK || v[0] == MOOB_T_RAW)
-		return 0;
+		return (t->flags & MOOB_TERM_MISSING_OK) ? 1 : 0;
 	if (t->op == MOOB_OP_EXISTS)
 		return 1;
 	if (v[0] != t->type)
@@ -241,7 +243,8 @@ int main(int argc, char **argv)
 		perror("nftw");
 		return 1;
 	}
-	qsort(hits, nhits, sizeof *hits, order_name[0] ? by_order : by_ino);
+	if (nhits)	/* hits is NULL when nothing matched, and qsort's base must not be NULL */
+		qsort(hits, nhits, sizeof *hits, order_name[0] ? by_order : by_ino);
 	if (out_limit >= 0 && (size_t)out_limit < nhits)
 		nhits = (size_t)out_limit;
 	for (i = 0; i < nhits; i++)

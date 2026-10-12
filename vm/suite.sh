@@ -128,7 +128,9 @@ run_lower() {
     grep -q 'r/g1$' /tmp/k.txt || fail "query-after-remount-path-$fs"
     umount $LAYER || fail "q-umount2-$fs"
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0,noindex none $LAYER || fail "q-noindex-mount-$fs"
-    $BIN/query $LAYER score ge int64 10 > /dev/null 2>&1 && fail "query-noindex-answered-$fs"
+    $BIN/query $LAYER score ge int64 10 > /tmp/noindex.txt 2>&1 && fail "query-noindex-answered-$fs"
+    grep -q 'Operation not supported' /tmp/noindex.txt || { cat /tmp/noindex.txt; fail "query-noindex-errno-$fs"; }
+    [ "$($BIN/query $LAYER q2errno kind exists x x)" = "q2 95" ] || fail "query2-noindex-errno-$fs"   # EOPNOTSUPP
     $BIN/query $LAYER info | grep -q 'flags=0x2' || fail "query-noindex-flag-$fs"
     umount $LAYER || fail "q-umount3-$fs"
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0,index_budget=1M none $LAYER || fail "q-budget-mount-$fs"
@@ -341,6 +343,64 @@ run_lower() {
     [ "$($BIN/query --uid 1001 $LAYER/da q2errno --limit 3 --cursor-in /tmp/c1 kind eq string note)" = "q2 116" ] || fail "q2b-cursor-remount-$fs"
     q2ord remount-pages 30 --order title string desc --limit 7 --pages -- --order title string desc $LOWER/da
     echo "QUERY2_ORDER_PASS: $fs"
+    # leapfrog intersection of equality terms (phase Q2c): answers equal the oracle, paging
+    # works, and the plan is really taken: with a non-equality first term whose values fall
+    # as inodes rise, a plain scan would answer in falling inode order, the intersection in
+    # rising inode order
+    for i in $(seq 1 30); do
+        f=$LAYER/da/o$i.md
+        $BIN/moobfs-attr set $f ns string n$((i % 3)) >/dev/null &&
+        $BIN/moobfs-attr set $f agent int64 $((i % 5)) >/dev/null &&
+        $BIN/moobfs-attr set $f rank string r$((100 - i)) >/dev/null || fail "q2c-attr-$fs"
+    done
+    q2ord leap2 2 ns eq string n1 agent eq int64 2 -- $LOWER/da ns eq string n1 agent eq int64 2
+    q2ord leap3 1 ns eq string n1 agent eq int64 2 kind eq string note -- $LOWER/da ns eq string n1 agent eq int64 2 kind eq string note
+    q2ord leap-mixed 2 rank exists x x ns eq string n1 agent eq int64 2 -- $LOWER/da rank exists x x ns eq string n1 agent eq int64 2
+    q2ord leap-range 1 ns eq string n1 created ge time 7000 agent eq int64 2 -- $LOWER/da ns eq string n1 created ge time 7000 agent eq int64 2
+    q2ord leap-none 0 ns eq string n1 agent eq int64 7 -- $LOWER/da ns eq string n1 agent eq int64 7
+    q2ord leap-type 0 ns eq string n1 agent eq string 2 -- $LOWER/da ns eq string n1 agent eq string 2
+    q2ord leap-pages 5 --limit 2 --pages ns eq string n1 kind eq string note -- $LOWER/da ns eq string n1 kind eq string note
+    q2ord leap-pages1 5 --limit 1 --pages kind eq string note ns eq string n1 -- $LOWER/da kind eq string note ns eq string n1
+    $BIN/query --uid 1001 $LAYER/da q2 --raw rank exists x x ns eq string n1 kind eq string note | cut -f1 > /tmp/raw.txt || fail "q2c-raw-$fs"
+    [ "$(wc -l < /tmp/raw.txt)" -eq 5 ] || fail "q2c-raw-count-$fs"
+    sort -n -c /tmp/raw.txt || { cat /tmp/raw.txt; fail "q2c-plan-not-leapfrog-$fs"; }
+    q2ord single-eq 10 rank exists x x ns eq string n1 -- $LOWER/da rank exists x x ns eq string n1
+    # "missing or ..." terms and batches (phase Q2d): an expiry on every fourth file.
+    # Operators such as gt? are unquoted words: globbing stays off until the block ends.
+    set -f
+    for i in 4 8 12 16 20 24 28; do
+        $BIN/moobfs-attr set $LAYER/da/o$i.md expires time $((i * 1000)) >/dev/null || fail "q2d-attr-$fs"
+    done
+    q2ord miss-gt 9 ns eq string n1 expires gt? time 10000 -- $LOWER/da ns eq string n1 expires gt? time 10000
+    q2ord miss-le 8 ns eq string n1 expires le? time 4000 -- $LOWER/da ns eq string n1 expires le? time 4000
+    q2ord miss-first 9 expires gt? time 10000 ns eq string n1 -- $LOWER/da expires gt? time 10000 ns eq string n1
+    q2ord miss-eq 10 ns eq string n1 kind eq? string note -- $LOWER/da ns eq string n1 kind eq? string note
+    q2ord miss-type 0 ns eq string n1 agent eq? string 2 -- $LOWER/da ns eq string n1 agent eq? string 2
+    q2ord miss-ordered 26 --order created time desc expires gt? time 10000 -- --order created time desc $LOWER/da expires gt? time 10000
+    q2ord miss-pages 9 --limit 2 --pages ns eq string n1 expires gt? time 10000 -- $LOWER/da ns eq string n1 expires gt? time 10000
+    q2batchcmp() {   # tag: three requests, one per namespace value, each equal to the oracle
+        $BIN/query --uid 1001 $LAYER/da q2batch -- ns eq string n0 -- ns eq string n1 expires gt? time 10000 -- ns eq string n2 > /tmp/kb.txt || fail "q2d-batch-$1-$fs"
+        k=0
+        for q in "ns eq string n0" "ns eq string n1 expires gt? time 10000" "ns eq string n2"; do
+            grep "^q$k	" /tmp/kb.txt | cut -f2- > /tmp/k.txt
+            # shellcheck disable=SC2086
+            $BIN/moobfs-index --domain $LOWER/da $q > /tmp/o.txt || fail "q2d-batch-oracle-$1-$fs"
+            cmp -s /tmp/k.txt /tmp/o.txt || { echo "kernel:"; cat /tmp/kb.txt; echo "oracle $k:"; cat /tmp/o.txt; fail "q2d-batch-mismatch-$1-$k-$fs"; }
+            k=$((k + 1))
+        done
+        [ "$(wc -l < /tmp/kb.txt)" -eq 29 ] || { cat /tmp/kb.txt; fail "q2d-batch-count-$1-$fs"; }
+    }
+    q2batchcmp plain
+    [ "$($BIN/query --uid 1001 $LAYER/db q2batcherrno -- kind exists x x)" = "q2batch 13" ] || fail "q2d-batch-isolation-$fs"
+    [ "$($BIN/query $LAYER/da/sub q2batcherrno -- kind exists x x)" = "q2batch 25" ] || fail "q2d-batch-enotty-$fs"
+    [ "$($BIN/query $LAYER/da q2batcherrno -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x)" = "q2batch 22" ] || fail "q2d-batch-nine-$fs"
+    [ "$($BIN/query $LAYER/da q2batcherrno -- kind exists x x -- kind eq? string note)" = "q2batch 22" ] || fail "q2d-batch-one-invalid-$fs"
+    echo "QUERY2_MISSING_BATCH_PASS: $fs"
+    set +f
+    chmod 0700 $LAYER/da/sub || fail "q2c-fallback-$fs"
+    q2ord leap-fallback 5 --limit 2 --pages ns eq string n1 kind eq string note -- $LOWER/da ns eq string n1 kind eq string note
+    set -f; q2batchcmp fallback; set +f
+    echo "QUERY2_LEAPFROG_PASS: $fs"
     echo "kind eq string note" > /tmp/q2q.txt
     $BIN/bench-load --workload W3 --target $LAYER/da --root $LAYER/da --query2 1 --uid 1001 --queries /tmp/q2q.txt --repeat 3 --out /tmp/q2w3 || fail "q2-bench-w3-$fs"
     rm -rf $LAYER/da $LAYER/db $LAYER/dshared || fail "q2-cleanup-$fs"

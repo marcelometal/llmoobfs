@@ -32,7 +32,7 @@ Mount contract (`layer/main.c`, `moobl_fill_super` and `moobl_parse_param`):
 | Mounting requires `CAP_SYS_ADMIN` in the initial user namespace; the type does not set `FS_USERNS_MOUNT`, so a mount from an unprivileged user namespace fails with `EPERM` | `moobl_fs_type`; tested by `tests/idmap.c userns` |
 | Idmapped mounts are refused with `EINVAL` because the type does not set `FS_ALLOW_IDMAP` | `moobl_fs_type`; tested by `tests/idmap.c idmap` |
 | `nolinks` refuses `link` and `symlink` creation | `moobl_link`, `moobl_symlink` |
-| `noindex` disables the index; `QUERY` then returns `ENOSYS` | `layer/index.c` (`if (!ix->enabled) return -ENOSYS`) |
+| `noindex` disables the index; `QUERY` and `QUERY2` then return `EOPNOTSUPP` (`ENOSYS` until journal 0050) | `layer/index.c` (`if (!ix->enabled) return -EOPNOTSUPP`) |
 | `index_budget` accepts 1M to 4G; the default is 128 MiB | `MOOBL_INDEX_BUDGET_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
 
 Modifying the lower tree from outside while the layer is mounted is undefined, as in

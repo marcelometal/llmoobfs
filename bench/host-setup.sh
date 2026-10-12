@@ -50,6 +50,7 @@ fi
 echo "== build"
 cd "$here"
 BUILD=build/host
+mkdir -p "$BUILD"   # a fresh checkout or copy has no build/ yet
 make layer KDIR="/lib/modules/$(uname -r)/build" > "$BUILD.layer.log" 2>&1 || { tail -20 "$BUILD.layer.log"; exit 1; }
 make attr-tools bench-tools BUILD=$BUILD CFLAGS="-O2 -g" > /dev/null
 gcc -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o $BUILD/query

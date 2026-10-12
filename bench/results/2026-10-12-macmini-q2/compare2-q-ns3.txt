@@ -1,0 +1,4 @@
+namespace eq string ns3 agent eq string a07
+agent eq string a07 namespace eq string ns3
+agent eq string a07
+agent eq string a07 kind eq string note

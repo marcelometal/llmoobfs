@@ -346,8 +346,10 @@ static int moobl_instantiate(struct inode *dir, struct dentry *dentry,
 	if (info->lower.dentry != lower_dentry) {
 		struct dentry *stale = info->lower.dentry;
 
-		/* published for RCU-walk readers (moobl_d_revalidate_rcu); the stale
-		 * dentry stays valid for them until the end of the grace period */
+		/*
+		 * published for RCU-walk readers (moobl_d_revalidate_rcu); the stale
+		 * dentry stays valid for them until the end of the grace period
+		 */
 		WRITE_ONCE(info->lower.dentry, dget(lower_dentry));
 		dput(stale);
 	}
@@ -469,8 +471,10 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	};
 	int err;
 
-	/* A directory may not move to another domain or depth: its subtree's partition would
-	 * change (docs/spec-query-v2.md §5); like a cross-device rename, mv copies instead. */
+	/*
+	 * A directory may not move to another domain or depth: its subtree's partition would
+	 * change (docs/spec-query-v2.md §5); like a cross-device rename, mv copies instead.
+	 */
 	if ((d_is_dir(old_dentry) && moobl_rename_crosses_domain(old_dir->i_sb, old_dentry, new_dentry)) ||
 	    ((flags & RENAME_EXCHANGE) && target && d_is_dir(new_dentry) &&
 	     moobl_rename_crosses_domain(old_dir->i_sb, new_dentry, old_dentry))) {

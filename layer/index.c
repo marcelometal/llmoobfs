@@ -9,7 +9,8 @@
  * set of entries of one attribute name in one domain, split again by whether
  * the inode passes the homogeneity rule. Answers MOOB_IOC_QUERY (all
  * partitions; privileged when domains are on) and MOOB_IOC_GET_INFO on the
- * mount root, and MOOB_IOC_QUERY2 (one domain) on a domain directory.
+ * mount root, and MOOB_IOC_QUERY2 and MOOB_IOC_QUERY2_BATCH (one domain) on a
+ * domain directory.
  */
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -281,6 +282,20 @@ static struct moobl_ix_entry *entry_find(struct moobl_ix_inode *rec, const char 
 	return NULL;
 }
 
+/* The entry of rec under one name node of rec's partition (NULL node: none carries it). */
+static struct moobl_ix_entry *entry_find_node(struct moobl_ix_inode *rec,
+					      const struct moobl_ix_name *nm)
+{
+	struct moobl_ix_entry *e;
+
+	if (!nm)
+		return NULL;
+	list_for_each_entry(e, &rec->entries, by_ino)
+		if (e->name == nm)
+			return e;
+	return NULL;
+}
+
 static void entry_link(struct moobl_ix_name *nm, struct moobl_ix_entry *e, u64 ino)
 {
 	struct rb_node **p = &nm->entries.rb_node, *parent = NULL;
@@ -442,8 +457,9 @@ static bool ext_acl(struct inode *inode)
  */
 static bool reach_ok(struct inode *in, struct inode *dom, bool want_read)
 {
-	umode_t u = want_read ? S_IRUSR : S_IXUSR, g = want_read ? S_IRGRP : S_IXGRP;
-	umode_t o = want_read ? S_IROTH : S_IXOTH;
+	/* octal class bits: read 0444 or search 0111, split per owner, group, other */
+	umode_t u = want_read ? 0400 : 0100, g = want_read ? 0040 : 0010;
+	umode_t o = want_read ? 0004 : 0001;
 	bool acl = ext_acl(in);
 
 	if (!acl && (in->i_mode & o))
@@ -452,11 +468,11 @@ static bool reach_ok(struct inode *in, struct inode *dom, bool want_read)
 		return false;
 	if (!uid_eq(in->i_uid, dom->i_uid) || !gid_eq(in->i_gid, dom->i_gid))
 		return false;
-	if ((dom->i_mode & S_IXUSR) && !(in->i_mode & u))
+	if ((dom->i_mode & 0100) && !(in->i_mode & u))
 		return false;
-	if ((dom->i_mode & S_IXGRP) && !(in->i_mode & g))
+	if ((dom->i_mode & 0010) && !(in->i_mode & g))
 		return false;
-	if ((dom->i_mode & S_IXOTH) && !(in->i_mode & o))
+	if ((dom->i_mode & 0001) && !(in->i_mode & o))
 		return false;
 	return true;
 }
@@ -639,6 +655,79 @@ static int scan_attrs(struct super_block *sb, struct dentry *lower, u64 ino, con
 	return err;
 }
 
+/* A child directory of the scan: its record goes on the stack and takes cpath. */
+static int scan_push_dir(struct moobl_index *ix, struct scan_dir *cur, struct dentry *child,
+			 char *cpath, struct list_head *stack)
+{
+	struct scan_dir *nd = kzalloc(sizeof(*nd), GFP_KERNEL);
+	unsigned int dn = ix->domain_depth;
+
+	if (!nd) {
+		kfree(cpath);
+		return -ENOMEM;
+	}
+	nd->dentry = dget(child);
+	nd->path = cpath;
+	nd->depth = cur->depth + 1;
+	if (dn && nd->depth == dn) {
+		nd->inner = d_inode(child)->i_ino;
+		nd->inner_ok = true;
+		nd->dom = dget(child);
+	} else if (dn && nd->depth > dn) {
+		struct inode *dom = d_inode(cur->dom);
+
+		nd->dom = dget(cur->dom);
+		nd->inner = cur->inner;
+		nd->self.domain = cur->inner;
+		nd->self.hetero = !(cur->inner_ok && target_ok(d_inode(child), dom));
+		nd->inner_ok = cur->inner_ok && reach_ok(d_inode(child), dom, false);
+	}
+	list_add(&nd->list, stack);
+	return 0;
+}
+
+/* A child regular file of the scan: its attributes go into the index; frees cpath. */
+static int scan_file(struct super_block *sb, struct scan_dir *cur, struct dentry *child,
+		     char *cpath, char *list, u8 *value)
+{
+	struct moobl_place fpl = { .domain = cur->inner };
+	int err;
+
+	if (cur->inner)
+		fpl.hetero = !(cur->inner_ok && target_ok(d_inode(child), d_inode(cur->dom)));
+	err = scan_attrs(sb, child, d_inode(child)->i_ino, cpath, &fpl, list, XATTR_LIST_MAX,
+			 value);
+	kfree(cpath);
+	return err;
+}
+
+/* One name read from a scanned directory: a directory is queued, a regular file indexed. */
+static int scan_child(struct super_block *sb, struct scan_dir *cur, struct scan_name *sn,
+		      struct list_head *stack, char *list, u8 *value)
+{
+	struct dentry *child = lookup_one_len_unlocked(sn->name, cur->dentry, sn->len);
+	char *cpath;
+	int err = 0;
+
+	if (IS_ERR(child))
+		return PTR_ERR(child);
+	if (d_really_is_negative(child) || !(d_is_dir(child) || d_is_reg(child)))
+		goto out;
+	cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path, cur->path[0] ? "/" : "", sn->len,
+			  sn->name);
+	if (!cpath) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (d_is_dir(child))
+		err = scan_push_dir(IX(sb), cur, child, cpath, stack);
+	else
+		err = scan_file(sb, cur, child, cpath, list, value);
+out:
+	dput(child);
+	return err;
+}
+
 int moobl_index_build(struct super_block *sb)
 {
 	struct moobl_sb *sbi = MOOBL_SB(sb);
@@ -697,64 +786,8 @@ int moobl_index_build(struct super_block *sb)
 		if (!err)
 			err = sc.err;
 		list_for_each_entry_safe(sn, tmp, &sc.names, list) {
-			struct dentry *child;
-
-			if (!err) {
-				child = lookup_one_len_unlocked(sn->name, cur->dentry, sn->len);
-				if (IS_ERR(child)) {
-					err = PTR_ERR(child);
-				} else if (d_really_is_positive(child) &&
-					   (d_is_dir(child) || d_is_reg(child))) {
-					char *cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path,
-								cur->path[0] ? "/" : "", sn->len, sn->name);
-
-					if (!cpath) {
-						err = -ENOMEM;
-					} else if (d_is_dir(child)) {
-						struct scan_dir *nd = kzalloc(sizeof(*nd), GFP_KERNEL);
-
-						if (!nd) {
-							err = -ENOMEM;
-							kfree(cpath);
-						} else {
-							unsigned int dn = ix->domain_depth;
-
-							nd->dentry = dget(child);
-							nd->path = cpath;
-							nd->depth = cur->depth + 1;
-							if (dn && nd->depth == dn) {
-								nd->inner = d_inode(child)->i_ino;
-								nd->inner_ok = true;
-								nd->dom = dget(child);
-							} else if (dn && nd->depth > dn) {
-								struct inode *dom = d_inode(cur->dom);
-
-								nd->dom = dget(cur->dom);
-								nd->inner = cur->inner;
-								nd->self.domain = cur->inner;
-								nd->self.hetero = !(cur->inner_ok &&
-										    target_ok(d_inode(child), dom));
-								nd->inner_ok = cur->inner_ok &&
-									       reach_ok(d_inode(child), dom, false);
-							}
-							list_add(&nd->list, &stack);
-						}
-					} else {
-						struct moobl_place fpl = { .domain = cur->inner };
-
-						if (cur->inner)
-							fpl.hetero = !(cur->inner_ok &&
-								       target_ok(d_inode(child), d_inode(cur->dom)));
-						err = scan_attrs(sb, child, d_inode(child)->i_ino, cpath, &fpl,
-								 list, XATTR_LIST_MAX, value);
-						kfree(cpath);
-					}
-					if (!IS_ERR(child))
-						dput(child);
-				} else {
-					dput(child);
-				}
-			}
+			if (!err)
+				err = scan_child(sb, cur, sn, &stack, list, value);
 			list_del(&sn->list);
 			kfree(sn);
 		}
@@ -1011,15 +1044,16 @@ void moobl_index_inode_evicted(struct super_block *sb, struct inode *inode)
 
 /* ---- QUERY -------------------------------------------------------------- */
 
-static int term_check(const struct moob_query_term *t)
+/* allowed: the term flags the caller's request version accepts (0 for the v1 QUERY). */
+static int term_check(const struct moob_query_term *t, u8 allowed)
 {
 	size_t nlen = strnlen(t->name, sizeof(t->name));
 
-	if (nlen == sizeof(t->name) || !moob_attr_name_ok(t->name, nlen) || t->reserved[0] ||
+	if (nlen == sizeof(t->name) || !moob_attr_name_ok(t->name, nlen) || (t->flags & ~allowed) ||
 	    t->pad[0] || t->pad[1] || t->pad[2])
 		return -EINVAL;
-	if (t->op == MOOB_OP_EXISTS)
-		return (t->type || t->len) ? -EINVAL : 0;
+	if (t->op == MOOB_OP_EXISTS)	/* "exists or missing" would match everything */
+		return (t->type || t->len || t->flags) ? -EINVAL : 0;
 	if (t->op < MOOB_OP_EQ || t->op > MOOB_OP_PREFIX)
 		return -EINVAL;
 	switch (t->type) {
@@ -1071,14 +1105,20 @@ static bool entry_matches(const struct moobl_ix_entry *e, const struct moob_quer
 }
 
 static bool inode_matches_rest(struct moobl_ix_inode *rec, const struct moob_query_term *terms,
-			       u32 nterms)
+			       u32 nterms, struct moobl_ix_name *const *tn)
 {
 	u32 i;
 
 	for (i = 1; i < nterms; i++) {
-		struct moobl_ix_entry *e = entry_find(rec, terms[i].name);
+		struct moobl_ix_entry *e = tn ? entry_find_node(rec, tn[i]) :
+					   entry_find(rec, terms[i].name);
 
-		if (!e || !entry_matches(e, &terms[i]))
+		if (!e) {
+			if (!(terms[i].flags & MOOB_TERM_MISSING_OK))
+				return false;
+			continue;
+		}
+		if (!entry_matches(e, &terms[i]))
 			return false;
 	}
 	return true;
@@ -1086,14 +1126,20 @@ static bool inode_matches_rest(struct moobl_ix_inode *rec, const struct moob_que
 
 /* Ordered scans walk the order attribute: every term is tested on the inode. */
 static bool inode_matches_all(struct moobl_ix_inode *rec, const struct moob_query_term *terms,
-			      u32 nterms)
+			      u32 nterms, struct moobl_ix_name *const *tn)
 {
 	u32 i;
 
 	for (i = 0; i < nterms; i++) {
-		struct moobl_ix_entry *e = entry_find(rec, terms[i].name);
+		struct moobl_ix_entry *e = tn ? entry_find_node(rec, tn[i]) :
+					   entry_find(rec, terms[i].name);
 
-		if (!e || !entry_matches(e, &terms[i]))
+		if (!e) {
+			if (!(terms[i].flags & MOOB_TERM_MISSING_OK))
+				return false;
+			continue;
+		}
+		if (!entry_matches(e, &terms[i]))
 			return false;
 	}
 	return true;
@@ -1164,6 +1210,7 @@ struct moobl_resume {
 	u8 type;
 	u16 len;
 	u64 ino;
+	int lead;		/* equality plan: index into leap_idx of the scanned run; -1: unset */
 	u8 value[MOOB_QUERY_VALUE_MAX];
 };
 
@@ -1308,6 +1355,9 @@ struct moobl_qscope {
 	bool ordered;		/* walk the order_type run of scan; test every term */
 	bool desc;
 	u8 otype;
+	bool leap;		/* intersect the equality terms below by leapfrog (spec §4.4) */
+	u8 nleap;
+	u8 leap_idx[MOOB_QUERY_MAX_TERMS];	/* equality terms; the first one leads */
 };
 
 /* Path relative to the scope: the mount-relative path without its first `strip` names. */
@@ -1320,6 +1370,178 @@ static const char *scope_path(const char *path, unsigned int strip)
 		path++;
 	}
 	return *path ? path : NULL;
+}
+
+/* Records the inode of e as a candidate; with want_key, also e's scan key for the cursor. */
+static int add_candidate(struct moobl_index *ix, struct moobl_ix_entry *e,
+			 const struct moobl_qscope *sc, struct moobl_candidate *c, char *pathbuf,
+			 bool want_key)
+{
+	struct moob_query_result tmp;
+	int err = 0;
+
+	fill_result(ix, e->owner, &tmp, pathbuf);
+	c->ino = tmp.ino;
+	c->path = NULL;
+	c->value = NULL;
+	if (!(tmp.flags & MOOB_RES_PATH_UNKNOWN)) {
+		const char *rel = scope_path(tmp.path, sc->strip);
+
+		if (rel) {
+			c->path = kstrdup(rel, GFP_ATOMIC);
+			if (!c->path)
+				err = -ENOMEM;
+		}
+	}
+	if (want_key) {
+		c->type = e->type;
+		c->len = e->len;
+		c->value = kmalloc(max_t(u16, e->len, 1), GFP_ATOMIC);
+		if (c->value)
+			memcpy(c->value, e->value, e->len);
+		else
+			err = -ENOMEM;
+	}
+	return err;
+}
+
+/* First entry of the equality run of t whose inode is >= ino, or NULL past the run. */
+static struct moobl_ix_entry *seek_eq(struct moobl_ix_name *nm, const struct moob_query_term *t,
+				      u64 ino)
+{
+	struct rb_node *n = nm->entries.rb_node;
+	struct moobl_ix_entry *best = NULL;
+
+	while (n) {
+		struct moobl_ix_entry *e = rb_entry(n, struct moobl_ix_entry, node);
+
+		if (entry_cmp(e, t->type, t->value, t->len, ino) >= 0) {
+			best = e;
+			n = n->rb_left;
+		} else {
+			n = n->rb_right;
+		}
+	}
+	if (!best || best->type != t->type ||
+	    value_cmp(best->type, best->value, best->len, t->type, t->value, t->len))
+		return NULL;
+	return best;
+}
+
+/* True while e is still inside the equality run of t. */
+static bool in_eq_run(const struct moobl_ix_entry *e, const struct moob_query_term *t)
+{
+	return e->type == t->type &&
+	       !value_cmp(e->type, e->value, e->len, t->type, t->value, t->len);
+}
+
+/*
+ * Equality plan (docs/spec-query-v2.md §4.4, revised by journal 0044): inside one value, the
+ * entries of an equality term are ordered by inode. Once per call, the runs of all equality
+ * terms are walked in lockstep from the resume inode until the first one ends: that one is
+ * the shortest, at a cost proportional to it. Then that run alone is scanned and every term is
+ * tested on each inode. Results come in inode order whichever run leads, so a call resumes
+ * after the last inode only. The first implementation (journal 0037) was a leapfrog with one
+ * tree seek per step; on the benchmark host it was 2.7 to 3.6 times slower than scanning a
+ * short run, and only faster when the first term's run was long. Called with the index lock
+ * held for reading.
+ */
+static int leap_collect(struct moobl_index *ix, const struct moobl_qscope *sc,
+			const struct moob_query_term *terms, u32 nterms,
+			struct moobl_resume *resume, struct moobl_candidate *cand, u32 *ncand,
+			u32 cap, char *pathbuf, bool want_key, bool *more)
+{
+	struct moobl_ix_name *nm[MOOB_QUERY_MAX_TERMS];
+	struct moobl_ix_name *tn[MOOB_QUERY_MAX_TERMS];
+	struct rb_node *it[MOOB_QUERY_MAX_TERMS];
+	const struct moob_query_term *lt;
+	struct moobl_ix_entry *e;
+	u64 x = 0;
+	u32 k;
+
+	for (k = 0; k < nterms; k++)
+		tn[k] = name_find(ix, terms[k].name, sc->domain, false);
+
+	if (resume->valid) {
+		if (resume->ino == U64_MAX)
+			return 0;
+		x = resume->ino + 1;
+	}
+	for (k = 0; k < sc->nleap; k++) {
+		nm[k] = name_find(ix, terms[sc->leap_idx[k]].name, sc->domain, false);
+		if (!nm[k])
+			return 0;
+	}
+	if (resume->lead < 0) {
+		for (k = 0; k < sc->nleap; k++) {
+			e = seek_eq(nm[k], &terms[sc->leap_idx[k]], x);
+			if (!e)
+				return 0;	/* an empty run: the intersection is empty */
+			it[k] = &e->node;
+		}
+		while (resume->lead < 0) {
+			for (k = 0; k < sc->nleap; k++) {
+				struct rb_node *n = rb_next(it[k]);
+
+				if (!n || !in_eq_run(rb_entry(n, struct moobl_ix_entry, node),
+						     &terms[sc->leap_idx[k]])) {
+					resume->lead = (int)k;	/* the first run to end */
+					break;
+				}
+				it[k] = n;
+			}
+		}
+	}
+	lt = &terms[sc->leap_idx[resume->lead]];
+	for (e = seek_eq(nm[resume->lead], lt, x); e;) {
+		struct rb_node *n;
+
+		resume->valid = true;
+		resume->type = e->type;
+		resume->len = e->len;
+		resume->ino = e->owner->ino;
+		memcpy(resume->value, e->value, e->len);
+		if (inode_matches_all(e->owner, terms, nterms, tn)) {
+			int err = add_candidate(ix, e, sc, &cand[*ncand], pathbuf, want_key);
+
+			(*ncand)++;
+			if (err)
+				return err;
+			if (*ncand == cap) {
+				*more = true;
+				return 0;
+			}
+		}
+		n = rb_next(&e->node);
+		e = n ? rb_entry(n, struct moobl_ix_entry, node) : NULL;
+		if (e && !in_eq_run(e, lt))
+			e = NULL;
+	}
+	return 0;
+}
+
+/* Copies one candidate to the caller as a result; last gets its scan key (cursor). */
+static int put_result(struct moob_query_result __user *dst, struct moob_query_result *one,
+		      const struct moobl_candidate *c, struct moobl_resume *last)
+{
+	memset(one, 0, sizeof(*one));
+	one->ino = c->ino;
+	if (c->path) {
+		one->path_len = (u32)strlen(c->path);
+		memcpy(one->path, c->path, one->path_len + 1);
+	} else {
+		one->flags = MOOB_RES_PATH_UNKNOWN;
+	}
+	if (copy_to_user(dst, one, sizeof(*one)))
+		return -EFAULT;
+	if (last) {
+		last->valid = true;
+		last->type = c->type;
+		last->len = c->len;
+		last->ino = c->ino;
+		memcpy(last->value, c->value, c->len);
+	}
+	return 0;
 }
 
 /*
@@ -1336,14 +1558,17 @@ static long query_run(struct super_block *sb, struct file *file,
 	struct moob_query_result *one;
 	struct moobl_candidate *cand;
 	struct moobl_resume *resume;
-	struct moob_query_result tmp;
 	char *pathbuf;
+	struct moobl_ix_name *tn_buf[MOOB_QUERY_MAX_TERMS];
+	struct moobl_ix_name **tn = sc->all ? NULL : tn_buf;
 	u32 i, count = 0, truncated = 0;
 	bool exhausted = false;
 	long err = 0;
 
-	/* one result at a time is copied to the caller's array, so the kernel never allocates
-	 * (or zeroes) a limit-sized buffer: the cost is per result, not per requested limit */
+	/*
+	 * one result at a time is copied to the caller's array, so the kernel never allocates
+	 * (or zeroes) a limit-sized buffer: the cost is per result, not per requested limit
+	 */
 	one = kmalloc(sizeof(*one), GFP_KERNEL);
 	cand = kcalloc(MOOBL_QUERY_CHUNK, sizeof(*cand), GFP_KERNEL);
 	resume = kzalloc(sizeof(*resume), GFP_KERNEL);
@@ -1354,16 +1579,37 @@ static long query_run(struct super_block *sb, struct file *file,
 	}
 	if (start)
 		*resume = *start;
+	resume->lead = -1;
 	resume->pdomain = sc->all ? resume->pdomain : sc->domain;
 	if (last)
 		last->valid = false;
 	while (!exhausted && !err) {
 		struct moobl_ix_name *nm;
+		struct moobl_ix_entry *seen = NULL;
 		struct rb_node *n;
 		u32 ncand = 0;
 		bool more = false;
+		/*
+		 * Without per-result checks every candidate is a result, so a chunk needs at most
+		 * the results still missing plus one (that one only sets truncated). Gathering a
+		 * full chunk for a small limit walked far past the answer (journal 0048).
+		 */
+		u32 cap = sc->check ? MOOBL_QUERY_CHUNK :
+			  min_t(u32, MOOBL_QUERY_CHUNK, limit - count + 1);
 
 		down_read(&ix->lock);
+		if (sc->leap) {
+			err = leap_collect(ix, sc, terms, nterms, resume, cand, &ncand, cap, pathbuf,
+					   last != NULL, &more);
+			goto chunk_done;
+		}
+		/*
+		 * QUERY2: candidates all sit in the domain's homogeneous partition, so each term's
+		 * attribute is one name node and entries are matched by pointer, not by strcmp
+		 */
+		if (!sc->all)
+			for (i = 0; i < nterms; i++)
+				tn[i] = name_find(ix, terms[i].name, sc->domain, false);
 		nm = sc->all ? name_lower_bound(ix, sc->scan, resume->pdomain, resume->phetero)
 			     : name_find(ix, sc->scan, sc->domain, false);
 		if (nm && (nm->domain != resume->pdomain || nm->hetero != resume->phetero)) {
@@ -1393,50 +1639,34 @@ static long query_run(struct super_block *sb, struct file *file,
 				resume->pdomain = nm->domain;
 				resume->phetero = nm->hetero;
 				resume->valid = false;
+				seen = NULL;
 				n = seek_first(nm, &terms[0]);
 				continue;
 			}
-			resume->valid = true;
-			resume->type = e->type;
-			resume->len = e->len;
-			resume->ino = e->owner->ino;
-			memcpy(resume->value, e->value, e->len);
+			seen = e;	/* the resume key is copied from it when the chunk ends */
 			n = sc->desc ? rb_prev(n) : rb_next(n);
 			if (sc->ordered)
-				match = inode_matches_all(e->owner, terms, nterms);
+				match = inode_matches_all(e->owner, terms, nterms, tn);
 			else
 				match = entry_matches(e, &terms[0]) &&
-					inode_matches_rest(e->owner, terms, nterms);
+					inode_matches_rest(e->owner, terms, nterms, tn);
 			if (!match)
 				continue;
-			fill_result(ix, e->owner, &tmp, pathbuf);
-			cand[ncand].ino = tmp.ino;
-			cand[ncand].path = NULL;
-			cand[ncand].value = NULL;
-			if (!(tmp.flags & MOOB_RES_PATH_UNKNOWN)) {
-				const char *rel = scope_path(tmp.path, sc->strip);
-
-				if (rel) {
-					cand[ncand].path = kstrdup(rel, GFP_ATOMIC);
-					if (!cand[ncand].path)
-						err = -ENOMEM;
-				}
-			}
-			if (last) {
-				cand[ncand].type = e->type;
-				cand[ncand].len = e->len;
-				cand[ncand].value = kmalloc(max_t(u16, e->len, 1), GFP_ATOMIC);
-				if (cand[ncand].value)
-					memcpy(cand[ncand].value, e->value, e->len);
-				else
-					err = -ENOMEM;
-			}
+			err = add_candidate(ix, e, sc, &cand[ncand], pathbuf, last != NULL);
 			ncand++;
-			if (ncand == MOOBL_QUERY_CHUNK) {
+			if (ncand == cap) {
 				more = true;
 				break;
 			}
 		}
+		if (seen) {
+			resume->valid = true;
+			resume->type = seen->type;
+			resume->len = seen->len;
+			resume->ino = seen->owner->ino;
+			memcpy(resume->value, seen->value, seen->len);
+		}
+chunk_done:
 		if (!more)
 			exhausted = true;
 		up_read(&ix->lock);
@@ -1444,32 +1674,13 @@ static long query_run(struct super_block *sb, struct file *file,
 			bool ok = !err && (!sc->check ||
 					   caller_may_read(file, sb, cand[i].path, cand[i].ino));
 
-			if (ok) {
-				if (count == limit) {
-					truncated = 1;
-					exhausted = true;
-				} else {
-					memset(one, 0, sizeof(*one));
-					one->ino = cand[i].ino;
-					if (cand[i].path) {
-						one->path_len = (u32)strlen(cand[i].path);
-						memcpy(one->path, cand[i].path, one->path_len + 1);
-					} else {
-						one->flags = MOOB_RES_PATH_UNKNOWN;
-					}
-					if (copy_to_user(&uout[count], one, sizeof(*one))) {
-						err = -EFAULT;
-					} else {
-						count++;
-						if (last) {
-							last->valid = true;
-							last->type = cand[i].type;
-							last->len = cand[i].len;
-							last->ino = cand[i].ino;
-							memcpy(last->value, cand[i].value, cand[i].len);
-						}
-					}
-				}
+			if (ok && count == limit) {
+				truncated = 1;
+				exhausted = true;
+			} else if (ok) {
+				err = put_result(&uout[count], one, &cand[i], last);
+				if (!err)
+					count++;
 			}
 			kfree(cand[i].path);
 			cand[i].path = NULL;
@@ -1503,7 +1714,7 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 	long err = 0;
 
 	if (!ix->enabled)
-		return -ENOSYS;
+		return -EOPNOTSUPP;	/* noindex (ENOSYS until journal 0050) */
 	if (ix->domain_depth && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	q = memdup_user(arg, sizeof(*q));
@@ -1516,7 +1727,7 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 		goto out;
 	}
 	for (i = 0; i < q->nterms && !err; i++)
-		err = term_check(&q->terms[i]);
+		err = term_check(&q->terms[i], 0);
 	sc.scan = q->terms[0].name;
 	if (!err)
 		err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, NULL, NULL,
@@ -1622,7 +1833,9 @@ static int cursor_decode(struct moobl_index *ix, const u8 *in, u64 qhash, const 
 	r->type = c.type;
 	r->len = c.len;
 	r->ino = c.ino;
-	if (c.len <= MOOBL_CURSOR_INLINE) {
+	if (sc->leap) {
+		r->len = 0;	/* the equality plan resumes after the inode, whichever run leads */
+	} else if (c.len <= MOOBL_CURSOR_INLINE) {
 		memcpy(r->value, c.value, c.len);
 	} else {
 		struct moobl_ix_inode *rec;
@@ -1673,75 +1886,164 @@ static int order_check(const struct moob_query2 *q)
  * it fall back to them. With order_by the attribute's entries of order_type are walked in
  * the requested direction; a cursor resumes after the last result of a previous call.
  */
-static long do_query2(struct super_block *sb, struct file *file, void __user *arg)
+static long query2_target(struct super_block *sb, struct file *file, u64 *domain,
+			  unsigned int *depth)
+{
+	struct moobl_index *ix = IX(sb);
+
+	if (!ix->enabled || !ix->domain_depth)
+		return -EOPNOTSUPP;	/* noindex (ENOSYS until journal 0050) or domains off */
+	if (!d_is_dir(file->f_path.dentry) ||
+	    !depth_and_domain(ix, file->f_path.dentry, depth, domain) ||
+	    *depth != ix->domain_depth)
+		return -ENOTTY;
+	if (inode_permission(&nop_mnt_idmap, file_inode(file), MAY_EXEC | MAY_READ))
+		return -EACCES;
+	return 0;
+}
+
+static long query2_validate(const struct moob_query2 *q)
+{
+	u32 i, plain = 0;
+	long err;
+
+	if (q->version != MOOB_QUERY2_VERSION || q->nterms > MOOB_QUERY_MAX_TERMS ||
+	    !q->limit || q->limit > MOOB_QUERY_MAX_LIMIT || q->flags ||
+	    !all_zero(q->pad, sizeof(q->pad)) || !all_zero(q->reserved, sizeof(q->reserved)))
+		return -EINVAL;
+	err = order_check(q);
+	for (i = 0; i < q->nterms && !err; i++) {
+		err = term_check(&q->terms[i], MOOB_TERM_MISSING_OK);
+		if (!(q->terms[i].flags & MOOB_TERM_MISSING_OK))
+			plain++;
+	}
+	/* a scan needs one term that only matches carriers of its attribute (spec §4.1) */
+	if (!err && !q->order_by[0] && !plain)
+		err = -EINVAL;
+	return err;
+}
+
+/* Runs a validated request (kernel copy) and fills its count, truncated and cursor. */
+static long query2_exec(struct super_block *sb, struct file *file, struct moob_query2 *q,
+			u64 domain, unsigned int depth)
 {
 	struct moobl_index *ix = IX(sb);
 	struct moobl_qscope sc = { 0 };
 	struct moobl_resume *start = NULL, *last = NULL;
-	struct moob_query2 *q;
-	unsigned int depth;
-	u64 domain, qhash;
+	struct moob_query_term *t = NULL;
+	u64 qhash;
 	u32 i;
-	long err = 0;
+	long err;
 
-	if (!ix->enabled)
-		return -ENOSYS;
-	if (!ix->domain_depth)
-		return -EOPNOTSUPP;
-	if (!d_is_dir(file->f_path.dentry) ||
-	    !depth_and_domain(ix, file->f_path.dentry, &depth, &domain) ||
-	    depth != ix->domain_depth)
-		return -ENOTTY;
-	if (inode_permission(&nop_mnt_idmap, file_inode(file), MAY_EXEC | MAY_READ))
-		return -EACCES;
-	q = memdup_user(arg, sizeof(*q));
-	if (IS_ERR(q))
-		return PTR_ERR(q);
-	if (q->version != MOOB_QUERY2_VERSION || q->nterms > MOOB_QUERY_MAX_TERMS ||
-	    !q->limit || q->limit > MOOB_QUERY_MAX_LIMIT || q->flags ||
-	    !all_zero(q->pad, sizeof(q->pad)) || !all_zero(q->reserved, sizeof(q->reserved))) {
-		err = -EINVAL;
-		goto out;
-	}
-	err = order_check(q);
-	for (i = 0; i < q->nterms && !err; i++)
-		err = term_check(&q->terms[i]);
-	if (err)
-		goto out;
 	sc.domain = domain;
 	sc.strip = depth;
 	sc.check = xa_load(&ix->fallback, (unsigned long)domain) != NULL;
 	sc.ordered = q->order_by[0] != '\0';
 	sc.desc = q->order == MOOB_ORDER_DESC;
 	sc.otype = q->order_type;
-	sc.scan = sc.ordered ? q->order_by : q->terms[0].name;
 	err = query_hash(ix, q, domain, sc.check, &qhash);
 	if (err)
-		goto out;
+		return err;
+	/* execution copy of the terms: a plain scan must lead with a term without MISSING_OK */
+	t = kmemdup(q->terms, sizeof(q->terms), GFP_KERNEL);
 	start = kzalloc(sizeof(*start), GFP_KERNEL);
 	last = kzalloc(sizeof(*last), GFP_KERNEL);
-	if (!start || !last) {
+	if (!t || !start || !last) {
 		err = -ENOMEM;
 		goto out;
+	}
+	if (!sc.ordered && (t[0].flags & MOOB_TERM_MISSING_OK)) {
+		for (i = 1; i < q->nterms; i++)
+			if (!(t[i].flags & MOOB_TERM_MISSING_OK)) {
+				swap(t[0], t[i]);
+				break;
+			}
+	}
+	sc.scan = sc.ordered ? q->order_by : t[0].name;
+	if (!sc.ordered) {
+		for (i = 0; i < q->nterms; i++)
+			if (t[i].op == MOOB_OP_EQ && !(t[i].flags & MOOB_TERM_MISSING_OK))
+				sc.leap_idx[sc.nleap++] = (u8)i;
+		sc.leap = sc.nleap >= 2;
+		if (sc.leap)
+			sc.scan = t[sc.leap_idx[0]].name;	/* cursor key: the lead term */
 	}
 	if (!all_zero(q->cursor, sizeof(q->cursor))) {
 		err = cursor_decode(ix, q->cursor, qhash, sc.scan, &sc, start);
 		if (err)
 			goto out;
 	}
-	err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, start, last,
+	err = query_run(sb, file, t, q->nterms, q->limit, q->results, &sc, start, last,
 			&q->count, &q->truncated);
 	if (err)
 		goto out;
 	memset(q->cursor, 0, sizeof(q->cursor));
 	if (q->truncated && last->valid)
 		cursor_encode(ix, q->cursor, last, qhash);
-	if (copy_to_user(arg, q, sizeof(*q)))
-		err = -EFAULT;
 out:
+	kfree(t);
 	kfree(start);
 	kfree(last);
+	return err;
+}
+
+static long do_query2(struct super_block *sb, struct file *file, void __user *arg)
+{
+	struct moob_query2 *q;
+	unsigned int depth;
+	u64 domain;
+	long err;
+
+	err = query2_target(sb, file, &domain, &depth);
+	if (err)
+		return err;
+	q = memdup_user(arg, sizeof(*q));
+	if (IS_ERR(q))
+		return PTR_ERR(q);
+	err = query2_validate(q);
+	if (!err)
+		err = query2_exec(sb, file, q, domain, depth);
+	if (!err && copy_to_user(arg, q, sizeof(*q)))
+		err = -EFAULT;
 	kfree(q);
+	return err;
+}
+
+/* Several QUERY2 requests on one domain: one permission check, all validated first (§4.3). */
+static long do_query2_batch(struct super_block *sb, struct file *file, void __user *arg)
+{
+	struct moob_query2_batch b;
+	struct moob_query2 *qs;
+	void __user *uq;
+	unsigned int depth;
+	u64 domain;
+	u32 i;
+	long err;
+
+	err = query2_target(sb, file, &domain, &depth);
+	if (err)
+		return err;
+	if (copy_from_user(&b, arg, sizeof(b)))
+		return -EFAULT;
+	if (b.version != MOOB_QUERY2_VERSION || !b.nqueries || b.nqueries > MOOB_QUERY2_BATCH_MAX ||
+	    !all_zero(b.reserved, sizeof(b.reserved)))
+		return -EINVAL;
+	uq = u64_to_user_ptr(b.queries);
+	qs = kvmalloc_array(b.nqueries, sizeof(*qs), GFP_KERNEL);
+	if (!qs)
+		return -ENOMEM;
+	if (copy_from_user(qs, uq, b.nqueries * sizeof(*qs))) {
+		err = -EFAULT;
+		goto out;
+	}
+	for (i = 0; i < b.nqueries && !err; i++)
+		err = query2_validate(&qs[i]);
+	for (i = 0; i < b.nqueries && !err; i++)
+		err = query2_exec(sb, file, &qs[i], domain, depth);
+	if (!err && copy_to_user(uq, qs, b.nqueries * sizeof(*qs)))
+		err = -EFAULT;
+out:
+	kvfree(qs);
 	return err;
 }
 
@@ -1801,6 +2103,8 @@ long moobl_root_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	if (cmd == MOOB_IOC_QUERY2)
 		return do_query2(sb, file, (void __user *)arg);
+	if (cmd == MOOB_IOC_QUERY2_BATCH)
+		return do_query2_batch(sb, file, (void __user *)arg);
 	if (file->f_path.dentry != sb->s_root)
 		return -ENOTTY;
 	switch (cmd) {

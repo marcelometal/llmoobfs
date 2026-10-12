@@ -1,0 +1,9 @@
+kind eq string note
+kind eq string decision score gt int64 500
+namespace eq string ns3 agent eq string a07
+namespace eq string ns1 kind eq string fact created ge time 1760000300000000000
+pinned eq bool 1 score lt int64 500
+kind prefix string de
+score ge int64 250 score le int64 750
+tag1 eq string v00 kind eq string note pinned eq bool 0 score gt int64 100
+weight exists - -

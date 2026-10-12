@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **UAPI change:** with `noindex`, `MOOB_IOC_QUERY` and `MOOB_IOC_QUERY2` return `EOPNOTSUPP`
+  instead of `ENOSYS` (journal 0050). checkpatch is now clean and required in CI; the oracle no
+  longer calls `qsort` on an empty answer; `bench/equiv.sh` checks the oracle's own status;
+  `bench-smoke` runs under ASan and UBSan in CI; `kasan.yml` fails explicitly on failure
+  markers.
+- QUERY2 "N most recent" (journal 0048): without per-result checks a scan chunk gathers only the
+  results still missing plus one, instead of 256 candidates; attributes are matched by name node
+  inside a domain. On the Mac mini the top-20 shapes got 7 to 17 times faster and now beat the
+  SQLite baseline (journal 0047).
+- Phase Q2d (journal 0038): term flag `MOOB_TERM_MISSING_OK` ("missing or ...", the byte
+  formerly `reserved[0]` is now `flags`) and `MOOB_IOC_QUERY2_BATCH` (up to 8 QUERY2 requests on
+  one domain, one permission check, all validated before any runs). Operators ending in `?` in
+  `query`, `moobfs-index` and the bench query files; `query q2batch`.
+- Phase Q2c (journals 0037 and 0044): `QUERY2` without `order_by` and with two or more
+  equality terms finds the shortest of their inode-ordered runs by walking them in lockstep
+  and scans only that one; a first version with leapfrog seeks was measured slower whenever
+  the first term's run was short and was replaced. Test client `--raw` prints the kernel's
+  order. Measurements on the Mac mini host (`bench/q2-campaign.sh`, `bench/q2c-compare.sh`,
+  `bench/results/2026-10-12-macmini-q2/`): QUERY2 answers v1 Q3 24 to 30 times faster and Q4
+  about 7 times faster, with the same inodes.
 - Phase Q2b (journal 0036): `QUERY2` orders by an attribute (`order_by`, `order`,
   `order_type`, ties by inode) and pages with an authenticated 128-byte cursor (`ESTALE` for
   a cursor from another query or mount, corrupt, or issued before a fallback). Oracle

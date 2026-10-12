@@ -1,0 +1,1 @@
+namespace eq string ns1 kind eq string fact created ge time 1760000300000000000

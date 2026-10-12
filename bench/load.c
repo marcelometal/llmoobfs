@@ -369,7 +369,10 @@ static int w3_queries(void)
 				if (q2_order && q2_order_set(&q2)) { result = -EINVAL; t0 = now_ns(); record((int)BENCH_QUERY_OP(i + 1), t0, result); continue; }
 				t0 = now_ns();
 				if (ioctl(fd, MOOB_IOC_QUERY2, &q2)) result = -errno;
-				else result = q2.truncated ? -EOVERFLOW : (int32_t)q2.count;
+				/* a top-N answer (--order or a --limit below the maximum) is truncated by
+				 * design: only a full-limit unordered answer cut short is an overflow */
+				else if (q2.truncated && !q2_order && q2_limit == MOOB_QUERY_MAX_LIMIT) result = -EOVERFLOW;
+				else result = (int32_t)q2.count;
 				record((int)BENCH_QUERY_OP(i + 1), t0, result);
 				continue;
 			}

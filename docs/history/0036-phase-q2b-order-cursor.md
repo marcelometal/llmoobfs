@@ -64,6 +64,15 @@ marcadores anteriores até `MOOBFS_LAYER_PASS`. A suíte passou na primeira exec
 PR da Q2b depois do merge da Q2a. No host de medição: o teste do canal de tempo, o W3 por
 domínio e "N mais recentes". Depois, fase Q2c (interseção por leapfrog).
 
+## Atualização (2026-10-11)
+
+O job `Lint` do pull request 32 falhou: o shellcheck (SC2209) leu a atribuição literal
+`t=time` da suíte como atribuição da saída de um comando. Corrigido com aspas no commit
+`vm: quote a literal assignment...`; o shellcheck 0.10.0 com `--severity=warning` passou
+localmente nos scripts de `vm/` e `scripts/` antes do novo push. O `make lint` local não roda
+dentro do contêiner a partir de uma worktree, porque `git ls-files` não encontra o repositório;
+os arquivos foram passados diretamente.
+
 KASAN e lockdep no CI do pull request 32 (kernel 6.12.112-virtme), execução 38173795652:
 `QUERY2_ORDER_PASS` e `QUERY2_PASS` em ext4, btrfs e XFS e `MOOBFS_LAYER_PASS`, sem relatório.
 A etapa da suíte levou 50 minutos (22 na Q2a), pelo custo das consultas paginadas no kernel
@@ -82,3 +91,11 @@ Atualização posterior (2026-10-12): a exceção acima não chegou a ser usada.
 recebeu também o PR 42 (triagem do CodeQL, com mudanças em `bench/`) e os PRs 43 a 48 do lado DX;
 como a mudança deixou de ser só documentação, a branch foi atualizada com a main final, o
 changelog resolvido mantendo as duas entradas, e o merge espera uma nova execução do KASAN.
+
+Update (2026-10-12, written in English per ADR-0010): KASAN and lockdep run 38256378430 on commit
+`8346648` (Q2b on the final `main`) passed: `QUERY2_ORDER_PASS` and `QUERY2_PASS` on ext4, btrfs
+and XFS, `DEMO_PASS` and `MOOBFS_LAYER_PASS`. The first attempt hit a KASAN report at 1.28 s of
+boot (`wild-memory-access in do_raw_spin_lock`), before the layer module was loaded; the workflow
+classified it as `MOOBFS_VM_ENV_FAIL` and retried once, as designed for the debug kernel under
+emulation (journal 0016). The second attempt loaded the module and ran the whole suite with no
+report. Merged into `main` on 2026-10-12 at 14:24 UTC.

@@ -110,6 +110,9 @@ kernel não promete segurança ao montar imagem hostil.
 - `checkpatch.pl`, `sparse` (`make C=1`) e `smatch` sobre `layer/`; `W=1` no build do módulo.
 - `scripts/kernel-doc` para a UAPI em `include/moobfs_ioctl.h`.
 - Pronto quando: zero avisos ou lista de supressões justificada.
+- Estado (2026-10-12, registro 0050): `checkpatch.pl` com zero avisos em `layer/` e `kernel/`, sem
+  supressões, e obrigatório no job `Lint`. `sparse`, `smatch`, `W=1` e `kernel-doc` continuam
+  pendentes.
 
 ### S6. Processo de divulgação e política de versões
 

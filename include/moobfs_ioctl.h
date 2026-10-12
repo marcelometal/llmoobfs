@@ -40,7 +40,7 @@ struct moob_query_term {
 	char name[MOOB_QUERY_NAME_MAX + 1];	/* NUL-terminated, without "user.moob." */
 	__u8 op;				/* enum moob_query_op */
 	__u8 type;				/* enum moob_attr_type of the value */
-	__u8 reserved[1];
+	__u8 flags;				/* MOOB_TERM_*; QUERY2 only, 0 for QUERY */
 	__u16 len;				/* payload bytes in value[] */
 	__u8 value[MOOB_QUERY_VALUE_MAX];	/* payload without the type byte */
 	__u8 pad[3];
@@ -53,6 +53,9 @@ struct moob_query_result {
 	__u32 path_len;				/* bytes of path actually stored */
 	char path[MOOB_QUERY_PATH_MAX];
 };
+/* Term flag: the term also matches inodes that do not carry the attribute ("missing or ..."). */
+#define MOOB_TERM_MISSING_OK 0x1U
+
 #define MOOB_RES_PATH_UNKNOWN 0x1U		/* no cached name for this inode */
 #define MOOB_RES_PATH_TRUNCATED 0x2U
 
@@ -107,8 +110,9 @@ struct moob_info {
  * the scan order of terms[0]. When truncated is set, cursor holds the position after the last
  * result: sending the same query (any limit) with that cursor continues from there. A cursor
  * that is corrupt, from another query or mount, or issued before the domain fell back to
- * per-result checks gives ESTALE. Per-term flags (terms[i].reserved[0]) are reserved for a
- * later phase and must be zero.
+ * per-result checks gives ESTALE. A term with MOOB_TERM_MISSING_OK also matches inodes
+ * without that attribute (an attribute of another type is not missing); without order_by at
+ * least one term must lack the flag, and EXISTS cannot carry it.
  */
 #define MOOB_QUERY2_VERSION 2U
 #define MOOB_QUERY2_CURSOR 128U
@@ -133,8 +137,24 @@ struct moob_query2 {
 	struct moob_query_term terms[MOOB_QUERY_MAX_TERMS];
 };
 
+/*
+ * Up to MOOB_QUERY2_BATCH_MAX QUERY2 requests on the same domain directory in one call, with
+ * one permission check: each request has its own results array, limit, count, truncated and
+ * cursor. Requests are all validated before any runs; they run in order, each under its own
+ * index lock, so the batch is not a snapshot. Union and deduplication stay with the caller.
+ */
+#define MOOB_QUERY2_BATCH_MAX 8U
+
+struct moob_query2_batch {
+	__u32 version;				/* MOOB_QUERY2_VERSION */
+	__u32 nqueries;				/* 1..MOOB_QUERY2_BATCH_MAX */
+	__u64 queries;				/* user pointer to struct moob_query2[nqueries] */
+	__u64 reserved[2];			/* must be 0 */
+};
+
 #define MOOB_IOC_QUERY _IOWR(MOOB_IOC_MAGIC, 1, struct moob_query)
 #define MOOB_IOC_GET_INFO _IOR(MOOB_IOC_MAGIC, 2, struct moob_info)
 #define MOOB_IOC_QUERY2 _IOWR(MOOB_IOC_MAGIC, 3, struct moob_query2)
+#define MOOB_IOC_QUERY2_BATCH _IOWR(MOOB_IOC_MAGIC, 4, struct moob_query2_batch)
 
 #endif

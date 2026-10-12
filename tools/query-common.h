@@ -45,14 +45,22 @@ static int parse_terms(int argc, char **argv, int from, struct moob_query_term *
 
 	while (from + 4 <= argc) {
 		struct moob_query_term *t = &terms[n];
-		int op = parse_op(argv[from + 1]);
+		char opbuf[16];
+		size_t olen = strlen(argv[from + 1]);
+		int missing = olen > 1 && olen < sizeof opbuf && argv[from + 1][olen - 1] == '?';
+		int op;
 		size_t nlen = strlen(argv[from]);
+
+		/* "gt?" and the like: the term also matches files without the attribute */
+		snprintf(opbuf, sizeof opbuf, "%.*s", (int)(missing ? olen - 1 : olen), argv[from + 1]);
+		op = parse_op(opbuf);
 
 		if (n == (int)MOOB_QUERY_MAX_TERMS || op < 0 || nlen > MOOB_QUERY_NAME_MAX)
 			return -1;
 		memset(t, 0, sizeof *t);
 		memcpy(t->name, argv[from], nlen);
 		t->op = (__u8)op;
+		t->flags = missing ? MOOB_TERM_MISSING_OK : 0;
 		if (op != MOOB_OP_EXISTS) {
 			int type = parse_type(argv[from + 2]);
 			const char *v = argv[from + 3];

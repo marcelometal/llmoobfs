@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Runs the kernel's checkpatch.pl (--no-tree, file mode) over the tracked sources in
 # layer/ and kernel/. The script and its data files come from a fixed stable tag and are
-# verified by SHA-256 before use. Advisory for now: CI reports the result without failing
-# (docs/dx-plan.md, lote 2). Needs curl and perl.
+# verified by SHA-256 before use. Required in CI since journal 0050 (the tree was brought to
+# zero warnings); checkpatch.pl exits 1 on any warning or error. Needs curl and perl.
 set -eu
 cd "$(dirname "$0")/.."
 

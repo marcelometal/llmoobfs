@@ -1,0 +1,2 @@
+kind eq string note
+agent eq string a07

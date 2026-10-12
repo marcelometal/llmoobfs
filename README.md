@@ -170,6 +170,8 @@ as a regression in the same VM.
 | M3 phase 3b: per-result POSIX authorization in `QUERY`; two uids, two namespaces, chmod and ACLs, remount, idmapped and user-namespace mounts refused, 5-second race of chmod/rename/unlink against `QUERY` | [0020](docs/history/0020-phase-3b-query-authorization.md), [spec-m3](docs/spec-m3.md) §3 | Debian 6.12.111 and KASAN 6.12.112; ext4, btrfs, XFS |
 | Phase Q2a: domain-scoped `QUERY2` (UAPI v2) on a domain directory, index partitioned by domain and a homogeneity rule, v1 restricted to administrators while `domain_depth` is on, `EXDEV` for directories across domains; equal to `moobfs-index --domain` (performance and timing-channel test not yet measured) | [0035](docs/history/0035-phase-q2a-domain-query.md), [spec-query-v2](docs/spec-query-v2.md) | Debian 6.12.111; ext4, btrfs, XFS |
 | Phase Q2b: `QUERY2` ordered by an attribute, ascending or descending, and paged by an authenticated cursor; equal to `moobfs-index --domain --order` (not yet measured) | [0036](docs/history/0036-phase-q2b-order-cursor.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Phase Q2c: leapfrog intersection of equality terms in `QUERY2`; equal to the oracle, plan checked by result order (not yet measured) | [0037](docs/history/0037-phase-q2c-leapfrog.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Phase Q2d: "missing or ..." terms and batches of up to 8 `QUERY2` requests per call; equal to the oracle (not yet measured) | [0038](docs/history/0038-phase-q2d-missing-batch.md) | Debian 6.12.111; ext4, btrfs, XFS |
 
 Not implemented: a persistent index, user-namespace or idmapped mounts, batch reads, a change
 cursor, revisions, packaging, a stable UAPI, a CLI, the full xfstests suite, and the M4

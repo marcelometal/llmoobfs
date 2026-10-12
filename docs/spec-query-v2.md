@@ -66,7 +66,7 @@ proposta continua registrada como acima; o comportamento implementado é este:
   nunca aparece a mais).
 - Com `domain_depth=0` a v1 mantém a semântica anterior e continua aberta a todos; a restrição
   a `CAP_SYS_ADMIN` (§4.5) vale quando os domínios estão ligados.
-- `MOOB_IOC_QUERY2` com o índice desligado (`noindex`) devolve `ENOSYS`, como a v1. Campos de
+- `MOOB_IOC_QUERY2` com o índice desligado (`noindex`) devolve `ENOSYS`, como a v1. (Revisão de 2026-10-12, registro 0050: as duas versões passaram a devolver `EOPNOTSUPP`.) Campos de
   `order_by`, `order`, `cursor`, `flags`, preenchimento, reservados e a marca `MISSING_OK` devem
   ser zero nesta fase (`EINVAL`); entram nas fases Q2b e Q2d.
 
@@ -124,6 +124,24 @@ Até 8 consultas v2 sobre o mesmo domínio numa chamada, com resultados concaten
 por consulta. União e remoção de duplicatas ficam com o cliente. Cobre o "ou" entre valores
 (tags, tipos) com uma chamada.
 
+**Implementação Q2d (2026-10-11, registro 0038), diferenças e complementos.**
+
+- O lote leva um vetor de pedidos `moob_query2` completos, cada um com seu vetor de
+  resultados, `limit`, `count`, `truncated` e `cursor`, em vez de um vetor único de resultados
+  concatenados. O cliente que quiser os resultados contíguos aponta os pedidos para fatias de
+  um mesmo vetor. Motivo: cada pedido continua paginável pelo próprio cursor, sem uma regra de
+  divisão do limite entre pedidos.
+- Todos os pedidos são validados antes de qualquer execução; um pedido inválido recusa o lote
+  inteiro com `EINVAL` e nada é escrito de volta. Os pedidos rodam em ordem, cada um sob a sua
+  própria aquisição do lock do índice: o lote não é uma fotografia única.
+- `MOOB_TERM_MISSING_OK` fica no byte de marcas do termo (antes `reserved[0]`, renomeado
+  `flags`). A v1 recusa qualquer marca (`EINVAL`). `EXISTS` com a marca é recusado ("existe ou
+  ausente" casaria tudo). Um atributo presente com outro tipo, inválido ou bruto (`raw`) conta
+  como presente ou ausente conforme o índice: tipo diferente é presente e não casa; inválido e
+  bruto não são indexados e contam como ausentes.
+- Na varredura simples, o kernel conduz pelo primeiro termo sem a marca (numa cópia dos termos;
+  o resumo do cursor usa a ordem do pedido). A interseção usa só termos `EQ` sem a marca.
+
 ### 4.4 Plano de execução no kernel, sem planejador
 
 - Com `order_by`: percorre a árvore do atributo de ordenação na partição, na ordem pedida, e
@@ -132,6 +150,20 @@ por consulta. União e remoção de duplicatas ficam com o cliente. Cobre o "ou"
   alternado (leapfrog) sobre as sequências desses termos, que já estão ordenadas por inode dentro
   de cada valor; os demais termos são testados em cada inode da interseção.
 - Nos outros casos: varredura do primeiro termo sem `MISSING_OK`, como na v1 corrigida.
+
+**Implementação Q2c (2026-10-11, registro 0037).** A interseção vale para o `QUERY2` sem
+`order_by` com dois ou mais termos `EQ`; a v1 continua com a varredura do primeiro termo, para
+servir de base de comparação. O primeiro termo `EQ`, na ordem do pedido, conduz: os resultados
+saem em ordem de inode e o cursor guarda o valor desse termo com o último inode. Cada passo é
+uma busca logarítmica na árvore de cada termo, até todos chegarem ao mesmo inode; os demais
+termos (inclusive os `EQ`, por simplicidade) são testados só nos inodes da interseção.
+
+**Revisão do plano de igualdade (2026-10-12, registro 0044).** Medido no host do registro 0042,
+o avanço alternado só ganhou quando a sequência do primeiro termo era longa e foi 2,7 a 3,6 vezes
+mais lento que a varredura simples quando ela era curta. O plano passou a ser: medir as
+sequências dos termos `EQ` em paralelo até a primeira terminar e varrer só essa, testando todos
+os termos. A retomada desse plano usa só o inode. A proposta original de §4.4 fica registrada
+acima.
 
 ### 4.5 A v1
 

@@ -1,0 +1,115 @@
+multi-fs: 13:47:05 btrfs campaign
+q2-campaign: 13:47:05 W1: 60000 memories, profile 8
+q2-campaign: 13:50:49 rep 1: v1 as root
+q2-campaign: 13:50:52 rep 1: QUERY2 as uid 1001
+q2-campaign: 13:50:52 rep 2: v1 as root
+q2-campaign: 13:50:55 rep 2: QUERY2 as uid 1001
+q2-campaign: 13:50:55 rep 3: v1 as root
+q2-campaign: 13:50:58 rep 3: QUERY2 as uid 1001
+q2-campaign: 13:50:58 equivalence v1 against QUERY2 (inodes)
+EQUIV_V1_V2 q3: 253 inodes
+EQUIV_V1_V2 q4: 1021 inodes
+q2-campaign: 13:50:58 v1 as uid 1001 (domain_depth=0)
+v1-root W3 query:Q1: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q2: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q3: n=50 err=0 results=253 p50=3503.7us p99=3616.3us
+v1-root W3 query:Q4: n=50 err=0 results=1021 p50=4318.4us p99=4467.4us INCONCLUSIVE
+v1-root W3 query:Q5: n=50 err=0 results=2926 p50=6618.5us p99=6808.0us INCONCLUSIVE
+v1-root W3 query:Q6: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q7: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q8: n=50 err=0 results=0 p50=10.7us p99=11.6us
+v1-root W3 query:Q9: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q1: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q2: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q3: n=50 err=0 results=253 p50=3712.9us p99=3964.1us
+v1-user W3 query:Q4: n=50 err=0 results=1021 p50=4350.3us p99=4754.3us
+v1-user W3 query:Q5: n=50 err=0 results=2926 p50=6928.4us p99=7381.1us
+v1-user W3 query:Q6: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q7: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q8: n=50 err=0 results=0 p50=10.1us p99=10.6us
+v1-user W3 query:Q9: n=0 err=50 p50=-us p99=-us
+v2-ns1 W3 query:Q1: n=50 err=0 results=1021 p50=683.8us p99=1213.4us INCONCLUSIVE
+v2-ns3 W3 query:Q1: n=50 err=0 results=253 p50=144.8us p99=490.2us INCONCLUSIVE
+v2-ns3 W3 query:Q2: n=50 err=0 results=253 p50=110.2us p99=284.1us
+v2-ns3 W3 query:Q3: n=50 err=0 results=3030 p50=984.1us p99=2011.4us INCONCLUSIVE
+v2-recent W3 query:Q1: n=50 err=0 results=20 p50=24.1us p99=35.6us INCONCLUSIVE
+v2-recent W3 query:Q2: n=50 err=0 results=20 p50=121.5us p99=243.2us INCONCLUSIVE
+Q2_CAMPAIGN_PASS: report in /home/debian/results/q2-campaign-btrfs-2026-10-12/report
+multi-fs: 13:51:09 btrfs sqlite
+sqlite-baseline: 13:51:09 load
+wal
+sqlite-baseline: 13:51:13 rep 1
+sqlite-baseline: 13:51:21 rep 2
+sqlite-baseline: 13:51:29 rep 3
+sqlite W3 query:Q1: n=50 err=0 results=24595 p50=45203.2us p99=50192.2us
+sqlite W3 query:Q10: n=50 err=0 results=98 p50=518.5us p99=544.5us
+sqlite W3 query:Q11: n=50 err=0 results=253 p50=177.6us p99=199.8us
+sqlite W3 query:Q12: n=50 err=0 results=20 p50=47.0us p99=53.9us
+sqlite W3 query:Q13: n=50 err=0 results=20 p50=272.9us p99=304.7us
+sqlite W3 query:Q2: n=50 err=0 results=6121 p50=11319.8us p99=11621.5us
+sqlite W3 query:Q3: n=50 err=0 results=253 p50=474.0us p99=524.9us
+sqlite W3 query:Q4: n=50 err=0 results=1021 p50=1719.2us p99=1756.7us
+sqlite W3 query:Q5: n=50 err=0 results=2926 p50=5463.4us p99=5682.6us
+sqlite W3 query:Q6: n=50 err=0 results=12158 p50=22438.5us p99=24150.0us
+sqlite W3 query:Q7: n=50 err=0 results=30170 p50=54694.1us p99=55867.1us
+sqlite W3 query:Q8: n=50 err=0 results=0 p50=94.7us p99=104.4us
+sqlite W3 query:Q9: n=50 err=0 results=17882 p50=8678.6us p99=8741.1us
+SQLITE_BASELINE_DONE: report in /home/debian/results/sqlite-baseline-btrfs-2026-10-12/report
+multi-fs: 13:51:36 xfs campaign
+q2-campaign: 13:51:36 W1: 60000 memories, profile 8
+q2-campaign: 13:54:50 rep 1: v1 as root
+q2-campaign: 13:54:52 rep 1: QUERY2 as uid 1001
+q2-campaign: 13:54:53 rep 2: v1 as root
+q2-campaign: 13:54:55 rep 2: QUERY2 as uid 1001
+q2-campaign: 13:54:55 rep 3: v1 as root
+q2-campaign: 13:54:58 rep 3: QUERY2 as uid 1001
+q2-campaign: 13:54:58 equivalence v1 against QUERY2 (inodes)
+EQUIV_V1_V2 q3: 253 inodes
+EQUIV_V1_V2 q4: 1021 inodes
+q2-campaign: 13:54:58 v1 as uid 1001 (domain_depth=0)
+v1-root W3 query:Q1: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q2: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q3: n=50 err=0 results=253 p50=2661.8us p99=2869.2us
+v1-root W3 query:Q4: n=50 err=0 results=1021 p50=3281.3us p99=3449.4us INCONCLUSIVE
+v1-root W3 query:Q5: n=50 err=0 results=2926 p50=6156.9us p99=6434.9us INCONCLUSIVE
+v1-root W3 query:Q6: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q7: n=0 err=50 p50=-us p99=-us
+v1-root W3 query:Q8: n=50 err=0 results=0 p50=11.1us p99=11.8us INCONCLUSIVE
+v1-root W3 query:Q9: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q1: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q2: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q3: n=50 err=0 results=253 p50=2747.2us p99=2987.4us
+v1-user W3 query:Q4: n=50 err=0 results=1021 p50=3321.9us p99=3566.1us INCONCLUSIVE
+v1-user W3 query:Q5: n=50 err=0 results=2926 p50=6363.0us p99=6676.3us INCONCLUSIVE
+v1-user W3 query:Q6: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q7: n=0 err=50 p50=-us p99=-us
+v1-user W3 query:Q8: n=50 err=0 results=0 p50=10.3us p99=11.2us INCONCLUSIVE
+v1-user W3 query:Q9: n=0 err=50 p50=-us p99=-us
+v2-ns1 W3 query:Q1: n=50 err=0 results=1021 p50=697.1us p99=1610.6us INCONCLUSIVE
+v2-ns3 W3 query:Q1: n=50 err=0 results=253 p50=145.1us p99=431.3us
+v2-ns3 W3 query:Q2: n=50 err=0 results=253 p50=109.6us p99=268.9us
+v2-ns3 W3 query:Q3: n=50 err=0 results=3030 p50=957.0us p99=2421.1us INCONCLUSIVE
+v2-recent W3 query:Q1: n=50 err=0 results=20 p50=17.1us p99=29.2us INCONCLUSIVE
+v2-recent W3 query:Q2: n=50 err=0 results=20 p50=89.9us p99=227.2us INCONCLUSIVE
+Q2_CAMPAIGN_PASS: report in /home/debian/results/q2-campaign-xfs-2026-10-12/report
+multi-fs: 13:55:08 xfs sqlite
+sqlite-baseline: 13:55:08 load
+wal
+sqlite-baseline: 13:55:12 rep 1
+sqlite-baseline: 13:55:20 rep 2
+sqlite-baseline: 13:55:28 rep 3
+sqlite W3 query:Q1: n=50 err=0 results=24595 p50=47294.7us p99=51454.3us
+sqlite W3 query:Q10: n=50 err=0 results=98 p50=486.8us p99=517.5us
+sqlite W3 query:Q11: n=50 err=0 results=253 p50=171.5us p99=189.9us
+sqlite W3 query:Q12: n=50 err=0 results=20 p50=67.6us p99=69.2us
+sqlite W3 query:Q13: n=50 err=0 results=20 p50=277.9us p99=296.8us
+sqlite W3 query:Q2: n=50 err=0 results=6121 p50=11934.6us p99=12266.4us
+sqlite W3 query:Q3: n=50 err=0 results=253 p50=407.2us p99=434.3us
+sqlite W3 query:Q4: n=50 err=0 results=1021 p50=1867.3us p99=1935.3us
+sqlite W3 query:Q5: n=50 err=0 results=2926 p50=5707.6us p99=5817.0us
+sqlite W3 query:Q6: n=50 err=0 results=12158 p50=23589.5us p99=24532.7us
+sqlite W3 query:Q7: n=50 err=0 results=30170 p50=56666.9us p99=58489.5us
+sqlite W3 query:Q8: n=50 err=0 results=0 p50=96.1us p99=101.7us
+sqlite W3 query:Q9: n=50 err=0 results=17882 p50=9040.5us p99=9326.6us
+SQLITE_BASELINE_DONE: report in /home/debian/results/sqlite-baseline-xfs-2026-10-12/report
+MULTI_FS_DONE
