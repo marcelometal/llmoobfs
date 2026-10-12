@@ -282,6 +282,20 @@ static struct moobl_ix_entry *entry_find(struct moobl_ix_inode *rec, const char 
 	return NULL;
 }
 
+/* The entry of rec under one name node of rec's partition (NULL node: none carries it). */
+static struct moobl_ix_entry *entry_find_node(struct moobl_ix_inode *rec,
+					      const struct moobl_ix_name *nm)
+{
+	struct moobl_ix_entry *e;
+
+	if (!nm)
+		return NULL;
+	list_for_each_entry(e, &rec->entries, by_ino)
+		if (e->name == nm)
+			return e;
+	return NULL;
+}
+
 static void entry_link(struct moobl_ix_name *nm, struct moobl_ix_entry *e, u64 ino)
 {
 	struct rb_node **p = &nm->entries.rb_node, *parent = NULL;
@@ -1073,12 +1087,13 @@ static bool entry_matches(const struct moobl_ix_entry *e, const struct moob_quer
 }
 
 static bool inode_matches_rest(struct moobl_ix_inode *rec, const struct moob_query_term *terms,
-			       u32 nterms)
+			       u32 nterms, struct moobl_ix_name *const *tn)
 {
 	u32 i;
 
 	for (i = 1; i < nterms; i++) {
-		struct moobl_ix_entry *e = entry_find(rec, terms[i].name);
+		struct moobl_ix_entry *e = tn ? entry_find_node(rec, tn[i]) :
+					   entry_find(rec, terms[i].name);
 
 		if (!e) {
 			if (!(terms[i].flags & MOOB_TERM_MISSING_OK))
@@ -1093,12 +1108,13 @@ static bool inode_matches_rest(struct moobl_ix_inode *rec, const struct moob_que
 
 /* Ordered scans walk the order attribute: every term is tested on the inode. */
 static bool inode_matches_all(struct moobl_ix_inode *rec, const struct moob_query_term *terms,
-			      u32 nterms)
+			      u32 nterms, struct moobl_ix_name *const *tn)
 {
 	u32 i;
 
 	for (i = 0; i < nterms; i++) {
-		struct moobl_ix_entry *e = entry_find(rec, terms[i].name);
+		struct moobl_ix_entry *e = tn ? entry_find_node(rec, tn[i]) :
+					   entry_find(rec, terms[i].name);
 
 		if (!e) {
 			if (!(terms[i].flags & MOOB_TERM_MISSING_OK))
@@ -1415,14 +1431,18 @@ static bool in_eq_run(const struct moobl_ix_entry *e, const struct moob_query_te
 static int leap_collect(struct moobl_index *ix, const struct moobl_qscope *sc,
 			const struct moob_query_term *terms, u32 nterms,
 			struct moobl_resume *resume, struct moobl_candidate *cand, u32 *ncand,
-			char *pathbuf, bool want_key, bool *more)
+			u32 cap, char *pathbuf, bool want_key, bool *more)
 {
 	struct moobl_ix_name *nm[MOOB_QUERY_MAX_TERMS];
+	struct moobl_ix_name *tn[MOOB_QUERY_MAX_TERMS];
 	struct rb_node *it[MOOB_QUERY_MAX_TERMS];
 	const struct moob_query_term *lt;
 	struct moobl_ix_entry *e;
 	u64 x = 0;
 	u32 k;
+
+	for (k = 0; k < nterms; k++)
+		tn[k] = name_find(ix, terms[k].name, sc->domain, false);
 
 	if (resume->valid) {
 		if (resume->ino == U64_MAX)
@@ -1463,13 +1483,13 @@ static int leap_collect(struct moobl_index *ix, const struct moobl_qscope *sc,
 		resume->len = e->len;
 		resume->ino = e->owner->ino;
 		memcpy(resume->value, e->value, e->len);
-		if (inode_matches_all(e->owner, terms, nterms)) {
+		if (inode_matches_all(e->owner, terms, nterms, tn)) {
 			int err = add_candidate(ix, e, sc, &cand[*ncand], pathbuf, want_key);
 
 			(*ncand)++;
 			if (err)
 				return err;
-			if (*ncand == MOOBL_QUERY_CHUNK) {
+			if (*ncand == cap) {
 				*more = true;
 				return 0;
 			}
@@ -1497,6 +1517,8 @@ static long query_run(struct super_block *sb, struct file *file,
 	struct moobl_candidate *cand;
 	struct moobl_resume *resume;
 	char *pathbuf;
+	struct moobl_ix_name *tn_buf[MOOB_QUERY_MAX_TERMS];
+	struct moobl_ix_name **tn = sc->all ? NULL : tn_buf;
 	u32 i, count = 0, truncated = 0;
 	bool exhausted = false;
 	long err = 0;
@@ -1519,16 +1541,29 @@ static long query_run(struct super_block *sb, struct file *file,
 		last->valid = false;
 	while (!exhausted && !err) {
 		struct moobl_ix_name *nm;
+		struct moobl_ix_entry *seen = NULL;
 		struct rb_node *n;
 		u32 ncand = 0;
 		bool more = false;
+		/*
+		 * Without per-result checks every candidate is a result, so a chunk needs at most
+		 * the results still missing plus one (that one only sets truncated). Gathering a
+		 * full chunk for a small limit walked far past the answer (journal 0048).
+		 */
+		u32 cap = sc->check ? MOOBL_QUERY_CHUNK :
+			  min_t(u32, MOOBL_QUERY_CHUNK, limit - count + 1);
 
 		down_read(&ix->lock);
 		if (sc->leap) {
-			err = leap_collect(ix, sc, terms, nterms, resume, cand, &ncand, pathbuf,
+			err = leap_collect(ix, sc, terms, nterms, resume, cand, &ncand, cap, pathbuf,
 					   last != NULL, &more);
 			goto chunk_done;
 		}
+		/* QUERY2: candidates all sit in the domain's homogeneous partition, so each term's
+		 * attribute is one name node and entries are matched by pointer, not by strcmp */
+		if (!sc->all)
+			for (i = 0; i < nterms; i++)
+				tn[i] = name_find(ix, terms[i].name, sc->domain, false);
 		nm = sc->all ? name_lower_bound(ix, sc->scan, resume->pdomain, resume->phetero)
 			     : name_find(ix, sc->scan, sc->domain, false);
 		if (nm && (nm->domain != resume->pdomain || nm->hetero != resume->phetero)) {
@@ -1558,28 +1593,32 @@ static long query_run(struct super_block *sb, struct file *file,
 				resume->pdomain = nm->domain;
 				resume->phetero = nm->hetero;
 				resume->valid = false;
+				seen = NULL;
 				n = seek_first(nm, &terms[0]);
 				continue;
 			}
-			resume->valid = true;
-			resume->type = e->type;
-			resume->len = e->len;
-			resume->ino = e->owner->ino;
-			memcpy(resume->value, e->value, e->len);
+			seen = e;	/* the resume key is copied from it when the chunk ends */
 			n = sc->desc ? rb_prev(n) : rb_next(n);
 			if (sc->ordered)
-				match = inode_matches_all(e->owner, terms, nterms);
+				match = inode_matches_all(e->owner, terms, nterms, tn);
 			else
 				match = entry_matches(e, &terms[0]) &&
-					inode_matches_rest(e->owner, terms, nterms);
+					inode_matches_rest(e->owner, terms, nterms, tn);
 			if (!match)
 				continue;
 			err = add_candidate(ix, e, sc, &cand[ncand], pathbuf, last != NULL);
 			ncand++;
-			if (ncand == MOOBL_QUERY_CHUNK) {
+			if (ncand == cap) {
 				more = true;
 				break;
 			}
+		}
+		if (seen) {
+			resume->valid = true;
+			resume->type = seen->type;
+			resume->len = seen->len;
+			resume->ino = seen->owner->ino;
+			memcpy(resume->value, seen->value, seen->len);
 		}
 chunk_done:
 		if (!more)
