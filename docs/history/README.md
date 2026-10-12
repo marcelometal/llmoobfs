@@ -60,3 +60,4 @@ Preservação depende de commits e cópias: nenhum disco ou serviço garante ret
 - [0043 — Canal de tempo: `QUERY2` por domínio contra a v1 (teste 4 da especificação)](0043-timing-channel-query2.md)
 - [0044 — `QUERY2` medido contra a v1 e revisão do plano de igualdade da Q2c](0044-q2-measured-equality-plan.md)
 - [0047 — `QUERY2` contra o SQLite no mesmo hardware](0047-sqlite-baseline-macmini.md)
+- [0048 — Otimização do "N mais recentes" no `QUERY2`](0048-recent-optimization.md)

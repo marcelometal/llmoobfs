@@ -93,3 +93,10 @@ revisado, cada um carregado duas vezes (`Q2C_COMPARE_PASS`).
 - Ruído de até cerca de 25% entre passadas no mesmo host para valores de dezenas de µs.
 - A comparação entre planos é sobre um conjunto sem agrupamento; em dados agrupados por inode o
   avanço alternado poderia ganhar, e isso não foi medido.
+
+## Nota de correção (2026-10-12)
+
+A explicação do custo do "N mais recentes" acima (cerca de 600 entradas a cerca de 2,8 µs por
+entrada, atribuída à busca do atributo na lista do inode) estava errada. A causa principal era a
+varredura juntar 256 candidatos mesmo para um pedido de 20, o que percorria cerca de 7 500
+entradas a cerca de 0,23 µs. Diagnóstico, correção e novas medições no registro 0048.

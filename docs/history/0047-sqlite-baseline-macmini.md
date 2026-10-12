@@ -62,3 +62,10 @@ A comparação justa fica entre os dois extremos.
 
 Otimizar o teste de termos por inode (o gargalo do "N mais recentes") e medir de novo; medir a
 paginação completa de uma forma ampla; repetir em btrfs e XFS.
+
+## Nota de correção (2026-10-12)
+
+A explicação do custo do "N mais recentes" acima (cerca de 600 entradas a cerca de 2,8 µs por
+entrada, atribuída à busca do atributo na lista do inode) estava errada. A causa principal era a
+varredura juntar 256 candidatos mesmo para um pedido de 20, o que percorria cerca de 7 500
+entradas a cerca de 0,23 µs. Diagnóstico, correção e novas medições no registro 0048.

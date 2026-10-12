@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- QUERY2 "N most recent" (journal 0048): without per-result checks a scan chunk gathers only the
+  results still missing plus one, instead of 256 candidates; attributes are matched by name node
+  inside a domain. On the Mac mini the top-20 shapes got 7 to 17 times faster and now beat the
+  SQLite baseline (journal 0047).
 - Phase Q2d (journal 0038): term flag `MOOB_TERM_MISSING_OK` ("missing or ...", the byte
   formerly `reserved[0]` is now `flags`) and `MOOB_IOC_QUERY2_BATCH` (up to 8 QUERY2 requests on
   one domain, one permission check, all validated before any runs). Operators ending in `?` in
