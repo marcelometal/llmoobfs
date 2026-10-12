@@ -81,6 +81,8 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0051 — The repository moves to English (ADR-0010)](0051-english-everywhere.md)
 - [0052 — Phase Q2e: QUERY2 under concurrency (spec test 8)](0052-phase-q2e-concurrency.md)
 - [0053 — Verified references](0053-references.md)
+- [0054 — Plan for a test with a real memory client](0054-real-client-plan.md)
+- [0055 — Measurement gaps: cold cache, mount time and write cost](0055-measurement-gaps.md)
 - [0056 — Static analysis: sparse and W=1 on both kernel modules](0056-sparse-w1.md)
 - [0057 — Bug: renaming a file over a just-deleted name failed with EINVAL](0057-rename-over-deleted-name.md)
 - [0058 — The KASAN job runs locally on a KVM host](0058-kasan-local.md)
