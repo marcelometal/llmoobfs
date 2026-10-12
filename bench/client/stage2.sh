@@ -5,13 +5,17 @@
 # a real `ai-memory serve` (zero-LLM) under umask 077 (private memory: directories 0700, files 0600,
 # which satisfies the homogeneity rule), writes the W-AIM workload through its MCP tool, stops the
 # server, mirrors the structured fields into user.moob.* and compares six query shapes between its
-# SQLite and QUERY2. Run as root.
+# SQLite and QUERY2: answers (aimem-compare.py) and, when the bench-aimem-latency binary is there,
+# latency warm and cold (REPEAT and COLD samples per project and shape; MAX_PROJECTS limits the
+# projects measured, 0 for all). Run as root.
 #   stage2.sh OUT PROJECTS PAGES_PER_PROJECT
 set -eu
 OUT=$1; PROJECTS=$2; PAGES=$3
 HERE=$(cd "$(dirname "$0")" && pwd)
 AIM_BIN=${AIM_BIN:-/home/debian/clients/ai-memory/target/release/ai-memory}
 QUERY=${QUERY:-/opt/moob-test/query}
+LATENCY=${LATENCY:-/opt/moob-test/bench-aimem-latency}
+REPEAT=${REPEAT:-200}; COLD=${COLD:-10}; MAX_PROJECTS=${MAX_PROJECTS:-0}
 USER_NAME=${USER_NAME:-debian}
 BASE=${BASE:-/srv/moob/ext4/aim2}
 PORT=${PORT:-47321}
@@ -40,3 +44,5 @@ find "$BASE/data/wiki" -name '*.md' -path '*/*/*/*' | head -3 | xargs -r stat -c
 python3 -I "$HERE/aimem-mirror.py" --db "$BASE/data/db/memory.sqlite" --wiki "$BASE/data/wiki" --out "$OUT/mirror.csv" | tee "$OUT/mirror.txt"
 "$QUERY" "$BASE/data/wiki" info > "$OUT/info.txt" 2>&1 || true
 python3 -I "$HERE/aimem-compare.py" --db "$BASE/data/db/memory.sqlite" --wiki "$BASE/data/wiki" --query "$QUERY" | tee "$OUT/compare.txt"
+[ ! -x "$LATENCY" ] || "$LATENCY" --db "$BASE/data/db/memory.sqlite" --wiki "$BASE/data/wiki" --out "$OUT/latency.csv" \
+    --repeat "$REPEAT" --cold "$COLD" --max-projects "$MAX_PROJECTS" | tee "$OUT/latency.txt"

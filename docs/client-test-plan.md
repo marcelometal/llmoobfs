@@ -101,3 +101,19 @@ Decisions:
 Done when: equal answers on every shape and scale, latencies, and the mirror's cost reported,
 including the shapes where `QUERY2` loses.
 
+### Results so far (2026-10-12, journals 0064 and 0065)
+
+Tools written (`bench/client/`); measured at 150 and 1 905 pages, one run each. Answers are equal
+on every shape. Warm latency: `QUERY2` wins on `pinned`, `rules` and `settled`, is equal on
+`recent` and `stale` and **loses on `incremental`**. Cold, both sides are dominated by the open.
+
+Two facts about the client change how the scales must run, and replace the estimate of one hour
+for 60 000 pages:
+
+- its scheduled maintenance (lint and forget sweep, 60 s after start) deletes expired pages and
+  adds its own pages while the workload is written;
+- its write cost grows with the store (75 to 221 ms per page over 2 000 pages).
+
+Still open: the scales up to 60 000 pages, the live sidecar and the mirror's cost against what
+ai-memory spends on SQLite.
+

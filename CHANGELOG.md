@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Real-client test, stage 2 (journals 0063 to 0065): ai-memory's structured queries against `QUERY2`
+  with projects as domains. Tools in `bench/client/` (workload through its MCP, mirror, comparator)
+  and `bench-aimem-latency`, which runs the six shapes on SQLite and on `QUERY2` in one process,
+  warm and cold. At 150 and 1 905 pages every answer is equal; warm, `QUERY2` is 1.6 to 5.8 times
+  faster on the filtered shapes, equal on two and slower on the incremental traversal (0.74 to
+  0.86). Small scales, one run each.
 - **UAPI change** (journal 0061, ADR-0011 F1): `GET_INFO` fills the index counters only for
   `CAP_SYS_ADMIN`, flagged by the new `MOOB_FLAG_COUNTERS`; other callers get zeros, because the
   counters sum every user's memories.
