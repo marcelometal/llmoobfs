@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `vm/kasan-local.sh` (journal 0058): the KASAN/lockdep job on a local KVM host, with the kernel
+  built once and cached; 17.5 minutes per run on the benchmark host against about an hour in CI.
 - `docs/references.md` (journal 0053): verified list of the papers, projects and tools MoobFS builds
   on, includes, compares against or used to decide; five citation and license errors corrected in
   the research documents, the fsx notice and `docs/ecosystem.md`.

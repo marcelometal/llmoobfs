@@ -148,6 +148,14 @@ on pull requests that touch `layer/`, `vm/` or the workflow, weekly on Monday,
 and on demand with `gh workflow run kasan.yml --ref <branch>`. For `layer/` or
 `vm/` changes the PR must link a green run on the final revision.
 
+On a Linux host with KVM, `sh vm/kasan-local.sh` runs the same job: the same pinned kernel
+(checked against the SHA-256 in the workflow), `vm/kasan.config`, test binaries and
+`vm/kasan-guest.sh`. It builds the kernel once into `~/.cache/moobfs-kasan` (rebuilt only when
+`vm/kasan.config` changes), so later runs cost only the module, the tests and the suite. It
+needs the packages of the workflow's install step, virtme-ng from `vm/kasan-requirements.txt`
+(a virtualenv is fine) and membership in the `kvm` group. A local pass is a faster development
+loop; the workflow on the pull request stays the required check.
+
 ## 7. Adding a lower filesystem
 
 Each new lower filesystem widens the tested matrix and needs a journal entry; it
