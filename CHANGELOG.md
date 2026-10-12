@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- ADR-0011 (proposed; journal 0060): threat and credential model of the layer (security roadmap S1),
+  with two findings: `GET_INFO` counters cross users (F1) and one index budget for all users (F2).
+- `ROADMAP.md` brought up to date, planned items in the agreed order (journal 0059).
 - `vm/kasan-local.sh` (journal 0058): the KASAN/lockdep job on a local KVM host, with the kernel
   built once and cached; 17.5 minutes per run on the benchmark host against about an hour in CI.
 - `docs/references.md` (journal 0053): verified list of the papers, projects and tools MoobFS builds

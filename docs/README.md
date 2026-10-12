@@ -37,12 +37,13 @@ accepted but may be only partly implemented, and only the journals and
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0010, with alternatives and reasons |
+| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0011, with alternatives and reasons |
 | [history/](history/README.md) | EN | Technical journal: one entry per piece of work, with evidence and limitations |
 
 Key decisions for newcomers: [ADR-0007](decisions/0007-stacked-memory-layer.md) (a stacked layer
 over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-space-index.md)
-(the in-kernel index partitioned by permission domain).
+(the in-kernel index partitioned by permission domain); for security,
+[ADR-0011](decisions/0011-threat-and-credential-model.md) (threat and credential model, proposed).
 
 ## Benchmarks (M4)
 
