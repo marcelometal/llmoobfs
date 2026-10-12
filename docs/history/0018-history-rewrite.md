@@ -46,3 +46,13 @@ Sequence executed by the user (the assistant prepared it in `build/publish-rewri
 temporarily remove the protection of `main`, force-push the rewritten clone, recreate the
 protection with the configuration saved in `build/protection-before.json`, and realign the
 local checkout.
+
+## Update (2026-10-12)
+
+The branch `docs/llm-memory-context` still carried the seven commits from before the rewrite, with
+the personal address in their author and committer fields; it was the only remote branch with no
+common ancestor with `main`. With the maintainer's authorization it was deleted, after a local
+`git bundle` copy was made outside the repository. The read-only ref `refs/pull/1/head` of the merged
+pull request 1 still points to those commits and cannot be removed by the owner, so the maintainer
+asked GitHub Support to remove the commits and their cached views. No other pull request ref
+carries them (all `refs/pull/*/head` checked).
