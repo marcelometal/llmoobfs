@@ -9,7 +9,7 @@ indicators of activity, not of quality. Nothing here has been run or integrated 
 
 | Project | License | Activity | Use for MoobFS |
 | --- | --- | --- | --- |
-| [virtme-ng](https://github.com/arighi/virtme-ng) | GPL-2.0 | active (2026-10) | Boots a freshly compiled kernel in QEMU using the host system as a copy-on-write root. Replaces part of our harness in `vm/` for fast iterations with our own kernel compiled with `CONFIG_KASAN` and `CONFIG_PROVE_LOCKING`. |
+| [virtme-ng](https://github.com/arighi/virtme-ng) | GPL-2.0-only | active (2026-10) | Boots a freshly compiled kernel in QEMU using the host system as a copy-on-write root. Replaces part of our harness in `vm/` for fast iterations with our own kernel compiled with `CONFIG_KASAN` and `CONFIG_PROVE_LOCKING`. |
 | [syzkaller](https://github.com/google/syzkaller) | Apache-2.0 | active | Syscall fuzzer with a `syz-mount-image` mode for filesystem images. Heavy, but it is the reference for continuous fuzzing. |
 | [LTP](https://github.com/linux-test-project/ltp) | GPL-2.0 | active | POSIX syscall tests over a mount; useful once there is write support. |
 
@@ -32,7 +32,7 @@ with `syz-mount-image` later; Janus/Hydra only as reading.
 | Project | License | Activity | Use |
 | --- | --- | --- | --- |
 | `dm-log-writes` (kernel ≥ 4.1) | GPL-2.0 | in-tree | Records and replays block writes with FUA marks; allows restoring the volume to any point and checking recovery. It is the kernel's standard mechanism. |
-| [xfstests](https://github.com/kdave/xfstests) (`generic/45x`, `generic/482`) | GPL-2.0 | active | Regression suite used by all in-tree filesystems. The crash tests use `dm-log-writes`. Being runnable under xfstests is a reasonable maturity criterion for M2. |
+| [xfstests](https://git.kernel.org/pub/scm/fs/xfs/xfstests-dev.git) (`generic/45x`, `generic/482`) | GPL-2.0 | active | Regression suite used by all in-tree filesystems. The crash tests use `dm-log-writes`. Being runnable under xfstests is a reasonable maturity criterion for M2. |
 | [CrashMonkey/ACE](https://github.com/utsaslab/crashmonkey) | Apache-2.0 | stalled since 2022 | Systematic workload generation and crash-consistency checking (OSDI 2018). Relevant method; the code needs adapting to current kernels. |
 | `dm-flakey` | GPL-2.0 | in-tree | I/O fault injection. |
 
@@ -70,7 +70,7 @@ a PDF; the link at nobius.org answered 406 to automated access and was not verif
 
 ## 6. Memory layer for agents (M4)
 
-All of the below are Apache-2.0, Python, active as of 2026-10. They are candidates to be
+All of the below were active as of 2026-10; their license is Apache-2.0 unless the row says otherwise. They are candidates to be
 **clients** of MoobFS, not competitors: they handle semantic selection and context assembly,
 which ADR-0005 keeps out of the kernel.
 
@@ -81,7 +81,7 @@ which ADR-0005 keeps out of the kernel.
 | [Graphiti](https://github.com/getzep/graphiti) | Temporal knowledge graph (Zep team) | Facts with temporal validity map well onto revisions + the `time` attribute. |
 | [cognee](https://github.com/topoteretes/cognee) | Ingestion of varied documents into a queryable graph | Same; client. |
 | [letta-code](https://github.com/letta-ai/letta-code) (Apache-2.0) | Coding agent memory in files, with git | Client and realistic workload for M4; reference for organizing memory in directories. |
-| [Agent VFS](https://github.com/johannesmichalke/agent-vfs) | User-space virtual filesystem with database persistence | Interface reference for agents; it is neither a kernel module nor a competitor to the layer. |
+| [Agent VFS](https://github.com/johannesmichalke/agent-vfs) (MIT) | User-space virtual filesystem with database persistence | Interface reference for agents; it is neither a kernel module nor a competitor to the layer. |
 | [Microsoft GraphRAG](https://github.com/microsoft/graphrag) (MIT) | Knowledge pipeline: entities, relations, communities | Source of attribute and relation datasets for `QUERY` workloads; it is not storage. |
 | [ai-memory](https://github.com/akitaonrails/ai-memory) (MIT, Rust) | Markdown wiki in git as source of truth, derived SQLite, capture via hooks, zero LLM by default | Closest client to our model: source of truth in files. Full reading in [research-ai-memory.md](research-ai-memory.md). |
 

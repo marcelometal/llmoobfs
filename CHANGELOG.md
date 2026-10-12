@@ -5,6 +5,9 @@
 - **Fix** (journal 0057): renaming a file or directory over a name whose previous file was just
   deleted failed with `EINVAL` (the atomic "write a temporary file, rename it over" pattern). Found
   by running ai-memory's own tests on the layer; regression test in `tests/layer.c`.
+- `docs/references.md` (journal 0053): verified list of the papers, projects and tools MoobFS builds
+  on, includes, compares against or used to decide; five citation and license errors corrected in
+  the research documents, the fsx notice and `docs/ecosystem.md`.
 - Phase Q2e (journal 0052): `QUERY2_RACE_PASS` races mode changes, renames, unlink and
   recreate, moves across domains and `chmod` of the domain directory against paged `QUERY2` over
   the plain, equality and ordered plans; test client `query race2`.
