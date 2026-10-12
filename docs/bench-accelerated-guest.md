@@ -1,69 +1,69 @@
-# Campanha do M4 em convidado acelerado: roteiro
+# M4 campaign on an accelerated guest: runbook
 
-Estado: proposta (2026-10-10), não executada. Complementa `docs/benchmark-plan.md` ("Método":
-VM dedicada com KVM; emulação só para correção) e `docs/benchmark-harness.md`. O harness
-está completo e validado na VM emulada; este documento diz como obter números de verdade.
+Status: proposal (2026-10-10), not executed. Complements `docs/benchmark-plan.md` ("Method":
+dedicated VM with KVM; emulation only for correctness) and `docs/benchmark-harness.md`. The harness
+is complete and validated in the emulated VM; this document says how to obtain real numbers.
 
-## 1. Por que a VM atual não serve para medir
+## 1. Why the current VM is no good for measuring
 
-`make vm-test` roda um kernel x86_64 (Debian 6.12.111) no QEMU dentro do Docker Desktop. Em um
-Mac com Apple Silicon isso é emulação instrução a instrução (TCG), dezenas de vezes mais lenta
-que o hardware e com distribuição de latências que não representa nada. O runner do GitHub
-também não tem KVM. Logo, nenhum tempo impresso por essas execuções é medida do projeto.
+`make vm-test` runs an x86_64 kernel (Debian 6.12.111) in QEMU inside Docker Desktop. On an
+Apple Silicon Mac this is instruction-by-instruction emulation (TCG), tens of times slower
+than the hardware and with a latency distribution that represents nothing. The GitHub runner
+also has no KVM. Therefore, no time printed by these runs is a measurement of the project.
 
-## 2. Três caminhos
+## 2. Three paths
 
-| Caminho | Hardware | Arquitetura do convidado | Valor dos números | Custo |
+| Path | Hardware | Guest architecture | Value of the numbers | Cost |
 | --- | --- | --- | --- | --- |
-| A. Host Linux x86_64 com KVM (bare metal ou nuvem com virtualização aninhada) | qualquer | x86_64, o mesmo kernel Debian 6.12.111 já testado | referência para o relatório do M4 | aluguel de horas ou máquina própria |
-| B. Mac Apple Silicon com Hypervisor.framework (Lima, UTM ou `qemu-system-aarch64 -accel hvf`) | o Mac de desenvolvimento | arm64, Debian 13 com kernel 6.12 arm64 | comparação relativa A/B/C na mesma máquina; arquitetura fora da matriz testada | zero |
-| C. VM de nuvem x86_64 usada como host (Azure D4as_v5, Oracle E3.Flex ou similar), com o módulo no kernel da própria instância | qualquer | x86_64, kernel 6.12.112 compilado na instância por `bench/kernel-build.sh` | medição em VM de nuvem, ambiente realista de produção; mesmo tarball do KASAN, sem instrumentação | horas de aluguel |
+| A. Linux x86_64 host with KVM (bare metal or cloud with nested virtualization) | any | x86_64, the same Debian 6.12.111 kernel already tested | reference for the M4 report | rented hours or own machine |
+| B. Apple Silicon Mac with Hypervisor.framework (Lima, UTM or `qemu-system-aarch64 -accel hvf`) | the development Mac | arm64, Debian 13 with the 6.12 arm64 kernel | relative A/B/C comparison on the same machine; architecture outside the tested matrix | zero |
+| C. x86_64 cloud VM used as the host (Azure D4as_v5, Oracle E3.Flex or similar), with the module in the instance's own kernel | any | x86_64, kernel 6.12.112 built on the instance by `bench/kernel-build.sh` | measurement on a cloud VM, a realistic production environment; same tarball as KASAN, without instrumentation | rented hours |
 
-Recomendação (2026-10-11): C é o caminho escolhido para a primeira campanha, por juntar x86,
-custo baixo e um segundo kernel na matriz; A continua sendo a referência quando houver
-hardware dedicado; B fica como preliminar opcional. Em B, o módulo é compilado para uma arquitetura nova: antes de medir, a suíte
-inteira (`vm/suite.sh`) e uma execução sob KASAN precisam passar nesse kernel, e o relatório
-deve dizer "arm64 virtualizado, fora da matriz".
+Recommendation (2026-10-11): C is the path chosen for the first campaign, since it combines x86,
+low cost and a second kernel in the matrix; A remains the reference when there is
+dedicated hardware; B stays as an optional preliminary. In B, the module is built for a new architecture: before measuring, the whole
+suite (`vm/suite.sh`) and a run under KASAN must pass on that kernel, and the report
+must say "virtualized arm64, outside the matrix".
 
-## 2.1 Caminho C: VM de nuvem como host (Azure)
+## 2.1 Path C: cloud VM as the host (Azure)
 
-Criação (portal da Azure): imagem Ubuntu Server 24.04 LTS x64 Gen2; tamanho
-`Standard_D4as_v5` (4 vCPU, 16 GB) ou `D4s_v5`; **tipo de segurança Standard**, não Trusted
-launch, porque o kernel compilado não é assinado e o Secure Boot o recusaria; chave SSH; só a
-porta 22; disco do SO Premium SSD 64 GB; **três discos de dados idênticos** para ext4, btrfs e
-XFS, com cache "Nenhum"; sem série B (burstable); desligamento automático.
+Creation (Azure portal): Ubuntu Server 24.04 LTS x64 Gen2 image; size
+`Standard_D4as_v5` (4 vCPU, 16 GB) or `D4s_v5`; **security type Standard**, not Trusted
+launch, because the built kernel is not signed and Secure Boot would refuse it; SSH key; only
+port 22; OS disk Premium SSD 64 GB; **three identical data disks** for ext4, btrfs and
+XFS, with cache "None"; no B series (burstable); auto-shutdown.
 
-Discos para a campanha: **Premium SSD v2** com IOPS e vazão fixos e iguais nos três. Os Premium
-SSD de P1 a P20 têm bursting por créditos ligado por padrão (o P6 garante 240 IOPS e sobe até
-3500 enquanto há créditos, que se esgotam em cerca de 30 minutos de carga), então a velocidade
-do dispositivo mudaria no meio de uma campanha de horas e a diferença seria atribuída ao sistema
-medido. P30 e acima não têm bursting por créditos, mas são grandes e caros para este uso. Discos
-P6 com bursting servem para o portão `HOST_SETUP_PASS` e para o piloto, nunca para o relatório.
+Disks for the campaign: **Premium SSD v2** with fixed IOPS and throughput, equal on all three. Premium
+SSDs from P1 to P20 have credit-based bursting on by default (the P6 guarantees 240 IOPS and rises up to
+3500 while there are credits, which run out in about 30 minutes of load), so the device speed
+would change in the middle of a campaign of hours and the difference would be attributed to the measured
+system. P30 and above have no credit-based bursting, but are large and expensive for this use. P6
+disks with bursting serve for the `HOST_SETUP_PASS` gate and for the pilot, never for the report.
 
-Na instância, como root, na ordem:
+On the instance, as root, in order:
 
 ```bash
 apt-get update && apt-get install -y build-essential flex bison libelf-dev libssl-dev bc dpkg-dev debhelper rsync kmod git
 git clone https://github.com/studiomoob/llmoobfs && cd llmoobfs
-sh bench/kernel-build.sh            # 6.12.112 a partir do config do Ubuntu + vm/bench.config; 45-60 min em 4 vCPU
+sh bench/kernel-build.sh            # 6.12.112 from the Ubuntu config + vm/bench.config; 45-60 min on 4 vCPU
 sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=saved/' /etc/default/grub && update-grub
-grep -E "menuentry '|submenu '" /boot/grub/grub.cfg | cut -d"'" -f2     # nome exato da entrada 6.12
-grub-reboot "Advanced options for Ubuntu>Ubuntu, with Linux 6.12.112-moobfs-bench"   # só o próximo boot
-shutdown -h now   # no portal: VM desalocada, desligar "inicialização segura", ligar
-uname -r          # 6.12.112-moobfs-bench; se não subir, reiniciar volta ao kernel da Azure
-lsblk                               # identificar os três discos de dados (sdc, sdd, sde ou similares)
-sh bench/host-setup.sh --ext4 /dev/sdc --btrfs /dev/sdd --xfs /dev/sde   # formata, compila, roda a suíte inteira
+grep -E "menuentry '|submenu '" /boot/grub/grub.cfg | cut -d"'" -f2     # exact name of the 6.12 entry
+grub-reboot "Advanced options for Ubuntu>Ubuntu, with Linux 6.12.112-moobfs-bench"   # next boot only
+shutdown -h now   # in the portal: VM deallocated, turn off "secure boot", start
+uname -r          # 6.12.112-moobfs-bench; if it does not come up, rebooting goes back to the Azure kernel
+lsblk                               # identify the three data disks (sdc, sdd, sde or similar)
+sh bench/host-setup.sh --ext4 /dev/sdc --btrfs /dev/sdd --xfs /dev/sde   # formats, builds, runs the whole suite
 ```
 
-`HOST_SETUP_PASS` é o portão: a suíte completa (`MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS`)
-passou nesse kernel e nesses discos, sem diagnóstico no `dmesg`. Qualquer falha vira registro
-antes de medir. Depois, calibração (§5) e campanha (§6) com os mesmos dispositivos montados.
-Se o KASAN do kernel 6.12.112 ainda não tiver rodado nessa máquina, não é necessário: o
-workflow já cobre esse kernel; o que a suíte valida aqui é o host e os discos.
+`HOST_SETUP_PASS` is the gate: the full suite (`MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS`)
+passed on that kernel and on those disks, with no diagnostics in `dmesg`. Any failure becomes a journal
+before measuring. Then, calibration (§5) and campaign (§6) with the same devices mounted.
+If KASAN for kernel 6.12.112 has not yet run on that machine, it is not necessary: the
+workflow already covers that kernel; what the suite validates here is the host and the disks.
 
-## 3. Preparar o convidado (caminho B, Lima)
+## 3. Prepare the guest (path B, Lima)
 
-Tudo abaixo é o procedimento proposto; os comandos não foram executados neste repositório.
+Everything below is the proposed procedure; the commands were not executed in this repository.
 
 ```bash
 brew install lima
@@ -72,7 +72,7 @@ limactl start moob
 limactl shell moob
 ```
 
-Dentro do convidado (Debian arm64):
+Inside the guest (Debian arm64):
 
 ```bash
 sudo apt-get update && sudo apt-get install -y build-essential linux-headers-$(uname -r) \
@@ -90,9 +90,9 @@ for f in sqlbase equiv run; do cp bench/$f.sh build/arm64/bench-$f.sh; done
 cp bench/queries-w3.txt build/arm64/bench-queries-w3.txt
 ```
 
-Discos dedicados: no Lima, acrescentar discos virtio com `limactl disk create` e `--mount`,
-ou, para a preliminar, usar arquivos de imagem em loop (pior para números de disco, aceitável
-para calibrar):
+Dedicated disks: in Lima, add virtio disks with `limactl disk create` and `--mount`,
+or, for the preliminary, use image files on loop (worse for disk numbers, acceptable
+for calibrating):
 
 ```bash
 sudo truncate -s 2G /var/tmp/ext4.img /var/tmp/btrfs.img /var/tmp/xfs.img
@@ -103,10 +103,10 @@ sudo mkfs.xfs -q -f -L moob-lower /var/tmp/xfs.img
 for i in ext4 btrfs xfs scratch log; do sudo losetup -f --show /var/tmp/$i.img; done
 ```
 
-## 4. Validar antes de medir
+## 4. Validate before measuring
 
-A suíte é parametrizada como em `vm/kasan-guest.sh`: `BIN`, `TOOLS`, `MODS`, `LOWER`,
-`LAYER` e `DEV_*`. Como root no convidado:
+The suite is parameterized as in `vm/kasan-guest.sh`: `BIN`, `TOOLS`, `MODS`, `LOWER`,
+`LAYER` and `DEV_*`. As root in the guest:
 
 ```bash
 export BIN=$PWD/build/arm64 TOOLS=/usr/bin MODS=/nonexistent LOWER=/mnt/moob-lower LAYER=/mnt/moob-layer
@@ -116,23 +116,23 @@ insmod build/arm64/moobfs_layer.ko
 sh vm/suite.sh | tee build/arm64/suite.log
 ```
 
-Critério: `MOOBFS_LAYER_PASS` e `MOOBFS_ACCEPTANCE_PASS`, sem `WARNING`, `BUG` ou `Oops` em
-`dmesg`. Diferenças de arquitetura prováveis que a suíte vai expor: tamanho de página (o Lima
-usa 4 KiB em Debian arm64; 16 KiB mudaria limites de xattr do ext4), e `/tools` ausente
-(`TOOLS` aponta para `/usr/bin`). Qualquer falha vira registro próprio antes de qualquer número.
+Criterion: `MOOBFS_LAYER_PASS` and `MOOBFS_ACCEPTANCE_PASS`, with no `WARNING`, `BUG` or `Oops` in
+`dmesg`. Likely architecture differences the suite will expose: page size (Lima
+uses 4 KiB on Debian arm64; 16 KiB would change ext4 xattr limits), and a missing `/tools`
+(`TOOLS` points to `/usr/bin`). Any failure becomes its own journal before any number.
 
-## 5. Calibrar o disco
+## 5. Calibrate the disk
 
 `sh bench/calibrate.sh --out <dir da campanha> ext4=/srv/moob/ext4 btrfs=/srv/moob/btrfs
-xfs=/srv/moob/xfs`: 30 s de escritas aleatórias de 4 KiB, cada uma seguida de `fsync`, por
-inferior; imprime operações por segundo e a latência do próprio `fsync` (p50, p99) e guarda o
-JSON do `fio`. A latência de conclusão da escrita (`clat`) não serve para isso: com `--fsync=1`
-ela mede só a escrita no cache de página (cerca de 10 µs no host da Azure). O resumo entra no
-relatório junto com o `environment.txt`.
+xfs=/srv/moob/xfs`: 30 s of random 4 KiB writes, each followed by `fsync`, per
+lower filesystem; prints operations per second and the latency of the `fsync` itself (p50, p99) and saves the
+`fio` JSON. The write completion latency (`clat`) is no good for this: with `--fsync=1`
+it measures only the write into the page cache (about 10 µs on the Azure host). The summary goes into the
+report together with `environment.txt`.
 
-## 6. Executar a campanha
+## 6. Run the campaign
 
-Montar a camada por inferior e chamar o orquestrador com os três sistemas:
+Mount the layer per lower filesystem and call the orchestrator with the three systems:
 
 ```bash
 mount /dev/loop0 /mnt/a-ext4 && mount /dev/loop1 /mnt/b-btrfs
@@ -143,14 +143,14 @@ BIN=$PWD/build/arm64 sh bench/run.sh --out build/bench/$(date -u +%Y%m%dT%H%M)-a
   --layer C-ext4=/mnt/c-layer:/mnt/c-lower
 ```
 
-Escalas S1 a S6 e perfis 6, 8 e 16 são execuções separadas do mesmo comando. O `report.py`
-produz `results.csv` e marca "inconclusivo" acima de 20% de dispersão. Saturação do índice: a
-mesma campanha com `index_budget=` reduzido na montagem, lendo `get_info.txt` de cada sistema.
+Scales S1 to S6 and profiles 6, 8 and 16 are separate runs of the same command. `report.py`
+produces `results.csv` and marks "inconclusive" above 20% dispersion. Index saturation: the
+same campaign with a reduced `index_budget=` at mount, reading `get_info.txt` of each system.
 
-## 7. O que registrar
+## 7. What to record
 
-Por campanha: `environment.txt` (o `run.sh` grava kernel, CPU, memória, presença de KVM ou
-HVF, versão do SQLite, commit), a calibração do `fio`, a saída de `equiv.txt` com os planos
-`SCAN` justificados, e o `results.csv`. O relatório em `docs/history/` cita o caminho de cada
-arquivo e declara a arquitetura e o tipo de aceleração. Nenhum número entra em README, site ou
-documento de valor sem esse caminho.
+Per campaign: `environment.txt` (`run.sh` records kernel, CPU, memory, presence of KVM or
+HVF, SQLite version, commit), the `fio` calibration, the output of `equiv.txt` with the justified
+`SCAN` plans, and `results.csv`. The report in `docs/history/` cites the path of each
+file and declares the architecture and the acceleration type. No number goes into the README, site or
+value document without that path.

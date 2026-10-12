@@ -1,53 +1,54 @@
-# 0022 — Avaliação de utilidade, proposta de valor e maturidade como critério de adoção
+# 0022 — Usefulness assessment, value proposition and maturity as an adoption criterion
 
-Data: 2026-10-10. Branch: `m3/3b-query-authz`. Estado: concluído (análise; nada implementado).
+Date: 2026-10-10. Branch: `m3/3b-query-authz`. Status: completed (analysis; nothing
+implemented).
 
-## Objetivo
+## Goal
 
-Responder, antes de qualquer divulgação, por que alguém usaria o MoobFS em vez de arquivos
-convencionais ou SQLite, tratando a maturidade das alternativas como vantagem concreta delas e
-o módulo de kernel como custo e risco a superar.
+Answer, before any announcement, why someone would use MoobFS instead of conventional files or
+SQLite, treating the maturity of the alternatives as a concrete advantage of theirs and the
+kernel module as a cost and a risk to overcome.
 
-## Resultado
+## Result
 
-[`docs/value-assessment.md`](../value-assessment.md): desempenho por operação mapeado para W1–W9,
-estimativa de memória por inode e atributo derivada das estruturas de `layer/index.c`
-(marcada como estimativa), segurança separando o que é herdado do VFS do que a camada
-acrescenta, confiabilidade e custo de manutenção de módulo, agilidade de desenvolvimento,
-três casos de uso com métrica de comprovação e condição de não uso, matriz de proposta de
-valor, resultados negativos do M4 que derrubam cada argumento, critérios de sucesso em quatro
-níveis, seção de maturidade com matriz de decisão para laboratório, produção controlada e
-produção crítica, e a entrega final (cinco benefícios, cinco limitações, comparação com
-arquivos e SQLite, conclusão).
+[`docs/value-assessment.md`](../value-assessment.md): per-operation performance mapped to W1–W9,
+an estimate of memory per inode and attribute derived from the structures of `layer/index.c`
+(marked as an estimate), security separating what is inherited from the VFS from what the layer
+adds, reliability and module maintenance cost, development agility, three use cases with a
+proof metric and a no-use condition, a value proposition matrix, negative M4 results that would
+knock down each argument, success criteria at four levels, a maturity section with a decision
+matrix for lab, controlled production and critical production, and the final deliverable (five
+benefits, five limitations, comparison with files and SQLite, conclusion).
 
-## Decisões
+## Decisions
 
-1. Nenhum ganho de desempenho ou produtividade é afirmado; tudo que depende de número fica
-   "potencial" ou "não demonstrado" até o M4.
-2. Hoje a recomendação para produção controlada e produção crítica é SQLite ou arquivos
-   convencionais; o MoobFS é aceitável só em laboratório e VM descartável.
-3. As capacidades que podem justificar adoção sem vencer o SQLite em todo benchmark são:
-   autorização POSIX por resultado de consulta entre muitos uids sem camada de autorização na
-   aplicação; dados legíveis por qualquer ferramenta Unix sem a camada; ausência de processo de
-   banco por host. Qualquer uma delas exige requisito real do usuário, não preferência.
-4. Achados de código registrados para o M3/M4: `QUERY` varre as entradas do primeiro termo e
-   filtra os demais pela lista do inode (provável desvantagem frente a índice composto; a
-   escolha do termo mais seletivo é candidata a melhoria, sem decisão agora); `index_used`
-   subestima a RAM real (não conta arredondamento de slab, nós do xarray nem buffers
-   transitórios); falha de orçamento ao registrar caminho é silenciosa; a escala S6 do plano
-   pode não saturar 128 MiB com 3 a 8 atributos, logo a medição de saturação deve reduzir
-   `index_budget` ou aumentar a escala; um só rwsem por mount serializa escritores de atributo;
-   canal de tempo pela quantidade de candidatos privados não testado.
-5. Critérios para sair de experimental: xfstests completo, ciclos de KASAN e syzkaller, ao
-   menos duas séries de kernel, doze meses sem defeito de perda de dados, reprodução
-   independente do M4, itens do roteiro de segurança, revisão externa.
+1. No performance or productivity gain is claimed; everything that depends on a number stays
+   "potential" or "not demonstrated" until M4.
+2. Today the recommendation for controlled production and critical production is SQLite or
+   conventional files; MoobFS is acceptable only in a lab and a disposable VM.
+3. The capabilities that may justify adoption without beating SQLite in every benchmark are:
+   POSIX authorization per query result across many uids without an authorization layer in the
+   application; data readable by any Unix tool without the layer; no database process per host.
+   Any of them requires a real user requirement, not a preference.
+4. Code findings recorded for M3/M4: `QUERY` scans the entries of the first term and filters
+   the others by the inode's list (probable disadvantage compared to a composite index; choosing
+   the most selective term is a candidate improvement, no decision now); `index_used`
+   underestimates the real RAM (it does not count slab rounding, xarray nodes or transient
+   buffers); a budget failure when recording a path is silent; the plan's S6 scale may not
+   saturate 128 MiB with 3 to 8 attributes, so the saturation measurement must reduce
+   `index_budget` or increase the scale; a single rwsem per mount serializes attribute writers;
+   timing channel through the number of private candidates not tested.
+5. Criteria for leaving experimental: full xfstests, KASAN and syzkaller cycles, at least two
+   kernel series, twelve months without a data-loss defect, independent reproduction of M4,
+   security roadmap items, external review.
 
-## Limitações
+## Limitations
 
-Estimativas de memória não medidas; comparação com SQLite assume configuração adequada (WAL,
-índices compostos, `ANALYZE`) sem execução; documento com 669 linhas, acima do alvo.
+Memory estimates not measured; the comparison with SQLite assumes an adequate configuration
+(WAL, composite indexes, `ANALYZE`) without running it; document with 669 lines, above the
+target.
 
-## Próximo passo
+## Next step
 
-Resultado do KASAN na branch e PR para `main`; o M4 passa a ser o próximo marco, com as
-medições indispensáveis listadas na entrega do documento.
+KASAN result on the branch and PR into `main`; M4 becomes the next milestone, with the
+indispensable measurements listed in the document's deliverable.

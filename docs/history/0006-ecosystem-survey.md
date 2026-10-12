@@ -1,42 +1,42 @@
-# 0006 — Publicação da ADR-0005 e levantamento do ecossistema livre
+# 0006 — Publication of ADR-0005 and survey of the free software ecosystem
 
-Data: 2026-10-10, America/Sao_Paulo.
+Date: 2026-10-10, America/Sao_Paulo.
 
-## Pedido
+## Request
 
-Publicar no GitHub o commit da ADR-0005 e levantar ferramentas, bibliotecas, módulos e
-projetos de software livre que ajudem o MoobFS, para não resolver problemas que já têm solução.
+Publish the ADR-0005 commit on GitHub and survey free software tools, libraries, modules and
+projects that help MoobFS, so as not to solve problems that already have a solution.
 
-## Resultado
+## Result
 
-- `git push origin main` publicou `b2fb037` (ADR-0005); os dois checks obrigatórios foram
-  acionados no GitHub.
-- `docs/ecosystem.md` (novo) organiza o levantamento por problema: VM instrumentada, fuzzing,
-  crash-consistency, estruturas de kernel, BFS em espaço de usuário, camadas de memória para
-  agentes e busca vetorial. Cada entrada traz licença, atividade e uso previsto.
+- `git push origin main` published `b2fb037` (ADR-0005); the two required checks were
+  triggered on GitHub.
+- `docs/ecosystem.md` (new) organizes the survey by problem: instrumented VM, fuzzing,
+  crash-consistency, kernel structures, BFS in user space, memory layers for
+  agents and vector search. Each entry gives license, activity and intended use.
 
-## Decisões derivadas (propostas, não implementadas)
+## Derived decisions (proposals, not implemented)
 
-Preferir `dm-log-writes` + xfstests a um replay próprio; fuzzing em espaço de usuário do
-parser compartilhado antes de syzkaller; virtme-ng para kernel com KASAN/lockdep; `bfs_shell`
-do Haiku como oráculo para o `QUERY` da ADR-0005; mem0/Letta/Graphiti/cognee tratados como
-clientes, não concorrentes.
+Prefer `dm-log-writes` + xfstests over our own replay; user-space fuzzing of the
+shared parser before syzkaller; virtme-ng for a kernel with KASAN/lockdep; Haiku's `bfs_shell`
+as the oracle for the `QUERY` of ADR-0005; mem0/Letta/Graphiti/cognee treated as
+clients, not competitors.
 
-## Evidências
+## Evidence
 
-Buscas na web e consultas à API do GitHub (licença, estrelas, último push) em 2026-10-10.
-Nenhuma ferramenta foi executada; nenhuma integração foi feita.
+Web searches and GitHub API queries (license, stars, last push) on 2026-10-10.
+No tool was executed; no integration was made.
 
-## Limitações e próximo passo
+## Limitations and next step
 
-Comparações de camadas de memória vêm de fornecedores. O PDF do livro de Giampaolo não foi
-verificado. Próximo passo: iniciar o item 1 de `docs/ecosystem.md` (fuzzing de `common/`).
+Comparisons of memory layers come from vendors. The PDF of Giampaolo's book was not
+verified. Next step: start item 1 of `docs/ecosystem.md` (fuzzing of `common/`).
 
-## Adendo (2026-10-10): página interativa do plano no site
+## Addendum (2026-10-10): interactive plan page on the site
 
-Pedido: transformar o desenho de entrada/processamento/saída numa página do site e publicar.
-Criada `site/plan.html` (sem dependências, JavaScript mínimo, funciona sem JS com todas as
-caixas visíveis), estilos em `site/style.css`, links de navegação em `index.html` e `guide.html`.
-Validação: `python3 scripts/check-site.py` (3 páginas), `git diff --check`, prévia local em
-1280 px (três colunas, filtro por marco, painel de detalhe) e 375 px (uma coluna), ambas sem
-overflow horizontal medido. A página marca só o M1 como validado; o restante é proposta.
+Request: turn the input/processing/output drawing into a site page and publish it.
+Created `site/plan.html` (no dependencies, minimal JavaScript, works without JS with all
+boxes visible), styles in `site/style.css`, navigation links in `index.html` and `guide.html`.
+Validation: `python3 scripts/check-site.py` (3 pages), `git diff --check`, local preview at
+1280 px (three columns, milestone filter, detail panel) and 375 px (one column), both without
+measured horizontal overflow. The page marks only M1 as validated; the rest is proposal.

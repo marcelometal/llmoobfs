@@ -1,64 +1,64 @@
-# Infraestrutura madura do kernel reutilizável pelo MoobFS
+# Mature kernel infrastructure reusable by MoobFS
 
-Data: 2026-10-10. Verificado contra o código-fonte do Linux **v6.12** (tag upstream) e contra
-`build/vm/kernel.config` do kernel Debian 6.12.111 usado na VM. Objetivo: antes de escrever o
-M2, listar o que o kernel já oferece a um módulo de filesystem, para não reescrever o que
-ext4, XFS, btrfs, ocfs2 e GFS2 usam há anos. "Disponível na VM" indica a opção de configuração
-do kernel alvo (`=y` embutido, `=m` módulo carregável).
+Date: 2026-10-10. Checked against the Linux **v6.12** source code (upstream tag) and against
+`build/vm/kernel.config` of the Debian 6.12.111 kernel used in the VM. Goal: before writing
+M2, list what the kernel already offers a filesystem module, so as not to rewrite what
+ext4, XFS, btrfs, ocfs2 and GFS2 have used for years. "In the VM" indicates the configuration option
+of the target kernel (`=y` built in, `=m` loadable module).
 
-## Reutilizar (decisão proposta para o M2)
+## Reuse (proposed decision for M2)
 
-| Necessidade do M2 | Infraestrutura | Maturidade | Na VM | Observações verificadas |
+| M2 need | Infrastructure | Maturity | In the VM | Verified notes |
 | --- | --- | --- | --- | --- |
-| Journaling de metadados e recuperação após queda | **jbd2** (`fs/jbd2/`) | Desde 2006; usado por ext4 e ocfs2 | `CONFIG_JBD2=m` | `jbd2_journal_init_dev`, `jbd2_journal_load`, `jbd2_journal_start`, `jbd2_journal_flush`, `jbd2_journal_destroy` são `EXPORT_SYMBOL`, logo acessíveis a módulo fora da árvore. ocfs2 é a prova de que um FS que não é ext4 consegue usá-lo. |
-| Leitura e escrita bufferizada, mmap gravável, truncamento, writeback | **iomap** (`fs/iomap/`) | Usado por XFS, GFS2, zonefs, erofs, ext4 (DIO) | `CONFIG_FS_IOMAP=y` | Exportados com `_GPL`: `iomap_file_buffered_write`, `iomap_page_mkwrite`, `iomap_truncate_page`, `iomap_zero_range`, `iomap_writepages`, `iomap_dirty_folio`. O M1 já usa `iomap_read_folio` e `iomap_fiemap`. zonefs (cerca de 2.600 linhas) é a menor referência in-tree de FS gravável sobre iomap. |
-| Compartilhar bytes entre arquivos por interface padrão | **remap_file_range** (`fs/remap_range.c`) | ioctls `FICLONE`, `FICLONERANGE`, `FIDEDUPERANGE`; usados por XFS, btrfs, ocfs2 | VFS, sempre presente | `generic_remap_file_range_prep`, `vfs_clone_file_range`, `vfs_dedupe_file_range` exportados. Implementar `.remap_file_range` faz `cp --reflink`, `duperemove` e `fsdupes` funcionarem sem ferramenta própria. `REMAP_FILE_DEDUP` exige que o VFS compare os bytes antes de compartilhar, o que é exatamente a regra do M1. |
-| Atributos estendidos com namespaces e permissões | **VFS xattr** (`fs/xattr.c`, `struct xattr_handler`) | Universal | VFS | `vfs_getxattr`, `vfs_setxattr`, `vfs_listxattr` cuidam de permissão, prefixos `user.`/`trusted.`/`security.` e chamadas de sistema. O módulo só fornece handlers por prefixo. |
-| Deduplicar blocos de xattr idênticos entre inodes | **mbcache** (`fs/mbcache.c`) | Usado por ext2 e ext4 | Embutido com ext4 | `mb_cache_entry_create`, `mb_cache_entry_find_first/next` exportados. Resolve o caso "muitas memórias com o mesmo conjunto de atributos" sem código próprio. |
-| Verificação criptográfica de conteúdo imutável | **fs-verity** (`fs/verity/`) | ext4, f2fs, btrfs | `CONFIG_FS_VERITY=y` | Árvore de Merkle por arquivo, verificada na leitura. Candidata a substituir o SHA-256 de payload do M1 para objetos selados, em fase posterior. |
-| Cache de páginas, dentries, inodes, locks POSIX (`fcntl`), writeback, freeze | VFS genérico | Universal | VFS | SQLite e git precisam de `fcntl` locks e `fsync`; o VFS entrega ambos a qualquer FS que implemente `fsync` corretamente. |
-| Checksums | `lib/crc32c`, `crypto/sha256` | Universal | sim | Já usados pelo M1. |
-| Estruturas em memória | `lib/btree.c`, maple tree, xarray, rbtree | Universal | sim | Para o índice de atributos em RAM do M2; B+ tree em disco fica para depois. |
+| Metadata journaling and recovery after a crash | **jbd2** (`fs/jbd2/`) | Since 2006; used by ext4 and ocfs2 | `CONFIG_JBD2=m` | `jbd2_journal_init_dev`, `jbd2_journal_load`, `jbd2_journal_start`, `jbd2_journal_flush`, `jbd2_journal_destroy` are `EXPORT_SYMBOL`, hence accessible to an out-of-tree module. ocfs2 is the proof that an FS that is not ext4 can use it. |
+| Buffered read and write, writable mmap, truncation, writeback | **iomap** (`fs/iomap/`) | Used by XFS, GFS2, zonefs, erofs, ext4 (DIO) | `CONFIG_FS_IOMAP=y` | Exported with `_GPL`: `iomap_file_buffered_write`, `iomap_page_mkwrite`, `iomap_truncate_page`, `iomap_zero_range`, `iomap_writepages`, `iomap_dirty_folio`. M1 already uses `iomap_read_folio` and `iomap_fiemap`. zonefs (about 2 600 lines) is the smallest in-tree reference of a writable FS over iomap. |
+| Share bytes between files through a standard interface | **remap_file_range** (`fs/remap_range.c`) | ioctls `FICLONE`, `FICLONERANGE`, `FIDEDUPERANGE`; used by XFS, btrfs, ocfs2 | VFS, always present | `generic_remap_file_range_prep`, `vfs_clone_file_range`, `vfs_dedupe_file_range` exported. Implementing `.remap_file_range` makes `cp --reflink`, `duperemove` and `fsdupes` work without a tool of our own. `REMAP_FILE_DEDUP` requires the VFS to compare the bytes before sharing, which is exactly the M1 rule. |
+| Extended attributes with namespaces and permissions | **VFS xattr** (`fs/xattr.c`, `struct xattr_handler`) | Universal | VFS | `vfs_getxattr`, `vfs_setxattr`, `vfs_listxattr` take care of permission, the `user.`/`trusted.`/`security.` prefixes and system calls. The module only provides per-prefix handlers. |
+| Deduplicate identical xattr blocks across inodes | **mbcache** (`fs/mbcache.c`) | Used by ext2 and ext4 | Built in with ext4 | `mb_cache_entry_create`, `mb_cache_entry_find_first/next` exported. Solves the "many memories with the same set of attributes" case without code of our own. |
+| Cryptographic verification of immutable content | **fs-verity** (`fs/verity/`) | ext4, f2fs, btrfs | `CONFIG_FS_VERITY=y` | Per-file Merkle tree, verified on read. Candidate to replace the M1 payload SHA-256 for sealed objects, in a later phase. |
+| Page cache, dentries, inodes, POSIX locks (`fcntl`), writeback, freeze | Generic VFS | Universal | VFS | SQLite and git need `fcntl` locks and `fsync`; the VFS delivers both to any FS that implements `fsync` correctly. |
+| Checksums | `lib/crc32c`, `crypto/sha256` | Universal | yes | Already used by M1. |
+| In-memory structures | `lib/btree.c`, maple tree, xarray, rbtree | Universal | yes | For the M2 in-RAM attribute index; an on-disk B+ tree is left for later. |
 
-## Filesystems empilhados (adendo 2026-10-10, ADR-0007)
+## Stacked filesystems (addendum 2026-10-10, ADR-0007)
 
-| Necessidade | Infraestrutura | Na VM | Observações verificadas no v6.12 |
+| Need | Infrastructure | In the VM | Notes verified on v6.12 |
 | --- | --- | --- | --- |
-| Delegar read/write/mmap/splice a um arquivo do FS inferior | `fs/backing-file.c`: `backing_file_open`, `backing_file_read_iter`, `backing_file_write_iter`, `backing_file_mmap`, `backing_file_splice_read/write` | VFS | Exportados `_GPL`; usados por overlayfs (11 chamadas em `fs/overlayfs/file.c`) e pelo passthrough do FUSE |
-| Modelo de referência de FS empilhado gravável | overlayfs (`fs/overlayfs/`, ~12,5 mil linhas) | `CONFIG_OVERLAY_FS=m` | Credenciais do montador via `override_creds`, regras sobre modificação do inferior, suporte em xfstests (`./check --fs overlay`) |
-| Modelo de referência de FS empilhado 1:1 | ecryptfs (`fs/ecryptfs/`, ~8,2 mil linhas) | `CONFIG_ECRYPT_FS=m` | Um inode da camada por inode inferior; passagem de xattr |
-| Reflink/dedup delegados | `vfs_clone_file_range`, `vfs_dedupe_file_range_one` | VFS | Chamados sobre os arquivos inferiores; `EOPNOTSUPP` em ext4 |
+| Delegate read/write/mmap/splice to a file of the lower FS | `fs/backing-file.c`: `backing_file_open`, `backing_file_read_iter`, `backing_file_write_iter`, `backing_file_mmap`, `backing_file_splice_read/write` | VFS | Exported `_GPL`; used by overlayfs (11 calls in `fs/overlayfs/file.c`) and by FUSE passthrough |
+| Reference model of a writable stacked FS | overlayfs (`fs/overlayfs/`, ~12.5 thousand lines) | `CONFIG_OVERLAY_FS=m` | Mounter credentials via `override_creds`, rules on modifying the lower filesystem, support in xfstests (`./check --fs overlay`) |
+| Reference model of a 1:1 stacked FS | ecryptfs (`fs/ecryptfs/`, ~8.2 thousand lines) | `CONFIG_ECRYPT_FS=m` | One layer inode per lower inode; xattr passthrough |
+| Delegated reflink/dedup | `vfs_clone_file_range`, `vfs_dedupe_file_range_one` | VFS | Called on the lower files; `EOPNOTSUPP` on ext4 |
 
-## Testar com (não escrever harness próprio)
+## Test with (do not write our own harness)
 
-| Necessidade | Ferramenta | Na VM |
+| Need | Tool | In the VM |
 | --- | --- | --- |
-| Consistência após queda de energia | `dm-log-writes` + testes estilo xfstests `generic/482` | `CONFIG_DM_LOG_WRITES=m` |
-| Injeção de erro de I/O | `dm-flakey` | `CONFIG_DM_FLAKEY=m` |
-| Regressão POSIX | xfstests grupo `generic`; `fsx` e `fsstress` (em `ltp/` do xfstests) | espaço de usuário |
-| Kernel instrumentado | virtme-ng com `CONFIG_KASAN` e `CONFIG_PROVE_LOCKING` | kernel próprio |
-| Fuzzing do parser | libFuzzer/AFL++ sobre `common/` | host |
+| Consistency after power loss | `dm-log-writes` + xfstests-style tests `generic/482` | `CONFIG_DM_LOG_WRITES=m` |
+| I/O error injection | `dm-flakey` | `CONFIG_DM_FLAKEY=m` |
+| POSIX regression | xfstests `generic` group; `fsx` and `fsstress` (in xfstests' `ltp/`) | user space |
+| Instrumented kernel | virtme-ng with `CONFIG_KASAN` and `CONFIG_PROVE_LOCKING` | our own kernel |
+| Parser fuzzing | libFuzzer/AFL++ over `common/` | host |
 
-## Avaliado e não adotado agora
+## Evaluated and not adopted now
 
-- **Snapshots em nível de bloco** (`dm-snapshot`, `dm-thin`, ambos `=m` na VM). Dão snapshot de volume inteiro sem código no FS, mas não dão revisões por arquivo nem identidade estável de memória, que é o que o M3 pede. Ficam como baseline de comparação para o M3.
-- **Alocador de blocos genérico**: não existe no kernel. ext2 (`balloc.c`, 1.535 linhas) é a referência mais simples de bitmap de blocos e inodes.
-- **B+ tree em disco genérica**: não existe. Cada FS tem a sua. `fs/befs/btree.c` (leitura) e o livro do BFS são referência; o M2 começa sem índice persistente.
-- **Buffer heads para dados**: ext2/ext3 usam; o M1 já escolheu iomap. Ver questão aberta abaixo.
+- **Block-level snapshots** (`dm-snapshot`, `dm-thin`, both `=m` in the VM). They give whole-volume snapshots without code in the FS, but they do not give per-file revisions nor stable memory identity, which is what M3 asks for. They remain as a comparison baseline for M3.
+- **Generic block allocator**: does not exist in the kernel. ext2 (`balloc.c`, 1 535 lines) is the simplest reference for block and inode bitmaps.
+- **Generic on-disk B+ tree**: does not exist. Each FS has its own. `fs/befs/btree.c` (read) and the BFS book are references; M2 starts without a persistent index.
+- **Buffer heads for data**: ext2/ext3 use them; M1 already chose iomap. See the open question below.
 
-## Questão aberta da forma "volume completo" (ADR-0006, superada)
+## Open question of the "full volume" form (ADR-0006, superseded)
 
-Não há FS in-tree que combine **iomap para dados bufferizados** com **jbd2 para metadados**:
-ext4 usa jbd2 com buffer heads nos dados bufferizados; XFS e GFS2 usam iomap com log próprio.
-As duas combinações conhecidas funcionam; a nossa é inédita e pode exigir ordenação explícita
-(dados antes do commit de metadados, equivalente a `data=ordered`) via callbacks de commit do
-jbd2. Alternativa segura se o experimento falhar: dados por buffer heads no M2, como ext3,
-migrando para iomap depois. Isso deve ser o primeiro protótipo do M2, antes do formato final.
+There is no in-tree FS that combines **iomap for buffered data** with **jbd2 for metadata**:
+ext4 uses jbd2 with buffer heads for buffered data; XFS and GFS2 use iomap with their own log.
+Both known combinations work; ours is unprecedented and may require explicit ordering
+(data before the metadata commit, equivalent to `data=ordered`) via jbd2 commit
+callbacks. Safe alternative if the experiment fails: data through buffer heads in M2, like ext3,
+migrating to iomap later. This should be the first M2 prototype, before the final format.
 
-## Referências de código para ler
+## Code references to read
 
-- `fs/ocfs2/journal.c`: uso de jbd2 por um FS que não é ext4.
-- `fs/zonefs/file.c`: escrita bufferizada e direta com iomap em FS pequeno.
-- `fs/ext2/{balloc,ialloc,dir,xattr}.c`: alocação por bitmap, diretórios lineares, xattr com mbcache.
-- `fs/xfs/xfs_reflink.c` e `fs/btrfs/reflink.c`: implementação de `remap_file_range` com copy-on-write.
-- `fs/remap_range.c`: o que o VFS já faz antes de chamar o FS (comparação de bytes no dedupe).
+- `fs/ocfs2/journal.c`: use of jbd2 by an FS that is not ext4.
+- `fs/zonefs/file.c`: buffered and direct writes with iomap in a small FS.
+- `fs/ext2/{balloc,ialloc,dir,xattr}.c`: bitmap allocation, linear directories, xattr with mbcache.
+- `fs/xfs/xfs_reflink.c` and `fs/btrfs/reflink.c`: implementation of `remap_file_range` with copy-on-write.
+- `fs/remap_range.c`: what the VFS already does before calling the FS (byte comparison in dedupe).

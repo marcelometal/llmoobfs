@@ -1,97 +1,97 @@
-# ADR-0005 — Modelo de memória para agentes com o Be File System como referência
+# ADR-0005 — Memory model for agents with the Be File System as reference
 
-Data: 2026-10-10. Estado: proposto; aceito pelo usuário como base de desenho para M2/M3. Nada aqui está implementado.
+Date: 2026-10-10. Status: proposed; accepted by the user as the design basis for M2/M3. Nothing here is implemented.
 
-## Contexto
+## Context
 
-O registro [0004](../history/0004-llm-memory-context.md) fixou o objetivo: um filesystem nativo
-para memória persistente e contexto consumidos por agentes LLM. O M1 (ADR-0003) valida apenas
-o compartilhamento físico de bytes entre inodes. Faltava um modelo que ligasse o objetivo ao
-mecanismo: o que é uma memória como arquivo, quais metadados ela carrega, como um agente a
-encontra sem recuperação semântica, e qual parte disso justifica estar no kernel.
+Journal [0004](../history/0004-llm-memory-context.md) fixed the goal: a native filesystem
+for persistent memory and context consumed by LLM agents. M1 (ADR-0003) validates only
+the physical sharing of bytes between inodes. What was missing was a model linking the goal to the
+mechanism: what a memory is as a file, which metadata it carries, how an agent
+finds it without semantic retrieval, and which part of this justifies being in the kernel.
 
-A proposta original (`docs/native-mvp.md`, §3) trata metadados de revisão como um bloco opaco
-de até 4 KiB, interpretado como JSON pela CLI. O kernel não os entende e não os indexa; toda
-busca estruturada ficaria em espaço de usuário, o que enfraquece a razão para um filesystem
-nativo em vez de um diretório comum com um banco ao lado.
+The original proposal (`docs/native-mvp.md`, §3) treats revision metadata as an opaque block
+of up to 4 KiB, interpreted as JSON by the CLI. The kernel does not understand or index them; all
+structured search would stay in user space, which weakens the reason for a native filesystem
+instead of an ordinary directory with a database beside it.
 
-O Be File System (BFS, 1997, Dominic Giampaolo e Cyril Meurillon) é o precedente mais próximo
-de "filesystem como camada de memória consultável": atributos estendidos tipados por arquivo,
-índices automáticos por atributo em B+ trees, consultas por igualdade e intervalo servidas pelo
-próprio filesystem, journaling de metadados e diretórios em B+ tree. O desenho está documentado
-em *Practical File System Design with the Be File System* (Giampaolo, 1999).
+The Be File System (BFS, 1997, Dominic Giampaolo and Cyril Meurillon) is the closest precedent
+of "filesystem as a queryable memory layer": typed extended attributes per file,
+automatic per-attribute indexes in B+ trees, equality and range queries served by the
+filesystem itself, metadata journaling and B+ tree directories. The design is documented
+in *Practical File System Design with the Be File System* (Giampaolo, 1999).
 
-## Decisão
+## Decision
 
-1. **Memória = arquivo; revisão = conteúdo imutável + atributos tipados.** Os metadados de uma
-   revisão deixam de ser um bloco opaco e passam a ser um conjunto limitado de atributos com
-   nome e tipo. Tipos previstos: `string` (UTF-8), `int64`, `double`, `bool`, `time` (ns desde
-   epoch) e `raw` (bytes, não indexável). Limite total por revisão permanece 4 KiB; o número
-   máximo de atributos e o tamanho de nome serão fixados na especificação do formato M2.
-2. **Exposição pela API padrão do Linux.** Atributos são lidos por `getxattr`/`listxattr` no
-   namespace `user.moob.*`. A CLI continua podendo renderizá-los como JSON. No M2, a escrita
-   de atributos ocorre dentro do `PUT` transacional, não por `setxattr` avulso.
-3. **Índices por atributo mantidos pelo módulo.** Atributos marcados como indexáveis na criação
-   do volume ganham um índice persistente por igualdade e intervalo. A estrutura inicial pode
-   ser simples e sequencial; B+ tree em disco é o alvo quando os limites do M1 forem removidos.
-   A atualização do índice é parte da mesma transação que publica a revisão.
-4. **Interface de consulta por ioctl, não por diretório virtual.** O VFS não tem chamada de
-   consulta por atributo; o BeOS tinha uma syscall própria. Adota-se um comando `QUERY` no
-   arquivo `.control` (mesma UAPI proposta em `native-mvp.md` §5), que recebe um predicado
-   limitado (atributo, operador, valor, conjunção) e devolve pares `(memory_id, revision)`.
-   Um diretório virtual de consultas ao estilo BeOS fica como alternativa futura, não adotada.
-5. **Recuperação semântica permanece em espaço de usuário.** O kernel não calcula embeddings,
-   não compara similaridade e não interpreta linguagem natural. A aplicação do agente usa as
-   consultas estruturais para reduzir candidatos e monta o contexto por conta própria.
-6. **Journaling de metadados como modelo de durabilidade do M2.** O desenho de log de
-   transações do BFS (metadados no journal, dados fora dele) é a referência de partida para
-   a especificação de escrita, falha e recuperação, a ser detalhada em ADR própria com testes
-   de queda de energia.
-7. **Diretórios em B+ tree substituem o namespace plano** quando o limite de 128 entradas do
-   M1 for removido. Isso é consequência, não meta imediata.
+1. **Memory = file; revision = immutable content + typed attributes.** The metadata of a
+   revision stops being an opaque block and becomes a limited set of attributes with
+   name and type. Planned types: `string` (UTF-8), `int64`, `double`, `bool`, `time` (ns since
+   epoch) and `raw` (bytes, not indexable). The total limit per revision remains 4 KiB; the
+   maximum number of attributes and the name size will be fixed in the M2 format specification.
+2. **Exposure through the standard Linux API.** Attributes are read by `getxattr`/`listxattr` in the
+   `user.moob.*` namespace. The CLI can still render them as JSON. In M2, writing
+   attributes happens inside the transactional `PUT`, not by standalone `setxattr`.
+3. **Per-attribute indexes maintained by the module.** Attributes marked as indexable at volume
+   creation get a persistent index for equality and range. The initial structure may
+   be simple and sequential; an on-disk B+ tree is the target when the M1 limits are removed.
+   The index update is part of the same transaction that publishes the revision.
+4. **Query interface through ioctl, not through a virtual directory.** The VFS has no
+   attribute-query call; BeOS had its own syscall. A `QUERY` command is adopted on the
+   `.control` file (same UAPI proposed in `native-mvp.md` §5), which receives a limited
+   predicate (attribute, operator, value, conjunction) and returns `(memory_id, revision)` pairs.
+   A BeOS-style virtual query directory remains a future alternative, not adopted.
+5. **Semantic retrieval remains in user space.** The kernel does not compute embeddings,
+   does not compare similarity and does not interpret natural language. The agent's application uses the
+   structural queries to reduce candidates and assembles the context on its own.
+6. **Metadata journaling as the M2 durability model.** The BFS transaction log
+   design (metadata in the journal, data outside it) is the starting reference for
+   the write, failure and recovery specification, to be detailed in its own ADR with
+   power-loss tests.
+7. **B+ tree directories replace the flat namespace** when the M1 limit of 128 entries
+   is removed. This is a consequence, not an immediate goal.
 
-Os itens 1 a 5 refinam a seção 3 da proposta original; a proposta é preservada e esta ADR
-aponta para ela. ADRs 0001 a 0004 continuam válidas.
+Items 1 to 5 refine section 3 of the original proposal; the proposal is preserved and this ADR
+points to it. ADRs 0001 to 0004 remain valid.
 
-## Reuso de código do BFS
+## Reuse of BFS code
 
-Avaliado e decidido como **não reutilizar código**, apenas o desenho:
+Evaluated and decided as **do not reuse code**, only the design:
 
-- `fs/befs` no Linux upstream (GPL-2.0-only, mantido por Luis de Bethencourt e Salah Triki)
-  é um driver **somente leitura** e, segundo seu próprio Kconfig, não disponibiliza atributos
-  nem índices. Ou seja, não implementa exatamente a parte que interessa. Sua licença é
-  compatível com a do MoobFS, e `fs/befs/btree.c` serve como referência de leitura de B+ tree
-  em disco com a API de buffer heads, mas o MoobFS usa iomap e um formato próprio.
-- A implementação do Haiku (OpenBFS, licença MIT, C++) é completa, com escrita, atributos,
-  índices e consultas, mas depende da API de kernel do Haiku. Portar para o kernel Linux
-  seria reescrever; é a melhor referência de comportamento e de casos de teste.
-- Usar o formato BFS em disco como formato do MoobFS foi descartado: ele não tem dedup de
-  conteúdo, revisões nem snapshots, e herdaria limites e decisões de 1997 sem a transação
-  idempotente com `request_id` que a proposta exige.
+- `fs/befs` in upstream Linux (GPL-2.0-only, maintained by Luis de Bethencourt and Salah Triki)
+  is a **read-only** driver and, according to its own Kconfig, does not make attributes
+  or indexes available. That is, it does not implement exactly the part of interest. Its license is
+  compatible with MoobFS's, and `fs/befs/btree.c` serves as a reference for reading an on-disk B+ tree
+  with the buffer heads API, but MoobFS uses iomap and its own format.
+- Haiku's implementation (OpenBFS, MIT license, C++) is complete, with writes, attributes,
+  indexes and queries, but depends on Haiku's kernel API. Porting it to the Linux kernel
+  would be rewriting; it is the best reference for behavior and for test cases.
+- Using the on-disk BFS format as the MoobFS format was discarded: it has no content dedup,
+  revisions or snapshots, and would inherit limits and decisions from 1997 without the idempotent
+  transaction with `request_id` that the proposal requires.
 
-## Alternativas consideradas
+## Alternatives considered
 
-- Manter metadados opacos e indexar em espaço de usuário (SQLite ao lado). Simples, mas torna
-  o filesystem nativo um mero repositório de bytes; rejeitado por contradizer ADR-0001.
-- Expor consultas como diretório virtual (`/mnt/moob/queries/<predicado>/`). Elegante para
-  ferramentas POSIX, mas cria entradas de diretório dinâmicas com semântica difícil de
-  manter sob concorrência e snapshots. Adiado.
-- Indexar conteúdo (texto completo) no kernel. Fora de escopo: é processamento semântico.
+- Keep opaque metadata and index in user space (SQLite beside it). Simple, but makes
+  the native filesystem a mere byte repository; rejected for contradicting ADR-0001.
+- Expose queries as a virtual directory (`/mnt/moob/queries/<predicate>/`). Elegant for
+  POSIX tools, but creates dynamic directory entries with semantics hard to
+  maintain under concurrency and snapshots. Postponed.
+- Index content (full text) in the kernel. Out of scope: it is semantic processing.
 
-## Consequências
+## Consequences
 
-- A especificação do formato M2 precisa definir: codificação dos atributos, lista de
-  atributos indexáveis, estrutura do índice, layout da UAPI de `QUERY` e regras de validação
-  de entradas inválidas (nomes, tipos, tamanhos, predicados).
-- Os testes de M2 devem cobrir consultas por igualdade e intervalo, índices após queda de
-  energia e rejeição de predicados malformados, além do que já exige a proposta original.
-- O roadmap ganha uma dependência explícita: M2 inclui atributos e índice, não só escrita.
-- Nenhum ganho de desempenho ou utilidade para LLMs é afirmado até M4 medir contra baselines.
+- The M2 format specification needs to define: attribute encoding, list of
+  indexable attributes, index structure, `QUERY` UAPI layout and validation rules
+  for invalid inputs (names, types, sizes, predicates).
+- M2 tests must cover equality and range queries, indexes after power
+  loss and rejection of malformed predicates, in addition to what the original proposal already requires.
+- The roadmap gains an explicit dependency: M2 includes attributes and an index, not just writes.
+- No performance gain or usefulness for LLMs is claimed until M4 measures against baselines.
 
-## Referências
+## References
 
 - Giampaolo, D. *Practical File System Design with the Be File System*. Morgan Kaufmann, 1999.
 - [Be File System — Wikipedia](https://en.wikipedia.org/wiki/Be_File_System)
-- [BeOS filesystem for Linux — documentação do kernel](https://docs.kernel.org/filesystems/befs.html)
-- `fs/befs/Kconfig` e `MAINTAINERS` no Linux upstream, consultados em 2026-10-10.
+- [BeOS filesystem for Linux — kernel documentation](https://docs.kernel.org/filesystems/befs.html)
+- `fs/befs/Kconfig` and `MAINTAINERS` in upstream Linux, consulted on 2026-10-10.
 - [Haiku BFS](https://github.com/haiku/haiku/tree/master/src/add-ons/kernel/file_systems/bfs)

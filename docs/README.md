@@ -1,11 +1,10 @@
 # Documentation index
 
-Every document under `docs/`, with its language and one line on what it covers. **EN** means
-English, **PT** means Portuguese (pt-BR), and **PT + EN abstract** means Portuguese with an
-English summary at the top. By the language policy in [CONTRIBUTING.md](../CONTRIBUTING.md),
-code, commits, issues and the README are in English, while documents here may be in either
-language. Translations of the entry documents that exist only in Portuguese are open as
-`good first issue` tasks with the `area/docs` label.
+Every document under `docs/`, with its language and one line on what it covers. Everything in the
+repository is in English ([ADR-0010](decisions/0010-english-everywhere.md)); documents first written
+in Portuguese were translated in place on 2026-10-12, and their originals remain in the git history.
+**PT (English translation in review)** marks the two documents whose translations are open pull
+requests from an outside contributor.
 
 Status words matter: a **proposal** describes intended behaviour, a **specification** is
 accepted but may be only partly implemented, and only the journals and
@@ -26,20 +25,20 @@ accepted but may be only partly implemented, and only the journals and
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [spec-m2.md](spec-m2.md) | PT | M2: the memory layer stacked over a mature filesystem (pass-through, typed attributes, index, `QUERY`) |
-| [spec-m3.md](spec-m3.md) | PT | M3: identity, isolation and provenance, change cursor, batch reads |
-| [spec-query-v2.md](spec-query-v2.md) | PT | Domain-scoped `QUERY2` (UAPI v2): domains, homogeneity rule, ioctl contract, phases Q2a–Q2e |
+| [spec-m2.md](spec-m2.md) | EN | M2: the memory layer stacked over a mature filesystem (pass-through, typed attributes, index, `QUERY`) |
+| [spec-m3.md](spec-m3.md) | EN | M3: identity, isolation and provenance, change cursor, batch reads |
+| [spec-query-v2.md](spec-query-v2.md) | EN | Domain-scoped `QUERY2` (UAPI v2): domains, homogeneity rule, ioctl contract, phases Q2a–Q2e |
 | [format-m1.md](format-m1.md) | EN | The read-only M1 image format, kept as a regression |
-| [kernel-infrastructure.md](kernel-infrastructure.md) | PT | Mature kernel infrastructure the layer reuses, checked against Linux v6.12 |
-| [native-mvp.md](native-mvp.md) | PT | The original full MVP proposal; its write interface was superseded by ADR-0007 |
-| [spec-m2-full-volume-superseded.md](spec-m2-full-volume-superseded.md) | PT | Superseded M2 proposal for a full writable volume, kept for the record |
+| [kernel-infrastructure.md](kernel-infrastructure.md) | EN | Mature kernel infrastructure the layer reuses, checked against Linux v6.12 |
+| [native-mvp.md](native-mvp.md) | EN | The original full MVP proposal; its write interface was superseded by ADR-0007 |
+| [spec-m2-full-volume-superseded.md](spec-m2-full-volume-superseded.md) | EN | Superseded M2 proposal for a full writable volume, kept for the record |
 
 ## Decisions and history
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [decisions/](decisions/) | PT (ADR-0004 in EN) | Architecture decision records ADR-0001 to ADR-0009, with alternatives and reasons |
-| [history/](history/README.md) | PT | Technical journal: one entry per piece of work, with evidence and limitations |
+| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0010, with alternatives and reasons |
+| [history/](history/README.md) | EN | Technical journal: one entry per piece of work, with evidence and limitations |
 
 Key decisions for newcomers: [ADR-0007](decisions/0007-stacked-memory-layer.md) (a stacked layer
 over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-space-index.md)
@@ -49,36 +48,35 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [benchmark-plan.md](benchmark-plan.md) | PT | M4 plan: questions, baselines, workloads, what a result must show |
-| [benchmark-harness.md](benchmark-harness.md) | PT | Harness specification: dataset, SQLite baselines, latency records, report, where raw archives go |
-| [bench-accelerated-guest.md](bench-accelerated-guest.md) | PT | How to run a campaign in an accelerated guest or a cloud VM |
+| [benchmark-plan.md](benchmark-plan.md) | EN | M4 plan: questions, baselines, workloads, what a result must show |
+| [benchmark-harness.md](benchmark-harness.md) | PT (English translation in review) | Harness specification: dataset, SQLite baselines, latency records, report, where raw archives go |
+| [bench-accelerated-guest.md](bench-accelerated-guest.md) | EN | How to run a campaign in an accelerated guest or a cloud VM |
 | [../bench/results/](../bench/results/README.md) | EN | Pilot campaign results and the `bench-evidence` release for raw archives |
 
 ## Assessments and research
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [value-assessment.md](value-assessment.md) | PT | Critical assessment of usefulness and value; the English summary is when-not-to-use.md |
-| [research-originality.md](research-originality.md) | PT | Prior-art audit (SFS, BFS, YoloFS and others) and what may be claimed |
-| [research-metadata-search.md](research-metadata-search.md) | PT | State of the art in file-metadata search, authorization and change feeds (for ADR-0009) |
-| [research-metadata-search-addendum.md](research-metadata-search-addendum.md) | PT | Addendum checking the items left unverified in the previous document |
-| [research-academic-survey.md](research-academic-survey.md) | PT + EN abstract | Systematic literature survey behind ADR-0009 |
-| [research-client-query-patterns.md](research-client-query-patterns.md) | PT + EN abstract | Structured queries in six LLM-agent memory systems, read from their source |
-| [research-ai-memory.md](research-ai-memory.md) | PT | Technical reading of ai-memory and how it relates to MoobFS |
-| [ecosystem.md](ecosystem.md) | PT | Free software relevant to the project, checked before building anything |
-| [project-review-2026-10-10.md](project-review-2026-10-10.md) | PT | Implementation and roadmap review, with static `QUERY` findings |
+| [value-assessment.md](value-assessment.md) | EN | Critical assessment of usefulness and value; the English summary is when-not-to-use.md |
+| [research-originality.md](research-originality.md) | EN | Prior-art audit (SFS, BFS, YoloFS and others) and what may be claimed |
+| [research-metadata-search.md](research-metadata-search.md) | EN | State of the art in file-metadata search, authorization and change feeds (for ADR-0009) |
+| [research-metadata-search-addendum.md](research-metadata-search-addendum.md) | EN | Addendum checking the items left unverified in the previous document |
+| [research-academic-survey.md](research-academic-survey.md) | EN | Systematic literature survey behind ADR-0009 |
+| [research-client-query-patterns.md](research-client-query-patterns.md) | EN | Structured queries in six LLM-agent memory systems, read from their source |
+| [research-ai-memory.md](research-ai-memory.md) | EN | Technical reading of ai-memory and how it relates to MoobFS |
+| [ecosystem.md](ecosystem.md) | EN | Free software relevant to the project, checked before building anything |
+| [project-review-2026-10-10.md](project-review-2026-10-10.md) | EN | Implementation and roadmap review, with static `QUERY` findings |
 
 ## Plans and process
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [security-roadmap.md](security-roadmap.md) | PT | Security and robustness items S1–S11 (threat model, syzkaller, fuzzing, hardening) |
-| [distribution-strategy.md](distribution-strategy.md) | PT | Proposed deployment model, DKMS packaging, kernel matrix and release stages |
-| [community-plan.md](community-plan.md) | PT | Plan for external contributions (policies, templates, CI); largely executed |
-| [seo-geo-plan.md](seo-geo-plan.md) | PT | Discoverability audit and plan for the README, site and docs |
-| [dx-plan.md](dx-plan.md) | PT | Contributor-experience plan for GitHub, in three batches |
-| [ai-workflow.md](ai-workflow.md) | PT | How AI-assisted development is governed (`AGENTS.md`, `CLAUDE.md`, Cursor rules) |
-| [ai-workflow.en.md](ai-workflow.en.md) | EN | English translation of ai-workflow.md (AI-assisted development governance) |
+| [security-roadmap.md](security-roadmap.md) | PT (English translation in review) | Security and robustness items S1–S11 (threat model, syzkaller, fuzzing, hardening) |
+| [distribution-strategy.md](distribution-strategy.md) | EN | Proposed deployment model, DKMS packaging, kernel matrix and release stages |
+| [community-plan.md](community-plan.md) | EN | Plan for external contributions (policies, templates, CI); largely executed |
+| [seo-geo-plan.md](seo-geo-plan.md) | EN | Discoverability audit and plan for the README, site and docs |
+| [dx-plan.md](dx-plan.md) | EN | Contributor-experience plan for GitHub, in three batches |
+| [ai-workflow.md](ai-workflow.md) | EN | How AI-assisted development is governed (`AGENTS.md`, `CLAUDE.md`, Cursor rules) |
 
 ## Assets
 

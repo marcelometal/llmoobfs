@@ -1,102 +1,102 @@
-# 0044 — `QUERY2` medido contra a v1 e revisão do plano de igualdade da Q2c
+# 0044 — `QUERY2` measured against v1 and revision of the Q2c equality plan
 
-Data: 2026-10-12. Estado: medido no host do registro 0042; plano revisado e testado na VM da suíte
-e no host; KASAN pelo CI no pull request. Resultados brutos em `bench/results/2026-10-12-macmini-q2/`.
+Date: 2026-10-12. Status: measured on the host of journal 0042; plan revised and tested in the suite's VM
+and on the host; KASAN by CI on the pull request. Raw results in `bench/results/2026-10-12-macmini-q2/`.
 
-## Objetivo
+## Goal
 
-Medir a v2 contra a v1 em escala no mesmo hardware (critério das fases Q2a a Q2c) e comparar o
-plano da Q2c (interseção por avanço alternado, registro 0037) com o da Q2b.
+Measure v2 against v1 at scale on the same hardware (criterion of phases Q2a to Q2c) and compare the
+Q2c plan (intersection by leapfrog, journal 0037) with the Q2b one.
 
-## Método
+## Method
 
-60 000 memórias, perfil 8, semente 1 (as do registro 0029), gravadas com W1 sob a raiz do layer,
-de modo que `ns0` a `ns7` são domínios. Três repetições de 50 chamadas por forma.
-`bench/q2-campaign.sh` mede a v1 e a v2; `bench/q2c-compare.sh` recarrega módulos diferentes
-sobre os mesmos dados e mede as mesmas formas da v2 com cada um, conferindo que as respostas são
-idênticas.
+60 000 memories, profile 8, seed 1 (those of journal 0029), written with W1 under the layer root,
+so that `ns0` to `ns7` are domains. Three repetitions of 50 calls per form.
+`bench/q2-campaign.sh` measures v1 and v2; `bench/q2c-compare.sh` reloads different modules
+over the same data and measures the same v2 forms with each one, checking that the responses are
+identical.
 
-## Resultados: v1 contra v2 (p50, mesmas respostas)
+## Results: v1 against v2 (p50, same responses)
 
-| Pergunta | v1 como root | v1 como usuário | v2 no domínio, como usuário |
+| Question | v1 as root | v1 as user | v2 in the domain, as user |
 | --- | --- | --- | --- |
-| Q3: `namespace = ns3 AND agent = a07` (253) | 3,86 ms | 4,14 ms | 0,13 a 0,16 ms (plano revisado) |
-| Q4: `namespace = ns1 AND kind = fact AND created >= T` (1 021) | 5,14 ms | 5,14 ms | 0,71 a 0,72 ms (plano revisado) |
+| Q3: `namespace = ns3 AND agent = a07` (253) | 3.86 ms | 4.14 ms | 0.13 to 0.16 ms (revised plan) |
+| Q4: `namespace = ns1 AND kind = fact AND created >= T` (1 021) | 5.14 ms | 5.14 ms | 0.71 to 0.72 ms (revised plan) |
 
-As respostas da v1 e da v2 têm os mesmos inodes nas duas formas (`equivalence.txt`). A v1 como
-usuário custa pouco mais que como root graças à revalidação RCU (registro 0028). A v2 não
-percorre os outros domínios: Q3 ficou de 24 a 30 vezes mais rápida, Q4 cerca de 7 vezes.
-Na Azure (registro 0029), Q3 e Q4 da v1 custavam 6,95 ms e 6,99 ms; este host é mais rápido por
-consulta, então as comparações valem dentro dele.
+The v1 and v2 responses have the same inodes in both forms (`equivalence.txt`). v1 as
+user costs little more than as root thanks to RCU revalidation (journal 0028). v2 does not
+walk the other domains: Q3 became 24 to 30 times faster, Q4 about 7 times.
+On Azure (journal 0029), v1's Q3 and Q4 cost 6.95 ms and 6.99 ms; this host is faster per
+query, so the comparisons hold within it.
 
-## Resultados: planos de igualdade (p50 em µs, duas passadas por módulo)
+## Results: equality plans (p50 in µs, two passes per module)
 
-| Forma no domínio | Q2b: varre o 1º termo | Q2c: avanço alternado | Revisado: sequência mais curta |
+| Form in the domain | Q2b: scans the 1st term | Q2c: leapfrog | Revised: shortest run |
 | --- | --- | --- | --- |
-| namespace (todo o domínio) AND agent (253) | 2 311 / 2 320 | 411 / 424 | 127 / 162 |
+| namespace (the whole domain) AND agent (253) | 2 311 / 2 320 | 411 / 424 | 127 / 162 |
 | agent AND namespace | 112 / 109 | 289 / 304 | 127 / 160 |
-| agent (253) AND kind (3 030), 98 resultados | 60 / 60 | 216 / 229 | 88 / 114 |
+| agent (253) AND kind (3 030), 98 results | 60 / 60 | 216 / 229 | 88 / 114 |
 | namespace AND kind AND created (ns1), 1 021 | 2 335 / 2 397 | 1 549 / 1 550 | 710 / 723 |
-| agent sozinho (mesmo plano nos três) | 71 / 71 | 81 / 86 | 79 / 98 |
+| agent alone (same plan in all three) | 71 / 71 | 81 / 86 | 79 / 98 |
 
-A linha "agent sozinho" usa o mesmo código nos três módulos; a diferença entre elas (71 a 98 µs)
-mostra a ordem do ruído desta medição.
+The "agent alone" line uses the same code in the three modules; the difference between them (71 to 98 µs)
+shows the order of the noise of this measurement.
 
-## Decisão: o plano da Q2c foi trocado
+## Decision: the Q2c plan was replaced
 
-O avanço alternado faz uma busca na árvore por passo. Ele só ganhou quando a sequência do
-primeiro termo era longa (o caso `namespace` dentro do próprio domínio, em que o termo casa com
-tudo); quando o primeiro termo já tinha sequência curta, foi 2,7 a 3,6 vezes mais lento que a
-varredura simples da Q2b, porque cada passo custa uma busca logarítmica e a varredura custa um
-`rb_next`. Com dados sem agrupamento, o número de passos do avanço alternado é da ordem da
-sequência mais curta, então ele não reduz o trabalho em relação a varrer essa sequência.
+The leapfrog does one tree search per step. It only won when the run of the
+first term was long (the `namespace` case within its own domain, where the term matches
+everything); when the first term already had a short run, it was 2.7 to 3.6 times slower than the
+simple Q2b scan, because each step costs a logarithmic search and the scan costs one
+`rb_next`. With unclustered data, the number of leapfrog steps is of the order of the
+shortest run, so it does not reduce the work compared to scanning that run.
 
-Plano revisado: uma vez por chamada, as sequências de todos os termos `EQ` são percorridas em
-paralelo a partir do inode de retomada até a primeira terminar; essa é a mais curta, a um custo
-proporcional a ela. Depois só ela é varrida, e todos os termos são testados em cada inode. O
-resultado ficou perto da melhor ordem escrita à mão em todas as formas: até 1,2 a 1,9 vez mais
-lento que ela (o custo de medir as sequências), 3 vezes mais rápido que o avanço alternado no
-melhor caso dele e cerca de 16 vezes mais rápido que a Q2b quando o primeiro termo é amplo.
-Alternativa registrada: árvore aumentada com tamanhos de subárvore, que daria o tamanho de cada
-sequência em tempo logarítmico; descartada por ora porque o percurso em paralelo já é barato e
-não muda a estrutura do índice.
+Revised plan: once per call, the runs of all `EQ` terms are walked in
+parallel from the resume inode until the first one ends; that is the shortest, at a cost
+proportional to it. Then only it is scanned, and all terms are tested on each inode. The
+result came close to the best hand-written order in all forms: up to 1.2 to 1.9 times
+slower than it (the cost of measuring the runs), 3 times faster than the leapfrog in its
+best case and about 16 times faster than Q2b when the first term is broad.
+Alternative recorded: an augmented tree with subtree sizes, which would give the size of each
+run in logarithmic time; discarded for now because the parallel walk is already cheap and
+does not change the structure of the index.
 
-Consequência no cursor: como a sequência escolhida pode mudar entre páginas, a retomada desse
-plano usa só o inode (as sequências estão todas em ordem de inode); o valor guardado no cursor é
-ignorado nesse plano. A UAPI não muda. `docs/spec-query-v2.md` §4.4 recebe a revisão; o registro
-0037 recebe nota apontando para este.
+Consequence for the cursor: since the chosen run can change between pages, resuming this
+plan uses only the inode (the runs are all in inode order); the value stored in the cursor is
+ignored in this plan. The UAPI does not change. `docs/spec-query-v2.md` §4.4 receives the revision; journal
+0037 receives a note pointing to this one.
 
-## Outras observações
+## Other observations
 
-- "N mais recentes" (ordem por `created` decrescente, 20 resultados) custou cerca de 185 µs com
-  `kind = note` (cerca de 40% do domínio) e cerca de 1,7 ms com `agent = a07` (cerca de 3%): a
-  varredura percorre cerca de 600 entradas da ordem até achar 20, a cerca de 2,8 µs por entrada.
-  O custo por entrada é dominado pela busca do atributo na lista do inode (`entry_find`, uma
-  alocação por atributo). Uma representação compacta dos atributos por inode é a otimização
-  candidata; não foi feita.
-- Remontagem com o cache quente: cerca de 0,71 s para 60 000 memórias (cerca de 12 µs por
-  memória). Índice: 437 882 entradas, 36,4 MB (cerca de 607 bytes por memória).
-- O `bench-load` contava toda resposta de "N mais recentes" como erro por estar truncada no
-  limite; corrigido (só conta como estouro uma resposta sem ordem e com o limite máximo).
+- "N most recent" (ordered by `created` descending, 20 results) cost about 185 µs with
+  `kind = note` (about 40% of the domain) and about 1.7 ms with `agent = a07` (about 3%): the
+  scan walks about 600 entries of the order until it finds 20, at about 2.8 µs per entry.
+  The per-entry cost is dominated by the search for the attribute in the inode's list (`entry_find`, one
+  allocation per attribute). A compact per-inode representation of the attributes is the candidate
+  optimization; it was not done.
+- Remount with a warm cache: about 0.71 s for 60 000 memories (about 12 µs per
+  memory). Index: 437 882 entries, 36.4 MB (about 607 bytes per memory).
+- `bench-load` counted every "N most recent" response as an error because it was truncated at the
+  limit; fixed (only a response without ordering and with the maximum limit counts as overflow).
 
-## Evidências
+## Evidence
 
-`make vm-test` com o plano revisado: `QUERY2_LEAPFROG_PASS` (o bloco da Q2c, inclusive a
-verificação do plano pela ordem da resposta), `QUERY2_MISSING_BATCH_PASS`, `QUERY2_ORDER_PASS` e
-`QUERY2_PASS` em ext4, btrfs e XFS, e todos os marcadores anteriores até `MOOBFS_LAYER_PASS`. No
-host, `bench/q2c-compare.sh` confirmou respostas idênticas entre Q2b, avanço alternado e plano
-revisado, cada um carregado duas vezes (`Q2C_COMPARE_PASS`).
+`make vm-test` with the revised plan: `QUERY2_LEAPFROG_PASS` (the Q2c block, including the
+plan verification by the order of the response), `QUERY2_MISSING_BATCH_PASS`, `QUERY2_ORDER_PASS` and
+`QUERY2_PASS` on ext4, btrfs and XFS, and all the previous markers up to `MOOBFS_LAYER_PASS`. On the
+host, `bench/q2c-compare.sh` confirmed identical responses between Q2b, leapfrog and the revised
+plan, each loaded twice (`Q2C_COMPARE_PASS`).
 
-## Limitações
+## Limitations
 
-- Só ext4 e um domínio por forma; sem carga concorrente.
-- Ruído de até cerca de 25% entre passadas no mesmo host para valores de dezenas de µs.
-- A comparação entre planos é sobre um conjunto sem agrupamento; em dados agrupados por inode o
-  avanço alternado poderia ganhar, e isso não foi medido.
+- Only ext4 and one domain per form; no concurrent load.
+- Noise of up to about 25% between passes on the same host for values of tens of µs.
+- The comparison between plans is over an unclustered set; on data clustered by inode the
+  leapfrog could win, and this was not measured.
 
-## Nota de correção (2026-10-12)
+## Correction note (2026-10-12)
 
-A explicação do custo do "N mais recentes" acima (cerca de 600 entradas a cerca de 2,8 µs por
-entrada, atribuída à busca do atributo na lista do inode) estava errada. A causa principal era a
-varredura juntar 256 candidatos mesmo para um pedido de 20, o que percorria cerca de 7 500
-entradas a cerca de 0,23 µs. Diagnóstico, correção e novas medições no registro 0048.
+The explanation of the cost of "N most recent" above (about 600 entries at about 2.8 µs per
+entry, attributed to the search for the attribute in the inode's list) was wrong. The main cause was the
+scan gathering 256 candidates even for a request of 20, which walked about 7 500
+entries at about 0.23 µs. Diagnosis, fix and new measurements in journal 0048.

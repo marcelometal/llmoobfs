@@ -1,193 +1,193 @@
-# Especificação do M2 — camada de memória empilhada sobre filesystem maduro
+# M2 specification — memory layer stacked over a mature filesystem
 
-Estado: **proposta** (2026-10-10). Nada implementado ou testado. Decisões em
-[ADR-0005](decisions/0005-memory-model-bfs-reference.md) e
-[ADR-0007](decisions/0007-stacked-memory-layer.md). A versão anterior desta especificação
-(volume completo, ADR-0006) está preservada em
+Status: **proposal** (2026-10-10). Nothing implemented or tested. Decisions in
+[ADR-0005](decisions/0005-memory-model-bfs-reference.md) and
+[ADR-0007](decisions/0007-stacked-memory-layer.md). The previous version of this specification
+(full volume, ADR-0006) is preserved in
 [spec-m2-full-volume-superseded.md](spec-m2-full-volume-superseded.md).
 
-## 1. O que é
+## 1. What it is
 
-`moobfs` é um módulo do kernel que monta uma **visão de memória** sobre um diretório de um
-filesystem maduro:
+`moobfs` is a kernel module that mounts a **memory view** over a directory of a
+mature filesystem:
 
 ```sh
 mount -t moobfs -o lower=/srv/memory/store,index_budget=128M none /mnt/memory
 ```
 
-Tudo que está em `/mnt/memory` é um arquivo ou diretório real em `/srv/memory/store`. A camada
-acrescenta: validação de atributos tipados, índice de atributos em memória, consulta por
-atributo (`QUERY`), capacidades do inferior expostas de forma uniforme e, nas fases seguintes,
-identidade e proveniência de memórias.
+Everything in `/mnt/memory` is a real file or directory in `/srv/memory/store`. The layer
+adds: validation of typed attributes, an in-memory attribute index, query by
+attribute (`QUERY`), capabilities of the lower filesystem exposed uniformly and, in the following phases,
+memory identity and provenance.
 
-Princípios:
+Principles:
 
-- **Nada preso.** Desmontado o MoobFS, o diretório inferior é um conjunto comum de arquivos
-  com xattr; `grep`, `getfattr`, `git`, `rsync` e `duperemove` funcionam nele sem a camada.
-- **Nada reinventado.** Blocos, journal, diretórios, mmap, locks, reflink, checksums e
-  snapshots são do inferior. Git versiona conteúdo. A camada não tem formato em disco próprio
-  além da codificação dos valores de xattr.
-- **Degradação explícita.** O que o inferior não oferece é reportado, não simulado.
+- **Nothing locked in.** Once MoobFS is unmounted, the lower directory is an ordinary set of files
+  with xattrs; `grep`, `getfattr`, `git`, `rsync` and `duperemove` work on it without the layer.
+- **Nothing reinvented.** Blocks, journal, directories, mmap, locks, reflink, checksums and
+  snapshots belong to the lower filesystem. Git versions content. The layer has no on-disk format of its own
+  beyond the encoding of xattr values.
+- **Explicit degradation.** What the lower filesystem does not offer is reported, not simulated.
 
-## 2. Escopo do M2
+## 2. M2 scope
 
-Entra: passagem completa de operações POSIX para o inferior (arquivos, diretórios, rename,
-unlink, truncate, mmap, fsync, locks, splice); atributos tipados em `user.moob.*` validados na
-escrita; índice em RAM e `QUERY` por ioctl; reflink e dedup delegados; `GET_INFO` com
-capacidades; ferramentas `moobfs-check` e `moobfs-index`; testes sobre btrfs, XFS e ext4.
+In: complete passthrough of POSIX operations to the lower filesystem (files, directories, rename,
+unlink, truncate, mmap, fsync, locks, splice); typed attributes in `user.moob.*` validated on
+write; in-RAM index and `QUERY` by ioctl; delegated reflink and dedup; `GET_INFO` with
+capabilities; `moobfs-check` and `moobfs-index` tools; tests over btrfs, XFS and ext4.
 
-Fica fora: revisões e identidade de memória (M3), consulta temporal (M3), índice persistente,
-dedup automático na escrita, qualquer alteração do inferior fora do diretório montado, suporte a
-mais de um inferior, exportação NFS, user namespaces não triviais (segue o que o overlayfs
-permite, avaliado caso a caso).
+Out: memory revisions and identity (M3), temporal query (M3), persistent index,
+automatic dedup on write, any change to the lower filesystem outside the mounted directory, support for
+more than one lower filesystem, NFS export, non-trivial user namespaces (follows what overlayfs
+allows, evaluated case by case).
 
-## 3. Modelo de dados
+## 3. Data model
 
-| Conceito | Representação no inferior | Papel da camada |
+| Concept | Representation in the lower filesystem | Role of the layer |
 | --- | --- | --- |
-| Memória | Arquivo comum | Expõe como arquivo; valida atributos |
-| Coleção | Diretório comum | Passagem |
-| Atributo tipado | xattr `user.moob.<nome>` = `tipo (1 byte) + payload` | Valida tipo, tamanho e nome; indexa |
-| Atributos opacos | Qualquer outro xattr | Passagem sem validação ou índice |
-| Versão da codificação | xattr `user.moob.format` no diretório raiz inferior, valor `1` | Recusa montar versão maior; migra versão menor só com ferramenta |
-| Conteúdo compartilhado | Reflink do inferior (btrfs, XFS) | Delegado; `FIEMAP` passa a flag `SHARED` do inferior |
+| Memory | Ordinary file | Exposes as a file; validates attributes |
+| Collection | Ordinary directory | Passthrough |
+| Typed attribute | xattr `user.moob.<name>` = `type (1 byte) + payload` | Validates type, size and name; indexes |
+| Opaque attributes | Any other xattr | Passthrough without validation or index |
+| Encoding version | xattr `user.moob.format` on the lower root directory, value `1` | Refuses to mount a higher version; migrates a lower version only with a tool |
+| Shared content | Reflink of the lower filesystem (btrfs, XFS) | Delegated; `FIEMAP` passes through the lower filesystem's `SHARED` flag |
 
-Tipos: `string` (UTF-8 válido, até 1 KiB), `int64`, `double`, `bool`, `time` (ns desde epoch,
-int64), `raw` (até 4 KiB, não indexado). Nome: `[a-z0-9_.]`, 1 a 64 bytes. Até 64 atributos
-tipados por arquivo. Limites são tetos de experimento, configuráveis em compilação.
-`setxattr` com tipo inválido, tamanho fora do limite ou nome fora do alfabeto retorna `EINVAL`;
-`user.moob.format` é reservado e retorna `EPERM` pela camada. Criar o 65.º atributo tipado
-retorna `ENOSPC`. O inferior pode impor um limite menor pelo tamanho do seu bloco de xattr
-(ext4 com blocos de 1 KiB comporta cerca de 36 entradas pequenas; com 4 KiB, mais de 64), e
-esse `ENOSPC` propaga sem ser mascarado: o limite efetivo é o menor dos dois.
+Types: `string` (valid UTF-8, up to 1 KiB), `int64`, `double`, `bool`, `time` (ns since epoch,
+int64), `raw` (up to 4 KiB, not indexed). Name: `[a-z0-9_.]`, 1 to 64 bytes. Up to 64 typed
+attributes per file. Limits are experiment ceilings, configurable at compile time.
+`setxattr` with an invalid type, a size out of bounds or a name outside the alphabet returns `EINVAL`;
+`user.moob.format` is reserved and returns `EPERM` from the layer. Creating the 65th typed attribute
+returns `ENOSPC`. The lower filesystem may impose a smaller limit through the size of its xattr block
+(ext4 with 1 KiB blocks holds about 36 small entries; with 4 KiB, more than 64), and
+that `ENOSPC` propagates without being masked: the effective limit is the smaller of the two.
 
-A camada não impõe esquema. Convenções de nomes (por exemplo `kind`, `tier`, `agent`,
-`session`, `created`, `expires`) ficam em documento de recomendação para clientes, não no kernel.
+The layer does not impose a schema. Naming conventions (for example `kind`, `tier`, `agent`,
+`session`, `created`, `expires`) live in a recommendation document for clients, not in the kernel.
 
-## 4. Operações
+## 4. Operations
 
-| Operação | Comportamento |
+| Operation | Behavior |
 | --- | --- |
-| lookup, readdir, create, mkdir, unlink, rmdir, rename, truncate, setattr | Passagem para o inferior com as credenciais de quem montou (`override_creds`), como no overlayfs; permissões verificadas na camada **e** no inferior |
-| link, symlink | Passagem se o inferior suportar; opção de montagem `nolinks` para recusar (`EPERM`), recomendada para clientes como o ai-memory, cujo confinamento rejeita symlinks |
-| read, write, mmap, splice, fsync, fallocate, locks | Delegados por `backing_file_*`; `fsync` chama o `fsync` do inferior; semântica de durabilidade é a do inferior |
-| `O_DIRECT` | Passagem; se o inferior recusar, propaga o erro |
-| getxattr, listxattr, removexattr | Passagem |
-| setxattr em `user.moob.*` | Valida tipo, tamanho, nome e UTF-8; grava no inferior; atualiza o índice sob o lock do inode; erro de validação retorna `EINVAL` sem tocar o inferior |
-| setxattr em outros namespaces | Passagem |
-| `FICLONE`, `FICLONERANGE`, `FIDEDUPERANGE` | `vfs_clone_file_range` / `vfs_dedupe_file_range_one` nos arquivos inferiores; `EOPNOTSUPP` se o inferior não suportar; o VFS já comparou bytes no dedup |
-| `FIEMAP` | Passagem |
-| `QUERY` (ioctl no diretório raiz montado) | Predicado de até 4 termos `(atributo, operador ∈ {=, <, <=, >, >=, prefixo}, valor tipado)` em conjunção, limite de resultados; retorna `(número de inode da camada, handle de arquivo)` para `open_by_handle_at`, mais caminho relativo quando disponível por lookup reverso limitado |
-| `GET_INFO` (ioctl) | Versão da UAPI, versão da codificação, limites, orçamento e uso do índice, capacidades do inferior (`reflink`, `dedup`, `data_checksums`, `snapshots`, `xattr`), tipo do inferior |
+| lookup, readdir, create, mkdir, unlink, rmdir, rename, truncate, setattr | Passthrough to the lower filesystem with the credentials of the mounter (`override_creds`), as in overlayfs; permissions checked in the layer **and** in the lower filesystem |
+| link, symlink | Passthrough if the lower filesystem supports it; mount option `nolinks` to refuse (`EPERM`), recommended for clients such as ai-memory, whose confinement rejects symlinks |
+| read, write, mmap, splice, fsync, fallocate, locks | Delegated via `backing_file_*`; `fsync` calls the lower filesystem's `fsync`; durability semantics are those of the lower filesystem |
+| `O_DIRECT` | Passthrough; if the lower filesystem refuses, propagates the error |
+| getxattr, listxattr, removexattr | Passthrough |
+| setxattr on `user.moob.*` | Validates type, size, name and UTF-8; writes to the lower filesystem; updates the index under the inode lock; a validation error returns `EINVAL` without touching the lower filesystem |
+| setxattr on other namespaces | Passthrough |
+| `FICLONE`, `FICLONERANGE`, `FIDEDUPERANGE` | `vfs_clone_file_range` / `vfs_dedupe_file_range_one` on the lower files; `EOPNOTSUPP` if the lower filesystem does not support it; the VFS has already compared bytes in dedup |
+| `FIEMAP` | Passthrough |
+| `QUERY` (ioctl on the mounted root directory) | Predicate of up to 4 terms `(attribute, operator ∈ {=, <, <=, >, >=, prefix}, typed value)` in conjunction, result limit; returns `(layer inode number, file handle)` for `open_by_handle_at`, plus the relative path when available by bounded reverse lookup |
+| `GET_INFO` (ioctl) | UAPI version, encoding version, limits, index budget and usage, capabilities of the lower filesystem (`reflink`, `dedup`, `data_checksums`, `snapshots`, `xattr`), type of the lower filesystem |
 
-Montagem `ro`: nenhuma escrita chega ao inferior; o índice é construído normalmente.
+`ro` mount: no write reaches the lower filesystem; the index is built normally.
 
-## 5. Índice de atributos
+## 5. Attribute index
 
-- Construído na montagem por varredura do diretório inferior (percurso com `iterate_dir` e
-  `vfs_getxattr` nos arquivos). Custo proporcional ao número de arquivos; orçamento de memória
-  `index_budget` (padrão 128 MiB); ultrapassado o orçamento, a montagem falha com `ENOMEM` e
-  mensagem clara, ou monta sem índice com `index=off` (`QUERY` retorna `ENOSYS`).
-- Estruturas: por atributo, `xarray` para inteiros/tempos/booleanos e `rbtree` para strings e
-  doubles, chaveadas pelo valor codificado; cada entrada aponta para o inode da camada.
-- Atualizado em `setxattr`, `removexattr`, `unlink`, `rename` (apenas lookup reverso) e
-  `create`, dentro do mesmo caminho de código, sob o lock do inode. Não persistido: a próxima
-  montagem reconstrói. Isso também absorve modificações feitas no inferior por fora enquanto
-  desmontado.
-- Modificar o inferior **enquanto montado** é indefinido, como no overlayfs; `moobfs-check`
-  detecta divergência entre índice e inferior por varredura comparativa.
+- Built at mount by a scan of the lower directory (walk with `iterate_dir` and
+  `vfs_getxattr` on the files). Cost proportional to the number of files; memory budget
+  `index_budget` (default 128 MiB); if the budget is exceeded, the mount fails with `ENOMEM` and
+  a clear message, or mounts without an index with `index=off` (`QUERY` returns `ENOSYS`).
+- Structures: per attribute, `xarray` for integers/times/booleans and `rbtree` for strings and
+  doubles, keyed by the encoded value; each entry points to the layer inode.
+- Updated in `setxattr`, `removexattr`, `unlink`, `rename` (reverse lookup only) and
+  `create`, within the same code path, under the inode lock. Not persisted: the next
+  mount rebuilds it. This also absorbs modifications made to the lower filesystem from outside while
+  unmounted.
+- Modifying the lower filesystem **while mounted** is undefined, as in overlayfs; `moobfs-check`
+  detects divergence between index and lower filesystem by a comparative scan.
 
-> Nota (2026-10-12, registro 0050): com o índice desligado, `QUERY` passou a devolver
-> `EOPNOTSUPP` em vez de `ENOSYS`; `ENOSYS` fica reservado a chamada de sistema inexistente.
+> Note (2026-10-12, journal 0050): with the index off, `QUERY` now returns
+> `EOPNOTSUPP` instead of `ENOSYS`; `ENOSYS` is reserved for a nonexistent system call.
 
-## 6. Consistência e durabilidade
+## 6. Consistency and durability
 
-- Tudo que o inferior garante, a camada herda; nada além disso. `fsync` bem-sucedido significa
-  o que significa no inferior.
-- Conteúdo e atributos não são gravados atomicamente juntos (são operações distintas no
-  inferior). Convenção recomendada aos clientes: gravar conteúdo em arquivo temporário, definir
-  atributos, `fsync` do arquivo, `rename`, e `fsync` do diretório pai. Com essa ordem, um
-  arquivo visível no nome final tem conteúdo e atributos completos, e o nome sobrevive a uma
-  queda de energia. Sem o `fsync` do diretório, o `rename` só se torna durável no próximo commit
-  do journal do inferior (verificado com `dm-log-writes` na fase 2e: o arquivo renomeado não
-  estava presente na marca gravada logo após o `rename`).
-- Falha de I/O no inferior propaga ao chamador; a camada não marca estado próprio.
-- Queda de energia: o inferior recupera; a camada reconstrói o índice.
+- Everything the lower filesystem guarantees, the layer inherits; nothing beyond that. A successful `fsync` means
+  what it means in the lower filesystem.
+- Content and attributes are not written atomically together (they are distinct operations in the
+  lower filesystem). Convention recommended to clients: write content to a temporary file, set
+  attributes, `fsync` the file, `rename`, and `fsync` the parent directory. With this order, a
+  file visible under the final name has complete content and attributes, and the name survives a
+  power loss. Without the directory `fsync`, the `rename` only becomes durable at the next commit
+  of the lower filesystem's journal (verified with `dm-log-writes` in phase 2e: the renamed file was not
+  present at the mark written right after the `rename`).
+- An I/O failure in the lower filesystem propagates to the caller; the layer does not mark state of its own.
+- Power loss: the lower filesystem recovers; the layer rebuilds the index.
 
-## 7. Ferramentas (espaço de usuário)
+## 7. Tools (user space)
 
-- `moobfs-check <lower>`: valida codificação de todos os `user.moob.*`, versão do formato,
-  limites; saída JSON; não repara.
-- `moobfs-index <lower>`: constrói o índice em espaço de usuário com o mesmo código de
-  `common/` e responde consultas; serve de oráculo para testar o `QUERY` do kernel e como
-  utilitário para quem não quer montar.
-- `moobfs-attr`: `get`/`set`/`list` tipados por cima de `getfattr`/`setfattr`, para scripts.
-- Dedup: `duperemove` ou `cp --reflink` do próprio sistema; nenhuma ferramenta própria.
-- Importação de imagens M1: `moobfs-import-m1 imagem.img <lower>` extrai arquivos e, se o
-  inferior suportar, aplica `FIDEDUPERANGE` para reproduzir o compartilhamento.
+- `moobfs-check <lower>`: validates the encoding of all `user.moob.*`, format version,
+  limits; JSON output; does not repair.
+- `moobfs-index <lower>`: builds the index in user space with the same code from
+  `common/` and answers queries; serves as an oracle to test the kernel `QUERY` and as a
+  utility for those who do not want to mount.
+- `moobfs-attr`: typed `get`/`set`/`list` on top of `getfattr`/`setfattr`, for scripts.
+- Dedup: `duperemove` or the system's own `cp --reflink`; no tool of our own.
+- Import of M1 images: `moobfs-import-m1 image.img <lower>` extracts files and, if the
+  lower filesystem supports it, applies `FIDEDUPERANGE` to reproduce the sharing.
 
-## 8. Entradas inválidas que devem ser rejeitadas
+## 8. Invalid inputs that must be rejected
 
-Na montagem: inferior inexistente, não é diretório, é o próprio ponto de montagem ou contém
-`user.moob.format` com versão maior; inferior sem suporte a xattr (`user.`) monta só com
-`index=off` e aviso. Em `setxattr`: tipo desconhecido, payload de tamanho errado para o tipo,
-UTF-8 inválido em `string` (inclui NUL, sequências longas demais, substitutos e pontos de
-código acima de U+10FFFF), `double` NaN, `bool` fora de 0/1, nome fora do alfabeto, nome
-reservado (`EPERM`), excesso de atributos (`ENOSPC`). Na varredura: xattr
-`user.moob.*` malformado em arquivo existente é registrado (`moobfs-check` lista) e o arquivo
-fica fora do índice; a montagem não falha. Em `QUERY`: operador inválido, tipo do valor
-incompatível com o atributo, mais de 4 termos, limite de resultados fora da faixa, estrutura com
-campos reservados não zerados. Cada caso tem teste nas ferramentas e no módulo.
+At mount: lower filesystem nonexistent, not a directory, is the mount point itself or contains
+`user.moob.format` with a higher version; a lower filesystem without xattr support (`user.`) mounts only with
+`index=off` and a warning. In `setxattr`: unknown type, payload of the wrong size for the type,
+invalid UTF-8 in `string` (includes NUL, overlong sequences, surrogates and code
+points above U+10FFFF), `double` NaN, `bool` outside 0/1, name outside the alphabet, reserved
+name (`EPERM`), too many attributes (`ENOSPC`). In the scan: a malformed
+`user.moob.*` xattr on an existing file is recorded (`moobfs-check` lists it) and the file
+stays out of the index; the mount does not fail. In `QUERY`: invalid operator, value type
+incompatible with the attribute, more than 4 terms, result limit out of range, structure with
+reserved fields not zeroed. Each case has a test in the tools and in the module.
 
-## 9. Testes e evidência exigida
+## 9. Tests and required evidence
 
-1. `make test`: `common/` (codificação, predicados, índice em espaço de usuário), ferramentas,
-   sanitizers, fuzzing da codificação e do parser de `QUERY`.
-2. `make vm-test`, com evidência em `build/vm/`:
-   - xfstests grupo `generic` sobre o mount moobfs com inferior btrfs, XFS e ext4, seguindo o
-     modelo de `./check --fs overlay`; lista de exclusões versionada e justificada;
-   - `fsx` e `fsstress` sobre o mount;
-   - `dm-log-writes` sob o inferior, com carga de `write`/`setxattr`/`fsync`/`rename`, replay
-     em cada marca e verificação de que todo arquivo no nome final tem atributos completos;
-   - `dm-flakey` no inferior: erros propagam, índice coerente após remontagem;
-   - entradas inválidas da seção 8;
-   - `QUERY` comparado com `moobfs-index` (mesmas consultas, mesmos resultados) e, para as
-     semânticas de operador, com `bfs_shell` do Haiku;
-   - reflink e dedup com `cp --reflink` e `duperemove` sobre btrfs e XFS; `EOPNOTSUPP` sobre ext4;
-   - **aceitação com clientes reais que não conhecem o MoobFS**: `git init`, commits e
-     `git fsck` no mount; SQLite em WAL com escritor e leitor concorrentes e `PRAGMA
-     integrity_check`; e um cliente de memória próprio (script que grava páginas markdown por
-     tmp + `rename` + `fsync`, define atributos tipados e consulta por `QUERY`). Sucesso é
-     conteúdo íntegro e `moobfs-check` limpo após desmontar. Nenhum projeto externo de memória
-     de agentes faz parte do critério: eles entram no M4 como sistemas a comparar.
-3. KASAN e `PROVE_LOCKING` via virtme-ng antes de qualquer marco declarado.
-4. O M1 continua executado em `make vm-test` como regressão do experimento concluído.
+1. `make test`: `common/` (encoding, predicates, user-space index), tools,
+   sanitizers, fuzzing of the encoding and of the `QUERY` parser.
+2. `make vm-test`, with evidence in `build/vm/`:
+   - xfstests `generic` group over the moobfs mount with btrfs, XFS and ext4 as lower filesystem, following the
+     model of `./check --fs overlay`; versioned and justified exclusion list;
+   - `fsx` and `fsstress` over the mount;
+   - `dm-log-writes` under the lower filesystem, with a `write`/`setxattr`/`fsync`/`rename` load, replay
+     at each mark and verification that every file under the final name has complete attributes;
+   - `dm-flakey` on the lower filesystem: errors propagate, index coherent after remount;
+   - invalid inputs from section 8;
+   - `QUERY` compared with `moobfs-index` (same queries, same results) and, for the
+     operator semantics, with Haiku's `bfs_shell`;
+   - reflink and dedup with `cp --reflink` and `duperemove` over btrfs and XFS; `EOPNOTSUPP` over ext4;
+   - **acceptance with real clients that do not know MoobFS**: `git init`, commits and
+     `git fsck` on the mount; SQLite in WAL with concurrent writer and reader and `PRAGMA
+     integrity_check`; and a memory client of our own (a script that writes markdown pages via
+     tmp + `rename` + `fsync`, sets typed attributes and queries via `QUERY`). Success is
+     intact content and a clean `moobfs-check` after unmounting. No external agent memory
+     project is part of the criterion: they come in M4 as systems to compare.
+3. KASAN and `PROVE_LOCKING` via virtme-ng before any declared milestone.
+4. M1 keeps running in `make vm-test` as a regression of the concluded experiment.
 
-## 10. Compatibilidade
+## 10. Compatibility
 
-A camada não tem formato em disco além da codificação de xattr, versionada por
-`user.moob.format`. Mudanças incompatíveis na codificação exigem versão nova, ferramenta de
-migração offline e decisão explícita. A UAPI dos ioctls tem versão própria; comando desconhecido
-retorna `ENOTTY`. Imagens M1 continuam legíveis pelo módulo M1 preservado no histórico e
-importáveis pela ferramenta da seção 7.
+The layer has no on-disk format beyond the xattr encoding, versioned by
+`user.moob.format`. Incompatible changes to the encoding require a new version, an offline migration
+tool and an explicit decision. The ioctl UAPI has its own version; an unknown command
+returns `ENOTTY`. M1 images remain readable by the M1 module preserved in the history and
+importable by the tool of section 7.
 
-## 11. Fases e critério de saída
+## 11. Phases and exit criterion
 
-| Fase | Entrega | Saída |
+| Phase | Deliverable | Exit |
 | --- | --- | --- |
-| 2a | Passagem mínima (wrapfs): lookup, readdir, create, read/write via `backing_file_*`, mmap, fsync, sobre ext4 | **Validada em 2026-10-10** ([registro 0011](history/0011-phase-2a-stacked-passthrough.md)): `fsx` passa e teste de passagem passa na VM; xfstests `generic` e KASAN ficam para 2b |
-| 2b | Passagem completa (rename, unlink, truncate, locks, splice, xattr opacos); btrfs e XFS como inferiores; reflink delegado | **Validada em 2026-10-10** ([registro 0012](history/0012-phase-2b-full-passthrough.md)): `FICLONE`/`FIDEDUPERANGE` funcionam sobre btrfs e XFS; xfstests completo e KASAN/lockdep ainda pendentes |
-| 2c | Codificação tipada, validação, `moobfs-check`, `moobfs-attr`, fuzzing | **Validada em 2026-10-10** ([registro 0013](history/0013-phase-2c-typed-attributes.md)): entradas inválidas rejeitadas no kernel e pelas ferramentas; fuzzing no CI |
-| 2d | Índice em RAM, `QUERY`, `GET_INFO`, `moobfs-index` como oráculo | **Validada em 2026-10-10** ([registro 0014](history/0014-phase-2d-index-query.md)): dez consultas idênticas kernel/oráculo em ext4, btrfs e XFS; `noindex` e `index_budget` exercitados |
-| 2e | Aceitação com git + SQLite + cliente de memória próprio; dm-log-writes; dm-flakey | **Validada em 2026-10-10** ([registro 0015](history/0015-phase-2e-investigation.md)): dois defeitos da camada encontrados e corrigidos; xfstests completo e KASAN/lockdep seguem pendentes |
+| 2a | Minimal passthrough (wrapfs): lookup, readdir, create, read/write via `backing_file_*`, mmap, fsync, over ext4 | **Validated on 2026-10-10** ([journal 0011](history/0011-phase-2a-stacked-passthrough.md)): `fsx` passes and the passthrough test passes in the VM; xfstests `generic` and KASAN are left for 2b |
+| 2b | Complete passthrough (rename, unlink, truncate, locks, splice, opaque xattrs); btrfs and XFS as lower filesystems; delegated reflink | **Validated on 2026-10-10** ([journal 0012](history/0012-phase-2b-full-passthrough.md)): `FICLONE`/`FIDEDUPERANGE` work over btrfs and XFS; full xfstests and KASAN/lockdep still pending |
+| 2c | Typed encoding, validation, `moobfs-check`, `moobfs-attr`, fuzzing | **Validated on 2026-10-10** ([journal 0013](history/0013-phase-2c-typed-attributes.md)): invalid inputs rejected in the kernel and by the tools; fuzzing in CI |
+| 2d | In-RAM index, `QUERY`, `GET_INFO`, `moobfs-index` as oracle | **Validated on 2026-10-10** ([journal 0014](history/0014-phase-2d-index-query.md)): ten queries identical kernel/oracle on ext4, btrfs and XFS; `noindex` and `index_budget` exercised |
+| 2e | Acceptance with git + SQLite + our own memory client; dm-log-writes; dm-flakey | **Validated on 2026-10-10** ([journal 0015](history/0015-phase-2e-investigation.md)): two defects of the layer found and fixed; full xfstests and KASAN/lockdep remain pending |
 
-## 12. Questões em aberto
+## 12. Open questions
 
-- Lookup reverso para devolver caminhos no `QUERY`: manter um mapa inode→dentry na camada ou
-  devolver só handles (proposta: handles sempre; caminhos como extensão opcional).
-- Comportamento com inferior montado por outro usuário ou com user namespaces (seguir o que o
-  overlayfs permite em 6.12 e documentar).
-- Se `user.moob.*` deve migrar para `trusted.moob.*` quando o mount for de root, para evitar que
-  processos sem privilégio alterem atributos por fora da camada.
-- Convenções de nomes de atributos para clientes: documento de recomendação a escrever junto
-  com a fase 2c, usando o front matter do ai-memory como primeiro caso.
+- Reverse lookup to return paths in `QUERY`: keep an inode→dentry map in the layer or
+  return only handles (proposal: handles always; paths as an optional extension).
+- Behavior with a lower filesystem mounted by another user or with user namespaces (follow what
+  overlayfs allows in 6.12 and document it).
+- Whether `user.moob.*` should migrate to `trusted.moob.*` when the mount is by root, to prevent
+  unprivileged processes from changing attributes outside the layer.
+- Attribute naming conventions for clients: a recommendation document to be written together
+  with phase 2c, using ai-memory's front matter as the first case.

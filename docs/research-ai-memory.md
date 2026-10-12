@@ -1,140 +1,140 @@
-# ai-memory (akitaonrails) — leitura técnica e relação com o MoobFS
+# ai-memory (akitaonrails) — technical reading and relation to MoobFS
 
-Data: 2026-10-10. Fonte: clone raso de `github.com/akitaonrails/ai-memory` em `385b81e`
-(release v2.6.3, 2026-10-09). Licença MIT. Criado em 2026-05-21; 9,1 mil estrelas, 636 forks,
-7 issues abertas na data. Rust 2024, workspace com 10 crates principais e 5 companions.
-Cerca de 396 mil linhas de Rust, das quais algo entre 40% e 55% são testes conforme o crate.
-Nada foi compilado ou executado; a leitura foi do código e da documentação.
+Date: 2026-10-10. Source: shallow clone of `github.com/akitaonrails/ai-memory` at `385b81e`
+(release v2.6.3, 2026-10-09). MIT license. Created on 2026-05-21; 9.1 thousand stars, 636 forks,
+7 open issues on that date. Rust 2024, workspace with 10 main crates and 5 companions.
+About 396 thousand lines of Rust, of which somewhere between 40% and 55% are tests depending on the crate.
+Nothing was compiled or run; the reading was of the code and the documentation.
 
-## O que o projeto é
+## What the project is
 
-Memória de longo prazo para agentes de codificação (Claude Code, Codex, Cursor, Gemini CLI e
-mais vinte harnesses), compartilhada entre agentes, máquinas e pessoas. Um único binário
-roda servidor HTTP + MCP, captura eventos de ciclo de vida via hooks, sanitiza, consolida em
-páginas markdown e serve busca e "handoffs" tipados entre agentes.
+Long-term memory for coding agents (Claude Code, Codex, Cursor, Gemini CLI and
+twenty more harnesses), shared across agents, machines and people. A single binary
+runs an HTTP + MCP server, captures lifecycle events via hooks, sanitizes, consolidates into
+markdown pages and serves search and typed "handoffs" between agents.
 
-Pipeline: `capture → consolidate → recall → handoff`. O caminho padrão não faz nenhuma
-chamada a LLM; LLM é opcional para consolidação mais rica, reranking e um passo "dream".
+Pipeline: `capture → consolidate → recall → handoff`. The default path makes no
+LLM call at all; an LLM is optional for richer consolidation, reranking and a "dream" step.
 
-## Modelo de armazenamento (confirmado no código)
+## Storage model (confirmed in the code)
 
-**Duas camadas, uma fonte de verdade.** Decisão registrada em `docs/design-decisions.md` §3
-("Option B: markdown em git é fonte de verdade, SQLite é índice derivado").
+**Two layers, one source of truth.** Decision recorded in `docs/design-decisions.md` §3
+("Option B: markdown in git is the source of truth, SQLite is a derived index").
 
-| Camada | O que é | Onde no código |
+| Layer | What it is | Where in the code |
 | --- | --- | --- |
-| `<data_dir>/wiki/` | Árvore de `.md` com front matter YAML, repositório git (libgit2 vendorizado) | `crates/ai-memory-wiki` (19 mil linhas, ~55% testes) |
-| `<data_dir>/db/memory.sqlite` | Índice derivado: FTS5, entidades, links, embeddings, sessões, observações, handoffs, auditoria | `crates/ai-memory-store` (58 mil linhas, ~37% testes), 76 migrações SQL |
-| `<data_dir>/raw/` | Segmentos JSONL imutáveis de workstreams gerenciados | `crates/ai-memory-workstream` |
+| `<data_dir>/wiki/` | Tree of `.md` files with YAML front matter, git repository (vendored libgit2) | `crates/ai-memory-wiki` (19 thousand lines, ~55% tests) |
+| `<data_dir>/db/memory.sqlite` | Derived index: FTS5, entities, links, embeddings, sessions, observations, handoffs, audit | `crates/ai-memory-store` (58 thousand lines, ~37% tests), 76 SQL migrations |
+| `<data_dir>/raw/` | Immutable JSONL segments of managed workstreams | `crates/ai-memory-workstream` |
 
-Layout do wiki: `<workspace-uuid>/<project-uuid>/{sessions,decisions,gotchas,procedures,
-concepts,notes,_rules,_slots}/*.md`, mais `_meta.md`, `index.md`, `log.md`. Caminho da
-página define o tipo OKF ("Open Knowledge Format" v0.2). Front matter carrega `kind`, `tier`,
+Wiki layout: `<workspace-uuid>/<project-uuid>/{sessions,decisions,gotchas,procedures,
+concepts,notes,_rules,_slots}/*.md`, plus `_meta.md`, `index.md`, `log.md`. The page
+path defines the OKF type ("Open Knowledge Format" v0.2). The front matter carries `kind`, `tier`,
 `pinned`, `expires_at`, `session_id`, `agent`, `entities`, `tags`, `last_modified_by`,
 `generated.{by,at}`.
 
-**Escrita de página** (`Wiki::write_page`, `wiki.rs:2642-2790`): sanitiza, passa por
-webhooks de admissão opcionais, grava o arquivo atomicamente (tmp + rename), faz upsert no
-SQLite; se o upsert falha, restaura os bytes antigos. Commit git é explícito
-(`commit_all`), chamado em SessionEnd, consolidação e checkpoints. Autor do commit é sempre
-`ai-memory <ai-memory@local>`; não há branches, remotes, gc ou reescrita de história.
+**Page write** (`Wiki::write_page`, `wiki.rs:2642-2790`): sanitizes, goes through
+optional admission webhooks, writes the file atomically (tmp + rename), upserts into
+SQLite; if the upsert fails, it restores the old bytes. The git commit is explicit
+(`commit_all`), called at SessionEnd, consolidation and checkpoints. The commit author is always
+`ai-memory <ai-memory@local>`; there are no branches, remotes, gc or history rewriting.
 
-**Versionamento** (`pages`): cada edição cria uma nova linha; a anterior recebe `is_latest=0`
-e `valid_to`, a nova aponta `supersedes`. Hash SHA-256 do corpo serve apenas para detectar
-mudança no mesmo caminho: **não há deduplicação de conteúdo entre caminhos** (confirmado em
-`ops.rs:1700-1770`). Decaimento (`decay.rs`) é um score de retenção por página episódica;
-eviction é soft delete com tombstone; purga definitiva após 180 dias sem acesso. Semânticas
-e fixadas (`pinned`) não decaem. TTL por `expires_at` vence `pinned`.
+**Versioning** (`pages`): each edit creates a new row; the previous one gets `is_latest=0`
+and `valid_to`, the new one points to `supersedes`. The SHA-256 hash of the body serves only to detect
+a change at the same path: **there is no content deduplication across paths** (confirmed in
+`ops.rs:1700-1770`). Decay (`decay.rs`) is a retention score per episodic page;
+eviction is a soft delete with a tombstone; permanent purge after 180 days without access. Semantic
+and pinned (`pinned`) pages do not decay. TTL via `expires_at` overrides `pinned`.
 
-**Watcher** (`watcher.rs`): `notify` com debounce de 300 ms e reconciliação completa a cada
-30 s. Não distingue escrita própria de edição humana: reindexa tudo e depende do curto-circuito
-por hash + front matter no store para não criar versão. A função que captura inode em
-`atomic.rs` existe mas seu retorno é descartado; o mecanismo documentado de supressão por
-inode não está em uso. Remoções de arquivo não são reconciliadas por padrão.
+**Watcher** (`watcher.rs`): `notify` with a 300 ms debounce and full reconciliation every
+30 s. It does not distinguish its own writes from human edits: it reindexes everything and relies on the
+hash + front matter short-circuit in the store to avoid creating a version. The function that captures the inode in
+`atomic.rs` exists but its return value is discarded; the documented inode-based suppression mechanism
+is not in use. File removals are not reconciled by default.
 
-**Concorrência:** um único escritor SQLite em thread dedicada (`WriteCmd` por mpsc), WAL,
-pool de leitores. Um servidor por `data_dir`, protegido por `flock` no CLI.
+**Concurrency:** a single SQLite writer on a dedicated thread (`WriteCmd` via mpsc), WAL,
+reader pool. One server per `data_dir`, protected by `flock` in the CLI.
 
-**Abstração de backend: não existe.** `rusqlite` chamado diretamente em 29 mil linhas de
-`ops.rs` + `reader.rs`; `Wiki` é struct concreta sobre `std::fs` com raiz fixa em
-`data_dir/wiki`. Os únicos pontos de extensão são as traits `LlmProvider` e `Embedder`, os
-**webhooks de admissão** (`docs/admission-webhooks.md`) e a política de companions
-(integrar por HTTP/MCP, nunca remendar o núcleo). Nenhuma menção a FUSE, mount, filesystem
-alternativo, Postgres, LanceDB, Qdrant ou "storage layer" como plano.
+**Backend abstraction: there is none.** `rusqlite` called directly across 29 thousand lines of
+`ops.rs` + `reader.rs`; `Wiki` is a concrete struct over `std::fs` with a root fixed at
+`data_dir/wiki`. The only extension points are the `LlmProvider` and `Embedder` traits, the
+**admission webhooks** (`docs/admission-webhooks.md`) and the companions policy
+(integrate via HTTP/MCP, never patch the core). No mention of FUSE, mount, alternative
+filesystem, Postgres, LanceDB, Qdrant or "storage layer" as a plan.
 
-## Recuperação
+## Retrieval
 
-`memory_query` funde até quatro fluxos por RRF: FTS5 sobre título+corpo, casamento de
-entidades do front matter, vizinhança de links e cosseno sobre `page_embeddings`. Embeddings
-locais por padrão desde 2.0 (`all-MiniLM-L6-v2`, 384 dims, candle, ~87 MB). Vetores são BLOBs
-em linhas comuns, cosseno em força bruta; `sqlite-vec` é adiado com critérios numéricos
-(`docs/vector-backend-policy.md`). Pós-fusão, um multiplicador de autoridade [0,55; 1,50]
-favorece regras, decisões e procedimentos. `as_of` consulta versões históricas
-("bi-temporal-lite", tempo de ingestão). 23 ferramentas MCP.
+`memory_query` fuses up to four streams via RRF: FTS5 over title+body, matching of
+front matter entities, link neighborhood and cosine over `page_embeddings`. Local
+embeddings by default since 2.0 (`all-MiniLM-L6-v2`, 384 dims, candle, ~87 MB). Vectors are BLOBs
+in ordinary rows, brute-force cosine; `sqlite-vec` is deferred with numeric criteria
+(`docs/vector-backend-policy.md`). Post-fusion, an authority multiplier [0.55, 1.50]
+favors rules, decisions and procedures. `as_of` queries historical versions
+("bi-temporal-lite", ingestion time). 23 MCP tools.
 
-Benchmark publicado: LongMemEval-S hit@5 0,823 com embeddings locais, 0,668 sem LLM; harness
-reproduzível em `evals/` e `docs/benchmarks/`. Teto de escrita medido: ~700 observações/s.
+Published benchmark: LongMemEval-S hit@5 0.823 with local embeddings, 0.668 without an LLM; reproducible
+harness in `evals/` and `docs/benchmarks/`. Measured write ceiling: ~700 observations/s.
 
-## Relação com o MoobFS
+## Relation to MoobFS
 
-**O ai-memory está uma camada acima.** Ele é exatamente o papel que a ADR-0005 chama de
-"cliente": captura, seleção semântica, montagem de contexto. Sua fonte de verdade é um
-diretório de arquivos. O lugar natural do MoobFS é embaixo de `wiki/`.
+**ai-memory sits one layer above.** It is exactly the role that ADR-0005 calls
+"client": capture, semantic selection, context assembly. Its source of truth is a
+directory of files. MoobFS's natural place is underneath `wiki/`.
 
-**O que já está resolvido lá e não devemos duplicar:** sanitização de segredos, protocolo de
-handoff, consolidação, busca híbrida, decaimento, multiusuário, integração com 20+ harnesses.
+**What is already solved there and we should not duplicate:** secret sanitization, handoff
+protocol, consolidation, hybrid search, decay, multi-user, integration with 20+ harnesses.
 
-**O que o git + SQLite já dão e o MoobFS precisa superar para justificar-se ali:**
+**What git + SQLite already provide and MoobFS needs to beat to justify itself there:**
 
-- Objetos git são endereçados por conteúdo: já há dedup de blobs idênticos e histórico de
-  revisões, com commit por sessão. A cadeia `supersedes` no SQLite duplica isso no índice.
-- FTS, grafo e vetores vivem no SQLite derivado e reconstruível.
+- Git objects are content-addressed: there is already dedup of identical blobs and revision
+  history, with a commit per session. The `supersedes` chain in SQLite duplicates this in the index.
+- FTS, graph and vectors live in the derived, rebuildable SQLite.
 
-**O que o MoobFS poderia oferecer de diferente:**
+**What MoobFS could offer that is different:**
 
-- Dedup de conteúdo **entre caminhos e sem commit**, que o ai-memory não faz no store e o
-  git só faz no momento do commit.
-- Revisões e snapshots **nativos**, sem a dupla contabilidade git + `supersedes`.
-- Front matter (`tier`, `pinned`, `expires_at`, `type`, `session_id`, `agent`, `entities`)
-  mapeia diretamente nos atributos tipados da ADR-0005; `QUERY` por atributo substituiria
-  parte do índice de entidades e dos filtros de tier/TTL hoje em SQL.
+- Content dedup **across paths and without a commit**, which ai-memory does not do in the store and
+  git only does at commit time.
+- **Native** revisions and snapshots, without the double bookkeeping of git + `supersedes`.
+- The front matter (`tier`, `pinned`, `expires_at`, `type`, `session_id`, `agent`, `entities`)
+  maps directly onto ADR-0005's typed attributes; `QUERY` by attribute would replace
+  part of the entity index and of the tier/TTL filters that are SQL today.
 
-**Incompatibilidades atuais, que mudam decisões do M2:**
+**Current incompatibilities, which change M2 decisions:**
 
-1. O ai-memory escreve com `std::fs` (tmp + rename + fsync), libgit2 escreve `.git/`, SQLite
-   exige WAL e locks POSIX. O M1 é somente leitura; a proposta original do M2 prevê escrita
-   **só por ioctl `PUT`**. Para hospedar `wiki/` inalterado, o M2 precisa de escrita POSIX
-   comum (`write`, `rename`, `fsync`, `unlink`), ou o ai-memory precisa de um adaptador.
-2. `confinement.rs` rejeita symlinks e reparse points e valida `.git` dentro da raiz; um
-   mount precisa se comportar como diretório comum.
-3. Limites do M1 (128 arquivos, 64 KiB, namespace plano, ASCII) são insuficientes: páginas
-   usam UTF-8 em caminhos aninhados por UUID e corpos de até 16 KiB por observação, mas
-   sessões longas e páginas consolidadas passam disso.
+1. ai-memory writes with `std::fs` (tmp + rename + fsync), libgit2 writes `.git/`, SQLite
+   requires WAL and POSIX locks. M1 is read-only; the original M2 proposal provides for writing
+   **only via the `PUT` ioctl**. To host `wiki/` unchanged, M2 needs ordinary POSIX
+   writes (`write`, `rename`, `fsync`, `unlink`), or ai-memory needs an adapter.
+2. `confinement.rs` rejects symlinks and reparse points and validates `.git` inside the root; a
+   mount needs to behave like an ordinary directory.
+3. M1 limits (128 files, 64 KiB, flat namespace, ASCII) are insufficient: pages
+   use UTF-8 in UUID-nested paths and bodies of up to 16 KiB per observation, but
+   long sessions and consolidated pages exceed that.
 
-**Ponto de integração sem tocar no núcleo:** os webhooks de admissão são chamados antes de
-toda escrita, remoção, movimentação e handoff, e podem observar ou espelhar a página para um
-sistema externo (exemplo `git-mirror` na documentação). Um webhook `moobfs-mirror` que faça
-`PUT` de cada página com atributos derivados do front matter permitiria testar o MoobFS como
-armazém de memórias reais **sem escrita POSIX e sem alterar o ai-memory**. É o caminho mais
-curto para o M4 ter dados e cargas reais.
+**Integration point without touching the core:** the admission webhooks are called before
+every write, removal, move and handoff, and can observe or mirror the page to an
+external system (`git-mirror` example in the documentation). A `moobfs-mirror` webhook that does a
+`PUT` of each page with attributes derived from the front matter would allow testing MoobFS as a
+store of real memories **without POSIX writes and without changing ai-memory**. It is the
+shortest path for M4 to have real data and workloads.
 
-## Sequência recomendada
+## Recommended sequence
 
-1. Especificação do M2 inclui requisito explícito: hospedar `wiki/` + `.git` + SQLite de um
-   cliente real que usa `std::fs`. Isso implica escrita POSIX, não só ioctl.
-2. Protótipo de webhook de admissão espelhando páginas em MoobFS (M2 mínimo) para coletar
-   corpus e medir dedup real entre páginas.
-3. M4 usa o harness de `evals/` e o teto de ~700/s como baselines; comparar `wiki/` em
-   ext4 versus MoobFS com cargas idênticas.
-4. Contato com o mantenedor só com resultado concreto em mãos. Como primeiro contato de boa
-   fé, três divergências doc/código encontradas nesta leitura podem virar issues pequenas e
-   verificáveis: inode de `atomic.rs` nunca consultado pelo watcher; `generated.by =
-   human:<user>` documentado em `okf.md` mas não implementado (watcher usa `author_id: None`);
-   descrição do crate store cita "sqlite-vec" enquanto a política o adia.
+1. The M2 specification includes an explicit requirement: host `wiki/` + `.git` + SQLite of a
+   real client that uses `std::fs`. This implies POSIX writes, not just ioctl.
+2. Prototype of an admission webhook mirroring pages into MoobFS (minimal M2) to collect a
+   corpus and measure real dedup across pages.
+3. M4 uses the `evals/` harness and the ~700/s ceiling as baselines; compare `wiki/` on
+   ext4 versus MoobFS with identical workloads.
+4. Contact the maintainer only with a concrete result in hand. As a good-faith first
+   contact, three doc/code divergences found in this reading could become small,
+   verifiable issues: the `atomic.rs` inode is never consulted by the watcher; `generated.by =
+   human:<user>` documented in `okf.md` but not implemented (the watcher uses `author_id: None`);
+   the store crate's description cites "sqlite-vec" while the policy defers it.
 
-## Arquivos para ler primeiro no repositório deles
+## Files to read first in their repository
 
 `docs/ARCHITECTURE.md`, `docs/design-decisions.md`, `docs/admission-webhooks.md`,
 `docs/companion-crates.md`, `docs/okf.md`, `docs/vector-backend-policy.md`,
 `crates/ai-memory-wiki/src/{wiki,git,watcher,atomic,confinement}.rs`,
-`crates/ai-memory-store/src/ops.rs` (upsert em 1700-1870), `migrations/V01__init.sql`.
+`crates/ai-memory-store/src/ops.rs` (upsert at 1700-1870), `migrations/V01__init.sql`.

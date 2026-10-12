@@ -1,20 +1,20 @@
-# ADR-0001 — Filesystem montável nativo do Linux
+# ADR-0001 — Native mountable Linux filesystem
 
-Data: 2026-10-10. Estado: aceito pelo usuário.
+Date: 2026-10-10. Status: accepted by the user.
 
-## Contexto
+## Context
 
-O objetivo é experimentar armazenamento persistente compartilhado para memória de LLM com acesso por filesystem montado.
+The goal is to experiment with shared persistent storage for LLM memory with access through a mounted filesystem.
 
-## Decisão
+## Decision
 
-Implementar `moobfs.ko` como módulo do Linux, registrado no VFS, com formato próprio em dispositivo de blocos. Busca e processamento semântico podem existir em espaço de usuário, sem participar das leituras normais.
+Implement `moobfs.ko` as a Linux module, registered in the VFS, with its own format on a block device. Search and semantic processing may exist in user space, without taking part in normal reads.
 
-## Alternativas consideradas
+## Alternatives considered
 
-- FUSE: reduz o custo inicial de desenvolvimento, mas foi explicitamente descartado pelo usuário.
-- Biblioteca/serviço sobre filesystem existente: útil como motor de memória, mas não atende ao requisito de filesystem nativo montável.
+- FUSE: reduces the initial development cost, but was explicitly discarded by the user.
+- Library/service over an existing filesystem: useful as a memory engine, but does not meet the requirement of a native mountable filesystem.
 
-## Consequências
+## Consequences
 
-É necessário compilar contra um kernel definido e testar montagem, I/O e entradas inválidas em VM. Remover FUSE não demonstra, por si só, ganho de desempenho. O primeiro marco é de leitura; o MVP completo inclui publicação e durabilidade.
+It is necessary to compile against a defined kernel and test mount, I/O and invalid inputs in a VM. Removing FUSE does not, by itself, demonstrate a performance gain. The first milestone is read-only; the full MVP includes publication and durability.

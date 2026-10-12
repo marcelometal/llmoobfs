@@ -1,98 +1,100 @@
-# 0017 — Uso no macOS e postura de segurança comparada ao mercado
+# 0017 — Use on macOS and security posture compared to the market
 
-Data: 2026-10-10, America/Sao_Paulo. Estado: levantamento e decisões; nenhuma mudança de
-código. Fontes consultadas listadas em cada seção.
+Date: 2026-10-10, America/Sao_Paulo. Status: survey and decisions; no code change. Sources
+consulted listed in each section.
 
-## Uso no macOS
+## Use on macOS
 
-Decisão: não há suporte nativo no Mac. A camada é um módulo do kernel Linux (`layer/moobfs_layer.ko`)
-sobre ext4, btrfs ou XFS. O macOS usa XNU, kexts de terceiros estão em desuso e exigem reduzir a
-segurança no Apple Silicon; FSKit é em espaço de usuário, a abordagem que a ADR-0001 descarta.
+Decision: there is no native support on the Mac. The layer is a Linux kernel module
+(`layer/moobfs_layer.ko`) over ext4, btrfs or XFS. macOS uses XNU, third-party kexts are
+deprecated and require lowering security on Apple Silicon; FSKit is in user space, the approach
+ADR-0001 rules out.
 
-Formas de uso no Mac:
+Ways to use it on the Mac:
 
-- Ferramentas de host (`tools/`) compilam e rodam no macOS com `make test`; não montam nada.
-- VM Linux no Mac (uso real): hoje `make vm-test` com Docker e QEMU x86-64 emulado; para uso
-  efetivo, VM arm64 (Lima, UTM, OrbStack) com o módulo compilado contra o kernel da VM, inferior
-  em disco ext4/btrfs/XFS dentro da VM, e o agente rodando dentro da VM.
-- Mac como cliente da VM por SSH, sshfs, NFS ou SMB: `QUERY` e `GET_INFO` são ioctls e não
-  atravessam esses protocolos; exportação NFS está fora do escopo do M2. Precisaria de um
-  serviço dentro da VM, na linha do cliente de memória próprio da aceitação do M2.
-- "Nada preso": o inferior desmontado é arquivos com xattr; `rsync -X` ou git levam ao APFS, e
-  `moobfs-check` valida offline no Mac. O índice e a consulta só existem no kernel Linux.
-- Não funciona pôr o inferior numa pasta do Mac via virtiofs: APFS não tem reflink no sentido de
-  btrfs/XFS e xattr por virtiofs com host macOS não é garantido.
+- Host tools (`tools/`) compile and run on macOS with `make test`; they mount nothing.
+- Linux VM on the Mac (real use): today `make vm-test` with Docker and emulated x86-64 QEMU; for
+  actual use, an arm64 VM (Lima, UTM, OrbStack) with the module compiled against the VM's
+  kernel, the lower on an ext4/btrfs/XFS disk inside the VM, and the agent running inside the VM.
+- Mac as a client of the VM over SSH, sshfs, NFS or SMB: `QUERY` and `GET_INFO` are ioctls and
+  do not cross these protocols; NFS export is out of M2 scope. It would need a service inside
+  the VM, along the lines of the in-house memory client from the M2 acceptance.
+- "Nothing locked in": the unmounted lower is files with xattrs; `rsync -X` or git carry them to
+  APFS, and `moobfs-check` validates offline on the Mac. The index and the query exist only in
+  the Linux kernel.
+- Putting the lower in a Mac folder via virtiofs does not work: APFS has no reflink in the
+  btrfs/XFS sense and xattrs over virtiofs with a macOS host are not guaranteed.
 
-Suporte nativo no Mac seria uma nova ADR (FSKit ou kext), não uma extensão.
+Native support on the Mac would be a new ADR (FSKit or kext), not an extension.
 
-## Postura de segurança atual
+## Current security posture
 
-Levantamento do que o repositório tem (verificado em `layer/`, `.github/workflows/ci.yml`,
+Survey of what the repository has (verified in `layer/`, `.github/workflows/ci.yml`,
 `vm/`, `docs/testing.md`):
 
-- Validação na borda: `QUERY` recusa limite zero ou acima do teto, flags e reservados não nulos
-  (`layer/index.c`); `copy_to_user` com tamanho fixo; atributos tipados validados antes de tocar
-  o inferior (tipo, tamanho, alfabeto do nome, UTF-8).
-- Permissões em dupla camada (`inode_permission` no inferior mais a verificação do próprio
-  inferior) e `override_creds`, como no overlayfs.
-- KASAN, UBSAN e lockdep em workflow dedicado (`vm/kasan-guest.sh`), falhando em qualquer
-  `BUG`, `Oops`, `WARNING` ou relato do KASAN no `dmesg`; ASan e UBSan no código de `common/`.
-- libFuzzer sobre a codificação de atributos, com tempo limitado no CI.
-- Módulo carregado só em VM QEMU descartável; orçamento de memória do índice (`index_budget`).
+- Validation at the edge: `QUERY` rejects a zero limit or one above the cap, and non-zero flags
+  and reserved fields (`layer/index.c`); `copy_to_user` with a fixed size; typed attributes
+  validated before touching the lower (type, size, name alphabet, UTF-8).
+- Permissions in two layers (`inode_permission` on the lower plus the lower's own check) and
+  `override_creds`, as in overlayfs.
+- KASAN, UBSAN and lockdep in a dedicated workflow (`vm/kasan-guest.sh`), failing on any
+  `BUG`, `Oops`, `WARNING` or KASAN report in `dmesg`; ASan and UBSan on the `common/` code.
+- libFuzzer over the attribute encoding, time-limited in CI.
+- Module loaded only in a disposable QEMU VM; index memory budget (`index_budget`).
 
-Lacunas apontadas: modelo de ameaça escrito; fuzzing de syscalls (syzkaller com descrições dos
-ioctls); tratar o inferior como entrada não confiável na varredura de montagem; manter
-`FS_USERNS_MOUNT` desligado enquanto user namespaces estiverem fora do escopo e dizer isso na
-ADR; `SECURITY.md`, sparse, smatch e checkpatch no CI; assinatura do módulo e Secure Boot para
-usuários finais. "Guardrails" no sentido de LLM não cabem na camada: é armazenamento; política de
-conteúdo fica no cliente.
+Gaps identified: a written threat model; syscall fuzzing (syzkaller with descriptions of the
+ioctls); treating the lower as untrusted input in the mount scan; keeping `FS_USERNS_MOUNT`
+off while user namespaces are out of scope and saying so in the ADR; `SECURITY.md`, sparse,
+smatch and checkpatch in CI; module signing and Secure Boot for end users. "Guardrails" in the
+LLM sense do not belong in the layer: it is storage; content policy stays in the client.
 
-## Referências de mercado e literatura
+## Market references and literature
 
-Fontes consultadas em 2026-10-10 (busca na web; resumos, não leitura integral):
+Sources consulted on 2026-10-10 (web search; summaries, not full reading):
 
-- Documentação do kernel, "Adding New Filesystems": fstests é a infraestrutura padrão e seu uso é
-  fortemente recomendado; exige forma documentada de testar e detectar regressões; o filesystem
-  deve lidar com entrada corrompida sem travar ou derrubar o kernel; fsck fortemente
-  recomendado; ioctls próprios em patches separados com justificativa.
-- Janus (IEEE S&P 2019) e Hydra (SOSP 2019), Georgia Tech: fuzzing conjunto de imagem e
-  syscalls; Janus encontrou 90 bugs em oito filesystems do kernel, 32 CVEs; Hydra encontrou 155
-  bugs incluindo inconsistência após queda e violações de POSIX. LFUZZ (FSU, 2024) estende Janus.
-- Debate em linux-fsdevel e LWN (2018, 2023, 2025) sobre imagens maliciosas: maintainers não
-  prometem que montar imagem hostil é seguro; Dave Chinner considera um crash disparável por
-  usuário um problema de segurança (DoS) mesmo sem exploit; fila de bugs do syzbot excede a
-  capacidade de correção; isolamento em VM (libguestfs) é a abordagem considerada segura.
-- bcachefs: antes do merge no 6.7, o autor reportou fstests e suíte própria sob lockdep+KASAN,
-  preempt e gcov (82% de linhas); removido da árvore no 6.18 e hoje DKMS.
-- overlayfs: CVE-2015-1328, CVE-2016-1576, CVE-2020-16120 e CVE-2026-74619, todos ligados a
-  montagem não privilegiada via `FS_USERNS_MOUNT` e user namespaces; distribuições que deixam a
-  flag desligada evitam a classe inteira. Histórico de `override_creds=off` mostra que o modelo
-  de credenciais do montador precisa estar escrito para ser revisável.
-- eCryptfs (camada empilhada): CVE-2014-9922 (escalada por pilha grande de filesystems com
-  overlayfs), CVE-2009-2406 (overflow em parser de metadados), e maioria dos CVEs no helper de
-  montagem em espaço de usuário.
-- xattr: CVE-2026-63833 (ntfs3, setxattr direto em nomes reservados dá euid 0), CVE-2010-2946
-  (JFS, prefixo de nome contorna restrição de namespace), CVE-2019-19319 (ext4, setxattr após
-  imagem forjada causa escrita fora de limites), CVE-2016-7097 (setgid preservado em setxattr).
-- OpenZFS (módulo fora da árvore): `ztest` como stress em espaço de usuário com injeção de
-  falhas; correção de 2026 para manipulação de pool por userns não privilegiado.
-- syzkaller: descrições syzlang em `sys/linux/*.txt` com `.const` manual ou `syz-extract`;
-  não há fluxo oficial para módulos fora da árvore, mas o padrão é um checkout local.
+- Kernel documentation, "Adding New Filesystems": fstests is the standard infrastructure and its
+  use is strongly recommended; it requires a documented way to test and detect regressions; the
+  filesystem must handle corrupted input without hanging or bringing down the kernel; fsck
+  strongly recommended; custom ioctls in separate patches with justification.
+- Janus (IEEE S&P 2019) and Hydra (SOSP 2019), Georgia Tech: joint image and syscall fuzzing;
+  Janus found 90 bugs in eight kernel filesystems, 32 CVEs; Hydra found 155 bugs including
+  post-crash inconsistency and POSIX violations. LFUZZ (FSU, 2024) extends Janus.
+- Debate on linux-fsdevel and LWN (2018, 2023, 2025) about malicious images: maintainers do not
+  promise that mounting a hostile image is safe; Dave Chinner considers a user-triggerable crash
+  a security problem (DoS) even without an exploit; the syzbot bug queue exceeds fixing
+  capacity; isolation in a VM (libguestfs) is the approach considered safe.
+- bcachefs: before the merge in 6.7, the author reported fstests and an own suite under
+  lockdep+KASAN, preempt and gcov (82% of lines); removed from the tree in 6.18 and now DKMS.
+- overlayfs: CVE-2015-1328, CVE-2016-1576, CVE-2020-16120 and CVE-2026-74619, all tied to
+  unprivileged mounting via `FS_USERNS_MOUNT` and user namespaces; distributions that leave the
+  flag off avoid the whole class. The history of `override_creds=off` shows that the mounter's
+  credential model needs to be written down to be reviewable.
+- eCryptfs (stacked layer): CVE-2014-9922 (escalation through a large filesystem stack with
+  overlayfs), CVE-2009-2406 (overflow in a metadata parser), and most CVEs in the user-space
+  mount helper.
+- xattr: CVE-2026-63833 (ntfs3, direct setxattr on reserved names gives euid 0), CVE-2010-2946
+  (JFS, name prefix bypasses namespace restriction), CVE-2019-19319 (ext4, setxattr after a
+  forged image causes out-of-bounds write), CVE-2016-7097 (setgid preserved on setxattr).
+- OpenZFS (out-of-tree module): `ztest` as user-space stress with fault injection; a 2026 fix
+  for pool manipulation by unprivileged userns.
+- syzkaller: syzlang descriptions in `sys/linux/*.txt` with manual `.const` or `syz-extract`;
+  there is no official flow for out-of-tree modules, but the pattern is a local checkout.
 
-Conclusão registrada: o conjunto atual do MoobFS (validação na borda, KASAN/UBSAN/lockdep,
-libFuzzer, VM isolada) é o que projetos comparáveis tinham no estágio experimental. O que falta
-para o patamar de mercado: fstests, syzkaller sobre os ioctls e o `setxattr`, fuzzing do inferior
-como entrada hostil, modelo de ameaça e de credenciais escrito, `FS_USERNS_MOUNT` explicitamente
-desligado, e processo de divulgação.
+Recorded conclusion: MoobFS's current set (validation at the edge, KASAN/UBSAN/lockdep,
+libFuzzer, isolated VM) is what comparable projects had at the experimental stage. What is
+missing to reach the market level: fstests, syzkaller over the ioctls and `setxattr`, fuzzing
+of the lower as hostile input, a written threat and credential model, `FS_USERNS_MOUNT`
+explicitly off, and a disclosure process.
 
-## Roadmap de segurança
+## Security roadmap
 
-Decisão: consolidar as técnicas num roadmap próprio. Criado `docs/security-roadmap.md` com estado atual verificado, onze itens S1 a S11 com
-precedente, passos e critério de pronto, e o que fica fora de escopo. Linha transversal
-adicionada em `ROADMAP.md` e entrada no `CHANGELOG.md`.
+Decision: consolidate the techniques in a roadmap of their own. Created
+`docs/security-roadmap.md` with the verified current state, eleven items S1 to S11 with
+precedent, steps and done-when criterion, and what stays out of scope. Cross-cutting line
+added in `ROADMAP.md` and entry in `CHANGELOG.md`.
 
-## Próximo passo
+## Next step
 
-Nenhum código alterado. Primeiro item do roadmap de segurança: S1, ADR de modelo de ameaça e
-credenciais. Outros candidatos: ADR curta de modelo de ameaça; descrições syzlang para
-`QUERY` e `GET_INFO`; rodar fstests (grupo `quick`) sobre a camada na VM.
+No code changed. First item of the security roadmap: S1, threat and credential model ADR.
+Other candidates: a short threat model ADR; syzlang descriptions for `QUERY` and `GET_INFO`;
+running fstests (`quick` group) over the layer in the VM.

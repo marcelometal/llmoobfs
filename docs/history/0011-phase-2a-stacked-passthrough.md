@@ -1,35 +1,35 @@
-# 0011 — Fase 2a: camada empilhada mínima sobre ext4, validada em VM
+# 0011 — Phase 2a: minimal stacked layer over ext4, validated in a VM
 
-Data: 2026-10-10, America/Sao_Paulo. Estado: implementado e validado na VM de teste.
+Date: 2026-10-10, America/Sao_Paulo. Status: implemented and validated in the test VM.
 
-## Pedido
+## Request
 
-Iniciar a fase 2a da especificação do M2 (ADR-0007): passagem mínima estilo wrapfs sobre um
-filesystem maduro, com `fsx`. A linguagem do módulo foi decidida nesta sessão (abaixo).
+Start phase 2a of the M2 specification (ADR-0007): minimal wrapfs-style pass-through over a
+mature filesystem, with `fsx`. The module's language was decided in this session (below).
 
-## Implementação
+## Implementation
 
-- `layer/main.c` (módulo `moobfs_layer.ko`, tipo de mount `moobfs_layer`, opção `lower=`):
-  um inode da camada por inode inferior (`iget5_locked` chaveado pelo inode inferior, como o
-  ecryptfs), caminho inferior em `d_fsdata`, I/O delegado por `fs/backing-file.c`
-  (`backing_file_open/read_iter/write_iter/splice/mmap`, como o overlayfs), credenciais do
-  montador guardadas no superbloco e usadas no I/O delegado. Operações: lookup, readdir, create,
-  mkdir, unlink, rmdir, getattr, setattr (truncate), permission, read, write, mmap compartilhado e
-  privado, fsync, llseek, fallocate, splice, statfs. Sem link, symlink e rename (`EPERM` pelo
-  VFS), sem xattr, sem índice: conforme o escopo da fase.
-- Montagem recusa: ausência de `lower=`, diretório inexistente, empilhar sobre outro
-  `moobfs_layer`, profundidade acima de `FILESYSTEM_MAX_STACK_DEPTH`.
-- `tests/layer.c`: aceitação de passagem, verificando no diretório inferior inodes, modos,
-  tamanhos e bytes após cada operação.
-- `tests/third_party/fsx/`: `fsx.c` e `statx.h` do xfstests (commit `57d71a8`, 2026-03-17),
-  com `global.h` próprio para compilar sem o build do xfstests. Licença GPL-2.0.
-- Harness: `make layer`; `vm/in-container.sh` cria imagem ext4 de 64 MiB com `mke2fs`, resolve
-  a cadeia de módulos do ext4 em `modules.dep` e descompacta cada um para a VM; `vm/init` executa
-  o M1 e depois a fase 2a; `vm/Dockerfile` ganha `e2fsprogs`; timeout do QEMU 180 s → 600 s.
+- `layer/main.c` (module `moobfs_layer.ko`, mount type `moobfs_layer`, option `lower=`):
+  one layer inode per lower inode (`iget5_locked` keyed by the lower inode, like
+  ecryptfs), lower path in `d_fsdata`, I/O delegated through `fs/backing-file.c`
+  (`backing_file_open/read_iter/write_iter/splice/mmap`, like overlayfs), the mounter's
+  credentials stored in the superblock and used in delegated I/O. Operations: lookup, readdir, create,
+  mkdir, unlink, rmdir, getattr, setattr (truncate), permission, read, write, shared and
+  private mmap, fsync, llseek, fallocate, splice, statfs. No link, symlink or rename (`EPERM` from the
+  VFS), no xattr, no index: per the phase's scope.
+- Mount refuses: missing `lower=`, nonexistent directory, stacking over another
+  `moobfs_layer`, depth above `FILESYSTEM_MAX_STACK_DEPTH`.
+- `tests/layer.c`: pass-through acceptance, checking in the lower directory inodes, modes,
+  sizes and bytes after each operation.
+- `tests/third_party/fsx/`: `fsx.c` and `statx.h` from xfstests (commit `57d71a8`, 2026-03-17),
+  with our own `global.h` to compile without the xfstests build. GPL-2.0 license.
+- Harness: `make layer`; `vm/in-container.sh` creates a 64 MiB ext4 image with `mke2fs`, resolves
+  the ext4 module chain in `modules.dep` and decompresses each one for the VM; `vm/init` runs
+  M1 and then phase 2a; `vm/Dockerfile` gains `e2fsprogs`; QEMU timeout 180 s → 600 s.
 
-## Evidências executadas
+## Evidence executed
 
-`make vm-test` (Docker, QEMU TCG em host arm64), kernel Debian `6.12.111+deb13-amd64`, GCC
+`make vm-test` (Docker, QEMU TCG on an arm64 host), Debian kernel `6.12.111+deb13-amd64`, GCC
 14.2.0, QEMU 10.0.13. `build/vm/console.log`:
 
 ```text
@@ -41,44 +41,44 @@ All 3000 operations completed A-OK!
 MOOBFS_LAYER_PASS: pass-through over ext4, layer tests, fsx 23000 ops, remount, unload
 ```
 
-Três execuções de `fsx` (sementes 1, 2 com I/O de 512 bytes, 3 com arquivo de 2 MB), arquivo
-final comparado byte a byte com a cópia inferior, desmontagem, remontagem e descarga do módulo
-sem `BUG`, `Oops` ou `WARNING` no `dmesg`. SHA-256 de `moobfs_layer.ko`:
-`1de9a67d9aa45ee0dced8b9c54a846103ff70c99cf746193977173eeb515f3e4`. A regressão do M1 passou
-inalterada na mesma execução.
+Three `fsx` runs (seeds 1, 2 with 512-byte I/O, 3 with a 2 MB file), final file
+compared byte by byte with the lower copy, unmount, remount and module unload
+without `BUG`, `Oops` or `WARNING` in `dmesg`. SHA-256 of `moobfs_layer.ko`:
+`1de9a67d9aa45ee0dced8b9c54a846103ff70c99cf746193977173eeb515f3e4`. The M1 regression passed
+unchanged in the same run.
 
-## Tentativas e correções
+## Attempts and fixes
 
-1. Os cabeçalhos do kernel Debian trazem a API de `backing_file_open(const struct file *, …)`
-   mais nova que a tag upstream v6.12 (`const struct path *`). O módulo compila só contra os
-   cabeçalhos fixados; a documentação em `kernel-infrastructure.md` cita o upstream e a diferença
-   fica registrada aqui.
-2. O ext4 pede o shash `crc32c` pela API de cripto, dependência que `modules.dep` não registra;
-   `crc32c_generic.ko` foi adicionado à cadeia.
-3. `vfs_getattr` dispara `WARN_ON_ONCE` quando recebe flags internas de consulta; a variante
-   correta para FS empilhado é `vfs_getattr_nosec`, como no ecryptfs. Corrigido; o aviso
-   aparecia no `dmesg` e fazia o teste falhar com `EPERM`.
-4. Bug no próprio teste: função de caminho com buffer estático único fazia `link(a, a)`.
-   Corrigido com buffers rotativos.
+1. The Debian kernel headers carry the `backing_file_open(const struct file *, …)` API,
+   newer than the upstream v6.12 tag (`const struct path *`). The module compiles only against the
+   pinned headers; the documentation in `kernel-infrastructure.md` cites upstream and the difference
+   is recorded here.
+2. ext4 requests the `crc32c` shash through the crypto API, a dependency that `modules.dep` does not record;
+   `crc32c_generic.ko` was added to the chain.
+3. `vfs_getattr` triggers `WARN_ON_ONCE` when it receives internal query flags; the
+   correct variant for a stacked FS is `vfs_getattr_nosec`, as in ecryptfs. Fixed; the warning
+   appeared in `dmesg` and made the test fail with `EPERM`.
+4. Bug in the test itself: a path function with a single static buffer did `link(a, a)`.
+   Fixed with rotating buffers.
 
-## Decisão: módulo em C
+## Decision: module in C
 
-Rust foi considerado e descartado para o módulo: no 6.12 não há abstrações estáveis de VFS em
-Rust (o conjunto de patches de filesystems em Rust foi abandonado em 2024 e nunca entrou na
-árvore); um FS empilhado depende de dezenas de helpers do VFS cujos bindings teriam de ser
-escritos à mão; e o kernel Debian alvo não é construído com `CONFIG_RUST`. Rust fica como
-alternativa a avaliar para as ferramentas de espaço de usuário.
+Rust was considered and discarded for the module: in 6.12 there are no stable VFS abstractions in
+Rust (the Rust filesystems patch set was abandoned in 2024 and never entered the
+tree); a stacked FS depends on dozens of VFS helpers whose bindings would have to be
+written by hand; and the target Debian kernel is not built with `CONFIG_RUST`. Rust remains an
+alternative to evaluate for the user-space tools.
 
-## Limitações
+## Limitations
 
-Kernel sem KASAN e sem `PROVE_LOCKING`; o aninhamento de locks de inode da camada sobre os do
-inferior não foi validado por lockdep. Sem xfstests completo, sem btrfs/XFS como inferior, sem
-dm-log-writes nesta fase. `rename` ausente impede git e SQLite por enquanto (fase 2b).
-Credenciais: as operações de diretório usam as do chamador com `nop_mnt_idmap`; só o I/O
-delegado usa as do montador. Isso precisa de revisão de segurança antes de qualquer uso fora
-de VM.
+Kernel without KASAN and without `PROVE_LOCKING`; the nesting of the layer's inode locks over those of the
+lower was not validated by lockdep. No full xfstests, no btrfs/XFS as the lower, no
+dm-log-writes in this phase. Missing `rename` prevents git and SQLite for now (phase 2b).
+Credentials: directory operations use the caller's with `nop_mnt_idmap`; only delegated
+I/O uses the mounter's. This needs a security review before any use outside
+a VM.
 
-## Próximo passo
+## Next step
 
-Fase 2b: rename, unlink de arquivos abertos já coberto, xattr opacos, btrfs e XFS como
-inferiores, reflink delegado, e kernel com KASAN/lockdep via virtme-ng.
+Phase 2b: rename, unlink of open files already covered, opaque xattrs, btrfs and XFS as
+lower filesystems, delegated reflink, and a kernel with KASAN/lockdep via virtme-ng.

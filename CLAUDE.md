@@ -1,7 +1,7 @@
-# MoobFS — instruções para Claude Code
+# MoobFS — instructions for Claude Code
 
 @AGENTS.md
 
-`AGENTS.md` é a fonte comum das regras deste projeto. Consulte também o registro de sessão mais recente em `docs/history/` e as decisões relevantes em `docs/decisions/`.
+`AGENTS.md` is the common source of this project's rules. Also consult the most recent session journal in `docs/history/` and the relevant decisions in `docs/decisions/`.
 
-Antes de encerrar uma tarefa, registre mudanças, justificativas resumidas, testes executados, limitações e próximo passo. Não afirme que um módulo foi testado no Linux apenas porque compilou ou passou em testes de ferramentas offline.
+Before closing a task, record changes, brief justifications, tests executed, limitations and next step. Do not claim that a module was tested on Linux merely because it compiled or passed offline tool tests.

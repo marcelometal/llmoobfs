@@ -1,78 +1,78 @@
-# ADR-0008 — Autorização do `QUERY` com reaproveitamento por diretório dentro de uma consulta
+# ADR-0008 — `QUERY` authorization with per-directory reuse within a query
 
-Data: 2026-10-11. Estado: **proposta em espera**. Decisão do mantenedor em 2026-10-11: manter
-a autorização como está e reavaliar esta proposta depois que o M4 mostrar se consultas que
-devolvem centenas de resultados fazem parte do uso real. Nada implementado.
-Não substitui decisão anterior; refina como o contrato de autorização da fase 3b (registro 0020,
-`docs/spec-m3.md` §3.1) é cumprido.
+Date: 2026-10-11. Status: **proposal on hold**. Maintainer decision on 2026-10-11: keep
+authorization as it is and reevaluate this proposal after M4 shows whether queries that
+return hundreds of results are part of real use. Nothing implemented.
+It does not replace an earlier decision; it refines how the authorization contract of phase 3b
+(journal 0020, `docs/spec-m3.md` §3.1) is fulfilled.
 
-## Contexto
+## Context
 
-Desde a fase 3b, cada resultado do `QUERY` é autorizado resolvendo o caminho relativo à raiz da
-montagem com `vfs_path_lookup`, sob as credenciais do chamador, e verificando `MAY_READ` no
-arquivo com `inode_permission`. O resultado só entra na resposta, e na contagem, se o chamador
-poderia abri-lo naquele instante; a janela entre a resposta e a abertura é aceita no contrato.
+Since phase 3b, each `QUERY` result is authorized by resolving the path relative to the mount
+root with `vfs_path_lookup`, under the caller's credentials, and checking `MAY_READ` on the
+file with `inode_permission`. The result only enters the response, and the count, if the caller
+could open it at that instant; the window between the response and the open is accepted in the contract.
 
-Os pilotos no host da Azure (registros 0025, 0027 e 0028) mediram o custo restante em cerca de
-1,7 µs por resultado, contra 0,2 a 0,4 µs por linha no SQLite com índice composto. O perfil com
-`perf` mostra que esse custo vem de refazer, para cada resultado, o caminho inteiro: montar o
-caminho como texto, copiá-lo de novo em `getname_kernel`, percorrer cada componente (com
-`moobl_permission` repetindo `inode_permission` no inode inferior) e verificar o arquivo. Num
-conjunto típico, centenas de resultados compartilham poucos diretórios (no piloto, 1000
-memórias em 256 diretórios), e a verificação de cada diretório é repetida a cada resultado.
+The pilots on the Azure host (journals 0025, 0027 and 0028) measured the remaining cost at about
+1.7 µs per result, against 0.2 to 0.4 µs per row in SQLite with a composite index. The profile with
+`perf` shows that this cost comes from redoing, for each result, the whole path: building the
+path as text, copying it again in `getname_kernel`, walking each component (with
+`moobl_permission` repeating `inode_permission` on the lower inode) and checking the file. In a
+typical set, hundreds of results share few directories (in the pilot, 1000
+memories in 256 directories), and the check of each directory is repeated for each result.
 
-## Proposta
+## Proposal
 
-Dentro de **uma única chamada** de `QUERY`, guardar a decisão de travessia de cada diretório já
-verificado e reaproveitá-la para os resultados seguintes:
+Within **a single** `QUERY` **call**, keep the traversal decision of each directory already
+checked and reuse it for the following results:
 
-1. Para cada candidato, subir pela cadeia de dentries a partir do pai do arquivo até a raiz da
-   montagem, sob `rcu_read_lock` e com o `seqlock` de renomeação (`rename_lock`) para detectar
-   mudanças concorrentes, verificando `MAY_EXEC` em cada diretório com `inode_permission`.
-2. Cada diretório aprovado entra num conjunto local à chamada (endereço do dentry); ao encontrar
-   um diretório já aprovado, a subida para ali. Diretórios recusados também são lembrados.
-3. Verificar `MAY_READ` no arquivo, como hoje.
-4. Se o `seqlock` indicar renomeação durante a subida, ou qualquer passo não puder ser feito sem
-   bloquear, o candidato cai no caminho atual (`vfs_path_lookup` completo). O caminho atual
-   continua sendo a referência de correção.
-5. O conjunto é descartado ao fim da chamada; nada é guardado entre chamadas nem entre
-   processos.
+1. For each candidate, walk up the dentry chain from the file's parent to the mount
+   root, under `rcu_read_lock` and with the rename `seqlock` (`rename_lock`) to detect
+   concurrent changes, checking `MAY_EXEC` on each directory with `inode_permission`.
+2. Each approved directory enters a set local to the call (dentry address); on finding
+   an already approved directory, the walk stops there. Refused directories are also remembered.
+3. Check `MAY_READ` on the file, as today.
+4. If the `seqlock` indicates a rename during the walk, or any step cannot be done without
+   blocking, the candidate falls back to the current path (full `vfs_path_lookup`). The current path
+   remains the correctness reference.
+5. The set is discarded at the end of the call; nothing is kept between calls or between
+   processes.
 
-## Invariantes que a mudança precisa manter
+## Invariants the change must keep
 
-- Nenhum resultado, nem contagem, que o chamador não pudesse abrir naquele instante (fora da
-  janela já aceita entre resposta e abertura).
-- Mesmas credenciais: as do chamador no momento da chamada, com `nop_mnt_idmap`.
-- Mesmo escopo: só caminhos alcançáveis a partir da raiz desta montagem; um dentry fora dela é
-  recusado.
-- Mudança de permissão de um diretório durante a consulta não pode conceder acesso que a
-  verificação atual negaria em nenhum instante da chamada. Reaproveitar uma decisão positiva
-  tomada antes de um `chmod` concorrente dentro da mesma chamada é equivalente à janela já
-  aceita; isso precisa ser escrito no contrato e testado.
+- No result, nor count, that the caller could not open at that instant (outside the
+  window already accepted between response and open).
+- Same credentials: the caller's at the time of the call, with `nop_mnt_idmap`.
+- Same scope: only paths reachable from the root of this mount; a dentry outside it is
+  refused.
+- A permission change on a directory during the query cannot grant access that the
+  current check would deny at any instant of the call. Reusing a positive decision
+  made before a concurrent `chmod` within the same call is equivalent to the already
+  accepted window; this needs to be written into the contract and tested.
 
-## Alternativas
+## Alternatives
 
-- **Manter como está.** Correto e simples; custo por resultado documentado. É a opção se o M4
-  mostrar que consultas com centenas de resultados não são o uso real.
-- **Cache entre chamadas.** Descartado: exigiria invalidação a cada `chmod`, `rename` e mudança
-  de ACL, e abriria espaço para decisões vencidas.
-- **Autorizar só o arquivo.** Descartado: ignora a travessia dos diretórios e quebraria o
-  isolamento por diretório testado na fase 3b.
-- **Tirar os caminhos da resposta.** Fora do escopo: mudaria a UAPI v1.
+- **Keep as it is.** Correct and simple; per-result cost documented. It is the option if M4
+  shows that queries with hundreds of results are not real use.
+- **Cache across calls.** Discarded: it would require invalidation at every `chmod`, `rename` and ACL
+  change, and would open room for stale decisions.
+- **Authorize only the file.** Discarded: it ignores directory traversal and would break the
+  per-directory isolation tested in phase 3b.
+- **Remove the paths from the response.** Out of scope: it would change UAPI v1.
 
-## Testes exigidos antes de aceitar
+## Tests required before accepting
 
-- Todos os blocos atuais da suíte (isolamento com dois usuários, ACLs, 600 candidatos em vários
-  lotes, concorrência com `chmod`, `rename` e remoção) passando sem mudança.
-- Novo teste de concorrência focado: `chmod` e renomeação de diretórios intermediários em laço
-  enquanto um usuário comum consulta, verificando a cada resposta que todo caminho devolvido
-  abre ou falha só pela janela aceita, e que nenhum resultado de diretório negado aparece.
-- Equivalência com o oráculo rodando como o mesmo usuário, em todas as formas do W3.
-- KASAN e lockdep sem diagnóstico.
-- Medição no host da Azure, por forma, contra o piloto 4.
+- All current blocks of the suite (isolation with two users, ACLs, 600 candidates in several
+  batches, concurrency with `chmod`, `rename` and removal) passing without change.
+- New focused concurrency test: `chmod` and rename of intermediate directories in a loop
+  while an ordinary user queries, checking at each response that every returned path
+  opens or fails only through the accepted window, and that no result from a denied directory appears.
+- Equivalence with the oracle running as the same user, in all W3 shapes.
+- KASAN and lockdep without diagnostics.
+- Measurement on the Azure host, per shape, against pilot 4.
 
-## Lacuna relacionada, fora desta decisão
+## Related gap, outside this decision
 
-Módulos de segurança que decidem pelo caminho na abertura (AppArmor, Landlock) não são
-consultados pela verificação atual nem pela proposta. Fica para a ADR do modelo de ameaça (S1
-do roteiro de segurança).
+Security modules that decide by path at open (AppArmor, Landlock) are not
+consulted by the current check nor by the proposal. It is left to the threat model ADR (S1
+of the security roadmap).

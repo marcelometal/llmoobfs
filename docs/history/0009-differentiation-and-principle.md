@@ -1,55 +1,56 @@
-# 0009 — O que o MoobFS traria de diferente, e o princípio de não concorrer com o maduro
+# 0009 — What MoobFS would bring that is different, and the principle of not competing with what is mature
 
-Data: 2026-10-10, America/Sao_Paulo.
+Date: 2026-10-10, America/Sao_Paulo.
 
-## Pedido
+## Request
 
-Responder o que o filesystem traria de benefício frente a outros; registrar e publicar. Em
-seguida o usuário enunciou um princípio: bibliotecas e filesystems maduros, mantidos por
-milhões de usuários, não devem ser concorrência mas base; a inovação possível está nos
-recursos que uma memória de LLM usaria. Exemplo dado: "concorrer com o git é loucura".
+Answer what benefit the filesystem would bring compared with others; record and publish. Then
+the user stated a principle: mature libraries and filesystems, maintained by
+millions of users, should not be competition but a foundation; the possible innovation lies in the
+features an LLM memory would use. Example given: "concorrer com o git é loucura" ("competing
+with git is madness").
 
-## Análise registrada
+## Recorded analysis
 
-**Sem concorrente direto em filesystems Linux:**
+**No direct competitor among Linux filesystems:**
 
-- Consulta por atributo tipado dentro do kernel (o BFS fez em 1997; nenhum FS Linux repetiu).
-- Formato pequeno, auditável de ponta a ponta, com validação integral e entradas inválidas
-  testadas uma a uma, desenhado para registros de memória.
+- Query by typed attribute inside the kernel (BFS did it in 1997; no Linux FS repeated it).
+- A small format, auditable end to end, with full validation and invalid inputs
+  tested one by one, designed for memory records.
 
-**Igual ou pior que o existente, portanto não é diferencial:** dedup e reflink (btrfs, XFS,
-ZFS), journaling (ext4, XFS), escala, desempenho e maturidade. Busca semântica fica fora por
-decisão.
+**Equal to or worse than what exists, therefore not a differentiator:** dedup and reflink (btrfs, XFS,
+ZFS), journaling (ext4, XFS), scale, performance and maturity. Semantic search stays out by
+decision.
 
-**Correção datada (2026-10-10):** a resposta inicial listou "trocar git por revisões nativas"
-como hipótese de benefício. Isso contradiz o princípio acima e é retirado. Git permanece a
-ferramenta de versionamento de conteúdo; revisões por memória no M3, se existirem, devem
-complementar (identidade estável, atributos por revisão, consulta temporal), não substituir o
-git, e isso precisa ser reavaliado na ADR do M3.
+**Dated correction (2026-10-10):** the initial answer listed "replacing git with native revisions"
+as a hypothetical benefit. This contradicts the principle above and is withdrawn. Git remains the
+content versioning tool; per-memory revisions in M3, if they exist, must
+complement (stable identity, per-revision attributes, temporal query), not replace
+git, and this needs to be reevaluated in the M3 ADR.
 
-## Princípio adotado
+## Principle adopted
 
-Confirmado pelo usuário e aceito como regra de projeto: usar o que é maduro (git, ext4/btrfs/XFS,
-jbd2, iomap, SQLite, xfstests), e concentrar a inovação nos recursos específicos de memória para
-LLMs: atributos tipados consultáveis, verificação integral, identidade e proveniência de
-memórias, consulta temporal.
+Confirmed by the user and accepted as a project rule: use what is mature (git, ext4/btrfs/XFS,
+jbd2, iomap, SQLite, xfstests), and concentrate the innovation on the memory-specific features for
+LLMs: queryable typed attributes, full verification, identity and provenance of
+memories, temporal query.
 
-## Implicação em aberto para a ADR-0006
+## Open implication for ADR-0006
 
-A especificação do M2 (ADR-0006) descreve um volume completo: alocador de blocos, diretórios,
-tabela de inodes, integração com jbd2. Pelo princípio acima, isso reconstrói o que ext4 e btrfs
-já fazem. A alternativa coerente é um **filesystem empilhado nativo** (padrão de overlayfs e
-ecryptfs, ambos in-tree, `=m` na VM; cerca de 12,5 mil e 8,2 mil linhas no v6.12) sobre um FS
-maduro: blocos, journal, diretórios, reflink, dedup e checksums vêm do FS inferior (btrfs ou
-XFS); a camada MoobFS adiciona só o que é específico de memória. Continua sendo módulo nativo
-montável, sem FUSE (ADR-0001 preservada). A decisão de substituir a ADR-0006 por essa forma é
-do usuário e fica registrada como pergunta pendente; nenhuma das duas foi implementada.
+The M2 specification (ADR-0006) describes a full volume: block allocator, directories,
+inode table, integration with jbd2. By the principle above, this rebuilds what ext4 and btrfs
+already do. The coherent alternative is a **native stacked filesystem** (pattern of overlayfs and
+ecryptfs, both in-tree, `=m` in the VM; about 12.5 thousand and 8.2 thousand lines in v6.12) over a mature
+FS: blocks, journal, directories, reflink, dedup and checksums come from the lower FS (btrfs or
+XFS); the MoobFS layer adds only what is memory-specific. It remains a native mountable
+module, without FUSE (ADR-0001 preserved). The decision to replace ADR-0006 with this form is
+the user's and is recorded as a pending question; neither of the two was implemented.
 
-## Mudanças
+## Changes
 
-Este registro, índice do histórico e `CHANGELOG.md`. Nenhum código.
+This journal, the history index and `CHANGELOG.md`. No code.
 
-## Próximo passo
+## Next step
 
-Decidir entre "volume completo" (ADR-0006 como está) e "camada empilhada sobre FS maduro"
-(nova ADR substituindo a 0006). Só então iniciar a fase 2a.
+Decide between "full volume" (ADR-0006 as it is) and "stacked layer over a mature FS"
+(a new ADR replacing 0006). Only then start phase 2a.

@@ -1,69 +1,69 @@
-# 0013 — Fase 2c: atributos tipados validados no kernel, ferramentas e fuzzing
+# 0013 — Phase 2c: typed attributes validated in the kernel, tools and fuzzing
 
-Data: 2026-10-10, America/Sao_Paulo. Estado: implementado e validado na VM de teste.
+Date: 2026-10-10, America/Sao_Paulo. Status: implemented and validated in the test VM.
 
-## Pedido
+## Request
 
-Continuar para a fase 2c da especificação do M2: codificação tipada de `user.moob.*` com
-validação no `setxattr`, ferramentas `moobfs-check` e `moobfs-attr`, fuzzing da codificação.
+Continue to phase 2c of the M2 specification: typed encoding of `user.moob.*` with
+validation in `setxattr`, the `moobfs-check` and `moobfs-attr` tools, fuzzing of the encoding.
 
-## Implementação
+## Implementation
 
-- `include/moobfs_attr.h` e `common/attr.c`: codificação compartilhada (um byte de tipo mais
-  payload; tipos `string` UTF-8 ≤ 1 KiB, `int64`, `double` sem NaN, `bool`, `time`, `raw`
-  ≤ 4 KiB), validador de UTF-8 estrito (rejeita NUL, sobrelongos, substitutos, > U+10FFFF),
-  regras de nome (`[a-z0-9_.]`, 1–64 bytes, sem pontos nas bordas ou duplicados), nome
-  reservado `format`, e parser do marcador de versão. Funções puras, sem alocação; o módulo as
-  inclui por `layer/attr.c` como o M1 faz com `common/format.c`.
-- `layer/main.c`: `setxattr` em `user.moob.*` passa por `moobl_typed_check` antes de tocar o
-  inferior: `EPERM` para o nome reservado, `EINVAL` para nome ou codificação inválidos,
-  `ENOSPC` ao criar o 65.º atributo tipado (contagem por `vfs_listxattr` só quando o atributo é
-  novo). Namespaces opacos continuam passando sem validação. Na montagem, a camada lê
-  `user.moob.format` na raiz inferior e recusa versões desconhecidas ou maiores que 1; ausência
-  é aceita; inferior sem xattr gera aviso.
-- `tools/moobfs-attr.c`: `get`, `set`, `rm`, `list` tipados sobre a API de xattr, mais `rawset`
-  para testes plantarem bytes inválidos. `tools/moobfs-check.c`: percorre uma árvore
-  (`nftw`, sem seguir symlinks, sem cruzar mounts), valida cada atributo tipado e o marcador de
-  formato, emite JSON e retorna 2 quando há problemas; não repara. Ambos Linux-only, alvo
+- `include/moobfs_attr.h` and `common/attr.c`: shared encoding (one type byte plus
+  payload; types `string` UTF-8 ≤ 1 KiB, `int64`, `double` without NaN, `bool`, `time`, `raw`
+  ≤ 4 KiB), strict UTF-8 validator (rejects NUL, overlongs, surrogates, > U+10FFFF),
+  name rules (`[a-z0-9_.]`, 1–64 bytes, no dots at the edges or doubled), reserved
+  name `format`, and the version marker parser. Pure functions, without allocation; the module
+  includes them through `layer/attr.c` as M1 does with `common/format.c`.
+- `layer/main.c`: `setxattr` on `user.moob.*` goes through `moobl_typed_check` before touching the
+  lower: `EPERM` for the reserved name, `EINVAL` for an invalid name or encoding,
+  `ENOSPC` when creating the 65th typed attribute (count by `vfs_listxattr` only when the attribute is
+  new). Opaque namespaces keep passing without validation. At mount, the layer reads
+  `user.moob.format` at the lower root and refuses unknown versions or versions greater than 1; absence
+  is accepted; a lower without xattr generates a warning.
+- `tools/moobfs-attr.c`: typed `get`, `set`, `rm`, `list` over the xattr API, plus `rawset`
+  for tests to plant invalid bytes. `tools/moobfs-check.c`: walks a tree
+  (`nftw`, without following symlinks, without crossing mounts), validates each typed attribute and the format
+  marker, emits JSON and returns 2 when there are problems; it does not repair. Both Linux-only, target
   `make attr-tools`.
-- `tests/attr_test.c`: 60 verificações da codificação, executadas em `make test` no host.
-  `tests/fuzz_attr.c` + `tests/fuzz-corpus/attr/`: alvo libFuzzer para validador, nomes e
-  marcador; `make fuzz` (clang LLVM com ASan/UBSan); passo no CI com 30 s de orçamento.
-- `tests/layer.c`: seção de atributos tipados (codificações válidas e inválidas, nome
-  reservado, limite de 64 com verificação de que escritas rejeitadas não tocam o inferior,
-  namespace opaco intocado). `vm/init`: exercita `moobfs-attr` e `moobfs-check` em cada
-  inferior, inclusive plantando um `bool` inválido direto no inferior e exigindo que o
-  verificador o reporte com o motivo.
+- `tests/attr_test.c`: 60 checks of the encoding, run in `make test` on the host.
+  `tests/fuzz_attr.c` + `tests/fuzz-corpus/attr/`: libFuzzer target for the validator, names and
+  marker; `make fuzz` (LLVM clang with ASan/UBSan); a CI step with a 30 s budget.
+- `tests/layer.c`: typed attributes section (valid and invalid encodings, reserved
+  name, limit of 64 with a check that rejected writes do not touch the lower,
+  opaque namespace untouched). `vm/init`: exercises `moobfs-attr` and `moobfs-check` on each
+  lower, including planting an invalid `bool` directly in the lower and requiring the
+  checker to report it with the reason.
 
-## Evidências executadas
+## Evidence executed
 
-- Host (macOS arm64): `make test` → `attr encoding tests: 60 checks passed` e os 9 testes do M1.
-- VM (`make vm-test`, kernel Debian 6.12.111): `MOOBFS_VM_PASS`, `LAYER_LOWER_PASS` para
-  ext4, btrfs e XFS, `MOOBFS_LAYER_PASS: … typed attributes and tools …`; sem `BUG`, `Oops`
-  ou `WARNING`. SHA-256 de `moobfs_layer.ko`: ver `build/vm/environment.txt` da execução.
-- Fuzzing: não executado no host (Apple clang não traz libFuzzer). No CI (run 38066427480,
-  commit `8ab6ecd`, ubuntu-24.04 com clang): 21.747.211 execuções em 31 s sob ASan e UBSan,
-  cobertura 113 arestas, corpus final de 138 entradas, nenhuma falha.
+- Host (macOS arm64): `make test` → `attr encoding tests: 60 checks passed` and the 9 M1 tests.
+- VM (`make vm-test`, Debian kernel 6.12.111): `MOOBFS_VM_PASS`, `LAYER_LOWER_PASS` for
+  ext4, btrfs and XFS, `MOOBFS_LAYER_PASS: … typed attributes and tools …`; no `BUG`, `Oops`
+  or `WARNING`. SHA-256 of `moobfs_layer.ko`: see `build/vm/environment.txt` of the run.
+- Fuzzing: not executed on the host (Apple clang does not ship libFuzzer). In CI (run 38066427480,
+  commit `8ab6ecd`, ubuntu-24.04 with clang): 21 747 211 executions in 31 s under ASan and UBSan,
+  coverage 113 edges, final corpus of 138 entries, no failure.
 
-## Tentativas e correções
+## Attempts and fixes
 
-1. O teste de passagem da fase 2b usava `user.moob.kind` com bytes sem tipo; passou a usar
-   `user.other.kind`. A recusa pelo módulo era o comportamento correto.
-2. A imagem ext4 de 64 MiB recebia blocos de 1 KiB do `mke2fs`, cujo bloco de xattr comporta
-   cerca de 36 entradas; o 37.º atributo falhava com `ENOSPC` vindo do ext4, não da camada.
-   A imagem passou a usar `-b 4096`, e a especificação registra que o limite efetivo é o menor
-   entre os 64 da camada e a capacidade do inferior.
-3. Uma chave sobrando no teste fez o build falhar e o log da VM ser o da rodada anterior; o
-   erro foi detectado pelo marcador antigo no console. O initramfs não tinha `/tmp`.
+1. The phase 2b pass-through test used `user.moob.kind` with untyped bytes; it now uses
+   `user.other.kind`. The refusal by the module was the correct behavior.
+2. The 64 MiB ext4 image received 1 KiB blocks from `mke2fs`, whose xattr block holds
+   about 36 entries; the 37th attribute failed with `ENOSPC` coming from ext4, not from the layer.
+   The image now uses `-b 4096`, and the specification records that the effective limit is the smaller
+   of the layer's 64 and the lower's capacity.
+3. A stray brace in the test made the build fail and the VM log be that of the previous round; the
+   error was detected by the old marker in the console. The initramfs had no `/tmp`.
 
-## Limitações
+## Limitations
 
-Mesmas da fase 2b (sem KASAN/lockdep, sem xfstests completo, sem dm-log-writes, sem cliente
-real na VM). O `moobfs-check` lê valores de até 4 KiB + 1; atributos maiores são reportados
-como problema sem leitura. O limite por arquivo é verificado só na criação, com custo de uma
-listagem de xattr por criação.
+Same as phase 2b (no KASAN/lockdep, no full xfstests, no dm-log-writes, no real
+client in the VM). `moobfs-check` reads values of up to 4 KiB + 1; larger attributes are reported
+as a problem without being read. The per-file limit is checked only at creation, at the cost of one
+xattr listing per creation.
 
-## Próximo passo
+## Next step
 
-Fase 2d: índice em RAM construído na montagem, atualizado em `setxattr`/`removexattr`/`unlink`,
-`QUERY` e `GET_INFO` por ioctl, `moobfs-index` em espaço de usuário como oráculo.
+Phase 2d: in-RAM index built at mount, updated on `setxattr`/`removexattr`/`unlink`,
+`QUERY` and `GET_INFO` through ioctl, `moobfs-index` in user space as the oracle.

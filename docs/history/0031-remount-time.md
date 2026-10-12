@@ -1,42 +1,42 @@
-# 0031 — Tempo de remontagem com 25 000 a 60 000 memórias
+# 0031 — Remount time with 25 000 to 60 000 memories
 
-Data: 2026-10-11. Estado: medido (nível de piloto).
+Date: 2026-10-11. Status: measured (pilot level).
 
-## Objetivo
+## Goal
 
-Completar o W7 que ficou sem valor nas escalas grandes da série do registro 0029 e medir também
-o W6 (cache frio), para informar a decisão, deixada ao M4 pela ADR-0007, de persistir ou não o
-índice em disco.
+Complete the W7 that produced no value at the large scales of the series in journal 0029 and also
+measure W6 (cold cache), to inform the decision, left to M4 by ADR-0007, of whether or not to
+persist the index on disk.
 
-## Resultado (host da Azure, ext4 em P6, evidências em `bench/results/2026-10-11-azure-remount/`)
+## Result (Azure host, ext4 on P6, evidence in `bench/results/2026-10-11-azure-remount/`)
 
-| Memórias | W7, cache quente (mediana de 5) | W6, cache frio (mediana de 3) | Índice contabilizado |
+| Memories | W7, warm cache (median of 5) | W6, cold cache (median of 3) | Accounted index |
 | --- | --- | --- | --- |
-| 25 000 | 0,47 s | 49 s | 14,9 MB |
-| 40 000 | 0,79 s | 75 s | 23,9 MB |
-| 60 000 | 1,18 s | 126 s | 35,8 MB |
+| 25 000 | 0.47 s | 49 s | 14.9 MB |
+| 40 000 | 0.79 s | 75 s | 23.9 MB |
+| 60 000 | 1.18 s | 126 s | 35.8 MB |
 
-Com cache quente, reconstruir o índice custa cerca de 19,7 µs por memória, linear, como nas
-escalas menores (registro 0029). Com cache frio, cerca de 2 ms por memória: a varredura lê o
-inode e os atributos de cada arquivo com leituras aleatórias, e o disco P6, provavelmente já sem
-créditos de burst depois da série, entrega poucas centenas por segundo. O W6 depende do disco e
-é um limite superior para este disco, não uma propriedade só da camada.
+With a warm cache, rebuilding the index costs about 19.7 µs per memory, linear, as at the smaller
+scales (journal 0029). With a cold cache, about 2 ms per memory: the scan reads the inode and the
+attributes of each file with random reads, and the P6 disk, probably already out of burst
+credits after the series, delivers a few hundred per second. W6 depends on the disk and is an
+upper bound for this disk, not a property of the layer alone.
 
-## Leitura
+## Reading
 
-- Montar depois de reiniciar a máquina, com 60 000 memórias, levou mais de dois minutos neste
-  disco, e o tempo cresce linearmente com o número de memórias. Até lá, nenhuma consulta é
-  respondida.
-- É o primeiro número concreto para a pergunta deixada aberta pela ADR-0007 sobre persistir o
-  índice: com índice persistido, a montagem fria leria um arquivo sequencial de cerca de 36 MB
-  em vez de 60 000 leituras aleatórias. O custo seria manter esse arquivo coerente com o
-  inferior (inclusive depois de mudanças feitas fora da montagem e de quedas), o que precisa de
-  decisão própria.
-- Na alternativa E da ADR-0009 (índice particionado por domínio), a reconstrução poderia ser
-  feita por domínio e sob demanda, na primeira consulta a cada domínio, o que reduz o tempo até
-  a primeira resposta sem persistir nada; vale medir antes de persistir.
+- Mounting after rebooting the machine, with 60 000 memories, took more than two minutes on this
+  disk, and the time grows linearly with the number of memories. Until then, no query is
+  answered.
+- It is the first concrete number for the question left open by ADR-0007 about persisting the
+  index: with a persisted index, the cold mount would read a sequential file of about 36 MB
+  instead of 60 000 random reads. The cost would be keeping that file coherent with the lower
+  (including after changes made outside the mount and after crashes), which needs a decision of
+  its own.
+- In alternative E of ADR-0009 (index partitioned by domain), the rebuild could be done per
+  domain and on demand, at the first query to each domain, which reduces the time to the first
+  response without persisting anything; worth measuring before persisting.
 
-## Limitações
+## Limitations
 
-Um host, um disco com bursting em estado desconhecido, três medições frias por escala. Repetir
-com disco de IOPS fixos antes de qualquer conclusão sobre persistência.
+One host, one disk with bursting in an unknown state, three cold measurements per scale. Repeat
+with a fixed-IOPS disk before any conclusion about persistence.

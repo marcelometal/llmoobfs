@@ -1,60 +1,60 @@
-# 0027 — `QUERY`: busca a partir do primeiro candidato e resultados copiados um a um
+# 0027 — `QUERY`: seek from the first candidate and results copied one by one
 
-Data: 2026-10-11. Branch: `m3/query-fast-path`. Estado: implementado, validado na VM e medido no
-host da Azure (piloto 3).
+Date: 2026-10-11. Branch: `m3/query-fast-path`. Status: implemented, validated in the VM and
+measured on the Azure host (pilot 3).
 
-## Origem
+## Origin
 
-O piloto 2 do M4 (registro 0025, `bench/results/2026-10-11-azure-pilot2-s1/`) mostrou o `QUERY`
-de 2 a 9 vezes mais lento que o SQLite com índice composto, por forma, e a leitura de
-`do_query` decompôs o custo em três partes: um custo fixo de cerca de 50 µs por chamada, uma
-varredura linear das entradas do primeiro termo e cerca de 2 µs por resultado devolvido.
+M4 pilot 2 (journal 0025, `bench/results/2026-10-11-azure-pilot2-s1/`) showed `QUERY` 2 to 9
+times slower than SQLite with a composite index, per shape, and reading `do_query` broke the
+cost down into three parts: a fixed cost of about 50 µs per call, a linear scan of the entries
+of the first term and about 2 µs per returned result.
 
-## Decisões
+## Decisions
 
-1. **Sem vetor do tamanho do limite.** `do_query` alocava com `kvcalloc` e zerava um vetor de
-   `limit` resultados (até 4096 × 280 bytes, cerca de 1,1 MB) em toda chamada. Agora cada
-   resultado autorizado é montado num único buffer e copiado direto para o vetor do chamador
-   com `copy_to_user`, fora do lock do índice. A UAPI não muda: o vetor, `count` e `truncated`
-   têm o mesmo significado. Em erro (`EFAULT`, `ENOMEM`) o conteúdo do vetor do chamador é
-   indefinido, como já era por omissão de contrato.
-2. **Busca a partir do primeiro candidato e parada no último.** As entradas de um atributo
-   ficam ordenadas por (tipo, valor, inode). `seek_first` posiciona a varredura na primeira
-   entrada que pode casar (igualdade, maior, maior ou igual e prefixo: primeira com valor não
-   inferior ao termo; menor e menor ou igual: primeira do tipo do termo) e `past_end` encerra
-   a varredura quando nenhuma entrada adiante pode casar (tipo maior que o do termo, valor além
-   do limite, fim da sequência de strings com o prefixo). Existência continua percorrendo tudo.
-   A retomada entre lotes de 256 candidatos usa a chave de retomada como antes.
-3. **O custo por resultado fica.** Resolver o caminho com as credenciais do chamador e verificar
-   a permissão é o contrato da fase 3b (registro 0020); nada muda nisso.
+1. **No vector the size of the limit.** `do_query` allocated with `kvcalloc` and zeroed a vector
+   of `limit` results (up to 4096 × 280 bytes, about 1.1 MB) on every call. Now each authorized
+   result is assembled in a single buffer and copied directly into the caller's vector with
+   `copy_to_user`, outside the index lock. The UAPI does not change: the vector, `count` and
+   `truncated` have the same meaning. On error (`EFAULT`, `ENOMEM`) the content of the caller's
+   vector is undefined, as it already was by omission in the contract.
+2. **Seek from the first candidate and stop at the last.** The entries of an attribute are
+   ordered by (type, value, inode). `seek_first` positions the scan at the first entry that can
+   match (equality, greater, greater or equal and prefix: first with a value not lower than the
+   term; less and less or equal: first of the term's type) and `past_end` ends the scan when no
+   entry ahead can match (type greater than the term's, value beyond the bound, end of the run
+   of strings with the prefix). Existence still walks everything. Resumption between batches of
+   256 candidates uses the resumption key as before.
+3. **The per-result cost stays.** Resolving the path with the caller's credentials and checking
+   the permission is the phase 3b contract (journal 0020); nothing changes there.
 
-## Testes
+## Tests
 
-Novo bloco em `vm/suite.sh`: um mesmo atributo (`mix`) com strings, int64, double, bool e time
-em 14 arquivos, e 23 consultas cobrindo todos os operadores, inclusive limites, resultados
-vazios e prefixos que esgotam a sequência, cada uma igual ao oráculo `moobfs-index`, mais
-contagens exatas. Os testes existentes continuam cobrindo a retomada entre lotes (600
-candidatos), o isolamento, a concorrência e as nove formas do W3 contra o SQLite e o oráculo.
-`make vm-test` (Debian 6.12.111): `ISOLATION_PASS` e `BENCH_LAYER_PASS` em ext4, btrfs e XFS,
-`MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`. KASAN: pelo workflow do pull request.
+New block in `vm/suite.sh`: one attribute (`mix`) with strings, int64, double, bool and time
+across 14 files, and 23 queries covering all operators, including bounds, empty results and
+prefixes that exhaust the run, each equal to the `moobfs-index` oracle, plus exact counts. The
+existing tests keep covering resumption between batches (600 candidates), isolation,
+concurrency and the nine W3 shapes against SQLite and the oracle. `make vm-test`
+(Debian 6.12.111): `ISOLATION_PASS` and `BENCH_LAYER_PASS` on ext4, btrfs and XFS,
+`MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`. KASAN: through the pull request workflow.
 
-## Próximo passo
+## Next step
 
-Mesclar após o KASAN do pull request; depois, a campanha completa em discos sem bursting.
+Merge after the pull request's KASAN run; then, the full campaign on disks without bursting.
 
-## Medição no host da Azure: piloto 3 (2026-10-11)
+## Measurement on the Azure host: pilot 3 (2026-10-11)
 
-Mesmo host, kernel, discos, semente, comando e harness do piloto 2; o módulo foi compilado do
-commit `b85d041` (harness do PR 20 com esta branch). Evidências em
-`bench/results/2026-10-11-azure-pilot3-s1/`; pacote bruto na pre-release
-`bench-2026-10-11-azure-pilot3-s1`. As 30 equivalências passaram (kernel, SQLite e oráculo).
+Same host, kernel, disks, seed, command and harness as pilot 2; the module was compiled from
+commit `b85d041` (harness of PR 20 with this branch). Evidence in
+`bench/results/2026-10-11-azure-pilot3-s1/`; raw package in the pre-release
+`bench-2026-10-11-azure-pilot3-s1`. The 30 equivalences passed (kernel, SQLite and oracle).
 
-W3 por forma, mediana, ext4 (btrfs e XFS seguem o mesmo padrão: Q8 4,9 µs, Q3 34 µs, Q7 de
-1052 a 1100 µs):
+W3 per shape, median, ext4 (btrfs and XFS follow the same pattern: Q8 4.9 µs, Q3 34 µs, Q7 from
+1052 to 1100 µs):
 
-| Forma | Resultados | SQLite | `QUERY` piloto 2 | `QUERY` piloto 3 | Usuário comum, piloto 3 |
+| Shape | Results | SQLite | `QUERY` pilot 2 | `QUERY` pilot 3 | Ordinary user, pilot 3 |
 | --- | --- | --- | --- | --- | --- |
-| Q8 | 0 | 19 µs | 54 µs | 4,9 µs | 4,8 µs |
+| Q8 | 0 | 19 µs | 54 µs | 4.9 µs | 4.8 µs |
 | Q3 | 3 | 15 µs | 141 µs | 34 µs | 34 µs |
 | Q4 | 23 | 26 µs | 178 µs | 73 µs | 74 µs |
 | Q5 | 70 | 43 µs | 248 µs | 144 µs | 150 µs |
@@ -64,17 +64,16 @@ W3 por forma, mediana, ext4 (btrfs e XFS seguem o mesmo padrão: Q8 4,9 µs, Q3 
 | Q1 | 390 | 91 µs | 843 µs | 744 µs | 770 µs |
 | Q7 | 513 | 224 µs | 1136 µs | 1049 µs | 1086 µs |
 
-Leitura: o custo fixo e a varredura linear desapareceram. Sem resultados, o `QUERY` responde em
-menos tempo que o SQLite do baseline (que prepara a instrução a cada chamada). O restante é
-quase linear no número de resultados, com cerca de 2 µs por resultado contra 0,2 a 0,4 µs do
-SQLite, e corresponde a montar o caminho, resolvê-lo com as credenciais do chamador, verificar a
-permissão e copiar 280 bytes para o usuário. Consultas seletivas ficam de 2 a 3 vezes mais
-lentas que o SQLite; consultas que devolvem centenas de resultados, de 4 a 8 vezes. W1, W2 e W4
-não mudaram em relação ao piloto 2 (W1 9,84 ms com camada contra 9,86 ms sem; W2 12,9 contra
-9,3 µs; W4 24,5 contra 10,1 µs).
+Reading: the fixed cost and the linear scan disappeared. With no results, `QUERY` answers in
+less time than the baseline SQLite (which prepares the statement on every call). The remainder
+is nearly linear in the number of results, at about 2 µs per result against 0.2 to 0.4 µs for
+SQLite, and corresponds to assembling the path, resolving it with the caller's credentials,
+checking the permission and copying 280 bytes to the user. Selective queries are 2 to 3 times
+slower than SQLite; queries that return hundreds of results, 4 to 8 times. W1, W2 and W4 did not
+change relative to pilot 2 (W1 9.84 ms with the layer against 9.86 ms without; W2 12.9 against
+9.3 µs; W4 24.5 against 10.1 µs).
 
-Candidatos para reduzir o custo por resultado, ainda sem decisão: autorizar cada diretório
-uma vez por consulta em vez de resolver o caminho completo por resultado (muitos resultados
-compartilham diretórios), e evitar a cópia do caminho com `kstrdup` sob o lock. Qualquer um
-mexe no contrato de autorização da fase 3b e exige decisão própria, testes de isolamento e
-KASAN antes de entrar.
+Candidates for reducing the per-result cost, still without a decision: authorize each directory
+once per query instead of resolving the full path per result (many results share directories),
+and avoid copying the path with `kstrdup` under the lock. Either one touches the phase 3b
+authorization contract and requires its own decision, isolation tests and KASAN before going in.

@@ -1,68 +1,68 @@
-# 0048 — Otimização do "N mais recentes" no `QUERY2`
+# 0048 — Optimization of "N most recent" in `QUERY2`
 
-Data: 2026-10-12. Estado: implementado, testado na VM da suíte e medido no host do registro 0042. Branch `m3/query-v2-recent`, sobre a da Q2d.
+Date: 2026-10-12. Status: implemented, tested in the suite's VM and measured on the host of journal 0042. Branch `m3/query-v2-recent`, on top of the Q2d one.
 
-## Objetivo
+## Goal
 
-O registro 0047 mostrou o SQLite à frente da v2 no "N mais recentes": 47 µs contra 185 µs com
-`kind = note`, e 279 µs contra 1,7 ms com `agent = a07` (filtro que casa com cerca de 3% do
-domínio). Pedido do mantenedor: otimizar.
+Journal 0047 showed SQLite ahead of v2 in "N most recent": 47 µs against 185 µs with
+`kind = note`, and 279 µs against 1.7 ms with `agent = a07` (a filter that matches about 3% of the
+domain). Maintainer's request: optimize.
 
-## Diagnóstico
+## Diagnosis
 
-`perf` no host, com a consulta seletiva repetida 2 000 vezes: 47% em `inode_matches_all`
-(percorre a lista de atributos de cada inode), 21% no laço de varredura, 13% em `rb_prev`, 9% em
-`strcmp`. A leitura do código mostrou a causa principal, que o perfil só sugeria: sem
-verificação por resultado, a varredura juntava candidatos em lotes de 256 mesmo quando o pedido
-era de 20. Com um filtro de 3%, juntar 256 candidatos é percorrer praticamente o domínio inteiro
-(cerca de 7 500 entradas) para usar 20. A estimativa do registro 0044 (cerca de 600 entradas a
-2,8 µs) estava errada: eram cerca de 7 500 entradas a cerca de 0,23 µs.
+`perf` on the host, with the selective query repeated 2 000 times: 47% in `inode_matches_all`
+(walks the attribute list of each inode), 21% in the scan loop, 13% in `rb_prev`, 9% in
+`strcmp`. Reading the code showed the main cause, which the profile only suggested: without
+per-result checking, the scan gathered candidates in batches of 256 even when the request
+was for 20. With a 3% filter, gathering 256 candidates means walking practically the entire domain
+(about 7 500 entries) to use 20. The estimate of journal 0044 (about 600 entries at
+2.8 µs) was wrong: it was about 7 500 entries at about 0.23 µs.
 
-## Mudanças (`layer/index.c`)
+## Changes (`layer/index.c`)
 
-1. **Lote limitado ao que falta:** fora do modo de contingência, cada lote junta no máximo os
-   resultados que faltam mais um (esse um só serve para marcar `truncated`). Vale para os três
-   planos (varredura simples, ordenada e de igualdade). No modo de contingência o lote continua
-   com 256, porque candidatos podem ser recusados pela verificação de permissão.
-2. **Atributo por nó de nome:** dentro de um domínio, todos os candidatos estão na partição
-   homogênea, então cada termo corresponde a um nó de nome; a busca na lista do inode compara
-   ponteiros em vez de `strcmp` (`entry_find_node`). A v1, que percorre todas as partições,
-   continua comparando nomes.
-3. **Chave de retomada copiada uma vez por lote**, da última entrada examinada, em vez de a cada
-   entrada.
+1. **Batch limited to what is missing:** outside fallback mode, each batch gathers at most the
+   results still missing plus one (that one only serves to mark `truncated`). Applies to the three
+   plans (simple, ordered and equality scan). In fallback mode the batch stays
+   at 256, because candidates can be rejected by the permission check.
+2. **Attribute per name node:** within a domain, all candidates are in the homogeneous
+   partition, so each term corresponds to a name node; the search in the inode's list compares
+   pointers instead of `strcmp` (`entry_find_node`). v1, which walks all partitions,
+   keeps comparing names.
+3. **Resume key copied once per batch**, from the last entry examined, instead of on every
+   entry.
 
-Alternativa considerada e não feita: escolher, para consultas ordenadas com um termo de
-igualdade seletivo, os N melhores da sequência desse termo com uma pequena pilha (heap). Com a
-mudança 1, a varredura ordenada já ficou abaixo do SQLite; o plano extra fica para quando um caso
-medido pedir.
+Alternative considered and not done: for ordered queries with a selective equality
+term, choose the N best of that term's run with a small heap. With
+change 1, the ordered scan already came in below SQLite; the extra plan is left for when a measured
+case calls for it.
 
-## Resultados (p50, mesmas respostas; duas passadas por módulo)
+## Results (p50, same responses; two passes per module)
 
-| Forma no domínio ns3 | Antes (registro 0044) | Depois | SQLite (registro 0047) |
+| Form in domain ns3 | Before (journal 0044) | After | SQLite (journal 0047) |
 | --- | --- | --- | --- |
-| 20 mais recentes, `kind = note` | 189 / 183 µs | 19 / 26 µs | 47 µs |
-| 20 mais recentes, `agent = a07` | 1 779 / 1 727 µs | 102 / 141 µs | 279 µs |
-| namespace e agent (253) | 166 / 166 µs | 119 / 144 µs | 178 a 476 µs |
-| agent e kind (98) | 115 / 114 µs | 82 / 101 µs | 509 µs |
-| ns1: namespace, kind e created (1 021) | 695 / 698 µs | 569 / 644 µs | 1 729 µs |
+| 20 most recent, `kind = note` | 189 / 183 µs | 19 / 26 µs | 47 µs |
+| 20 most recent, `agent = a07` | 1 779 / 1 727 µs | 102 / 141 µs | 279 µs |
+| namespace and agent (253) | 166 / 166 µs | 119 / 144 µs | 178 to 476 µs |
+| agent and kind (98) | 115 / 114 µs | 82 / 101 µs | 509 µs |
+| ns1: namespace, kind and created (1 021) | 695 / 698 µs | 569 / 644 µs | 1 729 µs |
 
-O "N mais recentes" ficou de 7 a 17 vezes mais rápido e passou à frente do SQLite nas duas
-formas (cerca de 2 a 2,5 vezes). As outras formas ganharam de 10% a 30% com a comparação por
-ponteiro.
+"N most recent" became 7 to 17 times faster and moved ahead of SQLite in both
+forms (about 2 to 2.5 times). The other forms gained 10% to 30% from the pointer
+comparison.
 
-## Evidências
+## Evidence
 
-- Host: respostas ordenadas (20 primeiros, nos dois sentidos) e paginação completa com limite 7
-  (inclusive `kind = note`, com mais de 400 páginas), e paginação sem ordem com limite 50, iguais
-  ao `moobfs-index --domain`: 14 de 14. `q2c-compare.sh` também confirmou respostas idênticas
-  entre os módulos.
-- VM da suíte (`make vm-test`): `QUERY2_ORDER_PASS`, `QUERY2_MISSING_BATCH_PASS`,
-  `QUERY2_LEAPFROG_PASS` e `QUERY2_PASS` em ext4, btrfs e XFS, e todos os marcadores anteriores
-  até `MOOBFS_LAYER_PASS`. KASAN: pelo CI no pull request.
+- Host: ordered responses (first 20, in both directions) and complete pagination with limit 7
+  (including `kind = note`, with more than 400 pages), and unordered pagination with limit 50, equal
+  to `moobfs-index --domain`: 14 of 14. `q2c-compare.sh` also confirmed identical responses
+  between the modules.
+- Suite VM (`make vm-test`): `QUERY2_ORDER_PASS`, `QUERY2_MISSING_BATCH_PASS`,
+  `QUERY2_LEAPFROG_PASS` and `QUERY2_PASS` on ext4, btrfs and XFS, and all the previous markers
+  up to `MOOBFS_LAYER_PASS`. KASAN: by CI on the pull request.
 
-## Limitações
+## Limitations
 
-- A comparação por ponteiro supõe que todas as entradas de um inode estão na partição dele; isso
-  vale salvo depois de uma falha de memória ao mudar a partição, caso em que o índice já fica
-  marcado como incompleto.
-- Medido só em ext4, com o cache quente e sem escrita concorrente.
+- The pointer comparison assumes that all entries of an inode are in its partition; this
+  holds except after a memory failure while changing the partition, in which case the index is already
+  marked as incomplete.
+- Measured only on ext4, with a warm cache and without concurrent writes.

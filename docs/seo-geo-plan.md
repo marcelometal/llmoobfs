@@ -1,197 +1,197 @@
-# Auditoria e plano de SEO/GEO do MoobFS (proposta)
+# MoobFS SEO/GEO audit and plan (proposal)
 
-Data: 2026-10-10. Estado: **proposta; nada foi implementado.** Este documento não altera
-nenhum outro arquivo. Base: leitura de `README.md`, `README.pt-BR.md`, `ROADMAP.md`,
+Date: 2026-10-10. Status: **proposal; nothing has been implemented.** This document does not change
+any other file. Basis: reading of `README.md`, `README.pt-BR.md`, `ROADMAP.md`,
 ADRs 0005-0007, `docs/spec-m2.md`, `docs/spec-m3.md`, `docs/benchmark-plan.md`,
-`docs/research-originality.md` (§4, 5, 7, 9), `docs/value-assessment.md` ("Entrega" e §9),
+`docs/research-originality.md` (§4, 5, 7, 9), `docs/value-assessment.md` ("Deliverable" and §9),
 `docs/distribution-strategy.md` §8, `docs/community-plan.md` (§8, 9, 10, 13),
-`docs/history/README.md`, `site/*.html`, `CHANGELOG.md` e `LICENSE`, na branch
-`community/readiness`. README, ROADMAP, CONTRIBUTING e `.github/` estavam em edição por outro
-agente; foram lidos apenas como estavam e podem mudar. Metadados do GitHub vêm do enunciado
-(consulta de 2026-10-10) e não foram reverificados.
+`docs/history/README.md`, `site/*.html`, `CHANGELOG.md` and `LICENSE`, on branch
+`community/readiness`. README, ROADMAP, CONTRIBUTING and `.github/` were being edited by another
+agent; they were read only as they stood and may change. GitHub metadata comes from the task
+statement (query of 2026-10-10) and was not re-verified.
 
-Princípio: SEO aqui significa que quem procura o assunto encontre uma descrição **correta e
-sem exagero**. GEO (respostas de assistentes de IA) é consequência de texto claro, factual e
-citável; nenhum arquivo ou metadado garante citação. Todas as frases públicas obedecem à lista
-de afirmações a evitar de `docs/research-originality.md` §7.
+Principle: SEO here means that whoever searches for the subject finds a **correct description,
+without exaggeration**. GEO (AI assistant answers) is a consequence of clear, factual and
+citable text; no file or metadata guarantees citation. All public sentences obey the list
+of claims to avoid in `docs/research-originality.md` §7.
 
 ---
 
-## 1. Diagnóstico do estado atual
+## 1. Diagnosis of the current state
 
-Prioridade: A = antes de qualquer divulgação; M = logo depois; B = quando houver capacidade.
+Priority: A = before any outreach; M = right after; B = when there is capacity.
 
-| Item | Estado | Problema | Prioridade |
+| Item | Status | Problem | Priority |
 | --- | --- | --- | --- |
-| Nome do repositório vs. projeto | Repo `llmoobfs`; projeto, README e site dizem "MoobFS" | Duas grafias dividem buscas e citações; `git clone` e badges usam `llmoobfs`. Renomear quebra clones antigos, mas o GitHub mantém redirecionamento (a confirmar o comportamento com Pages) | M (decisão do mantenedor) |
-| Descrição do repositório | "Experimental native Linux filesystem for persistent LLM memory. Read-only shared-content milestone; no FUSE." | Desatualizada: omite camada empilhada, atributos tipados, `QUERY`; "read-only milestone" contradiz M2/M3 | A |
-| Topics | 5: deduplication, filesystem, kernel-module, linux, llm-memory | Poucos; `deduplication` representa mal o foco atual (dedup é do btrfs/XFS, ver `research-originality.md` §7); faltam xattr, vfs, ext4/btrfs/xfs, ai-agents | A |
-| Estrutura do README | Abre com M1 somente leitura; M2 aparece em um parágrafo denso; "What is implemented" ainda é tabela do M1; sem seção "what it is not", comparação ou FAQ | Quem chega lê um projeto que não é mais o atual; o banner experimental aprovado (community-plan §9) ainda não está no topo (a confirmar após a edição em curso) | A |
-| Links internos | README aponta para `docs/*` em português sem aviso do idioma (alguns avisados: "in Portuguese") | Leitor anglófono cai em páginas PT sem saber; links de `site/` para o GitHub usam caminho `llmoobfs` | M |
-| Visibilidade da licença | `LICENSE` GPL-2.0-only e badge no README; GitHub detecta a licença pelo arquivo | Adequado; falta citar no About a licença só se o GitHub a exibir (a confirmar na UI) | B |
-| Releases e tags | Nenhum release, nenhuma tag (`git tag` vazio) | Sem versão citável; ferramentas e assistentes não têm um ponto estável para referenciar. Mas "sem release" é honesto e coerente com o estágio | M (decisão do mantenedor) |
-| Changelog | `CHANGELOG.md` com seção única "Unreleased — 2026-10-10", detalhada | Útil e honesto, porém sem datas por fase nem links para registros; vira ruído sem um primeiro marco | B |
-| Documentação de contribuição | `CONTRIBUTING.md`, `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` existem; `CONTRIBUTING.md` e `.github/` estão sendo reescritos | Fora do escopo; este plano só depende de que o README os linke | — |
-| Discussions | Desativadas; wiki desativada | Sem canal público de perguntas; perguntas viram issues. Wiki desativada é correta (duplicaria `docs/`) | M (decisão do mantenedor) |
-| Status de manutenção/experimental | Texto "Experimental" presente no título e em parágrafos; sem banner de limitações no topo; um autor, um kernel | Falta a declaração visível e uniforme de "não para produção" e das limitações (community-plan §9) | A |
-| Metadados do site | `<title>` "MoobFS — A filesystem for LLM memory and context."; meta description ainda descreve o marco somente leitura; nenhuma tag `og:`, `canonical` ou JSON-LD nas três páginas; sem `robots.txt` nem `sitemap.xml` em `site/` | Título promete "a filesystem" sem "experimental"; descrição desatualizada; compartilhamentos sem pré-visualização | A (descrição e título), M (resto) |
-| Conteúdo do site | `index.html` ainda mostra M1 como "Implemented today: read-only M1"; `guide.html` reproduz só o M1; `plan.html` diz que M2 "não está implementado" | Contradiz `ROADMAP.md` e o README; é a página mais indexável e a mais desatualizada | A |
-| GitHub Pages | Ativo em `studiomoob.github.io/llmoobfs/`, servindo `site/` | Existe e funciona; é o ativo a corrigir, não a criar. Renomear o repo mudaria a URL | M |
-| Idioma | README em EN, README.pt-BR e docs técnicos majoritariamente PT | Quase todo o conteúdo técnico que responderia às buscas em inglês está em português | M |
-| Evidência pública | Marcadores `MOOBFS_*_PASS` no README; CI; registros `docs/history/` | Bom ativo de credibilidade; falta uma página única em inglês que resuma o que foi provado e o que não foi | M |
+| Repository name vs. project | Repo `llmoobfs`; project, README and site say "MoobFS" | Two spellings split searches and citations; `git clone` and badges use `llmoobfs`. Renaming breaks old clones, but GitHub keeps a redirect (behavior with Pages to be confirmed) | M (maintainer decision) |
+| Repository description | "Experimental native Linux filesystem for persistent LLM memory. Read-only shared-content milestone; no FUSE." | Outdated: omits the stacked layer, typed attributes, `QUERY`; "read-only milestone" contradicts M2/M3 | A |
+| Topics | 5: deduplication, filesystem, kernel-module, linux, llm-memory | Too few; `deduplication` misrepresents the current focus (dedup belongs to btrfs/XFS, see `research-originality.md` §7); missing xattr, vfs, ext4/btrfs/xfs, ai-agents | A |
+| README structure | Opens with read-only M1; M2 appears in a dense paragraph; "What is implemented" is still the M1 table; no "what it is not" section, comparison or FAQ | A newcomer reads about a project that is no longer the current one; the approved experimental banner (community-plan §9) is not yet at the top (to be confirmed after the ongoing edit) | A |
+| Internal links | README points to Portuguese `docs/*` without a language notice (some are flagged: "in Portuguese") | An English-speaking reader lands on PT pages without knowing; links from `site/` to GitHub use the `llmoobfs` path | M |
+| License visibility | `LICENSE` GPL-2.0-only and badge in the README; GitHub detects the license from the file | Adequate; mention the license in About only if GitHub displays it (to be confirmed in the UI) | B |
+| Releases and tags | No release, no tag (`git tag` empty) | No citable version; tools and assistants have no stable point to reference. But "no release" is honest and consistent with the stage | M (maintainer decision) |
+| Changelog | `CHANGELOG.md` with a single, detailed "Unreleased — 2026-10-10" section | Useful and honest, but without dates per phase or links to journals; becomes noise without a first milestone | B |
+| Contribution documentation | `CONTRIBUTING.md`, `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` exist; `CONTRIBUTING.md` and `.github/` are being rewritten | Out of scope; this plan only depends on the README linking to them | — |
+| Discussions | Disabled; wiki disabled | No public question channel; questions become issues. Disabled wiki is correct (it would duplicate `docs/`) | M (maintainer decision) |
+| Maintenance/experimental status | "Experimental" text present in the title and in paragraphs; no limitations banner at the top; one author, one kernel | Missing the visible, uniform "not for production" statement and the limitations (community-plan §9) | A |
+| Site metadata | `<title>` "MoobFS — A filesystem for LLM memory and context."; meta description still describes the read-only milestone; no `og:`, `canonical` or JSON-LD tags on the three pages; no `robots.txt` or `sitemap.xml` in `site/` | Title promises "a filesystem" without "experimental"; outdated description; shares without a preview | A (description and title), M (rest) |
+| Site content | `index.html` still shows M1 as "Implemented today: read-only M1"; `guide.html` reproduces only M1; `plan.html` says M2 "is not implemented" | Contradicts `ROADMAP.md` and the README; it is the most indexable page and the most outdated | A |
+| GitHub Pages | Active at `studiomoob.github.io/llmoobfs/`, serving `site/` | Exists and works; it is the asset to fix, not to create. Renaming the repo would change the URL | M |
+| Language | README in EN, README.pt-BR and technical docs mostly PT | Almost all the technical content that would answer English searches is in Portuguese | M |
+| Public evidence | `MOOBFS_*_PASS` markers in the README; CI; `docs/history/` journals | Good credibility asset; missing a single English page summarizing what was proven and what was not | M |
 
-Pontos fortes a preservar: linguagem de limitações explícita, separação proposta/implementado/testado,
-reconhecimento de anterioridade (SFS, BFS, YoloFS) e licença clara.
+Strengths to preserve: explicit limitations language, separation of proposal/implemented/tested,
+acknowledgment of prior art (SFS, BFS, YoloFS) and a clear license.
 
 ---
 
-## 2. Descrição otimizada para o GitHub
+## 2. Optimized GitHub description
 
-Limite do campo: 350 caracteres. Contagens abaixo são aproximadas (conferir ao colar).
+Field limit: 350 characters. Counts below are approximate (check when pasting).
 
-**Recomendada (~290 caracteres):**
+**Recommended (~290 characters):**
 
 > Experimental Linux kernel module (GPL-2.0, no FUSE): a stacked filesystem layer over ext4, btrfs or XFS that adds typed xattr attributes, an in-memory index and a QUERY ioctl authorized by the caller's POSIX credentials. Intended as storage for LLM-agent memory. Research project, not for production.
 
-**Alternativa A (~245 caracteres, mais curta, foco no mecanismo):**
+**Alternative A (~245 characters, shorter, focus on the mechanism):**
 
 > Experimental stacked Linux filesystem layer (kernel module, no FUSE) over ext4/btrfs/XFS: typed extended attributes plus an in-memory index and a QUERY ioctl that honors POSIX permissions. Built to explore storage for LLM-agent memory. Not production-ready.
 
-**Alternativa B (~265 caracteres, foco no uso por agentes):**
+**Alternative B (~265 characters, focus on use by agents):**
 
 > Research project: kernel-level metadata queries for AI-agent memory stored as ordinary files. A stacked Linux filesystem module over ext4, btrfs or XFS; data stays readable without the module. Experimental, tested on one kernel in a VM, no performance numbers yet.
 
-Critérios: diz "experimental"; nomeia o mecanismo real (`user.moob.*`, índice, `QUERY`);
-não usa "first", "fastest", "secure", "production"; "no FUSE" fica porque é restrição de
-desenho (AGENTS.md). A alternativa B reproduz as limitações centrais e é a mais conservadora.
+Criteria: says "experimental"; names the real mechanism (`user.moob.*`, index, `QUERY`);
+does not use "first", "fastest", "secure", "production"; "no FUSE" stays because it is a design
+constraint (AGENTS.md). Alternative B reproduces the core limitations and is the most conservative.
 
-Homepage do repositório: manter `https://studiomoob.github.io/llmoobfs/`.
+Repository homepage: keep `https://studiomoob.github.io/llmoobfs/`.
 
-Título e description do site (proposta, `site/index.html`):
+Site title and description (proposal, `site/index.html`):
 
 - `<title>`: `MoobFS — Experimental stacked Linux filesystem layer for LLM-agent memory`
-  (~75 caracteres; acima do ideal de ~60 para SERP, aceitável; alternativa curta:
+  (~75 characters; above the ~60 ideal for SERP, acceptable; short alternative:
   `MoobFS — experimental Linux filesystem layer for agent memory`).
 - `<meta name="description">`: `Experimental Linux kernel module stacked over ext4, btrfs or XFS: typed xattr attributes, an in-memory index and a permission-aware QUERY ioctl for LLM-agent memory. Research project, not for production.`
 
 ---
 
-## 3. Topics recomendados
+## 3. Recommended topics
 
-Máximo do GitHub: 20. A coluna "Volume de busca" não traz números (nenhum foi medido);
-"especulativo" significa que não sei se o termo é usado em volume relevante no GitHub.
-Antes de aplicar, conferir a contagem de repositórios de cada topic na página
-`github.com/topics/<nome>` (a confirmar), e preferir os que já têm comunidade ativa.
+GitHub maximum: 20. The "Search volume" column has no numbers (none was measured);
+"speculative" means I do not know whether the term is used in relevant volume on GitHub.
+Before applying, check each topic's repository count on the page
+`github.com/topics/<name>` (to be confirmed), and prefer those that already have an active community.
 
-| # | Topic | Justificativa (uma linha) | Volume/uso |
+| # | Topic | Justification (one line) | Volume/use |
 | --- | --- | --- | --- |
-| 1 | `linux-kernel` | Módulo de kernel; o topic é convencional para código do kernel | uso comum (a confirmar contagem) |
-| 2 | `kernel-module` | Já presente; descreve o artefato `moobfs_layer.ko` | uso comum |
-| 3 | `filesystem` | Já presente; categoria principal | uso comum |
-| 4 | `vfs` | O projeto implementa operações do VFS Linux | de nicho, mas preciso |
-| 5 | `stacked-filesystem` | Termo técnico exato do desenho (ADR-0007), como overlayfs/ecryptfs | especulativo (provavelmente poucos repositórios) |
-| 6 | `xattr` | Atributos tipados vivem em xattr | de nicho, preciso |
-| 7 | `extended-attributes` | Forma por extenso do anterior, para quem não conhece a abreviação | especulativo |
-| 8 | `posix` | Autorização do `QUERY` segue permissões POSIX | uso comum |
-| 9 | `ext4` | Inferior validado | uso comum |
-| 10 | `btrfs` | Inferior validado | uso comum |
-| 11 | `xfs` | Inferior validado | uso comum |
-| 12 | `ai-agents` | Público-alvo declarado (memória de agentes) | uso comum |
-| 13 | `llm` | Contexto de uso | uso muito amplo, baixa especificidade |
-| 14 | `agent-memory` | Termo específico do problema | especulativo (crescendo; sem número) |
-| 15 | `llm-memory` | Já presente; mantém continuidade | especulativo |
-| 16 | `metadata` | A função central é consulta de metadados | uso amplo, baixa especificidade |
-| 17 | `indexing` | Índice de atributos em memória | uso amplo (alternativa a `index`) |
-| 18 | `c` | Linguagem do módulo e das ferramentas | uso muito comum |
-| 19 | `qemu` | Testes de VM são parte central da evidência e atraem revisores de kernel | de nicho |
-| 20 | `gpl-2-0` | Sinaliza licença compatível com o kernel | especulativo (o GitHub já mostra a licença) |
+| 1 | `linux-kernel` | Kernel module; the topic is conventional for kernel code | common use (count to be confirmed) |
+| 2 | `kernel-module` | Already present; describes the `moobfs_layer.ko` artifact | common use |
+| 3 | `filesystem` | Already present; main category | common use |
+| 4 | `vfs` | The project implements Linux VFS operations | niche, but precise |
+| 5 | `stacked-filesystem` | Exact technical term for the design (ADR-0007), like overlayfs/ecryptfs | speculative (probably few repositories) |
+| 6 | `xattr` | Typed attributes live in xattrs | niche, precise |
+| 7 | `extended-attributes` | Spelled-out form of the previous one, for those who do not know the abbreviation | speculative |
+| 8 | `posix` | `QUERY` authorization follows POSIX permissions | common use |
+| 9 | `ext4` | Validated lower | common use |
+| 10 | `btrfs` | Validated lower | common use |
+| 11 | `xfs` | Validated lower | common use |
+| 12 | `ai-agents` | Declared target audience (agent memory) | common use |
+| 13 | `llm` | Usage context | very broad use, low specificity |
+| 14 | `agent-memory` | Problem-specific term | speculative (growing; no number) |
+| 15 | `llm-memory` | Already present; keeps continuity | speculative |
+| 16 | `metadata` | The central function is metadata querying | broad use, low specificity |
+| 17 | `indexing` | In-memory attribute index | broad use (alternative to `index`) |
+| 18 | `c` | Language of the module and the tools | very common use |
+| 19 | `qemu` | VM tests are a central part of the evidence and attract kernel reviewers | niche |
+| 20 | `gpl-2-0` | Signals a kernel-compatible license | speculative (GitHub already shows the license) |
 
-Removidos em relação ao atual: `deduplication` (dedup é do btrfs/XFS; manter induziria a
-afirmação a evitar "Reflink/dedup do MoobFS"). Não usar: `memory` (ambíguo com RAM),
-`rag`, `semantic-search`, `vector-database`, `ai-memory` (o projeto não faz busca semântica nem
-vetores; seriam topics enganosos). Reservar 1-2 vagas (por exemplo, `gpl-2-0` ou `indexing`)
-para trocar depois de ver as páginas de topics.
+Removed relative to the current set: `deduplication` (dedup belongs to btrfs/XFS; keeping it would
+suggest the claim to avoid "MoobFS reflink/dedup"). Do not use: `memory` (ambiguous with RAM),
+`rag`, `semantic-search`, `vector-database`, `ai-memory` (the project does no semantic search or
+vectors; they would be misleading topics). Reserve 1-2 slots (for example, `gpl-2-0` or `indexing`)
+to swap after looking at the topic pages.
 
 ---
 
-## 4. Reorganização proposta do README
+## 4. Proposed README reorganization
 
-Cabeçalhos em inglês (política de idioma, community-plan §13). Ordem e função de cada seção:
+Headings in English (language policy, community-plan §13). Order and role of each section:
 
-| # | Cabeçalho | Propósito (uma linha) |
+| # | Heading | Purpose (one line) |
 | --- | --- | --- |
-| 1 | `# MoobFS` + subtítulo + links + badges | Nome, frase de uma linha (a descrição da §2) e navegação (PT, site, contributing, roadmap) |
-| 2 | `> Experimental research project. Not for production use.` (banner) | **Texto exato aprovado em community-plan §9**, com as sete limitações; verificar cada linha contra o repositório antes de publicar ("três defeitos" a confirmar contra os registros 0011-0015) |
-| 3 | `## At a glance` | Cinco linhas: camada empilhada, atributos tipados, índice em RAM, `QUERY` com autorização POSIX, dados legíveis sem o módulo; um bloco de status (inferiores e kernel testados) |
-| 4 | `## What MoobFS is, and what it is not` | Duas listas curtas; "is not": busca semântica, vetores, OR/texto livre, substituto de SQLite/git/ai-memory, FUSE, produção, dono do dedup/reflink |
-| 5 | `## How it works` | Fluxo escrita e consulta em um diagrama (reaproveitar `site/plan.html`; criar versão em texto/Mermaid no repositório) com link para `docs/architecture-overview.md` |
-| 6 | `## What is implemented, with evidence` | Tabela capacidade / estado (implementado, testado em qual kernel e inferior) / link para registro ou teste; substitui a tabela do M1; M1 vira nota de rodapé de regressão |
-| 7 | `## Limitations` | Lista objetiva: um kernel, índice só em RAM, root inicial, sem userns/idmap, UAPI v1 pode mudar, sem desempenho medido, sem auditoria externa, TOCTOU e falso negativo após rename de diretório |
-| 8 | `## Compared with plain files, SQLite and agent-memory frameworks` | Tabela curta derivada de `docs/value-assessment.md` ("Comparação honesta") e a regra "hoje, SQLite ou arquivos são a recomendação"; frameworks tratados como clientes |
-| 9 | `## Quick start (disposable VM)` | `make vm-test` e marcadores esperados; aviso de não carregar em host; link para `docs/testing.md` |
-| 10 | `## Documentation map` | Tabela: pergunta do leitor -> documento -> idioma (EN/PT) |
-| 11 | `## Prior work and positioning` | Reconhecimento de SFS, BFS, overlayfs, ecryptfs, YoloFS (texto de `research-originality.md` §9, versão em inglês) |
-| 12 | `## Contributing and security` | Link para CONTRIBUTING, pedidos de revisão (community-plan §8), SECURITY (contato e Advisories) |
-| 13 | `## License` | GPL-2.0-only, link para `LICENSE` |
+| 1 | `# MoobFS` + subtitle + links + badges | Name, one-line sentence (the §2 description) and navigation (PT, site, contributing, roadmap) |
+| 2 | `> Experimental research project. Not for production use.` (banner) | **Exact text approved in community-plan §9**, with the seven limitations; check each line against the repository before publishing ("three defects" to be confirmed against journals 0011-0015) |
+| 3 | `## At a glance` | Five lines: stacked layer, typed attributes, in-RAM index, `QUERY` with POSIX authorization, data readable without the module; one status block (tested lowers and kernel) |
+| 4 | `## What MoobFS is, and what it is not` | Two short lists; "is not": semantic search, vectors, OR/free text, replacement for SQLite/git/ai-memory, FUSE, production, owner of dedup/reflink |
+| 5 | `## How it works` | Write and query flow in one diagram (reuse `site/plan.html`; create a text/Mermaid version in the repository) with a link to `docs/architecture-overview.md` |
+| 6 | `## What is implemented, with evidence` | Table capability / status (implemented, tested on which kernel and lower) / link to journal or test; replaces the M1 table; M1 becomes a regression footnote |
+| 7 | `## Limitations` | Objective list: one kernel, index only in RAM, initial root, no userns/idmap, UAPI v1 may change, no measured performance, no external audit, TOCTOU and false negative after directory rename |
+| 8 | `## Compared with plain files, SQLite and agent-memory frameworks` | Short table derived from `docs/value-assessment.md` ("Honest comparison") and the rule "today, SQLite or files are the recommendation"; frameworks treated as clients |
+| 9 | `## Quick start (disposable VM)` | `make vm-test` and expected markers; warning not to load on a host; link to `docs/testing.md` |
+| 10 | `## Documentation map` | Table: reader's question -> document -> language (EN/PT) |
+| 11 | `## Prior work and positioning` | Acknowledgment of SFS, BFS, overlayfs, ecryptfs, YoloFS (text from `research-originality.md` §9, English version) |
+| 12 | `## Contributing and security` | Link to CONTRIBUTING, review requests (community-plan §8), SECURITY (contact and Advisories) |
+| 13 | `## License` | GPL-2.0-only, link to `LICENSE` |
 
-Regras: o README permanece em inglês; `README.pt-BR.md` espelha a estrutura (esta proposta não
-o edita). Remover o conteúdo extenso do M1 do README e movê-lo para `docs/` ou `site/guide.html`
-(já existe). Não usar "first", "fastest", "most secure". Limitar o README a ~200 linhas.
+Rules: the README stays in English; `README.pt-BR.md` mirrors the structure (this proposal does not
+edit it). Remove the extensive M1 content from the README and move it to `docs/` or `site/guide.html`
+(already exists). Do not use "first", "fastest", "most secure". Limit the README to ~200 lines.
 
 ---
 
-## 5. Estrutura de documentação SEO/GEO
+## 5. SEO/GEO documentation structure
 
-### 5.1 Consultas-alvo e o que já as responde
+### 5.1 Target queries and what already answers them
 
-| Consulta-alvo | Documento existente que a responde | Idioma | Lacuna |
+| Target query | Existing document that answers it | Language | Gap |
 | --- | --- | --- | --- |
-| "Linux filesystem for AI agents" | `README.md` (parcial, desatualizado), `docs/spec-m2.md`, `ADR-0007` | EN parcial / PT | Nenhuma página em inglês que explique a arquitetura atual |
-| "persistent memory for AI agents" | `README.md` objetivo; `docs/research-ai-memory.md` | EN / PT | Seção do README usa linguagem do M1; falta posicionamento frente a mem0/Letta/ai-memory em inglês |
-| "kernel-level metadata indexing" | `docs/spec-m2.md`, `ADR-0005`, `layer/index.c` | PT | Sem texto em inglês |
-| "POSIX filesystem for agent memory" | `docs/spec-m3.md` §3 e §3.1 | PT | Sem texto em inglês; contrato TOCTOU só em PT |
-| "stacked filesystem for LLM memory" | `ADR-0007` | PT | Idem |
-| "AI agent memory infrastructure" | `docs/value-assessment.md`, `docs/distribution-strategy.md` | PT | Sem resumo em inglês; comparações só em PT |
-| "structured metadata queries on Linux" | `docs/spec-m2.md` (QUERY), `docs/spec-m3.md` | PT | Sem exemplo curto de uso do `QUERY` em inglês |
+| "Linux filesystem for AI agents" | `README.md` (partial, outdated), `docs/spec-m2.md`, `ADR-0007` | EN partial / PT | No English page explaining the current architecture |
+| "persistent memory for AI agents" | `README.md` goal; `docs/research-ai-memory.md` | EN / PT | README section uses M1 language; missing positioning against mem0/Letta/ai-memory in English |
+| "kernel-level metadata indexing" | `docs/spec-m2.md`, `ADR-0005`, `layer/index.c` | PT | No English text |
+| "POSIX filesystem for agent memory" | `docs/spec-m3.md` §3 and §3.1 | PT | No English text; TOCTOU contract only in PT |
+| "stacked filesystem for LLM memory" | `ADR-0007` | PT | Same |
+| "AI agent memory infrastructure" | `docs/value-assessment.md`, `docs/distribution-strategy.md` | PT | No English summary; comparisons only in PT |
+| "structured metadata queries on Linux" | `docs/spec-m2.md` (QUERY), `docs/spec-m3.md` | PT | No short `QUERY` usage example in English |
 
-Conclusão: o conteúdo existe e é bom, mas está em português e disperso. A lacuna é de
-**tradução/síntese em inglês**, não de volume de páginas. Sem páginas por palavra-chave.
+Conclusion: the content exists and is good, but it is in Portuguese and scattered. The gap is one of
+**English translation/synthesis**, not of page volume. No per-keyword pages.
 
-### 5.2 Páginas novas (no máximo três, em inglês)
+### 5.2 New pages (at most three, in English)
 
-| Página | Onde | Origem | Observação |
+| Page | Where | Source | Note |
 | --- | --- | --- | --- |
-| `docs/architecture-overview.md` | `docs/` (versionada com o código; o site pode linkar) | ADR-0005/0007, spec-m2, spec-m3 §3 | Camadas, fluxo de escrita e consulta, `user.moob.*`, índice, `QUERY`, contrato de autorização e TOCTOU, "nothing trapped". Responde às consultas 1, 3, 4, 5, 7 numa só página, com um título sem repetir palavras-chave |
-| `docs/when-not-to-use.md` (título: "Comparison and when not to use MoobFS") | `docs/` | `value-assessment.md` "Entrega" e §9 | Tabela comparativa, casos em que pode valer e casos em que não vale, frase "today use SQLite or plain files"; responde às consultas 2 e 6 |
-| `docs/faq.md` | `docs/`, com versão renderizada em `site/faq.html` | Seção 6 abaixo | Perguntas curtas e citáveis; cada resposta cita o arquivo de origem |
+| `docs/architecture-overview.md` | `docs/` (versioned with the code; the site can link to it) | ADR-0005/0007, spec-m2, spec-m3 §3 | Layers, write and query flow, `user.moob.*`, index, `QUERY`, authorization and TOCTOU contract, "nothing trapped". Answers queries 1, 3, 4, 5, 7 in a single page, with a title that does not repeat keywords |
+| `docs/when-not-to-use.md` (title: "Comparison and when not to use MoobFS") | `docs/` | `value-assessment.md` "Deliverable" and §9 | Comparison table, cases where it may be worth it and cases where it is not, the sentence "today use SQLite or plain files"; answers queries 2 and 6 |
+| `docs/faq.md` | `docs/`, with a rendered version at `site/faq.html` | Section 6 below | Short, citable questions; each answer cites the source file |
 
-Regras: cada afirmação cita o arquivo; os números e estados são copiados, não reescritos; o
-rótulo "proposta / implementado / testado" segue AGENTS.md; nenhuma página duplica o README.
-Traduzir as ADRs/specs inteiras fica fora do plano (decisão da §13 do community-plan: sob
-demanda externa).
+Rules: each claim cites the file; numbers and statuses are copied, not rewritten; the
+"proposal / implemented / tested" label follows AGENTS.md; no page duplicates the README.
+Translating the ADRs/specs in full is outside the plan (decision of community-plan §13: on
+external demand).
 
-### 5.3 GitHub Pages vs. página no domínio StudioMoob
+### 5.3 GitHub Pages vs. a page on the StudioMoob domain
 
-| Critério | GitHub Pages (atual) | Página em domínio StudioMoob |
+| Criterion | GitHub Pages (current) | Page on a StudioMoob domain |
 | --- | --- | --- |
-| Estado | Existe, serve `site/`, gratuito | Não existe para o projeto (a confirmar) |
-| Custo | Zero; sem hospedagem | Domínio/hospedagem já pagos pela empresa (a confirmar); esforço de manter duas fontes |
-| Proximidade do código | Mesmo repositório; alterações no mesmo PR | Duplicação ou deploy adicional |
-| Autoridade de domínio | Subdomínio `github.io` compartilhado; autoridade própria baixa | Domínio da empresa pode ter mais autoridade (**a confirmar**, não medido) e dá URL estável independente do nome do repositório |
-| Risco | Renomear o repo muda a URL | Dependência de outro sistema; risco de divergir do repositório |
-| Credibilidade técnica | Natural para um projeto de código aberto | Pode reforçar a marca da empresa, mas parece marketing se não for estritamente técnico |
+| Status | Exists, serves `site/`, free | Does not exist for the project (to be confirmed) |
+| Cost | Zero; no hosting | Domain/hosting already paid by the company (to be confirmed); effort of maintaining two sources |
+| Proximity to the code | Same repository; changes in the same PR | Duplication or an additional deploy |
+| Domain authority | Shared `github.io` subdomain; low own authority | The company domain may have more authority (**to be confirmed**, not measured) and gives a stable URL independent of the repository name |
+| Risk | Renaming the repo changes the URL | Dependency on another system; risk of diverging from the repository |
+| Technical credibility | Natural for an open-source project | May reinforce the company brand, but looks like marketing if not strictly technical |
 
-Recomendação (sem implementação imediata): **manter e corrigir o GitHub Pages**. Reavaliar um
-domínio próprio (por exemplo um subdomínio apontando para o Pages, com `CNAME`) só depois do M4,
-se a decisão sobre o nome do repositório criar necessidade de URL estável. Um `CNAME` evita
-duplicar conteúdo e preserva links. Não criar uma segunda página com o mesmo texto.
+Recommendation (no immediate implementation): **keep and fix GitHub Pages**. Reassess an
+own domain (for example a subdomain pointing to Pages, with `CNAME`) only after M4,
+if the decision on the repository name creates a need for a stable URL. A `CNAME` avoids
+duplicating content and preserves links. Do not create a second page with the same text.
 
 ---
 
-## 6. FAQ técnica (English)
+## 6. Technical FAQ (English)
 
-Respostas em inglês para `docs/faq.md`; entre colchetes, a origem. Nenhuma contém "first",
-"fastest" ou "most secure".
+Answers in English for `docs/faq.md`; in brackets, the source. None contains "first",
+"fastest" or "most secure".
 
 **1. What is MoobFS?**
 MoobFS is an experimental GPL-2.0 Linux kernel module, stacked over ext4, btrfs or XFS, that
@@ -204,7 +204,7 @@ It explores storing LLM-agent memories as ordinary files while letting a program
 files have given attribute values, with the operating system's permissions deciding what each
 caller sees. The narrow hypothesis is attribute queries with per-result POSIX authorization,
 no separate database server and no second authorization policy. That hypothesis is not yet
-shown to cost less than SQLite plus application-level checks. [`docs/value-assessment.md`, "Conclusão fundamentada"]
+shown to cost less than SQLite plus application-level checks. [`docs/value-assessment.md`, "Grounded conclusion"]
 
 **3. How does the stacking work?**
 The module mounts with `mount -t moobfs_layer -o lower=<dir>` and delegates file I/O to the
@@ -253,7 +253,7 @@ SQLite offers full SQL, composite indexes and decades of maturity; MoobFS offers
 store of files plus xattrs and authorization by the OS per result. Writes to SQLite and to the
 files are two operations; MoobFS writes a file and an xattr, but file/metadata atomicity is
 the client's convention. Today SQLite or plain files are the recommendation for anything
-outside a lab. [`docs/value-assessment.md` "Comparação honesta"]
+outside a lab. [`docs/value-assessment.md` "Honest comparison"]
 
 **11. How does it differ from plain files and from FUSE-based systems?**
 Plain files need `find` plus `getfattr`, a linear scan, with no query call. FUSE systems run
@@ -271,7 +271,7 @@ Proven in the author's VM runs: answer correctness against the oracle, two-uid i
 three lower filesystems, git/SQLite acceptance, and a KASAN/lockdep run on kernel 6.12.112.
 Hypotheses pending M4: any speed or efficiency advantage, behavior near the index budget,
 scale and long-running operation. There is no independent reproduction yet.
-[`docs/research-originality.md` §5; `docs/value-assessment.md` "Medições do M4"; `docs/benchmark-plan.md`]
+[`docs/research-originality.md` §5; `docs/value-assessment.md` "Indispensable M4 measurements"; `docs/benchmark-plan.md`]
 
 **14. Which kernels are supported?**
 One test target: Debian kernel 6.12.111 in a QEMU VM, plus a 6.12.112 KASAN debug kernel on
@@ -310,137 +310,137 @@ Do not open a public issue. Use the private GitHub Security Advisory channel or 
 
 ---
 
-## 7. Estratégia de divulgação legítima
+## 7. Legitimate outreach strategy
 
-Regra geral: divulgar **resultados reproduzíveis**, não promessas. Cada publicação linka o
-commit exato, o comando e os logs. Antes do M4, nenhuma comparação de desempenho.
+General rule: publicize **reproducible results**, not promises. Each publication links the
+exact commit, the command and the logs. Before M4, no performance comparison.
 
-| Canal | Quando | Enquadramento honesto | Observações |
+| Channel | When | Honest framing | Notes |
 | --- | --- | --- | --- |
-| Pedidos de revisão (issues `kernel-expert`/`security`) | Já (após o merge da fase 3b, ação 15-18 do community-plan) | Pergunta delimitada, pacote para o revisor (community-plan §8) | Sem reivindicar auditoria; crédito ao revisor |
-| `r/linux_kernel` | Só com algo discutível tecnicamente (a confirmar regras do subreddit e se aceitam projetos próprios) | "Experimental stacked fs, here are the limits, looking for review" | Evitar postar se as regras proibirem autopromoção |
-| kernelnewbies (lista/IRC) | Perguntas de aprendizado sobre APIs do VFS, quando houver dúvida real | Pergunta específica, não anúncio | A confirmar a política atual da lista |
-| LKML / linux-fsdevel | **Somente** com pergunta técnica concreta para os mantenedores (por exemplo, uso de `vfs_path_lookup` no ioctl); código fora da árvore e módulo experimental não justificam RFC | Pergunta curta, patches/links reproduzíveis, ciente de que o módulo está fora da árvore | Seguir as regras da lista; nunca divulgação |
-| LWN | Não solicitar cobertura; só um comentário factual onde o assunto já estiver em pauta | — | Não escrever "pitch" |
-| Hacker News "Show HN" | Após M4 publicado ou uma demonstração reproduzível clara; enquadramento "experimental, one kernel, no benchmarks yet (or: here are the raw numbers)" | O autor responde em tempo real, admite limites | Título sem superlativos; sem pedir votos |
-| Artigos técnicos | Após o M4, com dados brutos, scripts e o commit; antes, um texto sobre a abordagem de teste (`dm-log-writes`, KASAN) é possível | Descrever método, falhas encontradas e limitações | Publicar os números mesmo se desfavoráveis (previsto em ADR-0007) |
-| Participação em projetos relacionados | Quando houver relevância técnica: YoloFS (comparação de abordagem), ai-memory, Letta, mem0 (integração como cliente; issue só se houver problema reproduzível de interoperabilidade) | Contribuição ou pergunta concreta, sem anúncio | Respeitar as regras de cada projeto; não abrir issues de divulgação |
-| Revisores externos | Convites diretos a pessoas escolhidas por afinidade técnica, com o pacote da §8 do community-plan | Sem pressão; "revisado" nunca significa "aprovado" | Registrar achados em issue/advisory e diário |
-| Documentação de contribuição e issues "good first" | Contínuo | Issues sem kernel (community-plan §4) | Mantém qualificados os contribuidores |
+| Review requests (`kernel-expert`/`security` issues) | Now (after the phase 3b merge, community-plan actions 15-18) | Bounded question, package for the reviewer (community-plan §8) | Without claiming an audit; credit to the reviewer |
+| `r/linux_kernel` | Only with something technically debatable (subreddit rules and whether they accept own projects to be confirmed) | "Experimental stacked fs, here are the limits, looking for review" | Avoid posting if the rules forbid self-promotion |
+| kernelnewbies (list/IRC) | Learning questions about VFS APIs, when there is a real doubt | Specific question, not an announcement | The list's current policy to be confirmed |
+| LKML / linux-fsdevel | **Only** with a concrete technical question for the maintainers (for example, use of `vfs_path_lookup` in the ioctl); out-of-tree code and an experimental module do not justify an RFC | Short question, reproducible patches/links, aware that the module is out of tree | Follow the list's rules; never for promotion |
+| LWN | Do not request coverage; only a factual comment where the subject is already being discussed | — | Do not write a "pitch" |
+| Hacker News "Show HN" | After M4 is published or a clear reproducible demonstration; framing "experimental, one kernel, no benchmarks yet (or: here are the raw numbers)" | The author answers in real time, admits limits | Title without superlatives; no asking for votes |
+| Technical articles | After M4, with raw data, scripts and the commit; before that, a text on the testing approach (`dm-log-writes`, KASAN) is possible | Describe method, failures found and limitations | Publish the numbers even if unfavorable (foreseen in ADR-0007) |
+| Participation in related projects | When technically relevant: YoloFS (approach comparison), ai-memory, Letta, mem0 (integration as a client; an issue only if there is a reproducible interoperability problem) | Contribution or concrete question, no announcement | Respect each project's rules; do not open promotional issues |
+| External reviewers | Direct invitations to people chosen for technical affinity, with the package from community-plan §8 | No pressure; "reviewed" never means "approved" | Record findings in an issue/advisory and the journal |
+| Contribution documentation and "good first" issues | Continuous | Issues without kernel work (community-plan §4) | Keeps contributors qualified |
 
-Excluído explicitamente: estrelas ou forks falsos ou comprados; links pagos; spam ou postagem
-automatizada indiscriminada; contas múltiplas; pedir estrelas em massa; `llms.txt` ou
-metadados artificiais apresentados como garantia de citação por IA (se um dia for adicionado,
-será apenas um índice de documentos, sem promessa); texto escrito para enganar assistentes;
-afirmações da lista de `research-originality.md` §7. Em respostas de IA, o único método
-legítimo é tornar a documentação correta, estável e citável.
+Explicitly excluded: fake or bought stars or forks; paid links; spam or indiscriminate
+automated posting; multiple accounts; mass requests for stars; `llms.txt` or
+artificial metadata presented as a guarantee of AI citation (if one is ever added,
+it will be only a document index, with no promise); text written to mislead assistants;
+claims from the list in `research-originality.md` §7. For AI answers, the only legitimate
+method is to make the documentation correct, stable and citable.
 
 ---
 
-## 8. Plano de implementação priorizado
+## 8. Prioritized implementation plan
 
-Esforço: S (até 2 h), M (meio dia a 2 dias), L (mais de 2 dias). Itens marcados
-"decisão" dependem do mantenedor.
+Effort: S (up to 2 h), M (half a day to 2 days), L (more than 2 days). Items marked
+"decision" depend on the maintainer.
 
-| # | Ação | Esforço | Depende de | Decisão do mantenedor |
+| # | Action | Effort | Depends on | Maintainer decision |
 | --- | --- | --- | --- | --- |
-| 1 | Atualizar a descrição do repositório (§2) e os topics (§3) no GitHub | S | — | Escolha entre recomendada/A/B; remover `deduplication` |
-| 2 | Atualizar `<title>`, meta description e o bloco de status de `site/index.html` (e `guide.html`/`plan.html`) para M2/M3; adicionar banner experimental | M | Texto aprovado de community-plan §9; README reescrito | — |
-| 3 | Reorganizar o README conforme §4 (inclui o banner) | M | Fim da edição em curso do outro agente | — |
-| 4 | Espelhar a estrutura em `README.pt-BR.md` | S | 3 | — |
-| 5 | Criar `docs/architecture-overview.md` (EN) | M | Fatos de ADR-0005/0007, spec-m2, spec-m3 | — |
-| 6 | Criar `docs/when-not-to-use.md` (EN) a partir de `value-assessment` | M | — | — |
-| 7 | Criar `docs/faq.md` (EN) com a §6 revisada contra o código atual | M | 5, 6 (para links) | — |
-| 8 | Acrescentar ao site: `faq.html`, `og:`/`canonical`, `robots.txt`, `sitemap.xml`, link para a arquitetura | M | 2, 7; URL final do site (depende de 12) | — |
-| 9 | Ativar Discussions (categorias: Q&A, Ideas, Show and tell) ou manter só issues | S | Capacidade de moderar | **Decisão: ligar ou não**; sugestão: ligar após o merge da fase 3b se houver tempo para responder, caso contrário manter desligado e reconhecer o canal no CONTRIBUTING |
-| 10 | Criar a primeira tag/release `v0.1.0-experimental` (pré-release no GitHub) com notas ligadas a `CHANGELOG.md` | M | Merge da fase 3b; CHANGELOG com seção datada | **Decisão: criar ou não.** Pró: ponto citável. Contra: sugere estabilidade e UAPI v1 pode mudar; distribution-strategy coloca versão pública após M4. Se criar, marcar como "pre-release" e usar o nome com "experimental" |
-| 11 | Ajustar `CHANGELOG.md`: seção "Unreleased" separada por fase com links aos registros | S | 10 | — |
-| 12 | Renomear o repositório `llmoobfs` para `moobfs` | M | Checar disponibilidade do nome na organização; verificar redirecionamento de clone, Pages, badges e links | **Decisão: renomear ou manter.** Renomear alinha nome e projeto, e o GitHub redireciona repositório e clones, mas a URL do Pages muda (a confirmar redirecionamento). Fazer antes de divulgar, uma única vez; atualizar todos os links e badges |
-| 13 | Medir o tráfego base (Insights/Traffic, Pages com Search Console) antes de qualquer divulgação | S | 2, 8 | — |
-| 14 | Divulgação seletiva (§7), começando por pedidos de revisão | M | 1-8; fase 3b fechada | — |
-| 15 | Publicar o benchmark M4 e o artigo técnico | L | M4 concluído | Se publica números desfavoráveis (já previsto) |
-| 16 | Reavaliar domínio próprio/`CNAME` | S | 12, 15 | Sim/não |
+| 1 | Update the repository description (§2) and topics (§3) on GitHub | S | — | Choice between recommended/A/B; remove `deduplication` |
+| 2 | Update `<title>`, meta description and the status block of `site/index.html` (and `guide.html`/`plan.html`) to M2/M3; add experimental banner | M | Approved text of community-plan §9; rewritten README | — |
+| 3 | Reorganize the README per §4 (includes the banner) | M | End of the other agent's ongoing edit | — |
+| 4 | Mirror the structure in `README.pt-BR.md` | S | 3 | — |
+| 5 | Create `docs/architecture-overview.md` (EN) | M | Facts from ADR-0005/0007, spec-m2, spec-m3 | — |
+| 6 | Create `docs/when-not-to-use.md` (EN) from `value-assessment` | M | — | — |
+| 7 | Create `docs/faq.md` (EN) with §6 reviewed against the current code | M | 5, 6 (for links) | — |
+| 8 | Add to the site: `faq.html`, `og:`/`canonical`, `robots.txt`, `sitemap.xml`, link to the architecture | M | 2, 7; final site URL (depends on 12) | — |
+| 9 | Enable Discussions (categories: Q&A, Ideas, Show and tell) or keep only issues | S | Capacity to moderate | **Decision: enable or not**; suggestion: enable after the phase 3b merge if there is time to answer, otherwise keep disabled and acknowledge the channel in CONTRIBUTING |
+| 10 | Create the first tag/release `v0.1.0-experimental` (GitHub pre-release) with notes linked to `CHANGELOG.md` | M | Phase 3b merge; CHANGELOG with dated section | **Decision: create or not.** Pro: citable point. Con: suggests stability and UAPI v1 may change; distribution-strategy places a public version after M4. If created, mark as "pre-release" and use the name with "experimental" |
+| 11 | Adjust `CHANGELOG.md`: "Unreleased" section split by phase with links to journals | S | 10 | — |
+| 12 | Rename the repository `llmoobfs` to `moobfs` | M | Check the name's availability in the organization; verify redirect of clone, Pages, badges and links | **Decision: rename or keep.** Renaming aligns name and project, and GitHub redirects the repository and clones, but the Pages URL changes (redirect to be confirmed). Do it before outreach, only once; update all links and badges |
+| 13 | Measure baseline traffic (Insights/Traffic, Pages with Search Console) before any outreach | S | 2, 8 | — |
+| 14 | Selective outreach (§7), starting with review requests | M | 1-8; phase 3b closed | — |
+| 15 | Publish the M4 benchmark and the technical article | L | M4 completed | Whether to publish unfavorable numbers (already foreseen) |
+| 16 | Reassess own domain/`CNAME` | S | 12, 15 | Yes/no |
 
-Ordem sugerida: 1, 12 (se for fazer), 3, 4, 2, 5-7, 8, 9, 10, 11, 13, 14, 15, 16. Os itens 1 e 2
-corrigem informação desatualizada e não dependem de decisão estratégica.
+Suggested order: 1, 12 (if it is to be done), 3, 4, 2, 5-7, 8, 9, 10, 11, 13, 14, 15, 16. Items 1 and 2
+fix outdated information and do not depend on a strategic decision.
 
 ---
 
-## 9. Critérios de sucesso em 30, 60 e 90 dias
+## 9. Success criteria at 30, 60 and 90 days
 
-O objetivo é **credibilidade e contribuidores qualificados**, não visitas. Nenhuma meta abaixo
-é garantia; as faixas são hipóteses de ordem de grandeza para um projeto novo, de nicho
-(kernel), sem divulgação paga; ajustar após medir a linha de base da ação 13.
+The goal is **credibility and qualified contributors**, not visits. No target below
+is a guarantee; the ranges are order-of-magnitude hypotheses for a new, niche
+(kernel) project, without paid promotion; adjust after measuring the baseline from action 13.
 
-### Métricas disponíveis no GitHub
+### Metrics available on GitHub
 
-| Métrica | Onde | Uso |
+| Metric | Where | Use |
 | --- | --- | --- |
-| Visitantes e clones únicos, 14 dias | Insights > Traffic | Detectar picos após uma publicação; dados com retenção curta, exportar manualmente a cada 14 dias |
-| Referrers e conteúdo popular | Insights > Traffic | Ver quais páginas (README, docs, site) atraem e de onde |
-| Estrelas e forks | Página do repositório | Sinal fraco; interpretar apenas com o perfil de quem interage |
-| Issues e PRs de contas novas | Issues/PRs | Sinal forte: pedidos de revisão respondidos, PRs de documentação ou testes |
-| Resultados do CI e execuções do KASAN | Actions | Qualidade contínua |
+| Unique visitors and clones, 14 days | Insights > Traffic | Detect spikes after a publication; short-retention data, export manually every 14 days |
+| Referrers and popular content | Insights > Traffic | See which pages (README, docs, site) attract and from where |
+| Stars and forks | Repository page | Weak signal; interpret only with the profile of who interacts |
+| Issues and PRs from new accounts | Issues/PRs | Strong signal: answered review requests, documentation or test PRs |
+| CI results and KASAN runs | Actions | Continuous quality |
 
-### Métricas que exigem ferramentas externas
+### Metrics that require external tools
 
-| Métrica | Ferramenta | Observação |
+| Metric | Tool | Note |
 | --- | --- | --- |
-| Impressões, consultas e posição das páginas do Pages | Google Search Console (verificação do site, a confirmar viabilidade para `github.io`) e Bing Webmaster | Dados só aparecem semanas após a indexação |
-| Presença em respostas de IA | Amostragem manual mensal de ~10 perguntas (as consultas da §5.1) em alguns assistentes, registrando a data, o modelo e se há citação correta | Sem promessa de cobertura; os resultados variam entre execuções |
-| Citações em textos técnicos | Busca manual por menções ao repositório (links) e alertas | Registrar o contexto e se a descrição está correta |
+| Impressions, queries and position of the Pages pages | Google Search Console (site verification, feasibility for `github.io` to be confirmed) and Bing Webmaster | Data only appears weeks after indexing |
+| Presence in AI answers | Monthly manual sampling of ~10 questions (the §5.1 queries) in a few assistants, recording the date, the model and whether there is a correct citation | No coverage promise; results vary between runs |
+| Citations in technical texts | Manual search for mentions of the repository (links) and alerts | Record the context and whether the description is correct |
 
-### Faixas por período
+### Ranges per period
 
-| Período | Qualidade (prioridade) | Alcance (informativo) | Racional |
+| Period | Quality (priority) | Reach (informative) | Rationale |
 | --- | --- | --- | --- |
-| 30 dias | Metadados, README, site e FAQ corrigidos e coerentes entre si; 0 afirmações da lista §7 do `research-originality.md`; 1 ou 2 pedidos de revisão publicados; resposta a toda issue em até ~7 dias | Estrelas: de poucas unidades a ~20 (faixa especulativa, a maioria vindo de contatos diretos); visitas únicas semanais em dezenas | Sem divulgação ampla, o tráfego tende a vir de contatos do autor; uma contagem baixa não indica falha |
-| 60 dias | Pelo menos 1 revisão externa substantiva ou 1 PR externo (documentação, teste ou reprodução); Pages indexado (aparece no Search Console); 1 reprodução independente do `make vm-test` registrada ("a confirmar" se ocorrer) | Estrelas ~20 a ~80 se houver um post técnico bem recebido (hipótese); 0 a 3 contribuidores externos | O principal limitador é o tempo de revisores de kernel, não a descoberta |
-| 90 dias | Plano de benchmark M4 executado ou com data de publicação; decisão sobre release tomada e registrada; amostra mensal de IA mostra descrições corretas (ou nenhuma citação, que é aceitável) | Estrelas ~50 a ~250 apenas se houver publicação de resultados do M4 (muito incerto); 1 a 5 contribuidores externos | Interesse depende de resultados mensuráveis; um M4 desfavorável também é resultado válido (ADR-0007) |
+| 30 days | Metadata, README, site and FAQ fixed and consistent with each other; 0 claims from the §7 list of `research-originality.md`; 1 or 2 review requests published; response to every issue within ~7 days | Stars: from a handful to ~20 (speculative range, most coming from direct contacts); weekly unique visits in the tens | Without broad outreach, traffic tends to come from the author's contacts; a low count does not indicate failure |
+| 60 days | At least 1 substantive external review or 1 external PR (documentation, test or reproduction); Pages indexed (appears in Search Console); 1 independent reproduction of `make vm-test` recorded ("to be confirmed" if it occurs) | Stars ~20 to ~80 if there is a well-received technical post (hypothesis); 0 to 3 external contributors | The main limiting factor is kernel reviewers' time, not discovery |
+| 90 days | M4 benchmark plan executed or with a publication date; release decision made and recorded; monthly AI sample shows correct descriptions (or no citation, which is acceptable) | Stars ~50 to ~250 only if M4 results are published (very uncertain); 1 to 5 external contributors | Interest depends on measurable results; an unfavorable M4 is also a valid result (ADR-0007) |
 
-Alertas de que algo está errado: picos de estrelas sem issues ou clones, referrers
-suspeitos, contas novas sem histórico pedindo promoção ou oferecendo serviços. Não agir sobre
-estrelas artificiais; se detectadas, ignorá-las e não amplificá-las.
+Warning signs that something is wrong: star spikes without issues or clones, suspicious
+referrers, new accounts with no history asking for promotion or offering services. Do not act on
+artificial stars; if detected, ignore them and do not amplify them.
 
 ---
 
-## 10. Arquivos e configurações que precisariam ser alterados
+## 10. Files and settings that would need to change
 
-Lista consolidada; **nenhum foi alterado por este documento**. Os arquivos marcados (*) estão
-em edição por outro agente: coordenar antes.
+Consolidated list; **none was changed by this document**. Files marked (*) are
+being edited by another agent: coordinate first.
 
-| Arquivo | Mudança |
+| File | Change |
 | --- | --- |
-| `README.md` (*) | Reorganização da §4; banner aprovado; links para `docs/architecture-overview.md`, `docs/when-not-to-use.md`, `docs/faq.md`; sem alegações da lista §7 |
-| `README.pt-BR.md` (*) | Espelhar a estrutura; manter os mesmos limites |
-| `ROADMAP.md` (*) | Estados "concluído com evidência / planejado / dependente de validação" (community-plan §10); sem datas; links para os registros |
-| `CONTRIBUTING.md` (*) e `.github/` (*) | Ligação com Discussions (se ativadas), pedidos de revisão e a política de idioma; sem mudança deste plano |
-| `site/index.html` | Novo `<title>` e meta description (§2); status "M2/M3" em lugar do M1; banner experimental; `og:title`, `og:description`, `canonical` |
-| `site/guide.html`, `site/plan.html` | Descrições e avisos atualizados; guia de reprodução do layer (hoje cobre só M1); `plan.html` deixa de dizer que M2 não está implementado |
-| `site/faq.html` (novo) | Renderização do FAQ da §6 |
-| `site/robots.txt`, `site/sitemap.xml` (novos) | Descoberta de páginas pelo Pages; URL final depende da decisão de renomear |
-| `docs/architecture-overview.md` (novo, EN) | §5.2 |
-| `docs/when-not-to-use.md` (novo, EN) | §5.2 |
-| `docs/faq.md` (novo, EN) | §6, revisado contra o código antes de publicar |
-| `docs/history/` e `CHANGELOG.md` | Registro desta rodada (quando implementada) e, se houver, a nota da primeira tag; histórico de decisão sobre renomear e Discussions |
-| `docs/decisions/` | Uma ADR curta só se o nome do repositório mudar, ou se a política de releases for definida (ID sequencial; não alterar as existentes) |
+| `README.md` (*) | §4 reorganization; approved banner; links to `docs/architecture-overview.md`, `docs/when-not-to-use.md`, `docs/faq.md`; no claims from the §7 list |
+| `README.pt-BR.md` (*) | Mirror the structure; keep the same limits |
+| `ROADMAP.md` (*) | Statuses "completed with evidence / planned / dependent on validation" (community-plan §10); no dates; links to journals |
+| `CONTRIBUTING.md` (*) and `.github/` (*) | Link to Discussions (if enabled), review requests and the language policy; no change from this plan |
+| `site/index.html` | New `<title>` and meta description (§2); "M2/M3" status in place of M1; experimental banner; `og:title`, `og:description`, `canonical` |
+| `site/guide.html`, `site/plan.html` | Updated descriptions and notices; reproduction guide for the layer (today covers only M1); `plan.html` stops saying M2 is not implemented |
+| `site/faq.html` (new) | Rendering of the §6 FAQ |
+| `site/robots.txt`, `site/sitemap.xml` (new) | Page discovery by Pages; final URL depends on the rename decision |
+| `docs/architecture-overview.md` (new, EN) | §5.2 |
+| `docs/when-not-to-use.md` (new, EN) | §5.2 |
+| `docs/faq.md` (new, EN) | §6, reviewed against the code before publishing |
+| `docs/history/` and `CHANGELOG.md` | Journal for this round (when implemented) and, if any, the note on the first tag; decision history on renaming and Discussions |
+| `docs/decisions/` | A short ADR only if the repository name changes, or if the release policy is defined (sequential ID; do not change existing ones) |
 
-Configurações do GitHub (fora do repositório, feitas pelo mantenedor):
+GitHub settings (outside the repository, made by the maintainer):
 
-| Configuração | Mudança proposta |
+| Setting | Proposed change |
 | --- | --- |
-| Description | Texto da §2 (uma das três opções) |
-| Topics | Lista da §3, até 20 |
-| Website | Manter `https://studiomoob.github.io/llmoobfs/` (ou a nova URL após renomear) |
-| Discussions | **Decisão do mantenedor** (ação 9); se ligadas, categorias Q&A, Ideas, Show and tell |
-| Wiki | Manter desativada |
-| Releases | **Decisão do mantenedor** sobre `v0.1.0-experimental` (ação 10), como pre-release |
-| Nome do repositório | **Decisão do mantenedor** (ação 12) |
-| Social preview | Imagem 1280x640 sem alegações (a confirmar se já existe) |
-| Security | Manter Security Advisories privadas habilitadas (contato em community-plan §13) |
+| Description | §2 text (one of the three options) |
+| Topics | §3 list, up to 20 |
+| Website | Keep `https://studiomoob.github.io/llmoobfs/` (or the new URL after renaming) |
+| Discussions | **Maintainer decision** (action 9); if enabled, categories Q&A, Ideas, Show and tell |
+| Wiki | Keep disabled |
+| Releases | **Maintainer decision** on `v0.1.0-experimental` (action 10), as a pre-release |
+| Repository name | **Maintainer decision** (action 12) |
+| Social preview | 1280x640 image without claims (to be confirmed whether one already exists) |
+| Security | Keep private Security Advisories enabled (contact in community-plan §13) |
 
-Pendências "a confirmar": comportamento exato do redirecionamento de Pages após renomear;
-viabilidade do Search Console para `github.io`; regras vigentes dos subreddits e listas;
-contagem atual de repositórios por topic; existência de imagem de pré-visualização social;
-número de defeitos de kernel (registros 0011 a 0015); texto atual do README após a edição
-em curso.
+Pending "to be confirmed" items: exact behavior of the Pages redirect after renaming;
+feasibility of Search Console for `github.io`; current rules of the subreddits and lists;
+current repository count per topic; existence of a social preview image;
+number of kernel defects (journals 0011 to 0015); current README text after the ongoing
+edit.

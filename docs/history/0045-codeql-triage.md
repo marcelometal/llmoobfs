@@ -1,127 +1,127 @@
-# 0045 — Triagem dos 30 alertas abertos do CodeQL
+# 0045 — Triage of the 30 open CodeQL alerts
 
-Data: 2026-10-12. Branch: `fix/codeql-triage`, criada a partir de `origin/main` (`fccf38a`,
-merge do PR #41). PR: https://github.com/studiomoob/llmoobfs/pull/42. Estado: correções de
-código implementadas e testadas; as dispensas no GitHub ficam com o mantenedor (escritas na API
-de code scanning negadas nesta sessão; ver "Comandos para o mantenedor").
+Date: 2026-10-12. Branch: `fix/codeql-triage`, created from `origin/main` (`fccf38a`,
+merge of PR #41). PR: https://github.com/studiomoob/llmoobfs/pull/42. Status: code
+fixes implemented and tested; the dismissals on GitHub are left to the maintainer (writes to the code
+scanning API denied in this session; see "Commands for the maintainer").
 
-## Objetivo
+## Goal
 
-Dar uma decisão a cada um dos 30 alertas abertos do CodeQL (`security-extended`, C de espaço de
-usuário em `tools/`, `common/` e `bench/`, introduzido no registro 0039), antes de responder ao
-critério `static_analysis_fixed` do OpenSSF Best Practices (projeto 15408). Nada em `layer/`,
-`kernel/`, no formato, na UAPI ou nos formatos de manifesto e de registro do benchmark mudou.
+Give a decision to each of the 30 open CodeQL alerts (`security-extended`, user-space C
+in `tools/`, `common/` and `bench/`, introduced in journal 0039), before answering the
+`static_analysis_fixed` criterion of OpenSSF Best Practices (project 15408). Nothing in `layer/`,
+`kernel/`, the format, the UAPI or the benchmark's manifest and record formats changed.
 
-Numeração: conferidas `origin/main` (último 0041), todas as branches remotas (`m3/query-v2-q2b`
-a `q2d` usam 0036 a 0038; `m3/query-v2-q2d` também 0042 a 0044) e as branches locais. O 0040
-continua reservado para a fase Q2e. A branch local `codex/kernel-index-reuse-research`, não
-publicada, ainda tem um `0039-kernel-index-reuse-research.md` duplicado e precisa ser renumerada
-para 0046 ou depois.
+Numbering: `origin/main` (last 0041), all remote branches (`m3/query-v2-q2b`
+to `q2d` use 0036 to 0038; `m3/query-v2-q2d` also 0042 to 0044) and the local branches were checked. 0040
+remains reserved for phase Q2e. The local branch `codex/kernel-index-reuse-research`, not
+published, still has a duplicate `0039-kernel-index-reuse-research.md` and needs to be renumbered
+to 0046 or later.
 
-## Critério
+## Criterion
 
-- (a) Corrigir quando há problema real ou quando uma mudança pequena e clara elimina o padrão sem
-  mudar comportamento.
-- (b) Dispensar quando o alerta descreve o uso pretendido: ferramentas de linha de comando que
-  abrem o caminho que o próprio usuário passou e harness de benchmark que lê um manifesto e
-  arquivos de consulta escolhidos pelo operador. Nenhum desses binários é instalado com setuid;
-  o `load --uid N` só reduz privilégio (`setgroups`/`setgid`/`setuid` para um usuário comum),
-  nunca o eleva. Não há fronteira de privilégio entre quem fornece o dado e quem executa.
+- (a) Fix when there is a real problem or when a small, clear change eliminates the pattern without
+  changing behavior.
+- (b) Dismiss when the alert describes the intended use: command-line tools that
+  open the path the user themselves passed, and a benchmark harness that reads a manifest and
+  query files chosen by the operator. None of these binaries is installed setuid;
+  `load --uid N` only lowers privilege (`setgroups`/`setgid`/`setuid` to an ordinary user),
+  never raises it. There is no privilege boundary between whoever supplies the data and whoever executes.
 
-Motivos de dispensa: `false positive` para `tools/` (o fluxo existe, mas não é uma
-vulnerabilidade: abrir o caminho pedido é a função da ferramenta); `used in tests` para
-`bench/` (harness de medição, não instalado nem usado em produção). `won't fix` não foi usado,
-porque sugeriria um defeito real aceito.
+Dismissal reasons: `false positive` for `tools/` (the flow exists, but it is not a
+vulnerability: opening the requested path is the tool's function); `used in tests` for
+`bench/` (measurement harness, not installed nor used in production). `won't fix` was not used,
+because it would suggest an accepted real defect.
 
-## Decisões por alerta
+## Decisions per alert
 
-| Alerta | Regra | Local (em `main`) | Decisão | Justificativa |
+| Alert | Rule | Location (in `main`) | Decision | Justification |
 | --- | --- | --- | --- | --- |
-| 27 | `cpp/unbounded-write` | `bench/common.h:93` | Corrigido | Falso positivo confirmado: `strlen(tok) >= BENCH_PATH_MAX` já rejeitava antes do `strcpy` para `path[BENCH_PATH_MAX]`; agora `memcpy` do tamanho verificado contra `sizeof out->path` |
-| 28 | `cpp/unbounded-write` | `bench/common.h:113` | Corrigido | Falso positivo confirmado: `strlen(tok) > 64` para `name[65]`; agora `n >= sizeof a->name` e `memcpy`, mesma fronteira |
-| 29 | `cpp/unbounded-write` | `bench/common.h:117` | Corrigido | Falso positivo confirmado: `strlen(colon) >= sizeof a->value` antes do `strcpy`; agora `memcpy` do tamanho verificado |
-| 30 | `cpp/world-writable-file-creation` | `bench/sqlclient.c:53` | Corrigido | Arquivo de registros criado por `bench_create_out()` (modo 0644 antes da umask) |
-| 31 | `cpp/world-writable-file-creation` | `bench/load.c:536` | Corrigido | Idem (registros do W3 com `--uid`) |
-| 32 | `cpp/world-writable-file-creation` | `bench/load.c:551` | Corrigido | Idem (registros do leitor do W5) |
-| 33 | `cpp/world-writable-file-creation` | `bench/load.c:445` | Corrigido | Idem (registros por processo) |
-| 34 | `cpp/world-writable-file-creation` | `bench/load.c:412` | Corrigido | `/proc/sys/vm/drop_caches` é um arquivo existente; aberto com `open(O_WRONLY)` sem `O_CREAT`, então nada pode ser criado |
-| 35 | `cpp/world-writable-file-creation` | `bench/gen.c:81` | Corrigido | Manifesto criado por `bench_create_out()` |
-| 6 | `cpp/sql-injection` | `bench/sqlclient.c:72` | Dispensar (`used in tests`) | `sqlclient` é a linha de base SQLite do W3: executa, por definição, as consultas do arquivo que o operador passa (`bench/queries-w3.txt`); não é serviço nem recebe entrada de terceiros |
-| 7 | `cpp/path-injection` | `bench/sqlclient.c:53` | Substituído pelo 38 (dispensar o 38); ver nota | Prefixo de saída `--out` do operador |
-| 8 | `cpp/path-injection` | `bench/sqlclient.c:56` | Dispensar (`used in tests`) | Arquivo SQL `--sql` do operador |
-| 9 | `cpp/path-injection` | `tools/fsck.c:43` | Dispensar (`false positive`) | `fsck.moobfs IMAGE` lê a imagem que o próprio usuário indicou, só leitura, com os privilégios dele |
-| 10 | `cpp/path-injection` | `bench/load.c:536` | Substituído pelo 39 (dispensar o 39); ver nota | Prefixo `--out` do operador |
-| 11 | `cpp/path-injection` | `bench/load.c:551` | Substituído pelo 40 (dispensar o 40); ver nota | Prefixo `--out` do operador |
-| 12 | `cpp/path-injection` | `bench/load.c:445` | Substituído pelo 41 (dispensar o 41); ver nota | Prefixo `--out` do operador |
-| 13 | `cpp/path-injection` | `bench/load.c:454` | Dispensar (`used in tests`) | `--root` do operador (W8) |
-| 14 | `cpp/path-injection` | `bench/load.c:460` | Dispensar (`used in tests`) | `--manifest` do operador |
-| 15 | `cpp/path-injection` | `bench/load.c:418` | Dispensar (`used in tests`) | `--target` do operador (W6/W7) |
-| 16 | `cpp/path-injection` | `bench/load.c:366` | Dispensar (`used in tests`) | `--queries` do operador (W8) |
-| 17 | `cpp/path-injection` | `bench/load.c:328` | Dispensar (`used in tests`) | `--root`/`--target` do operador (consulta) |
-| 18 | `cpp/path-injection` | `bench/load.c:291` | Dispensar (`used in tests`) | `--root` do operador (W3) |
-| 19 | `cpp/path-injection` | `bench/load.c:274` | Dispensar (`used in tests`) | `--target` + caminho do manifesto gerado por `bench-gen` (W5) |
-| 20 | `cpp/path-injection` | `bench/load.c:218` | Dispensar (`used in tests`) | `--queries` do operador (W3) |
-| 21 | `cpp/path-injection` | `bench/load.c:171` | Dispensar (`used in tests`) | `--target` + caminho do manifesto (W2) |
-| 22 | `cpp/path-injection` | `bench/load.c:143` | Dispensar (`used in tests`) | `--target` + caminho do manifesto (W1, arquivo temporário, já 0644) |
-| 23 | `cpp/path-injection` | `bench/load.c:152` | Dispensar (`used in tests`) | Diretório pai do mesmo caminho (W1, `fsync`) |
-| 24 | `cpp/path-injection` | `tools/mkfs.c:52` | Dispensar (`false positive`) | `mkfs.moobfs` lê os arquivos-fonte `NAME=SOURCE` que o usuário passou, só leitura |
-| 25 | `cpp/path-injection` | `bench/gen.c:81` | Substituído pelo 42 (dispensar o 42); ver nota | `--out` do operador |
-| 26 | `cpp/path-injection` | `tools/mkfs.c:88` | Dispensar (`false positive`) | `mkfs.moobfs NEW_IMAGE`: cria a imagem que o usuário pediu, com `O_EXCL` (não sobrescreve) e modo 0600 |
+| 27 | `cpp/unbounded-write` | `bench/common.h:93` | Fixed | Confirmed false positive: `strlen(tok) >= BENCH_PATH_MAX` already rejected before the `strcpy` into `path[BENCH_PATH_MAX]`; now `memcpy` of the size checked against `sizeof out->path` |
+| 28 | `cpp/unbounded-write` | `bench/common.h:113` | Fixed | Confirmed false positive: `strlen(tok) > 64` for `name[65]`; now `n >= sizeof a->name` and `memcpy`, same boundary |
+| 29 | `cpp/unbounded-write` | `bench/common.h:117` | Fixed | Confirmed false positive: `strlen(colon) >= sizeof a->value` before the `strcpy`; now `memcpy` of the checked size |
+| 30 | `cpp/world-writable-file-creation` | `bench/sqlclient.c:53` | Fixed | Record file created by `bench_create_out()` (mode 0644 before the umask) |
+| 31 | `cpp/world-writable-file-creation` | `bench/load.c:536` | Fixed | Same (W3 records with `--uid`) |
+| 32 | `cpp/world-writable-file-creation` | `bench/load.c:551` | Fixed | Same (W5 reader records) |
+| 33 | `cpp/world-writable-file-creation` | `bench/load.c:445` | Fixed | Same (per-process records) |
+| 34 | `cpp/world-writable-file-creation` | `bench/load.c:412` | Fixed | `/proc/sys/vm/drop_caches` is an existing file; opened with `open(O_WRONLY)` without `O_CREAT`, so nothing can be created |
+| 35 | `cpp/world-writable-file-creation` | `bench/gen.c:81` | Fixed | Manifest created by `bench_create_out()` |
+| 6 | `cpp/sql-injection` | `bench/sqlclient.c:72` | Dismiss (`used in tests`) | `sqlclient` is the W3 SQLite baseline: it executes, by definition, the queries of the file the operator passes (`bench/queries-w3.txt`); it is not a service and does not receive third-party input |
+| 7 | `cpp/path-injection` | `bench/sqlclient.c:53` | Replaced by 38 (dismiss 38); see note | Operator's `--out` output prefix |
+| 8 | `cpp/path-injection` | `bench/sqlclient.c:56` | Dismiss (`used in tests`) | Operator's `--sql` SQL file |
+| 9 | `cpp/path-injection` | `tools/fsck.c:43` | Dismiss (`false positive`) | `fsck.moobfs IMAGE` reads the image the user themselves indicated, read-only, with their privileges |
+| 10 | `cpp/path-injection` | `bench/load.c:536` | Replaced by 39 (dismiss 39); see note | Operator's `--out` prefix |
+| 11 | `cpp/path-injection` | `bench/load.c:551` | Replaced by 40 (dismiss 40); see note | Operator's `--out` prefix |
+| 12 | `cpp/path-injection` | `bench/load.c:445` | Replaced by 41 (dismiss 41); see note | Operator's `--out` prefix |
+| 13 | `cpp/path-injection` | `bench/load.c:454` | Dismiss (`used in tests`) | Operator's `--root` (W8) |
+| 14 | `cpp/path-injection` | `bench/load.c:460` | Dismiss (`used in tests`) | Operator's `--manifest` |
+| 15 | `cpp/path-injection` | `bench/load.c:418` | Dismiss (`used in tests`) | Operator's `--target` (W6/W7) |
+| 16 | `cpp/path-injection` | `bench/load.c:366` | Dismiss (`used in tests`) | Operator's `--queries` (W8) |
+| 17 | `cpp/path-injection` | `bench/load.c:328` | Dismiss (`used in tests`) | Operator's `--root`/`--target` (query) |
+| 18 | `cpp/path-injection` | `bench/load.c:291` | Dismiss (`used in tests`) | Operator's `--root` (W3) |
+| 19 | `cpp/path-injection` | `bench/load.c:274` | Dismiss (`used in tests`) | `--target` + manifest path generated by `bench-gen` (W5) |
+| 20 | `cpp/path-injection` | `bench/load.c:218` | Dismiss (`used in tests`) | Operator's `--queries` (W3) |
+| 21 | `cpp/path-injection` | `bench/load.c:171` | Dismiss (`used in tests`) | `--target` + manifest path (W2) |
+| 22 | `cpp/path-injection` | `bench/load.c:143` | Dismiss (`used in tests`) | `--target` + manifest path (W1, temporary file, already 0644) |
+| 23 | `cpp/path-injection` | `bench/load.c:152` | Dismiss (`used in tests`) | Parent directory of the same path (W1, `fsync`) |
+| 24 | `cpp/path-injection` | `tools/mkfs.c:52` | Dismiss (`false positive`) | `mkfs.moobfs` reads the `NAME=SOURCE` source files the user passed, read-only |
+| 25 | `cpp/path-injection` | `bench/gen.c:81` | Replaced by 42 (dismiss 42); see note | Operator's `--out` |
+| 26 | `cpp/path-injection` | `tools/mkfs.c:88` | Dismiss (`false positive`) | `mkfs.moobfs NEW_IMAGE`: creates the image the user asked for, with `O_EXCL` (does not overwrite) and mode 0600 |
 
-Resumo: 9 corrigidos (3 `unbounded-write`, 6 `world-writable-file-creation`); 21 com decisão
-de dispensa (20 `path-injection`, 1 `sql-injection`), dos quais 16 dispensados pelo número
-atual e 5 (7, 10, 11, 12, 25) pelo alerta novo que os substitui no PR (38 a 42). Nenhum alerta
-revelou um defeito explorável.
+Summary: 9 fixed (3 `unbounded-write`, 6 `world-writable-file-creation`); 21 with a dismissal
+decision (20 `path-injection`, 1 `sql-injection`), of which 16 dismissed by the current
+number and 5 (7, 10, 11, 12, 25) by the new alert that replaces them in the PR (38 to 42). No alert
+revealed an exploitable defect.
 
-Nota sobre os alertas 7, 10, 11, 12 e 25: a criação dos arquivos de saída passou para
-`bench_create_out()` em `bench/common.h`, então o `fopen` desses cinco fluxos deixou de existir.
-O CodeQL reporta os mesmos fluxos como alertas novos (38 a 42); ver "Resultado do CodeQL no PR".
+Note on alerts 7, 10, 11, 12 and 25: the creation of the output files moved to
+`bench_create_out()` in `bench/common.h`, so the `fopen` of these five flows no longer exists.
+CodeQL reports the same flows as new alerts (38 to 42); see "CodeQL result on the PR".
 
-## Mudanças
+## Changes
 
-- `bench/common.h`: `bench_parse_line()` copia `path`, `name` e `value` com `memcpy` do
-  comprimento já verificado contra `sizeof` do destino (antes, `strcpy` depois da mesma
-  verificação; para `name`, `> 64` virou `>= sizeof a->name`, idêntico com `name[65]`). Novo
+- `bench/common.h`: `bench_parse_line()` copies `path`, `name` and `value` with `memcpy` of the
+  length already checked against the destination's `sizeof` (before, `strcpy` after the same
+  check; for `name`, `> 64` became `>= sizeof a->name`, identical with `name[65]`). New
   `bench_create_out()`: `open(O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644)` + `fdopen`.
-  O comentário de topo deixa de dizer "no I/O" e cita o helper.
-- `bench/load.c`, `bench/gen.c`, `bench/sqlclient.c`: os cinco `fopen(..., "w"/"wb")` de saída
-  usam `bench_create_out()`. No W6, `drop_caches` é aberto com `open(O_WRONLY | O_CLOEXEC)` e
-  `fdopen`, sem `O_CREAT`.
+  The top comment no longer says "no I/O" and cites the helper.
+- `bench/load.c`, `bench/gen.c`, `bench/sqlclient.c`: the five output `fopen(..., "w"/"wb")`
+  use `bench_create_out()`. In W6, `drop_caches` is opened with `open(O_WRONLY | O_CLOEXEC)` and
+  `fdopen`, without `O_CREAT`.
 
-Efeito observável: só o modo dos arquivos de saída quando a umask não remove a escrita de
-"outros". Com a umask usual 022 o resultado continua 0644. Formatos de manifesto e de registro
-inalterados (o `bench-smoke` confere determinismo e compara com o oráculo).
+Observable effect: only the mode of the output files when the umask does not remove write for
+"others". With the usual umask 022 the result is still 0644. Manifest and record formats
+unchanged (`bench-smoke` checks determinism and compares with the oracle).
 
-## Testes executados
+## Tests executed
 
-Em contêiner `ubuntu:24.04` (aarch64, Docker no macOS), a partir de uma cópia limpa da branch:
+In a `ubuntu:24.04` container (aarch64, Docker on macOS), from a clean copy of the branch:
 
-| Comando | Resultado |
+| Command | Result |
 | --- | --- |
-| `make test` | 9 testes, OK |
-| `make test CC=clang BUILD=build/asan CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' LDFLAGS='-fsanitize=address,undefined'` (o mesmo passo do CI) | 9 testes, OK |
+| `make test` | 9 tests, OK |
+| `make test CC=clang BUILD=build/asan CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' LDFLAGS='-fsanitize=address,undefined'` (the same step as CI) | 9 tests, OK |
 | `make bench-smoke` | `BENCH_SMOKE_PASS` |
-| `make bench-smoke CC=clang BUILD=build/asan-bench CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all' LDFLAGS='-fsanitize=address,undefined'` | `BENCH_SMOKE_PASS`; um relatório do UBSan em `tools/moobfs-index.c:194`, preexistente (ver limitações) |
-| `umask 000; bench-gen --seed 1 --inodes 5 --profile 6 --out /tmp/m.txt; stat -c %a` | 644 nesta branch; 666 em `origin/main` (mesmo contêiner) |
+| `make bench-smoke CC=clang BUILD=build/asan-bench CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all' LDFLAGS='-fsanitize=address,undefined'` | `BENCH_SMOKE_PASS`; one UBSan report in `tools/moobfs-index.c:194`, preexisting (see limitations) |
+| `umask 000; bench-gen --seed 1 --inodes 5 --profile 6 --out /tmp/m.txt; stat -c %a` | 644 on this branch; 666 on `origin/main` (same container) |
 
-A mesma execução do `bench-smoke` em `origin/main` imprimiu as mesmas linhas de saída (inclusive
-`load: proc 0: 300 failed operations (recorded as errors)`, esperado no diretório comum).
-Não executado localmente: `make vm-test` (a mudança não toca o que a VM exercita além do
-`bench-smoke`; o job `Native Linux VM` do CI roda no PR).
+The same `bench-smoke` run on `origin/main` printed the same output lines (including
+`load: proc 0: 300 failed operations (recorded as errors)`, expected in the ordinary directory).
+Not executed locally: `make vm-test` (the change does not touch what the VM exercises beyond
+`bench-smoke`; the CI `Native Linux VM` job runs on the PR).
 
-CI do PR #42 em `da1a760` (runs 38244739816 e 38244739750): `Lint`, `Tools and sanitizers`
-(inclui `make test` com ASan/UBSan e `make bench-smoke`) e `Analyze C (tools, common, bench)`
-passaram; `CodeQL` falhou pelos alertas novos 38 a 42 (seção seguinte); `Native Linux VM`
-pendente no momento da escrita.
+CI of PR #42 at `da1a760` (runs 38244739816 and 38244739750): `Lint`, `Tools and sanitizers`
+(includes `make test` with ASan/UBSan and `make bench-smoke`) and `Analyze C (tools, common, bench)`
+passed; `CodeQL` failed because of the new alerts 38 to 42 (next section); `Native Linux VM`
+pending at the time of writing.
 
-## Resultado do CodeQL no PR
+## CodeQL result on the PR
 
-A análise do PR (run do workflow `CodeQL` em `da1a760`) não reportou nenhum dos alertas 27 a 35
-nas linhas alteradas, mas abriu cinco alertas novos de `cpp/path-injection`, 38 a 42, e por isso
-o check `CodeQL` do PR ficou vermelho ("5 new alerts including 5 high severity security
+The PR analysis (run of the `CodeQL` workflow at `da1a760`) reported none of the alerts 27 to 35
+on the changed lines, but opened five new `cpp/path-injection` alerts, 38 to 42, and therefore
+the PR's `CodeQL` check went red ("5 new alerts including 5 high severity security
 vulnerabilities"):
 
-| Novo | Local (na branch) | Substitui |
+| New | Location (on the branch) | Replaces |
 | --- | --- | --- |
 | 38 | `bench/sqlclient.c:53` | 7 |
 | 39 | `bench/load.c:540` | 10 |
@@ -129,25 +129,25 @@ vulnerabilities"):
 | 41 | `bench/load.c:449` | 12 |
 | 42 | `bench/gen.c:81` | 25 |
 
-São os mesmos fluxos (prefixo `--out` do operador), agora com a mensagem "passed to
-`bench_create_out(path)`, which calls `open`": o texto da linha mudou, então a impressão digital
-do alerta também mudou. Qualquer correção do modo nesses cinco pontos tem esse efeito. O CodeQL
-só considera `umask()` chamada na mesma função, e uma `umask` global mudaria também o modo dos
-diretórios criados pelo W1. Alternativa descartada: deixar os cinco `fopen` como estavam e
-dispensar 30, 31, 32, 33 e 35, o que manteria o check verde e os arquivos em 0666 menos a umask.
-Ficou a correção, porque o pedido era o modo explícito. Decisão para 38 a 42: dispensar como
-`used in tests`, com a mesma justificativa dos alertas que substituem. Os antigos 7, 10, 11, 12
-e 25 devem fechar como `fixed` na primeira análise de `main` depois do merge.
+These are the same flows (operator's `--out` prefix), now with the message "passed to
+`bench_create_out(path)`, which calls `open`": the text of the line changed, so the alert's
+fingerprint also changed. Any fix of the mode at these five points has this effect. CodeQL
+only considers `umask()` called in the same function, and a global `umask` would also change the mode of the
+directories created by W1. Alternative discarded: leave the five `fopen` as they were and
+dismiss 30, 31, 32, 33 and 35, which would keep the check green and the files at 0666 minus the umask.
+The fix stayed, because the request was the explicit mode. Decision for 38 to 42: dismiss as
+`used in tests`, with the same justification as the alerts they replace. The old 7, 10, 11, 12
+and 25 should close as `fixed` in the first analysis of `main` after the merge.
 
-A análise de PR é restrita às linhas alteradas (diff-informed), então a ausência dos alertas
-27 a 35 na branch só fica confirmada pela análise completa de `main` depois do merge.
+The PR analysis is restricted to the changed lines (diff-informed), so the absence of alerts
+27 to 35 on the branch is only confirmed by the full analysis of `main` after the merge.
 
-## Comandos para o mantenedor
+## Commands for the maintainer
 
-Dispensar os 21 alertas da tabela (exceto 7, 10, 11, 12 e 25, que serão substituídos) e os cinco
-novos. Rodar 38 a 42 antes do merge, para que o PR fique sem alertas novos abertos (a página do
-PR e o check passam a refletir a dispensa; não confirmado nesta sessão). Os demais podem ser
-rodados a qualquer momento.
+Dismiss the 21 alerts in the table (except 7, 10, 11, 12 and 25, which will be replaced) and the five
+new ones. Run 38 to 42 before the merge, so that the PR has no new open alerts (the PR
+page and the check then reflect the dismissal; not confirmed in this session). The others can be
+run at any time.
 
 ```sh
 gh api -X PATCH repos/studiomoob/llmoobfs/code-scanning/alerts/9 -f state=dismissed -f dismissed_reason='false positive' -f dismissed_comment='Intended CLI use: fsck.moobfs reads the image path its own user passed, read-only. Not setuid; no privilege boundary. Triage: docs/history/0045-codeql-triage.md'
@@ -173,27 +173,27 @@ gh api -X PATCH repos/studiomoob/llmoobfs/code-scanning/alerts/42 -f state=dismi
 gh api -X PATCH repos/studiomoob/llmoobfs/code-scanning/alerts/6 -f state=dismissed -f dismissed_reason='used in tests' -f dismissed_comment='sqlclient is the SQLite baseline of the benchmark and runs, by design, the SQL file its operator passes; not a service. Not setuid; no privilege boundary. Triage: docs/history/0045-codeql-triage.md'
 ```
 
-Conferência depois do merge e da análise de `main`:
+Check after the merge and the analysis of `main`:
 
 ```sh
 gh api 'repos/studiomoob/llmoobfs/code-scanning/alerts?state=open&tool_name=CodeQL&per_page=100' --jq 'length'
 ```
 
-Esperado: 0. Os alertas 7, 10 a 12, 25 e 27 a 35 devem aparecer com `state=fixed`.
+Expected: 0. Alerts 7, 10 to 12, 25 and 27 to 35 should appear with `state=fixed`.
 
-## Limitações
+## Limitations
 
-- O UBSan aponta `qsort(NULL, 0, ...)` em `tools/moobfs-index.c:194` quando nenhum arquivo
-  casa; reproduzido também em `origin/main`, fora do escopo desta triagem e não coberto pelo
-  passo de sanitizers do CI (que roda só `make test`). Correção trivial (`if (nhits)`), deixada
-  como próximo passo.
-- As dispensas valem enquanto os binários não forem instalados com setuid nem expostos a
-  entrada de terceiros; uma mudança nisso reabre a análise.
-- O `make bench-smoke` sob sanitizers foi executado aqui, mas não está no CI.
+- UBSan flags `qsort(NULL, 0, ...)` in `tools/moobfs-index.c:194` when no file
+  matches; also reproduced on `origin/main`, outside the scope of this triage and not covered by the
+  CI sanitizers step (which runs only `make test`). Trivial fix (`if (nhits)`), left
+  as a next step.
+- The dismissals hold as long as the binaries are not installed setuid nor exposed to
+  third-party input; a change in that reopens the analysis.
+- `make bench-smoke` under sanitizers was executed here, but is not in CI.
 
-## Próximo passo
+## Next step
 
-Mantenedor: dispensar 38 a 42 (o check `CodeQL` do PR depende disso), fazer o merge, dispensar
-os demais, conferir que não resta alerta aberto e responder `static_analysis_fixed` citando este
-registro. Depois, corrigir o `qsort` de `moobfs-index` e considerar o
-`bench-smoke` com sanitizers no CI.
+Maintainer: dismiss 38 to 42 (the PR's `CodeQL` check depends on it), merge, dismiss
+the others, check that no open alert remains and answer `static_analysis_fixed` citing this
+journal. Then, fix the `qsort` in `moobfs-index` and consider
+`bench-smoke` with sanitizers in CI.

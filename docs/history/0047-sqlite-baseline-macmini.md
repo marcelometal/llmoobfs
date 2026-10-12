@@ -1,71 +1,71 @@
-# 0047 — `QUERY2` contra o SQLite no mesmo hardware
+# 0047 — `QUERY2` against SQLite on the same hardware
 
-Data: 2026-10-12. Estado: medido no host do registro 0042; resultados em
-`bench/results/2026-10-12-macmini-sqlite/` e `bench/results/2026-10-12-macmini-q2/`.
+Date: 2026-10-12. Status: measured on the host of journal 0042; results in
+`bench/results/2026-10-12-macmini-sqlite/` and `bench/results/2026-10-12-macmini-q2/`.
 
-## Objetivo
+## Goal
 
-A pergunta que os registros 0043 e 0044 deixaram aberta: com os ajustes da série Q2, como o
-`QUERY2` se compara com a base SQLite do harness (alternativa B da ADR-0009), na mesma máquina e
-nos mesmos dados. Na Azure (registro 0029), o SQLite respondia Q3 em 0,39 ms e a v1 em 6,95 ms,
-mas eram outro host e outro código.
+The question that journals 0043 and 0044 left open: with the adjustments of the Q2 series, how does
+`QUERY2` compare with the harness's SQLite baseline (alternative B of ADR-0009), on the same machine and
+on the same data. On Azure (journal 0029), SQLite answered Q3 in 0.39 ms and v1 in 6.95 ms,
+but those were a different host and different code.
 
-## Método
+## Method
 
-`bench/sqlite-baseline.sh` (novo): banco de `bench/sqlbase.sh` com os índices compostos do
-harness, carregado dos mesmos 60 000 arquivos da campanha do registro 0044, no mesmo SSD;
-consultas pela biblioteca (`bench-sqlclient`), 3 repetições de 50 execuções. As formas da v2
-foram escritas em SQL com o domínio como a coluna `namespace` (`extra.sql`). Os dois lados
-devolvem número de inode e caminho de cada resultado.
+`bench/sqlite-baseline.sh` (new): database from `bench/sqlbase.sh` with the harness's composite
+indexes, loaded from the same 60 000 files of the campaign of journal 0044, on the same SSD;
+queries through the library (`bench-sqlclient`), 3 repetitions of 50 executions. The v2 forms
+were written in SQL with the domain as the `namespace` column (`extra.sql`). Both sides
+return the inode number and path of each result.
 
-## Resultados (p50; v2 com o plano revisado do registro 0044)
+## Results (p50; v2 with the revised plan of journal 0044)
 
-| Pergunta | SQLite | `QUERY2` | Quem ganha |
+| Question | SQLite | `QUERY2` | Who wins |
 | --- | --- | --- | --- |
-| namespace = ns3 e agent = a07 (253) | 178 a 476 µs | 127 a 162 µs | v2, de 1,1 a 3,7 vezes |
-| namespace = ns3, agent = a07 e kind = note (98) | 509 µs | 88 a 114 µs | v2, de 4,5 a 5,8 vezes |
-| namespace = ns1, kind = fact e created ≥ T (1 021) | 1 729 µs | 710 a 723 µs | v2, cerca de 2,4 vezes |
-| 20 mais recentes de ns3 com kind = note | 47 µs | 180 a 191 µs | SQLite, cerca de 4 vezes |
-| 20 mais recentes de ns3 com agent = a07 | 279 µs | 1 638 a 1 801 µs | SQLite, cerca de 6 vezes |
+| namespace = ns3 and agent = a07 (253) | 178 to 476 µs | 127 to 162 µs | v2, by 1.1 to 3.7 times |
+| namespace = ns3, agent = a07 and kind = note (98) | 509 µs | 88 to 114 µs | v2, by 4.5 to 5.8 times |
+| namespace = ns1, kind = fact and created ≥ T (1 021) | 1 729 µs | 710 to 723 µs | v2, about 2.4 times |
+| 20 most recent of ns3 with kind = note | 47 µs | 180 to 191 µs | SQLite, about 4 times |
+| 20 most recent of ns3 with agent = a07 | 279 µs | 1 638 to 1 801 µs | SQLite, about 6 times |
 
-A faixa do SQLite na primeira linha vem de duas execuções do mesmo comando SQL em posições
-diferentes do ciclo: 476 µs logo depois de consultas que devolvem 24 000 e 6 000 linhas (cache da
-CPU frio), 178 µs depois de uma consulta parecida. A v2 foi medida em ciclos de formas pequenas.
-A comparação justa fica entre os dois extremos.
+The SQLite range in the first row comes from two executions of the same SQL command at different
+positions in the cycle: 476 µs right after queries that return 24 000 and 6 000 rows (cold CPU
+cache), 178 µs after a similar query. v2 was measured in cycles of small forms.
+The fair comparison lies between the two extremes.
 
-## Conclusões
+## Conclusions
 
-- **Filtros de igualdade e intervalo dentro de um domínio:** a v2 ficou à frente do SQLite com
-  índices compostos em todas as formas medidas. Isso inverte o quadro da v1, que perdia por 10 a
-  18 vezes na Azure.
-- **"N mais recentes":** o SQLite ganha. Ele tem um índice composto (`namespace, kind, created`)
-  que entrega os 20 primeiros já em ordem, e no caso de `agent` combina índice e ordenação. A v2
-  percorre a árvore de `created` do domínio e testa os termos em cada entrada, com cerca de 2,8 µs
-  por entrada (registro 0044). É o principal ponto fraco restante, e a otimização candidata
-  continua a mesma: atributos compactos por inode para o teste de termos.
-- **Formas amplas** (dezenas de milhares de resultados): o SQLite devolve tudo numa chamada (Q1
-  com 24 595 linhas em 46 ms); a v2 limita cada chamada a 4096 resultados e pagina por cursor.
-  Não foi medido o custo de paginar uma resposta inteira dessas.
-- **Custo de manter o banco:** a carga do SQLite a partir dos arquivos levou 4 s para 60 000
-  memórias, mas um SQLite lateral precisa ficar sincronizado com cada escrita, o que a v2 faz no
-  próprio caminho de escrita. Esse custo não entra nesta tabela; é o argumento da ADR-0009.
+- **Equality and range filters within a domain:** v2 came out ahead of SQLite with
+  composite indexes in all the forms measured. This reverses the picture of v1, which lost by 10 to
+  18 times on Azure.
+- **"N most recent":** SQLite wins. It has a composite index (`namespace, kind, created`)
+  that delivers the first 20 already in order, and in the `agent` case it combines index and ordering. v2
+  walks the domain's `created` tree and tests the terms on each entry, at about 2.8 µs
+  per entry (journal 0044). This is the main remaining weak point, and the candidate optimization
+  remains the same: compact per-inode attributes for the term test.
+- **Broad forms** (tens of thousands of results): SQLite returns everything in one call (Q1
+  with 24 595 rows in 46 ms); v2 limits each call to 4096 results and paginates by cursor.
+  The cost of paginating an entire response of that kind was not measured.
+- **Cost of maintaining the database:** loading SQLite from the files took 4 s for 60 000
+  memories, but a side SQLite needs to stay synchronized with each write, which v2 does in its
+  own write path. That cost does not enter this table; it is the argument of ADR-0009.
 
-## Limitações
+## Limitations
 
-- Só ext4, um domínio por forma, sem carga concorrente nem escrita durante as consultas.
-- A posição de cada forma no ciclo afeta o cache da CPU nos dois lados; os ciclos do SQLite e da
-  v2 não eram iguais.
-- O SQLite foi usado com os índices do harness, sem ajuste fino de `PRAGMA` além de WAL e
+- Only ext4, one domain per form, no concurrent load nor writes during the queries.
+- The position of each form in the cycle affects the CPU cache on both sides; the SQLite and
+  v2 cycles were not the same.
+- SQLite was used with the harness's indexes, without fine-tuning of `PRAGMA` beyond WAL and
   `synchronous=NORMAL`.
 
-## Próximo passo
+## Next step
 
-Otimizar o teste de termos por inode (o gargalo do "N mais recentes") e medir de novo; medir a
-paginação completa de uma forma ampla; repetir em btrfs e XFS.
+Optimize the per-inode term test (the bottleneck of "N most recent") and measure again; measure the
+complete pagination of a broad form; repeat on btrfs and XFS.
 
-## Nota de correção (2026-10-12)
+## Correction note (2026-10-12)
 
-A explicação do custo do "N mais recentes" acima (cerca de 600 entradas a cerca de 2,8 µs por
-entrada, atribuída à busca do atributo na lista do inode) estava errada. A causa principal era a
-varredura juntar 256 candidatos mesmo para um pedido de 20, o que percorria cerca de 7 500
-entradas a cerca de 0,23 µs. Diagnóstico, correção e novas medições no registro 0048.
+The explanation of the cost of "N most recent" above (about 600 entries at about 2.8 µs per
+entry, attributed to the search for the attribute in the inode's list) was wrong. The main cause was the
+scan gathering 256 candidates even for a request of 20, which walked about 7 500
+entries at about 0.23 µs. Diagnosis, fix and new measurements in journal 0048.

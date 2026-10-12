@@ -1,64 +1,64 @@
-# 0019 — Decisões a partir de uma revisão externa da arquitetura
+# 0019 — Decisions arising from an external review of the architecture
 
-Data: 2026-10-10, America/Sao_Paulo. Estado: decisões registradas; implementação nos marcos
-indicados.
+Date: 2026-10-10, America/Sao_Paulo. Status: decisions recorded; implementation in the
+milestones indicated.
 
-## Contexto
+## Context
 
-Uma revisão produzida fora do projeto propôs um "prompt mestre" com visão estratégica, análise
-de projetos, oportunidades, arquitetura de referência em quatro camadas, plano de benchmark,
-roadmap em quatro fases e critérios de diferenciação. Ela foi confrontada com o estado real do
-repositório e com as ADRs.
+A review produced outside the project proposed a "master prompt" with a strategic vision,
+analysis of projects, opportunities, a four-layer reference architecture, a benchmark plan,
+a four-phase roadmap and differentiation criteria. It was checked against the actual state of
+the repository and against the ADRs.
 
-## Aceito e incorporado
+## Accepted and incorporated
 
-1. **Isolamento entre agentes e namespaces** entra no escopo do M3 como parte do modelo de
-   identidade (agente, namespace, memória), expresso em atributos tipados e permissões POSIX,
-   sem lógica de política no kernel. Era a lacuna real apontada pela revisão.
-2. **Metodologia de benchmark** para o M4: p50/p95/p99, amplificação de escrita, tempo de
-   montagem e de reconstrução do índice, aquecimento, repetições e dispersão; baselines ext4 e
-   btrfs com SQLite mantido pela aplicação; clientes reais (ai-memory, mem0, Letta) como
-   cargas; escalas atreladas ao orçamento do índice. Documentado em `docs/benchmark-plan.md`.
-3. **Operações em lote e cursor de "mudanças desde a revisão X"** como candidatos do M3, em
-   extensão compatível da UAPI v1.
-4. Referências adicionadas ao levantamento: letta-code, Agent VFS e GraphRAG, classificados
-   como cliente, referência de interface e fonte de dataset, respectivamente.
+1. **Isolation between agents and namespaces** enters M3 scope as part of the identity model
+   (agent, namespace, memory), expressed in typed attributes and POSIX permissions, without
+   policy logic in the kernel. This was the real gap the review pointed out.
+2. **Benchmark methodology** for M4: p50/p95/p99, write amplification, mount time and index
+   rebuild time, warm-up, repetitions and dispersion; ext4 and btrfs baselines with SQLite
+   maintained by the application; real clients (ai-memory, mem0, Letta) as loads; scales tied
+   to the index budget. Documented in `docs/benchmark-plan.md`.
+3. **Batch operations and a "changes since revision X" cursor** as M3 candidates, in a
+   compatible extension of UAPI v1.
+4. References added to the survey: letta-code, Agent VFS and GraphRAG, classified as client,
+   interface reference and dataset source, respectively.
 
-## Recusado, com motivo
+## Rejected, with reason
 
-- Persistência do índice como entrega de curto prazo: segue condicionada a medição.
-- Escalas de 10 milhões de memórias e 1.000 agentes como requisito: são hipóteses do M4.
-- Letta MemFS, Agent VFS e GraphRAG como concorrentes: são espaço de usuário ou pipelines.
-- SDK, API HTTP e MCP como camada do repositório: trabalho do cliente; sem servidor próprio.
-- PostgreSQL com pgvector como baseline do `QUERY`: compara operações diferentes.
-- Validade e políticas de retenção como lógica no módulo: são atributos interpretados pelo
-  cliente.
-- O diagnóstico, a auditoria e a análise competitiva pedidos como "primeira ação" já existiam
-  nos registros 0001 a 0016 e em `docs/ecosystem.md`.
+- Index persistence as a short-term deliverable: remains conditional on measurement.
+- Scales of 10 million memories and 1 000 agents as a requirement: they are M4 hypotheses.
+- Letta MemFS, Agent VFS and GraphRAG as competitors: they are user space or pipelines.
+- SDK, HTTP API and MCP as a layer of the repository: client work; no server of our own.
+- PostgreSQL with pgvector as a `QUERY` baseline: it compares different operations.
+- Validity and retention policies as logic in the module: they are attributes interpreted by
+  the client.
+- The diagnosis, audit and competitive analysis requested as a "first action" already existed
+  in journals 0001 to 0016 and in `docs/ecosystem.md`.
 
-## Mudanças
+## Changes
 
-`docs/benchmark-plan.md` (novo), `ROADMAP.md` (M3 e M4), `docs/ecosystem.md`, este registro.
-Nenhum código.
+`docs/benchmark-plan.md` (new), `ROADMAP.md` (M3 and M4), `docs/ecosystem.md`, this journal.
+No code.
 
-## Adendo (mesmo dia): segunda rodada da revisão externa
+## Addendum (same day): second round of the external review
 
-A revisão respondeu com um plano M3/M4 alinhado às ADRs. Incorporado: identidade lógica
-`(namespace, agent, memory_id)` como atributos tipados comuns, gerados pelo cliente, sem
-atributos reservados nem contadores no kernel (a proposta anterior de `id`/`rev`/`mrev`
-atribuídos pela camada fica adiada por custo e por criar estado não reproduzível pelo
-cliente); invariantes de isolamento e a correção do `QUERY`, que hoje devolve toda entrada do
-índice sem verificar as permissões do chamador; `QUERY_BATCH` e `READ_BATCH` condicionados à
-medição de W2 e W3; revisão lógica e histórico mantidos no cliente, cursor de enumeração só
-se o M4 justificar; cargas W1 a W9, escalas S1 a S6, perfis de 3, 8 e 16 atributos,
-aquecimento, repetições, ordem alternada, fórmulas de amplificação de escrita e pontos de
-saturação do índice. `docs/spec-m3.md` e `docs/benchmark-plan.md` reescritos de acordo.
+The review replied with an M3/M4 plan aligned with the ADRs. Incorporated: logical identity
+`(namespace, agent, memory_id)` as ordinary typed attributes, generated by the client, without
+reserved attributes or counters in the kernel (the earlier proposal of `id`/`rev`/`mrev`
+assigned by the layer is postponed because of cost and because it creates state the client
+cannot reproduce); isolation invariants and the fix of `QUERY`, which today returns every index
+entry without checking the caller's permissions; `QUERY_BATCH` and `READ_BATCH` conditional on
+the measurement of W2 and W3; logical revision and history kept in the client, enumeration
+cursor only if M4 justifies it; loads W1 to W9, scales S1 to S6, profiles of 3, 8 and 16
+attributes, warm-up, repetitions, alternating order, write amplification formulas and index
+saturation points. `docs/spec-m3.md` and `docs/benchmark-plan.md` rewritten accordingly.
 
-## Adendo: harness especificado
+## Addendum: harness specified
 
-Pesquisa de ferramentas de benchmark de metadados: `mdtest` e `fs_mark` reportam vazão, não
-latência por chamada, e não cobrem xattr; `filebench` parado; `fio` só para o caminho de dados;
-`mdbench` e MDWorkbench reportam latência mas sem xattr nem consulta. Decisão: harness próprio
-em C sem dependências, com validação de equivalência pelo oráculo e gate de `EXPLAIN QUERY
-PLAN` nos baselines SQLite. Especificado em `docs/benchmark-harness.md`, incluindo os testes do
-próprio harness e o alvo `make bench-smoke`.
+Research of metadata benchmark tools: `mdtest` and `fs_mark` report throughput, not per-call
+latency, and do not cover xattrs; `filebench` stalled; `fio` only for the data path;
+`mdbench` and MDWorkbench report latency but without xattrs or query. Decision: our own harness
+in C without dependencies, with equivalence validation by the oracle and an `EXPLAIN QUERY
+PLAN` gate on the SQLite baselines. Specified in `docs/benchmark-harness.md`, including the
+tests of the harness itself and the `make bench-smoke` target.

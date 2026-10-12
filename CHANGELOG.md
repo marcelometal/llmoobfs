@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Everything in the repository is in English (ADR-0010, journal 0051): 82 documents, ADRs and
+  journals written in Portuguese were translated in place; `README.pt-BR.md` stays as a mirror.
 - **UAPI change:** with `noindex`, `MOOB_IOC_QUERY` and `MOOB_IOC_QUERY2` return `EOPNOTSUPP`
   instead of `ENOSYS` (journal 0050). checkpatch is now clean and required in CI; the oracle no
   longer calls `qsort` on an empty answer; `bench/equiv.sh` checks the oracle's own status;

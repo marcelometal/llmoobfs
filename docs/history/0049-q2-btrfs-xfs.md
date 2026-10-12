@@ -1,43 +1,43 @@
-# 0049 — `QUERY2`, v1 e SQLite em btrfs e XFS
+# 0049 — `QUERY2`, v1 and SQLite on btrfs and XFS
 
-Data: 2026-10-12. Estado: medido no host do registro 0042; resultados em
+Date: 2026-10-12. Status: measured on the host of journal 0042; results in
 `bench/results/2026-10-12-macmini-btrfs-xfs/`.
 
-## Objetivo
+## Goal
 
-Os registros 0044, 0047 e 0048 mediram só em ext4. Repetir a campanha da v1 contra a v2 e a
-base SQLite nas partições btrfs e XFS do mesmo SSD, com o módulo da otimização do registro 0048.
+Journals 0044, 0047 and 0048 measured only on ext4. Repeat the campaign of v1 against v2 and the
+SQLite baseline on the btrfs and XFS partitions of the same SSD, with the module from the optimization of journal 0048.
 
-## Resultados (p50; mesmas 60 000 memórias, perfil 8, semente 1)
+## Results (p50; same 60 000 memories, profile 8, seed 1)
 
-| Pergunta | Sistema | ext4 | btrfs | XFS |
+| Question | System | ext4 | btrfs | XFS |
 | --- | --- | --- | --- | --- |
-| namespace = ns3 e agent = a07 (253) | v1 como usuário | 4,14 ms | 3,71 ms | 2,75 ms |
-| | SQLite | 178 a 476 µs | 178 a 474 µs | 172 a 407 µs |
-| | v2 | 119 a 144 µs | 145 µs | 145 µs |
-| namespace, kind e created (1 021) | v1 como usuário | 5,14 ms | 4,35 ms | 3,32 ms |
+| namespace = ns3 and agent = a07 (253) | v1 as user | 4.14 ms | 3.71 ms | 2.75 ms |
+| | SQLite | 178 to 476 µs | 178 to 474 µs | 172 to 407 µs |
+| | v2 | 119 to 144 µs | 145 µs | 145 µs |
+| namespace, kind and created (1 021) | v1 as user | 5.14 ms | 4.35 ms | 3.32 ms |
 | | SQLite | 1 729 µs | 1 719 µs | 1 867 µs |
-| | v2 | 569 a 644 µs | 684 µs | 697 µs |
-| 20 mais recentes, kind = note | SQLite | 47 µs | 47 µs | 68 µs |
-| | v2 | 19 a 26 µs | 24 µs | 17 µs |
-| 20 mais recentes, agent = a07 | SQLite | 279 µs | 273 µs | 278 µs |
-| | v2 | 102 a 141 µs | 122 µs | 90 µs |
+| | v2 | 569 to 644 µs | 684 µs | 697 µs |
+| 20 most recent, kind = note | SQLite | 47 µs | 47 µs | 68 µs |
+| | v2 | 19 to 26 µs | 24 µs | 17 µs |
+| 20 most recent, agent = a07 | SQLite | 279 µs | 273 µs | 278 µs |
+| | v2 | 102 to 141 µs | 122 µs | 90 µs |
 
-Os valores de ext4 da v2 são os do registro 0048 (duas passadas); os de btrfs e XFS, de uma
-campanha de 3 repetições cada. A v1 e a v2 devolveram os mesmos inodes nas duas formas
-comparáveis nos três sistemas de arquivos.
+The v2 ext4 values are those of journal 0048 (two passes); the btrfs and XFS ones, from one
+campaign of 3 repetitions each. v1 and v2 returned the same inodes in the two comparable
+forms on the three filesystems.
 
-## Conclusões
+## Conclusions
 
-- A v2 ficou à frente do SQLite em todas as formas medidas, nos três sistemas de arquivos.
-- A v2 praticamente não depende do sistema de arquivos inferior: o índice está na RAM e, sem
-  verificação por resultado, nada é lido do disco. A v1 depende (2,7 a 4,1 ms em Q3), porque
-  resolve o caminho de cada resultado no inferior.
-- O SQLite também quase não varia, porque o banco inteiro cabe no cache.
+- v2 came out ahead of SQLite in all the forms measured, on the three filesystems.
+- v2 practically does not depend on the lower filesystem: the index is in RAM and, without
+  per-result checking, nothing is read from disk. v1 does depend on it (2.7 to 4.1 ms in Q3), because
+  it resolves the path of each result on the lower.
+- SQLite also barely varies, because the entire database fits in the cache.
 
-## Limitações
+## Limitations
 
-- Uma campanha por sistema de arquivos em btrfs e XFS (três repetições); ruído da ordem de 20%
-  em valores de dezenas de µs.
-- Cache quente, sem escrita concorrente; a criação das 60 000 memórias (W1) não foi analisada
-  aqui.
+- One campaign per filesystem on btrfs and XFS (three repetitions); noise of the order of 20%
+  on values of tens of µs.
+- Warm cache, no concurrent writes; the creation of the 60 000 memories (W1) was not analyzed
+  here.

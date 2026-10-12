@@ -89,9 +89,9 @@ and what each success marker proves is in [docs/testing.md](docs/testing.md).
 >   [0035](docs/history/0035-phase-q2a-domain-query.md)).
 > - Reflink, deduplication and durability come from the lower filesystem, not from MoobFS.
 >
-> Contributions are welcome ([CONTRIBUTING.md](CONTRIBUTING.md)). Code, commits, issues, pull
-> requests and this README are in English; `docs/` mixes Portuguese and English
-> ([index with languages](docs/README.md)).
+> Contributions are welcome ([CONTRIBUTING.md](CONTRIBUTING.md)). Everything in the repository is
+> in English, including the design documents and the technical journal
+> ([documentation index](docs/README.md)).
 
 ## At a glance
 
@@ -286,17 +286,17 @@ Every document under `docs/`, with its language, is listed in the [docs index](d
 | Should I use it, compared with files, SQLite, FUSE and memory frameworks? | [when-not-to-use.md](docs/when-not-to-use.md), [value-assessment.md](docs/value-assessment.md) | EN, PT |
 | Short answers | [faq.md](docs/faq.md) | EN |
 | How do I build, test and read the logs? | [development.md](docs/development.md), [testing.md](docs/testing.md) | EN |
-| What does the M2 layer specify? | [spec-m2.md](docs/spec-m2.md), [kernel-infrastructure.md](docs/kernel-infrastructure.md), [ADR-0007](docs/decisions/0007-stacked-memory-layer.md) | PT |
-| What does M3 specify (identity, isolation, provenance, change cursor, batch reads)? | [spec-m3.md](docs/spec-m3.md) | PT |
-| How will performance be measured? | [benchmark-plan.md](docs/benchmark-plan.md), [benchmark-harness.md](docs/benchmark-harness.md) | PT |
+| What does the M2 layer specify? | [spec-m2.md](docs/spec-m2.md), [kernel-infrastructure.md](docs/kernel-infrastructure.md), [ADR-0007](docs/decisions/0007-stacked-memory-layer.md) | EN |
+| What does M3 specify (identity, isolation, provenance, change cursor, batch reads)? | [spec-m3.md](docs/spec-m3.md) | EN |
+| How will performance be measured? | [benchmark-plan.md](docs/benchmark-plan.md), [benchmark-harness.md](docs/benchmark-harness.md) | PT (English translation in review) |
 | What has been measured so far (pilots, not M4)? | [bench/results/](bench/results/README.md); raw archives in the [`bench-evidence`](https://github.com/studiomoob/llmoobfs/releases/tag/bench-evidence) release | EN |
-| What does the domain-scoped `QUERY2` (UAPI v2) specify? | [spec-query-v2.md](docs/spec-query-v2.md) | PT |
+| What does the domain-scoped `QUERY2` (UAPI v2) specify? | [spec-query-v2.md](docs/spec-query-v2.md) | EN |
 | What is the M1 image format? | [format-m1.md](docs/format-m1.md) | EN |
-| What was the original full MVP proposal? | [native-mvp.md](docs/native-mvp.md) (write interface superseded by ADR-0007) | PT |
-| Why was each decision taken? | [docs/decisions/](docs/decisions/), [technical journal](docs/history/) | PT |
-| Which free software is relevant around the project? | [ecosystem.md](docs/ecosystem.md) | PT |
-| How is AI-assisted development governed? | [ai-workflow.md](docs/ai-workflow.md) (shared through `AGENTS.md`, `CLAUDE.md` and Cursor rules) | PT |
-| Prior art, what may and may not be claimed | [research-originality.md](docs/research-originality.md) | PT |
+| What was the original full MVP proposal? | [native-mvp.md](docs/native-mvp.md) (write interface superseded by ADR-0007) | EN |
+| Why was each decision taken? | [docs/decisions/](docs/decisions/), [technical journal](docs/history/) | EN |
+| Which free software is relevant around the project? | [ecosystem.md](docs/ecosystem.md) | EN |
+| How is AI-assisted development governed? | [ai-workflow.md](docs/ai-workflow.md) (shared through `AGENTS.md`, `CLAUDE.md` and Cursor rules) | EN |
+| Prior art, what may and may not be claimed | [research-originality.md](docs/research-originality.md) | EN |
 | Changes, governance, conduct, security | [CHANGELOG.md](CHANGELOG.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) | EN |
 
 Git records exact changes; journals record concise rationale, experiments and results. Future
