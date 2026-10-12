@@ -80,3 +80,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0050 — Pending code items received from the developer experience batch](0050-dx-code-items.md)
 - [0051 — The repository moves to English (ADR-0010)](0051-english-everywhere.md)
 - [0054 — Plan for a test with a real memory client](0054-real-client-plan.md)
+- [0055 — Measurement gaps: cold cache, mount time and write cost](0055-measurement-gaps.md)
