@@ -103,6 +103,15 @@ the lower's free count well below that floor. Not a crash; a quota/reserve bypas
 model (ADR-0011 promise 2, "never lets the caller do on the lower what the lower would refuse")
 does not currently hold for the reserved-space case.
 
+*Correction, 2026-10-12 (journal 0069).* Lowering `CAP_SYS_RESOURCE` does not close the case
+reproduced above. ext4 grants its reserve when the caller's fsuid equals the reserve owner **or**
+the caller has the capability (`fs/ext4/balloc.c:650-652`); the mounter credentials have fsuid 0
+and the default reserve owner is 0, so delegated writes still reach the reserve. overlayfs with a
+root mounter behaves the same. What the capability decides is the quota hard limit
+(`fs/quota/dquot.c:1285`, `ignore_hardlimit`) and the reserve of a lower mounted with another
+`resuid`. The layer now lowers the capability as overlayfs does, tested on ext4 with
+`resuid=4242`; the default-`resuid` case stays open and promise 2 is **not** met for it.
+
 **R-CRED-3 — `setattr` must not pass `ATTR_MODE` together with `ATTR_KILL_SUID|ATTR_KILL_SGID`.**
 Source: `fs/attr.c:435-444` — `notify_change` comments *"no function will ever call notify_change
 with both ATTR_MODE and ATTR_KILL_S*ID set"* and enforces it with `BUG()` at `:444`. References:
@@ -119,6 +128,11 @@ unprivileged user reaches the forbidden combination.
 a crash reachable by the main adversary (A1), which ADR-0011 promise 1 and `SECURITY.md` classify
 as a vulnerability. (The fix pattern is the one-line `lower_ia.ia_valid &= ~ATTR_MODE` guard the
 two reference filesystems use; applying it is a code task, out of scope here.)
+
+*Note, 2026-10-12 (journal 0069).* Fixed with that guard and a regression test. The same pair of
+flags also arrives through `truncate`/`ftruncate` and through `chown` of such a file, the latter
+for every caller including root (`chown_common` always asks to clear set-user-ID); the test covers
+the three.
 
 **R-CRED-4 — name operations run with the caller's credentials, not the mounter's.**
 Source: ADR-0011's own decision, and the overlayfs alternative it rejects. Reference: overlayfs
@@ -229,6 +243,8 @@ reported `st_ino` is the lower inode number and `st_dev` is the single layer ano
 the layer, because each subvolume restarts inode numbering at 257. overlayfs documents this and
 offers `xino`; MoobFS neither documents it nor mitigates it. Recommendation: document the limit
 (a note like overlayfs's), since a lower spanning btrfs subvolumes is a realistic memory layout.
+
+*Note, 2026-10-12 (journal 0069).* Documented in the README's limitations; not mitigated.
 
 **R-INODE-5 — refuse to open device/fifo nodes while still indexing their attributes.**
 Source: general VFS safety; overlayfs/ecryptfs treat special files by `init_special_inode`.

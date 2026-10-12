@@ -192,6 +192,14 @@ measurements (only pilot-grade campaigns exist, in [bench/results/](bench/result
   after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower
   filesystem's. Acceptance ran over ext4 only.
+- Inode numbers are the lower's. When the lower directory spans several btrfs subvolumes, two
+  files can show the same `st_dev` and `st_ino` through the layer, which confuses tools that
+  detect hard links that way (`tar`, `rsync`, `du`, `find -samefile`). Keep the lower in one
+  subvolume.
+- Data is written with the mounter's credentials without `CAP_SYS_RESOURCE`, so quota limits hold.
+  On ext4 with the default reserve owner (uid 0), ordinary users writing through the layer can
+  still use the blocks reserved for root; mount the lower with another `resuid`, or set the
+  reserve to zero, if that matters.
 
 ## Compared with plain files, SQLite and memory frameworks
 

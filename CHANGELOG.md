@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Security fix** (journal 0069; review of journal 0066): any user writing to or truncating a
+  set-user-ID or set-group-ID file through the layer, and any `chown` of one, crashed the kernel
+  (`BUG()` in `notify_change`). Regression test in `tests/layer.c`.
+- **Behaviour change** (journal 0069): data operations no longer carry `CAP_SYS_RESOURCE`, so quota
+  limits apply to writes through the layer. ext4's reserve with the default owner (uid 0) is still
+  reachable; see the README's limitations and ADR-0011, finding F4.
+- `docs/research-stacked-fs-kernel-rules.md` (journal 0066): the rules a stacked filesystem must
+  follow, from kernel v6.12 sources, each with whether the layer complies.
 - `docs/adoption-risks.md` (proposal; journal 0067): fifteen risks any agent-memory system takes by
   adopting the layer, each with its evidence, what exists and an answer (fix, build, contain or
   accept).

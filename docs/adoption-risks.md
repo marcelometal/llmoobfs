@@ -47,7 +47,8 @@ fourth by the client's test suite (journal 0057). A review on 2026-10-12
 unprivileged user can cause: writing to a set-user-ID file through the layer reaches a `BUG()` in
 the VFS, because `moobl_setattr` forwards `ATTR_MODE` together with the kill-suid flags. That
 finding is reported as reproduced in a VM and **not fixed**; it was not re-verified for this
-document.
+document. *Note, 2026-10-12:* verified against the code and fixed in journal 0069, with the test
+item 1 below asks for.
 
 **Exists.** KASAN and lockdep on every change to `layer/` (CI and `vm/kasan-local.sh`), sparse and
 `W=1`, checkpatch, a race test for `QUERY2` (journal 0052), ai-memory's 1 147 tests on the layer.
@@ -118,6 +119,13 @@ A mapped inode space (overlayfs `xino`) is the full answer and is not proposed n
 
 **Residual.** None for R-CRED-2 once fixed. Each finding that changes a promise needs a dated
 revision of ADR-0011.
+
+*Correction, 2026-10-12 (journal 0069).* "None once fixed" was wrong. The capability is lowered
+now, which closes the quota case, but ext4 also grants its reserve to uid 0, the fsuid of the
+mounter credentials (`fs/ext4/balloc.c:650`). With the default reserve owner an ordinary user
+still spends the reserve through the layer. Closing it needs delegated writes to run with the
+caller's fsuid for the allocation, or a deployment rule (`resuid` other than 0); recorded as F4 in
+ADR-0011 and in the README's limitations.
 
 ## 5. Linux only, a module and root are required
 

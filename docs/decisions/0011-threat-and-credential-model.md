@@ -113,6 +113,20 @@ and S7 (fuzzing).
   degradation of the query service. Kept as a known limitation under S9 (per-uid or per-domain
   accounting is the candidate); `GET_INFO` and `moobfs-check` make it visible.
 
+Added on 2026-10-12, from the review of journal 0066 (`docs/research-stacked-fs-kernel-rules.md`):
+
+- **F3 — a write to a set-user-ID file crashed the kernel.** `setattr` forwarded `ATTR_MODE`
+  together with `ATTR_KILL_SUID`/`ATTR_KILL_SGID` to the lower, a pair `notify_change` refuses
+  with `BUG()`. Any user could reach it by writing to or truncating a set-user-ID or set-group-ID
+  file, and any `chown` of such a file did too. It broke promise 1. **Fixed on 2026-10-12**
+  (journal 0069), with a regression test.
+- **F4 — the mounter credentials kept `CAP_SYS_RESOURCE`.** Delegated writes ignored the quota
+  hard limit and could use space reserved by the lower, against promise 2. The capability is
+  lowered since journal 0069, as overlayfs does. **One case stays open:** ext4 also grants its
+  reserve to the reserve owner's uid, 0 by default and the fsuid of the mounter credentials, so
+  with the default `resuid` an ordinary user writing through the layer still spends that reserve.
+  Promise 2 does not hold for it; the README lists the workaround (another `resuid`).
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that
