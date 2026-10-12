@@ -56,3 +56,4 @@ Preservação depende de commits e cópias: nenhum disco ou serviço garante ret
 - [0039 — Experiência do desenvolvedor no GitHub: lote 2 (ferramentas)](0039-dx-batch2.md)
 - [0041 — Experiência do desenvolvedor no GitHub: lote 3 (vitrine)](0041-dx-batch3.md)
 - [0045 — Triagem dos 30 alertas abertos do CodeQL](0045-codeql-triage.md)
+- [0046 — Dependências Python do workflow KASAN fixadas por hash](0046-kasan-pip-hashes.md)
