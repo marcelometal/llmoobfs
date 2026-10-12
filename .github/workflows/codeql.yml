@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: CodeQL
+# CodeQL over the user-space C sources (tools/, common/, bench/ and the headers and tests
+# they compile with). C/C++ extraction follows the compiler, so what is analyzed is exactly
+# what the manual build below compiles. The kernel modules (layer/, kernel/) are not built
+# here: they need kernel headers and are covered by the VM, KASAN and checkpatch jobs.
+on:
+  push:
+    branches: [main]
+    paths: ['tools/**', 'common/**', 'bench/**', 'include/**', 'tests/*.c', 'Makefile', '.github/workflows/codeql.yml']
+  pull_request:
+    paths: ['tools/**', 'common/**', 'bench/**', 'include/**', 'tests/*.c', 'Makefile', '.github/workflows/codeql.yml']
+  schedule:
+    - cron: '41 5 * * 2'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    name: Analyze C (tools, common, bench)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build dependencies (bench-tools needs libsqlite3-dev)
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libsqlite3-dev
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-extended
+      - name: Build (same targets as on a Linux host)
+        run: make tools attr-tools bench-tools
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:c-cpp

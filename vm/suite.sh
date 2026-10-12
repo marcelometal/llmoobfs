@@ -469,6 +469,50 @@ run_lower ext4 "$DEV_EXT4" no
 run_lower btrfs "$DEV_BTRFS" yes
 run_lower xfs "$DEV_XFS" yes
 
+# Readable demonstration, quoted in the README: typed attributes written through the layer,
+# QUERY2 on domain directories under the default mount options, results filtered by permission.
+# Lines starting with "DEMO| " are each command as run (with $BIN on PATH) and its output.
+demo() {
+    printf 'DEMO| # %s\n' "$*"
+    ( PATH=$BIN:$PATH; eval "$*" ) > /tmp/demo.out 2>&1; rc=$?
+    sed 's/^/DEMO| /' /tmp/demo.out
+    return $rc
+}
+mount -t ext4 "$DEV_EXT4" $LOWER || fail demo-lower-mount
+mkdir $LOWER/alice $LOWER/bob $LOWER/team || fail demo-mkdir
+echo 'Cache: keep SQLite next to the files' > $LOWER/alice/cache.md || fail demo-write
+echo 'Deploys are frozen on Fridays' > $LOWER/bob/deploy.md || fail demo-write
+echo 'C code follows the kernel style' > $LOWER/team/style.md || fail demo-write
+echo 'Notes for the salary review' > $LOWER/team/salary.md || fail demo-write
+chown -R 1001:1001 $LOWER/alice && chmod 0700 $LOWER/alice && chmod 0600 $LOWER/alice/cache.md || fail demo-alice
+chown -R 1002:1002 $LOWER/bob && chmod 0700 $LOWER/bob && chmod 0600 $LOWER/bob/deploy.md || fail demo-bob
+chmod 0755 $LOWER/team && chmod 0644 $LOWER/team/style.md || fail demo-team
+chown 1002:1002 $LOWER/team/salary.md && chmod 0600 $LOWER/team/salary.md || fail demo-salary
+echo "DEMO| # (prepared on the lower ext4: alice/ uid 1001 0700, bob/ uid 1002 0700, team/ 0755)"
+demo "mount -t moobfs_layer -o lower=$LOWER none $LAYER" || fail demo-mount
+for f in alice/cache.md bob/deploy.md team/style.md team/salary.md; do
+    demo "moobfs-attr set $LAYER/$f kind string decision" || fail "demo-attr-$f"
+done
+demo "moobfs-attr list $LOWER/alice/cache.md" || fail demo-attr-lower
+grep -q "^kind	string	decision$" /tmp/demo.out || fail demo-attr-lower-content
+demo "stat -c '%A %u %n' $LAYER/team/*" || fail demo-stat
+demo "query --uid 1001 $LAYER/alice q2 kind eq string decision" || fail demo-q2-alice
+[ "$(wc -l < /tmp/demo.out)" -eq 1 ] && grep -q '	cache.md$' /tmp/demo.out || fail demo-q2-alice-content
+demo "query --uid 1001 $LAYER/team q2 kind eq string decision" || fail demo-q2-team
+[ "$(wc -l < /tmp/demo.out)" -eq 1 ] && grep -q '	style.md$' /tmp/demo.out || fail demo-q2-team-content
+demo "query --uid 1001 $LAYER/bob q2 kind eq string decision" && fail demo-q2-bob-answered
+grep -q 'Permission denied' /tmp/demo.out || fail demo-q2-bob-errno
+demo "query --uid 1001 $LAYER kind eq string decision" && fail demo-v1-user-answered
+grep -q 'Operation not permitted' /tmp/demo.out || fail demo-v1-user-errno
+demo "query $LAYER kind eq string decision" || fail demo-v1-root
+[ "$(wc -l < /tmp/demo.out)" -eq 4 ] || fail demo-v1-root-count
+demo "query $LAYER info" || fail demo-info
+grep -q 'domain_depth=1 heterogeneous=1 fallback_domains=0' /tmp/demo.out || fail demo-info-counts
+umount $LAYER || fail demo-umount
+rm -rf $LOWER/alice $LOWER/bob $LOWER/team /tmp/demo.out || fail demo-cleanup
+umount $LOWER || fail demo-lower-umount
+echo "DEMO_PASS: QUERY2 per domain, v1 refused to a user, heterogeneous file left out"
+
 # Phase 2e: acceptance with clients that do not know MoobFS (git, SQLite), an own memory
 # client, power loss under dm-log-writes and I/O errors under dm-flakey.
 export PATH=$TOOLS:/bin:/usr/bin:/sbin:/usr/sbin

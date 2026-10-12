@@ -28,6 +28,6 @@ Files:
   `bench-gen --seed 1 --inodes 1000 --profile 8`.
 
 The raw latency records (`*.rec`), the SQLite baseline databases and the manifest are in
-`2026-10-11-azure-pilot-s1-raw.tgz`, attached to the GitHub pre-release
-`bench-2026-10-11-azure-pilot-s1` (SHA-256
-`1755901556b389e24bfcdf8ace1caaff55bc69d82b2377c010136bb00d26985f`).
+[`2026-10-11-azure-pilot-s1-raw.tgz`](https://github.com/studiomoob/llmoobfs/releases/download/bench-evidence/2026-10-11-azure-pilot-s1-raw.tgz) in the GitHub release
+`bench-evidence` (SHA-256
+`1755901556b389e24bfcdf8ace1caaff55bc69d82b2377c010136bb00d26985f`). Originally attached to the pre-release `bench-2026-10-11-azure-pilot-s1`; that tag remains.

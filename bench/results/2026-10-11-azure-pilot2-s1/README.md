@@ -14,9 +14,9 @@ Command: `W3_REPEAT=50 BIN=build/host sh bench/run.sh --out build/bench/pilot2-s
 Files: `environment.txt`, `run.log`, `report.txt`, `results.csv`, `results.json`,
 `calibration/`, `rep1..rep5/<system>/` (equivalence, `moobfs-check`, `GET_INFO`, diskstats),
 `manifest.sha256`. Raw records, SQLite databases and the manifest are in
-`2026-10-11-azure-pilot2-s1-raw.tgz`, attached to the GitHub pre-release
-`bench-2026-10-11-azure-pilot2-s1` (SHA-256
-`d2ad07362d97597a855193fb0c530fd56a74403f5319ddec015507461cac5261`).
+[`2026-10-11-azure-pilot2-s1-raw.tgz`](https://github.com/studiomoob/llmoobfs/releases/download/bench-evidence/2026-10-11-azure-pilot2-s1-raw.tgz) in the GitHub release
+`bench-evidence` (SHA-256
+`d2ad07362d97597a855193fb0c530fd56a74403f5319ddec015507461cac5261`). Originally attached to the pre-release `bench-2026-10-11-azure-pilot2-s1`; that tag remains.
 
 Interpretation is in journal 0025 ("Piloto 2"). In short: every equivalence passed; W1 is
 bounded by the disk's fsync and equal with and without the layer; the layer adds a few

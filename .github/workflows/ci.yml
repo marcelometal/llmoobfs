@@ -47,6 +47,9 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends shellcheck
       - name: shellcheck and SPDX headers (same command as locally)
         run: make lint   # info-level shellcheck findings are tracked as issues
+      - name: checkpatch.pl on layer/ and kernel/ (advisory, does not fail the job)
+        continue-on-error: true
+        run: make checkpatch
       - name: DCO sign-off on every commit in the pull request
         if: github.event_name == 'pull_request'
         env:

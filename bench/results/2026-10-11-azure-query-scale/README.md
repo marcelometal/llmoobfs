@@ -15,8 +15,9 @@ each).
 Per scale directory `sS/`: `environment.txt`, `run.log`, `report.txt`, `results.csv`,
 `results.json`, `rep*/<system>/` (equivalence, `moobfs-check`, `GET_INFO` after W1 and after W7),
 `manifest.sha256`. Raw latency records, SQLite databases and manifests (123 MB):
-`2026-10-11-azure-query-scale-raw.tgz` on the GitHub pre-release `bench-2026-10-11-azure-query-scale`
-(SHA-256 `c35cd91fe1ce6f3e6a23ae5974a566daf5bd05cbb70fbf09e729280e3570a7ae`).
+[`2026-10-11-azure-query-scale-raw.tgz`](https://github.com/studiomoob/llmoobfs/releases/download/bench-evidence/2026-10-11-azure-query-scale-raw.tgz) in the GitHub release
+`bench-evidence`
+(SHA-256 `c35cd91fe1ce6f3e6a23ae5974a566daf5bd05cbb70fbf09e729280e3570a7ae`). Originally attached to the pre-release `bench-2026-10-11-azure-query-scale`; that tag remains.
 
 Known issues in this series:
 - Shapes whose answer exceeds 4096 results are truncated by the QUERY UAPI v1; they show as

@@ -92,8 +92,10 @@ int main(int argc, char **argv)
 		while (k < argc && !strncmp(argv[k], "--", 2)) {
 			if (!strcmp(argv[k], "--order") && k + 3 < argc) {
 				int t = parse_type(argv[k + 2]);
-				if (t < 0 || strlen(argv[k + 1]) > MOOB_QUERY_NAME_MAX) return 65;
-				strcpy(q2.order_by, argv[k + 1]);
+				size_t olen = strlen(argv[k + 1]);
+
+				if (t < 0 || olen >= sizeof q2.order_by) return 65;
+				memcpy(q2.order_by, argv[k + 1], olen + 1);
 				q2.order_type = (__u8)t;
 				q2.order = !strcmp(argv[k + 3], "desc") ? MOOB_ORDER_DESC : MOOB_ORDER_ASC;
 				k += 4;

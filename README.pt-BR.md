@@ -2,41 +2,104 @@
 
 **Filesystem nativo experimental para Linux, voltado à memória e ao contexto de LLMs.**
 
-Módulo experimental do kernel Linux (GPL-2.0, sem FUSE): uma camada de filesystem empilhada
-sobre ext4, btrfs ou XFS que acrescenta atributos tipados em xattr, um índice em memória e um
-ioctl `QUERY` autorizado pelas credenciais POSIX de quem chama. Pensado como armazenamento para
-memória de agentes de LLM. Projeto de pesquisa, não para produção. Sem versão lançada.
+O MoobFS é um módulo do kernel Linux (GPL-2.0, sem FUSE) que se empilha sobre um diretório de
+ext4, btrfs ou XFS, valida atributos tipados `user.moob.*` em arquivos comuns e responde a
+consultas por atributo a partir do kernel, devolvendo só os arquivos que quem chama pode ler. É
+um projeto de pesquisa sobre armazenamento para a memória de agentes de LLM.
 
-[English](README.md) · [Site](https://studiomoob.github.io/llmoobfs/) · [FAQ (EN)](docs/faq.md) · [Contribuição](CONTRIBUTING.md) · [Roadmap](ROADMAP.md)
+[English](README.md) · [Site](https://studiomoob.github.io/llmoobfs/) · [Índice da documentação](docs/README.md) · [FAQ (EN)](docs/faq.md) · [Contribuição](CONTRIBUTING.md) · [Roadmap](ROADMAP.md)
 
-> **Estágio experimental. Sem versão lançada; não use em produção.** Fatos verificados neste
-> repositório em 2026-10-10:
-> - testado em **uma só série de kernel**, em VM: Debian 6.12.111 no QEMU (`make vm-test`) e
->   upstream 6.12.112 sob KASAN/UBSAN/lockdep (`kasan.yml`); apenas sobre ext4, btrfs e XFS;
-> - o índice de atributos vive **somente em RAM**, limitado por `index_budget`, e é reconstruído
->   a cada montagem;
-> - montar exige **`CAP_SYS_ADMIN` no namespace de usuário inicial**; montagens em user
->   namespace e montagens idmapped são recusadas;
-> - a **UAPI v1** (`QUERY`, `GET_INFO`) pode mudar; não há promessa de compatibilidade;
-> - **nenhum número de desempenho foi medido** (M4 pendente); nenhuma alegação de velocidade ou
->   eficiência é feita;
-> - os próprios testes do projeto encontraram e corrigiram **três defeitos no lado do kernel**
->   durante o desenvolvimento (registros [0015](docs/history/0015-phase-2e-investigation.md) e
->   [0016](docs/history/0016-kasan-lockdep-harness.md)); **não houve auditoria externa**;
-> - reflink, deduplicação e durabilidade vêm do filesystem inferior, não do MoobFS.
+## Veja funcionando
+
+Cada diretório de primeiro nível da montagem é um domínio de permissão. O root marca quatro
+arquivos de memória com um atributo tipado; depois a Alice (uid 1001) consulta. Ela recebe a
+própria memória e, no domínio compartilhado `team/`, só o `style.md`. O `salary.md` não aparece
+porque um domínio só indexa arquivos que todos os que podem entrar nele conseguem ler (a regra de
+homogeneidade de [spec-query-v2](docs/spec-query-v2.md) §3); legível só pelo Bob, ele fica fora do
+índice de `team/` para qualquer chamador, inclusive o Bob e o root, e arquivos privados devem ficar
+num domínio próprio. O domínio do Bob e o `QUERY` da montagem inteira (v1, para administradores)
+são recusados a ela:
+
+```text
+# (prepared on the lower ext4: alice/ uid 1001 0700, bob/ uid 1002 0700, team/ 0755)
+# mount -t moobfs_layer -o lower=/lower none /mnt/layer
+# moobfs-attr set /mnt/layer/alice/cache.md kind string decision
+# moobfs-attr set /mnt/layer/bob/deploy.md kind string decision
+# moobfs-attr set /mnt/layer/team/style.md kind string decision
+# moobfs-attr set /mnt/layer/team/salary.md kind string decision
+# moobfs-attr list /lower/alice/cache.md
+kind	string	decision
+# stat -c '%A %u %n' /mnt/layer/team/*
+-rw------- 1002 /mnt/layer/team/salary.md
+-rw-r--r-- 0 /mnt/layer/team/style.md
+# query --uid 1001 /mnt/layer/alice q2 kind eq string decision
+16	cache.md
+# query --uid 1001 /mnt/layer/team q2 kind eq string decision
+18	style.md
+# query --uid 1001 /mnt/layer/bob q2 kind eq string decision
+open: Permission denied
+# query --uid 1001 /mnt/layer kind eq string decision
+MOOB_IOC_QUERY: Operation not permitted
+# query /mnt/layer kind eq string decision
+16	alice/cache.md
+17	bob/deploy.md
+18	team/style.md
+19	team/salary.md
+```
+
+Saída real de `make vm-test` em 2026-10-11 (Debian 6.12.111 no QEMU, inferior ext4): as linhas
+`DEMO| ` de `build/vm/console.log` sem o prefixo, deixando de fora a chamada final de `GET_INFO`.
+As linhas que começam com `#` são comandos executados como root. `query` é o cliente de teste em
+[`tests/query.c`](tests/query.c), porque ainda não há CLI; `--uid 1001` troca para esse usuário
+antes da chamada, e a forma `q2` é o `MOOB_IOC_QUERY2` sobre um diretório de domínio. O roteiro é
+o bloco de demonstração de [`vm/suite.sh`](vm/suite.sh).
+
+## Início rápido
+
+Com Docker em execução (no Apple Silicon a VM roda sob emulação de CPU e demora mais):
+
+```sh
+git clone https://github.com/studiomoob/llmoobfs.git
+cd llmoobfs
+make vm-test                          # compila ferramentas e módulos e inicia uma VM QEMU descartável
+grep '^DEMO| ' build/vm/console.log   # a sessão acima, na sua própria execução
+```
+
+Nunca carregue os módulos no seu host. Ambiente em [docs/development.md](docs/development.md); o
+que cada marcador de sucesso prova está em [docs/testing.md](docs/testing.md) (em inglês).
+
+> **Experimental. Só uma tag de pre-release do fonte (`v0.1.0-experimental`); não use em
+> produção.** Fatos em 2026-10-11:
+> - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e upstream 6.12.112 sob
+>   KASAN/UBSAN/lockdep; inferiores apenas ext4, btrfs e XFS.
+> - O índice de atributos vive **só em RAM**, limitado por `index_budget`, e é reconstruído a
+>   cada montagem.
+> - Montar exige **`CAP_SYS_ADMIN` no namespace de usuário inicial**; montagens em user
+>   namespace e idmapped são recusadas.
+> - **As UAPIs v1 e v2 podem mudar**, sem promessa de compatibilidade. Com os domínios ligados (o
+>   padrão desde a fase Q2a), o `QUERY` v1 é só para administradores.
+> - **Nenhuma alegação de velocidade ou eficiência.** Só existem medições em nível de piloto
+>   numa VM de nuvem ([bench/results/](bench/results/README.md)); o M4 não foi feito.
+> - **Sem auditoria externa.** Os próprios testes e revisões do projeto encontraram e corrigiram
+>   defeitos no lado do kernel (registros [0015](docs/history/0015-phase-2e-investigation.md),
+>   [0016](docs/history/0016-kasan-lockdep-harness.md),
+>   [0035](docs/history/0035-phase-q2a-domain-query.md)).
+> - Reflink, deduplicação e durabilidade vêm do filesystem inferior, não do MoobFS.
 >
-> Contribuições são bem-vindas: veja [CONTRIBUTING.md](CONTRIBUTING.md). Política de idioma:
-> código, commits, issues, pull requests e o README principal em inglês; documentos em `docs/`
-> podem estar em português ou inglês, com ADRs e especificações traduzidos sob demanda.
+> Contribuições são bem-vindas ([CONTRIBUTING.md](CONTRIBUTING.md)). Código, commits, issues,
+> pull requests e o README principal são em inglês; `docs/` mistura português e inglês
+> ([índice com os idiomas](docs/README.md)).
 
 ## Em resumo
 
 **O que é.** Um módulo nativo do kernel Linux, `moobfs_layer.ko`, montado como camada
 empilhada sobre um diretório de um filesystem maduro (ext4, btrfs ou XFS). Memórias são
 arquivos comuns; seus metadados são atributos estendidos tipados (`user.moob.*`) que o módulo
-valida na escrita e indexa em RAM. Um ioctl `QUERY` na raiz da montagem responde predicados
-conjuntivos sobre atributos a partir do kernel, devolvendo só as entradas que quem chama
-poderia abrir pelas permissões POSIX e ACLs. Tudo continua legível com ferramentas Unix comuns
+valida na escrita e indexa em RAM, particionados por domínio de permissão (por padrão, cada
+diretório de primeiro nível). Um ioctl `QUERY2` sobre um diretório de domínio responde
+predicados conjuntivos sobre atributos a partir do kernel, devolvendo só arquivos que todos os
+que entram no domínio podem ler; o `QUERY` antigo, sobre a montagem inteira, verifica cada
+resultado pelas permissões POSIX e ACLs e, com os domínios ligados, é para administradores. Tudo continua legível com ferramentas Unix comuns
 sem a camada. O formato de imagem somente leitura do M1, com conteúdo físico compartilhado, é
 mantido como regressão.
 
@@ -66,9 +129,11 @@ hoje nem amplia a janela de contexto do modelo.
 
 Escrever uma memória é um `write` POSIX comum mais `setxattr`; a camada valida a codificação
 (byte de tipo mais carga) antes de o xattr chegar ao inferior e atualiza o índice. Encontrar
-memórias é uma chamada `QUERY`: até quatro predicados sobre atributos em conjunção,
-respondidos pelo índice, cada resultado verificado contra as permissões POSIX e ACLs de quem
-chama antes de ser devolvido; o cliente então abre o arquivo normalmente. Desmontada a camada,
+memórias é uma chamada `QUERY2` sobre um diretório de domínio: até quatro predicados sobre
+atributos em conjunção, respondidos pela partição daquele domínio depois de uma verificação de
+permissão no diretório. Um arquivo que nem todos os que entram no domínio podem ler fica fora da
+partição ([spec-query-v2](docs/spec-query-v2.md) §3). O cliente então abre o arquivo
+normalmente. Desmontada a camada,
 o diretório inferior é uma árvore comum que `grep`, `getfattr`, `git` e `rsync` leem sem o
 módulo. Detalhes com citações do código (em inglês):
 [visão da arquitetura](docs/architecture-overview.md); o fluxo em diagrama:
@@ -90,10 +155,11 @@ regressão na mesma VM.
 | Fase 2e: aceitação com git, SQLite em WAL concorrente, cliente de memória próprio; replay de queda de energia com `dm-log-writes`; erros de E/S com `dm-flakey`; dois defeitos da camada encontrados e corrigidos | [0015](docs/history/0015-phase-2e-investigation.md) | Debian 6.12.111; só ext4 |
 | Harness KASAN/UBSAN/lockdep com a mesma suíte; terceiro defeito encontrado e corrigido | [0016](docs/history/0016-kasan-lockdep-harness.md) | Upstream 6.12.112, virtme-ng |
 | M3 fase 3b: autorização POSIX por resultado no `QUERY`; dois uids, dois namespaces, chmod e ACLs, remontagem, montagens idmapped e em user namespace recusadas, corrida de 5 s de chmod/rename/unlink contra `QUERY` | [0020](docs/history/0020-phase-3b-query-authorization.md), [spec-m3](docs/spec-m3.md) §3 | Debian 6.12.111 e KASAN 6.12.112; ext4, btrfs, XFS |
+| Fase Q2a: `QUERY2` por domínio (UAPI v2) sobre um diretório de domínio, índice particionado por domínio e regra de homogeneidade, v1 restrita a administradores enquanto `domain_depth` estiver ligado, `EXDEV` para diretórios entre domínios; igual ao `moobfs-index --domain` (desempenho e teste do canal de tempo ainda não medidos) | [0035](docs/history/0035-phase-q2a-domain-query.md), [spec-query-v2](docs/spec-query-v2.md) | Debian 6.12.111; ext4, btrfs, XFS |
 
 Não implementado: índice persistente, montagens em user namespace ou idmapped, leituras em
-lote, cursor de mudanças, revisões, empacotamento, UAPI estável, CLI, xfstests completo e
-qualquer medição (M4). Veja o [ROADMAP.md](ROADMAP.md).
+lote, cursor de mudanças, revisões, empacotamento, UAPI estável, CLI, xfstests completo e as
+medições do M4 (só existem campanhas em nível de piloto, em [bench/results/](bench/results/README.md)). Veja o [ROADMAP.md](ROADMAP.md).
 
 ## Limitações
 
@@ -102,9 +168,10 @@ qualquer medição (M4). Veja o [ROADMAP.md](ROADMAP.md).
 - Índice só em RAM, não paginável, limitado por `index_budget` (padrão 128 MiB), reconstruído
   por varredura linear a cada montagem; comportamento perto da saturação não testado.
 - Montar exige `CAP_SYS_ADMIN` no namespace inicial; sem contêineres rootless.
-- A UAPI v1 pode mudar; a tag `v0.1.0-experimental` é um instantâneo do fonte, sem binários, empacotamento ou suporte.
-- Nenhum número de desempenho, latência ou memória; nenhuma comparação com SQLite, FUSE ou o
-  inferior puro pode ser afirmada antes do M4.
+- As UAPIs v1 e v2 podem mudar; a tag `v0.1.0-experimental` é um instantâneo do fonte, sem binários, empacotamento ou suporte.
+- Só há números em nível de piloto (uma VM da Azure, uma semente de dados; registros 0025 a
+  0031); nenhuma comparação com SQLite, FUSE ou o inferior puro pode ser afirmada como resultado
+  antes do M4.
 - Sem auditoria externa, syzkaller, xfstests completo ou documento de modelo de ameaça.
 - A autorização do `QUERY` vale no instante da consulta (contrato TOCTOU); possíveis falsos
   negativos após renomear diretório, até remontar ([spec-m3](docs/spec-m3.md) §3.1).
@@ -145,7 +212,7 @@ Compila as ferramentas e os dois módulos e inicia uma VM QEMU x86-64 com o kern
 carregue os módulos no seu host. No Apple Silicon usa emulação. Ambiente em
 [docs/development.md](docs/development.md); o que cada marcador prova e não prova em
 [docs/testing.md](docs/testing.md). Uma execução bem-sucedida termina com `MOOBFS_VM_PASS`,
-`LAYER_LOWER_PASS` para ext4, btrfs e xfs, `MOOBFS_ACCEPTANCE_PASS` e `MOOBFS_LAYER_PASS`
+`LAYER_LOWER_PASS` para ext4, btrfs e xfs, `DEMO_PASS`, `MOOBFS_ACCEPTANCE_PASS` e `MOOBFS_LAYER_PASS`
 (texto exato no [README em inglês](README.md#try-it-in-a-vm)).
 
 ### Ferramentas de imagem do M1 (regressão)
@@ -170,8 +237,10 @@ sob KASAN (o harness KASAN roda a suíte da camada) e não há benchmark.
 
 ## Mapa da documentação
 
+Todos os documentos de `docs/`, com o idioma de cada um, estão no [índice da documentação](docs/README.md).
+
 - [Visão da arquitetura](docs/architecture-overview.md), [comparação e quando não usar](docs/when-not-to-use.md) e [FAQ](docs/faq.md), em inglês.
-- [Especificação M2](docs/spec-m2.md), [infraestrutura do kernel](docs/kernel-infrastructure.md), [ADR-0007](docs/decisions/0007-stacked-memory-layer.md); [especificação M3](docs/spec-m3.md); [plano](docs/benchmark-plan.md) e [harness](docs/benchmark-harness.md) do benchmark M4.
+- [Especificação M2](docs/spec-m2.md), [infraestrutura do kernel](docs/kernel-infrastructure.md), [ADR-0007](docs/decisions/0007-stacked-memory-layer.md); [especificação M3](docs/spec-m3.md); [especificação do `QUERY2`](docs/spec-query-v2.md); [plano](docs/benchmark-plan.md) e [harness](docs/benchmark-harness.md) do benchmark M4; [resultados de piloto](bench/results/README.md) (EN), com os pacotes brutos na release [`bench-evidence`](https://github.com/studiomoob/llmoobfs/releases/tag/bench-evidence).
 - [Formato implementado do M1](docs/format-m1.md) e [proposta original do MVP](docs/native-mvp.md) (interface de escrita substituída pela ADR-0007).
 - [Decisões](docs/decisions/), [histórico](docs/history/), [levantamento do ecossistema](docs/ecosystem.md), [anterioridade](docs/research-originality.md) e [changelog](CHANGELOG.md).
 - [Regras para Codex, Claude e Cursor](docs/ai-workflow.md).

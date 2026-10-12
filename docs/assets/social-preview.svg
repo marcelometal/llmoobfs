@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<!-- GitHub social preview for studiomoob/llmoobfs, 1280x640. Render with render-social-preview.sh.
+     Colours follow site/style.css (primary, ink, muted and wash); the mark is site/favicon.svg.
+     No performance claims belong here. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#ffffff"/>
+  <rect x="0" y="0" width="1280" height="16" fill="#a8371b"/>
+  <g transform="translate(96 132) scale(4)" fill="none">
+    <path d="M3 8h10v8h9M3 28h10v-8h9" stroke="#a8371b" stroke-width="3"/>
+    <rect x="22" y="12" width="11" height="12" fill="#a8371b"/>
+  </g>
+  <g font-family="Arial, Helvetica, 'DejaVu Sans', sans-serif" fill="#2b201c">
+    <text x="276" y="250" font-size="132" font-weight="700" letter-spacing="-4">MoobFS</text>
+    <text x="100" y="368" font-size="50" font-weight="700" letter-spacing="-1">Linux filesystem layer for LLM-agent memory</text>
+    <text x="100" y="436" font-size="32" fill="#5d514c">Kernel module stacked over ext4, btrfs or XFS: typed attributes,</text>
+    <text x="100" y="480" font-size="32" fill="#5d514c">an in-RAM index and queries filtered by file permissions.</text>
+  </g>
+  <rect x="96" y="530" width="1088" height="64" fill="#f8ece7"/>
+  <text x="124" y="573" font-family="Arial, Helvetica, 'DejaVu Sans', sans-serif" font-size="28" font-weight="700" fill="#a8371b">Experimental research project · GPL-2.0 · no FUSE · run it in a disposable VM</text>
+</svg>

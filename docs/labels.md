@@ -22,6 +22,10 @@ Rules:
   GitHub search and external aggregators look for that exact name.
 - `help wanted` (GitHub default) marks every open issue that an outside
   contributor or reviewer can take; it is removed when someone is assigned.
+- Pull requests receive `area/*` labels automatically from the paths they
+  change (`.github/labeler.yml`, workflow `labeler.yml`). The bot only adds
+  labels; a wrong one is removed by hand and stays removed unless a later push
+  matches it again. Issues are labeled by their templates or by hand.
 - `priority/p0` is for data loss, kernel crash or hang, or a leak between users;
   these usually go through `SECURITY.md` first.
 

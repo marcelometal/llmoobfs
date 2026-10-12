@@ -22,6 +22,20 @@ Disk: the Docker image pulls a Debian base plus kernel image and headers, and
 `build/` holds images, kernels and logs; plan for several GiB. Network: needed
 for the first `docker build` and for fetching the KASAN kernel tarball.
 
+### Dev container (experimental)
+
+`.devcontainer/devcontainer.json` describes an Ubuntu 24.04 container (the CI
+runners' release) with the docker-in-docker feature and the host tools
+(`build-essential`, `clang`, `libclang-rt-18-dev`, `llvm`, `python3`,
+`shellcheck`, `libsqlite3-dev`, `sqlite3`, `curl`, `perl`), installed by
+`.devcontainer/post-create.sh`. It is meant for GitHub Codespaces or a local Dev
+Containers client, so that `make test`, `make lint` and `make vm-test` run
+without installing anything on your machine; `make vm-test` still loads the
+module only inside its QEMU guest. The time, disk and minimum machine for `make
+vm-test` in a Codespace have not been measured yet, so the container is not
+advertised in the README and declares no `hostRequirements`; journal 0039 tracks
+the measurement.
+
 ## 2. Clone and build on the host
 
 ```sh
@@ -50,7 +64,11 @@ checks as the CI `Lint` job (shellcheck at warning severity on the tracked
 `vm/*.sh` and `scripts/*.sh`, and SPDX headers on C sources through
 `scripts/check-spdx.sh`); it needs `shellcheck` installed (`apt install
 shellcheck` or `brew install shellcheck`). The DCO check runs only in pull
-requests.
+requests. `make checkpatch` runs the kernel's `checkpatch.pl --no-tree` on the
+tracked `layer/` and `kernel/` sources; `scripts/checkpatch.sh` downloads the
+script and its data files from the stable tag `v6.12.112` into `build/` and
+verifies their SHA-256 first (needs `curl` and `perl`). The CI `Lint` job runs
+it as an advisory step that does not fail the job.
 
 ## 3. `make vm-test`: the native Linux suite
 
@@ -159,7 +177,7 @@ on a Linux x86-64 host (Ubuntu 24.04 is what CI uses):
 sudo apt-get install -y build-essential flex bison libelf-dev libssl-dev bc cpio kmod \
   qemu-system-x86 qemu-utils python3-pip python3-venv udev \
   e2fsprogs btrfs-progs xfsprogs sqlite3 git dmsetup acl
-python3 -m pip install --user "virtme-ng==1.41"
+python3 -m pip install --user --require-hashes -r vm/kasan-requirements.txt   # virtme-ng 1.41
 export PATH="$HOME/.local/bin:$PATH"
 
 # 2. Kernel source, pinned and verified (values from kasan.yml)
@@ -213,7 +231,7 @@ the `kasan-evidence` artifact holds the console, `dmesg` and `.config`.
 
 - Kernel code (`layer/`, `kernel/`): Linux kernel style, tabs, 80 columns as a
   guide, explicit bounds and endianness, `checkpatch.pl --no-tree` clean where
-  practical.
+  practical (`make checkpatch`; advisory in CI, baseline in journal 0039).
 - Tools and tests: C11, `-Wall -Wextra -Werror -Wconversion -Wshadow` (the
   `Makefile`'s `WARN`), no warnings silenced to pass the build.
 - Every source file starts with `// SPDX-License-Identifier: GPL-2.0-only` (C
@@ -221,7 +239,7 @@ the `kasan-evidence` artifact holds the console, `dmesg` and `.config`.
   checks the `.c` and `.h` files under `layer/ common/ tools/ tests/ include/`
   (vendored code under `tests/third_party/` keeps its own headers).
 - Shell scripts: POSIX `sh`, `set -eu` where the script is not sourced, pass
-  `shellcheck` (CI runs it on `vm/*.sh`).
+  `shellcheck` (CI runs it on `vm/*.sh` and `scripts/*.sh` through `make lint`).
 - Commit messages and the DCO: see [../CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## 8. What "nothing is tested on Linux by compiling on macOS" means

@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: Labeler
+# Adds area/* labels to pull requests from the paths they change (.github/labeler.yml).
+# pull_request_target is needed so the token can label pull requests from forks. Safe here
+# because nothing from the pull request is checked out or executed: the action reads the
+# list of changed files and the configuration from the base branch through the API.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  label:
+    name: Label by path
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          sync-labels: false

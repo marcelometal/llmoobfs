@@ -55,3 +55,7 @@ Preservação depende de commits e cópias: nenhum disco ou serviço garante ret
 - [0035 — Fase Q2a: `QUERY` por domínio (UAPI v2), partições e regra de homogeneidade](0035-phase-q2a-domain-query.md)
 - [0036 — Fase Q2b: ordenação e cursor no `QUERY2`](0036-phase-q2b-order-cursor.md)
 - [0037 — Fase Q2c: interseção por avanço alternado no `QUERY2`](0037-phase-q2c-leapfrog.md)
+- [0039 — Experiência do desenvolvedor no GitHub: lote 2 (ferramentas)](0039-dx-batch2.md)
+- [0041 — Experiência do desenvolvedor no GitHub: lote 3 (vitrine)](0041-dx-batch3.md)
+- [0045 — Triagem dos 30 alertas abertos do CodeQL](0045-codeql-triage.md)
+- [0046 — Dependências Python do workflow KASAN fixadas por hash](0046-kasan-pip-hashes.md)

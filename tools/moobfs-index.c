@@ -206,9 +206,11 @@ int main(int argc, char **argv)
 	}
 	for (;;) {
 		if (argc >= 5 && !strcmp(argv[1], "--order")) {
+			size_t olen = strlen(argv[2]);
+
 			order_type = parse_type(argv[3]);
-			if (order_type < 0 || strlen(argv[2]) > MOOB_QUERY_NAME_MAX) return 64;
-			strcpy(order_name, argv[2]);
+			if (order_type < 0 || olen >= sizeof order_name) return 64;
+			memcpy(order_name, argv[2], olen + 1);
 			order_desc = !strcmp(argv[4], "desc");
 			argv += 4; argc -= 4;
 		} else if (argc >= 3 && !strcmp(argv[1], "--limit")) {

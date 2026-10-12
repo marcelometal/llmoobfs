@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: First interaction
+# Greets a person's first issue and first pull request with the project's ground rules.
+# pull_request_target lets the token comment on pull requests from forks; nothing from the
+# pull request is checked out or executed.
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  greet:
+    name: Greet first-time contributors
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3.1.0
+        with:
+          issue_message: |
+            Thanks for opening your first issue in MoobFS!
+
+            MoobFS is an experimental kernel module: please do not load it on a host you
+            care about. Reproductions are most useful when they come from `make vm-test`
+            (disposable QEMU VM) and include `build/vm/console.log`. Suspected
+            vulnerabilities belong in a private report (see `SECURITY.md`), not in a public
+            issue. Questions and ideas are also welcome in the
+            [welcome discussion](https://github.com/studiomoob/llmoobfs/discussions/29).
+          pr_message: |
+            Thanks for your first pull request to MoobFS! A few things that help it land
+            (details in `CONTRIBUTING.md`):
+
+            - every commit needs a DCO sign-off (`git commit -s`); the `Lint` job checks it;
+            - run `make test` and `make lint` locally (`make help` lists every target);
+              changes to `layer/`, `kernel/` or `vm/` also need `make vm-test`, which loads
+              the module only inside a disposable VM;
+            - add a journal entry in `docs/history/` and a line in `CHANGELOG.md`, and
+              describe only the tests that actually ran.
+
+            The maintainer reviews and merges. If something in the process is unclear, ask
+            here or in the [welcome discussion](https://github.com/studiomoob/llmoobfs/discussions/29).

@@ -2,43 +2,107 @@
 
 **An experimental native Linux filesystem for LLM memory and context.**
 
-Experimental Linux kernel module (GPL-2.0, no FUSE): a stacked filesystem layer over ext4,
-btrfs or XFS that adds typed xattr attributes, an in-memory index and a `QUERY` ioctl
-authorized by the caller's POSIX credentials. Intended as storage for LLM-agent memory.
-Research project, not for production. First pre-release tag: `v0.1.0-experimental` (source only, no binaries, no support).
+MoobFS is a Linux kernel module (GPL-2.0, no FUSE) that stacks over a directory of ext4, btrfs
+or XFS, validates typed `user.moob.*` attributes on ordinary files and answers attribute queries
+from the kernel, returning only the files the caller is allowed to read. It is a research
+project exploring storage for LLM-agent memory.
 
-[Português](README.pt-BR.md) · [Project site](https://studiomoob.github.io/llmoobfs/) · [FAQ](docs/faq.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md)
+[Português](README.pt-BR.md) · [Project site](https://studiomoob.github.io/llmoobfs/) · [Docs index](docs/README.md) · [FAQ](docs/faq.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md)
 
 [![CI](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml/badge.svg)](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml)
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/studiomoob/llmoobfs/badge)](https://scorecard.dev/viewer/?uri=github.com/studiomoob/llmoobfs)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
 
-> **Experimental status. Pre-release tag only (`v0.1.0-experimental`), not for production use.** Facts verified in this
-> repository as of 2026-10-10:
-> - tested on **one kernel series**, in a VM: Debian 6.12.111 in QEMU (`make vm-test`) and
->   upstream 6.12.112 under KASAN/UBSAN/lockdep (`kasan.yml`); over ext4, btrfs and XFS only;
-> - the attribute index lives **only in RAM**, bounded by `index_budget`, and is rebuilt at
->   every mount;
-> - mounting requires **`CAP_SYS_ADMIN` in the initial user namespace**; user-namespace mounts
->   and idmapped mounts are refused;
-> - the **UAPI v1** (`QUERY`, `GET_INFO`) may change; there is no compatibility promise;
-> - **no performance numbers have been measured** (M4 pending); no speed or efficiency claim is made;
-> - our own tests found and fixed **three kernel-side defects** during development (journals
->   [0015](docs/history/0015-phase-2e-investigation.md) and
->   [0016](docs/history/0016-kasan-lockdep-harness.md)); there has been **no external audit**;
-> - reflink, deduplication and durability come from the lower filesystem, not from MoobFS.
+## See it run
+
+Each top-level directory of the mount is a permission domain. Root tags four memory files with
+a typed attribute; Alice (uid 1001) then queries. She gets her own memory and, in the shared
+`team/` domain, only `style.md`. `salary.md` is missing because a domain indexes only files that
+everyone who can enter the domain can read (the homogeneity rule of
+[spec-query-v2](docs/spec-query-v2.md) §3); being readable by Bob alone, it is outside `team/`'s
+index for every caller, Bob and root included, and private files belong in their own domain.
+Bob's domain and the whole-mount `QUERY` (v1, for administrators) are refused to her:
+
+```text
+# (prepared on the lower ext4: alice/ uid 1001 0700, bob/ uid 1002 0700, team/ 0755)
+# mount -t moobfs_layer -o lower=/lower none /mnt/layer
+# moobfs-attr set /mnt/layer/alice/cache.md kind string decision
+# moobfs-attr set /mnt/layer/bob/deploy.md kind string decision
+# moobfs-attr set /mnt/layer/team/style.md kind string decision
+# moobfs-attr set /mnt/layer/team/salary.md kind string decision
+# moobfs-attr list /lower/alice/cache.md
+kind	string	decision
+# stat -c '%A %u %n' /mnt/layer/team/*
+-rw------- 1002 /mnt/layer/team/salary.md
+-rw-r--r-- 0 /mnt/layer/team/style.md
+# query --uid 1001 /mnt/layer/alice q2 kind eq string decision
+16	cache.md
+# query --uid 1001 /mnt/layer/team q2 kind eq string decision
+18	style.md
+# query --uid 1001 /mnt/layer/bob q2 kind eq string decision
+open: Permission denied
+# query --uid 1001 /mnt/layer kind eq string decision
+MOOB_IOC_QUERY: Operation not permitted
+# query /mnt/layer kind eq string decision
+16	alice/cache.md
+17	bob/deploy.md
+18	team/style.md
+19	team/salary.md
+```
+
+This is real output from `make vm-test` on 2026-10-11 (Debian 6.12.111 in QEMU, ext4 lower): the
+`DEMO| ` lines of `build/vm/console.log` with the prefix removed, and the closing `GET_INFO`
+call left out. Lines starting with `#` are commands run as root. `query` is the test client in
+[`tests/query.c`](tests/query.c), since there is no CLI yet; `--uid 1001` switches to that user
+before the call, and the `q2` form is `MOOB_IOC_QUERY2` on a domain directory. The script is the
+demonstration block of [`vm/suite.sh`](vm/suite.sh).
+
+## Quickstart
+
+With Docker running (on Apple Silicon the VM runs under CPU emulation and takes longer):
+
+```sh
+git clone https://github.com/studiomoob/llmoobfs.git
+cd llmoobfs
+make vm-test                          # builds the tools and modules, boots a disposable QEMU VM
+grep '^DEMO| ' build/vm/console.log   # the session above, from your own run
+```
+
+Never load the modules on your host. Setup details are in [docs/development.md](docs/development.md),
+and what each success marker proves is in [docs/testing.md](docs/testing.md).
+
+> **Experimental. Source pre-release tag only (`v0.1.0-experimental`); not for production.**
+> Facts as of 2026-10-11:
+> - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
+>   KASAN/UBSAN/lockdep; lower filesystems ext4, btrfs and XFS only.
+> - The attribute index lives **in RAM only**, bounded by `index_budget`, rebuilt at every mount.
+> - Mounting needs **`CAP_SYS_ADMIN` in the initial user namespace**; user-namespace and
+>   idmapped mounts are refused.
+> - **UAPI v1 and v2 may change**, with no compatibility promise. With domains on (the default
+>   since phase Q2a), the v1 `QUERY` is for administrators only.
+> - **No speed or efficiency claim.** Only pilot-grade measurements on one cloud VM exist
+>   ([bench/results/](bench/results/README.md)); M4 is not done.
+> - **No external audit.** Our own tests and reviews found and fixed kernel-side defects
+>   (journals [0015](docs/history/0015-phase-2e-investigation.md),
+>   [0016](docs/history/0016-kasan-lockdep-harness.md),
+>   [0035](docs/history/0035-phase-q2a-domain-query.md)).
+> - Reflink, deduplication and durability come from the lower filesystem, not from MoobFS.
 >
-> Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Language policy: code,
-> commits, issues, pull requests and this README are in English; documents under `docs/` may be
-> in Portuguese or English, with ADRs and specifications translated on request.
+> Contributions are welcome ([CONTRIBUTING.md](CONTRIBUTING.md)). Code, commits, issues, pull
+> requests and this README are in English; `docs/` mixes Portuguese and English
+> ([index with languages](docs/README.md)).
 
 ## At a glance
 
 **What it is.** A native Linux kernel module, `moobfs_layer.ko`, mounted as a stacked layer
 over a directory of a mature filesystem (ext4, btrfs or XFS). Memories are ordinary files;
 their metadata are typed extended attributes (`user.moob.*`) that the module validates on
-write and indexes in RAM. A `QUERY` ioctl on the mount root answers conjunctive attribute
-predicates from the kernel, returning only entries the caller could open under POSIX
-permissions and ACLs. Everything stays readable with plain Unix tools without the layer.
+write and indexes in RAM, partitioned by permission domain (by default, each top-level
+directory). A `QUERY2` ioctl on a domain directory answers conjunctive attribute predicates from
+the kernel, returning only files that everyone who can enter the domain may read; the older
+whole-mount `QUERY` checks each result against POSIX permissions and ACLs and, with domains on,
+is for administrators. Everything stays readable with plain Unix tools without the layer.
 A read-only M1 image format with shared physical payloads is kept as a regression.
 
 **What it is not.** Not FUSE and not a daemon: there is no user-space server, socket or
@@ -79,9 +143,11 @@ lower filesystem (ext4, btrfs or XFS): real files, real xattrs, journal, reflink
 
 Writing a memory is an ordinary POSIX write plus `setxattr`; the layer validates the encoding
 (type byte plus payload) before the xattr reaches the lower filesystem and updates its index.
-Finding memories is one `QUERY` call: up to four attribute predicates joined by AND, answered
-from the index, with each result checked against the caller's POSIX permissions and ACLs
-before it is returned; the client then opens the file normally. Unmount the layer and the lower
+Finding memories is one `QUERY2` call on a domain directory: up to four attribute predicates
+joined by AND, answered from that domain's partition of the index after one permission check on
+the directory. A file that not everyone entering the domain may read is left out of the
+partition ([spec-query-v2](docs/spec-query-v2.md) §3). The client then opens the file
+normally. Unmount the layer and the lower
 directory is a plain tree that `grep`, `getfattr`, `git` and `rsync` read without the module.
 Details with source citations: [architecture overview](docs/architecture-overview.md); the
 same flow as a diagram: [site/plan.html](https://studiomoob.github.io/llmoobfs/plan.html#flow).
@@ -107,8 +173,8 @@ as a regression in the same VM.
 | Phase Q2c: leapfrog intersection of equality terms in `QUERY2`; equal to the oracle, plan checked by result order (not yet measured) | [0037](docs/history/0037-phase-q2c-leapfrog.md) | Debian 6.12.111; ext4, btrfs, XFS |
 
 Not implemented: a persistent index, user-namespace or idmapped mounts, batch reads, a change
-cursor, revisions, packaging, a stable UAPI, a CLI, the full xfstests suite, and any
-measurement (M4). See [ROADMAP.md](ROADMAP.md) for the planned and validation-dependent items.
+cursor, revisions, packaging, a stable UAPI, a CLI, the full xfstests suite, and the M4
+measurements (only pilot-grade campaigns exist, in [bench/results/](bench/results/README.md)). See [ROADMAP.md](ROADMAP.md) for the planned and validation-dependent items.
 
 ## Limitations
 
@@ -117,9 +183,9 @@ measurement (M4). See [ROADMAP.md](ROADMAP.md) for the planned and validation-de
 - The index is RAM only, non-pageable, bounded by `index_budget` (default 128 MiB), rebuilt by
   a linear scan at every mount; behaviour near a saturated budget on large trees is untested.
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; no rootless containers.
-- UAPI v1 may change; the `v0.1.0-experimental` tag is a source snapshot, with no binaries, packaging or support.
-- No performance, latency or memory figure exists; no comparison with SQLite, FUSE or the bare
-  lower filesystem may be stated before M4.
+- UAPI v1 and v2 may change; the `v0.1.0-experimental` tag is a source snapshot, with no binaries, packaging or support.
+- Only pilot-grade figures exist (one Azure VM, one dataset seed; journals 0025–0031); no
+  comparison with SQLite, FUSE or the bare lower filesystem may be stated as a result before M4.
 - No external audit, no syzkaller, no full xfstests, no threat-model document yet.
 - `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
   after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
@@ -171,6 +237,7 @@ MOOBFS_VM_PASS: shared extents, independent inodes, reads, readonly, remount, 15
 LAYER_LOWER_PASS: ext4 reflink=no
 LAYER_LOWER_PASS: btrfs reflink=yes
 LAYER_LOWER_PASS: xfs reflink=yes
+DEMO_PASS: QUERY2 per domain, v1 refused to a user, heterogeneous file left out
 MOOBFS_ACCEPTANCE_PASS: git, sqlite wal, memory client, dm-log-writes replay, dm-flakey
 MOOBFS_LAYER_PASS: pass-through over ext4, btrfs and xfs; layer tests; typed attributes and tools; index and QUERY equal to the oracle; fsx 9000 ops each; reflink on btrfs/xfs; nolinks; unload
 ```
@@ -210,6 +277,8 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 ## Documentation map
 
+Every document under `docs/`, with its language, is listed in the [docs index](docs/README.md).
+
 | Question | Document | Language |
 | --- | --- | --- |
 | How is the layer built, with source citations? | [architecture-overview.md](docs/architecture-overview.md) | EN |
@@ -219,6 +288,8 @@ KASAN harness runs the layer suite), and no benchmark exists.
 | What does the M2 layer specify? | [spec-m2.md](docs/spec-m2.md), [kernel-infrastructure.md](docs/kernel-infrastructure.md), [ADR-0007](docs/decisions/0007-stacked-memory-layer.md) | PT |
 | What does M3 specify (identity, isolation, provenance, change cursor, batch reads)? | [spec-m3.md](docs/spec-m3.md) | PT |
 | How will performance be measured? | [benchmark-plan.md](docs/benchmark-plan.md), [benchmark-harness.md](docs/benchmark-harness.md) | PT |
+| What has been measured so far (pilots, not M4)? | [bench/results/](bench/results/README.md); raw archives in the [`bench-evidence`](https://github.com/studiomoob/llmoobfs/releases/tag/bench-evidence) release | EN |
+| What does the domain-scoped `QUERY2` (UAPI v2) specify? | [spec-query-v2.md](docs/spec-query-v2.md) | PT |
 | What is the M1 image format? | [format-m1.md](docs/format-m1.md) | EN |
 | What was the original full MVP proposal? | [native-mvp.md](docs/native-mvp.md) (write interface superseded by ADR-0007) | PT |
 | Why was each decision taken? | [docs/decisions/](docs/decisions/), [technical journal](docs/history/) | PT |

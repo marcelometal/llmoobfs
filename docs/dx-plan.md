@@ -1,7 +1,11 @@
 # Plano de experiência do desenvolvedor no GitHub
 
-Data: 2026-10-11. Estado: proposta aprovada pelo mantenedor; lote 1 em execução (registro
-[0032](history/0032-dx-batch1.md)). Complementa [`community-plan.md`](community-plan.md)
+Data: 2026-10-11. Estado em 2026-10-12: **plano concluído** (seção 4); pendências opcionais e
+repasses na seção 4. Histórico do estado: proposta aprovada pelo mantenedor; lote 1 concluído (registro
+[0032](history/0032-dx-batch1.md)); lote 2 implementado; selo OpenSSF Best Practices "passing" obtido em
+2026-10-12; pendente só a medição em Codespaces (registro [0039](history/0039-dx-batch2.md)); lote 3
+concluído, com as ações do mantenedor aplicadas em 2026-10-12 (registro
+[0041](history/0041-dx-batch3.md)). Complementa [`community-plan.md`](community-plan.md)
 (políticas, templates, CI de lint e DCO) e [`seo-geo-plan.md`](seo-geo-plan.md) (descoberta),
 que já foram executados em grande parte e não são repetidos aqui.
 
@@ -21,7 +25,7 @@ Lacunas encontradas:
 | Tema | Achado | Evidência |
 | --- | --- | --- |
 | Descoberta de tarefas | Issues iniciais usam só `difficulty/good-first-issue`; a página `/contribute` do GitHub, a busca e agregadores (goodfirstissue.dev, up-for-grabs) usam o label exato `good first issue`; `help wanted` não é usado | `gh issue list`, `gh label list` |
-| Releases | Seis pré-releases "Benchmark evidence" aparecem antes de `v0.1.0-experimental`; nenhuma release é "Latest" | `gh release list` |
+| Releases | Seis pré-releases (sete em 2026-10-11) "Benchmark evidence" aparecem antes de `v0.1.0-experimental`; nenhuma release é "Latest" | `gh release list` |
 | Social preview | Imagem gerada pelo GitHub, sem imagem própria | `usesCustomOpenGraphImage: false` |
 | README | O banner de cautelas vem antes de qualquer demonstração; não há quickstart curto nem demo | leitura de `README.md` |
 | Discussions | Zero discussões; nenhuma issue fixada | GraphQL `discussions.totalCount` |
@@ -62,6 +66,16 @@ YAML; nada a corrigir.
 - `checkpatch.pl --no-tree` em `layer/` e `kernel/` no job `Lint`, começando como aviso.
 - Labeler por caminho (`area/*`) e mensagem de primeira contribuição.
 
+Estado em 2026-10-11 (registro [0039](history/0039-dx-batch2.md)):
+
+| Item | Estado |
+| --- | --- |
+| Devcontainer | Arquivo pronto; construído localmente com a CLI de Dev Containers (não é um Codespace). **Pendente**: medir `make vm-test` num Codespace real; até lá, sem botão no README e sem `hostRequirements` |
+| OpenSSF Scorecard | Workflow e badge prontos; só roda em `main` (push e agenda), então o primeiro resultado sai depois do merge. **Pendente (mantenedor)**: inscrição no OpenSSF Best Practices |
+| CodeQL | Workflow com build manual de `make tools attr-tools bench-tools` |
+| `checkpatch.pl` | `make checkpatch`, passo de aviso (`continue-on-error`) no job `Lint`; linha de base: 0 erros e 14 avisos em 7 arquivos |
+| Labeler e primeira contribuição | Workflows prontos; por usarem `pull_request_target`, só passam a valer depois do merge |
+
 ### Lote 3 — Vitrine
 
 - README: quickstart e demonstração (GIF ou asciinema de `QUERY`) antes do banner, que
@@ -73,8 +87,50 @@ YAML; nada a corrigir.
   de evidências ou mover para outro local. **Decisão do mantenedor**; qualquer mudança
   preserva os anexos e é registrada.
 
+Estado em 2026-10-11 (registro [0041](history/0041-dx-batch3.md)). Decisões do mantenedor:
+release única para as evidências; demonstração em texto com saída real, não GIF nem asciinema.
+
+| Item | Estado |
+| --- | --- |
+| README | Frase de abertura, demonstração real (bloco `DEMO| ` de `vm/suite.sh`, `QUERY2` por domínio, gerado por `make vm-test`), quickstart de quatro comandos, aviso experimental integral e compacto logo abaixo, com fatos de 2026-10-11; espelhado no `README.pt-BR.md` |
+| Social preview | `docs/assets/social-preview.{svg,png}` e script de renderização. **Pendente (mantenedor)**: envio em Settings → Social preview |
+| Índice de `docs/` | `docs/README.md` com idioma e descrição de cada documento. **Pendente (mantenedor)**: criar as seis issues de tradução cujos comandos estão no registro 0041 |
+| Evidências de benchmark | Release única `bench-evidence` preparada: texto e manifesto (`bench/evidence-release.md`), `scripts/bench-evidence-release.sh` (simulação testada), links atualizados, regra para novas campanhas. **Pendente (mantenedor)**: `scripts/bench-evidence-release.sh --apply`, antes do merge |
+
 ## 3. Fora do escopo
 
 - Bot de "stale": fecha automaticamente issues de quem chega e não combina com um projeto pequeno.
 - Wiki: a documentação versionada fica em `docs/`.
 - Qualquer alteração em `layer/`, `kernel/` ou no formato.
+
+## 4. Encerramento (2026-10-12)
+
+| Lote | Resultado | Onde |
+| --- | --- | --- |
+| 1 | `make help` e `make lint`, CODEOWNERS, `CITATION.cff`, labels de descoberta, issues fixadas, discussão de boas-vindas (#29), secret scanning e push protection | PR #27, registro [0032](history/0032-dx-batch1.md) |
+| 2 | Devcontainer, OpenSSF Scorecard, CodeQL (30 alertas triados: 14 corrigidos, 21 dispensados com justificativa, nenhum aberto), `checkpatch.pl` como aviso, labeler, saudação de primeira contribuição, token do Actions só leitura, `virtme-ng` instalado por hash no KASAN; selo **OpenSSF Best Practices passing** (projeto 15408) | PRs #30, #42, #44 e #45; registros [0039](history/0039-dx-batch2.md), [0045](history/0045-codeql-triage.md) e [0046](history/0046-kasan-pip-hashes.md) |
+| 3 | README com demonstração real e quickstart, release única `bench-evidence`, social preview (GitHub e `og:image` do site), índice de `docs/` por idioma, issues de tradução #35 a #40 | PRs #33, #41 e o PR deste encerramento; registro [0041](history/0041-dx-batch3.md) |
+
+Primeira contribuição externa: PR #43, de @dfbustosus, tradução de `docs/ai-workflow.md` (issue
+#40, uma das issues abertas no lote 3), mergeado em 2026-10-12 depois de passar pelo labeler, pela
+saudação automática, pelo CODEOWNERS e pela aprovação de CI exigida para quem contribui pela
+primeira vez a partir de um fork.
+
+OpenSSF Scorecard em 2026-10-12, antes de refletir o selo: 6,9. Notas que sobem sozinhas:
+CII-Best-Practices (selo obtido), SAST (commits novos passam pelo CodeQL), Maintained (o
+repositório completa 90 dias). Notas que dependem de pessoas ou de decisão: Code-Review (exige
+aprovação de uma segunda pessoa nos PRs) e Signed-Releases.
+
+Pendências que ficam fora do plano:
+
+- **Opcional, mantenedor:** medir `make vm-test` num Codespace (tempo, disco, máquina mínima)
+  antes de anunciar o botão "Open in Codespaces"; comandos no registro 0039. Usa a cota paga do
+  Codespaces.
+- **Decisão do mantenedor:** assinar as próximas releases (Scorecard Signed-Releases).
+- **Repassadas à sessão da fila Q2**, por mexerem em código ou no harness que ela usa:
+  zerar os 14 avisos do `checkpatch.pl` em `layer/` e `kernel/` e torná-lo obrigatório (item S5
+  de `docs/security-roadmap.md`); corrigir o `qsort(NULL, 0, ...)` de
+  `tools/moobfs-index.c` apontado pelo UBSan (registro 0045); acrescentar `make bench-smoke` com
+  sanitizers ao CI; corrigir em `kasan.yml` a negação `! grep` que não reprova o passo (SC2251,
+  registro 0039).
+

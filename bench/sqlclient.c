@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	snprintf(recname, sizeof recname, "%s.0.rec", out);
-	recf = fopen(recname, "wb");
+	recf = bench_create_out(recname);
 	if (!recf) { perror(recname); return 1; }
 	for (r = 0; r < repeat; r++) {
 		FILE *f = fopen(sqlf, "r");

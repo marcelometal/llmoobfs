@@ -7,8 +7,9 @@ equivalence check because a profiling dataset had been left under the ext4 layer
 (journal 0025); no numbers came from it.
 
 Files as in pilots 2 and 3. Raw records, SQLite databases, manifest and the post-fix `perf.data`:
-`2026-10-11-azure-pilot4-s1-raw.tgz` on the GitHub pre-release `bench-2026-10-11-azure-pilot4-s1`
-(SHA-256 `392a5c76f65e3018bf0f3403830710b9e39dccedacb2bb948129f0be62bbfde5`). The post-fix
+[`2026-10-11-azure-pilot4-s1-raw.tgz`](https://github.com/studiomoob/llmoobfs/releases/download/bench-evidence/2026-10-11-azure-pilot4-s1-raw.tgz) in the GitHub release
+`bench-evidence`
+(SHA-256 `392a5c76f65e3018bf0f3403830710b9e39dccedacb2bb948129f0be62bbfde5`). Originally attached to the pre-release `bench-2026-10-11-azure-pilot4-s1`; that tag remains. The post-fix
 inclusive profile is `../2026-10-11-azure-profile-q7/perf-children-rcu.txt`.
 
 Interpretation in journal 0028: the path walk now stays in RCU-walk, and queries returning many
