@@ -76,6 +76,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 | Document | Lang | What it covers |
 | --- | --- | --- |
 | [security-roadmap.md](security-roadmap.md) | PT (English translation in review) | Security and robustness items S1–S11 (threat model, syzkaller, fuzzing, hardening) |
+| [research-stacked-fs-kernel-rules.md](research-stacked-fs-kernel-rules.md) | EN | Stacked-FS rules from kernel v6.12 primary sources (credentials, locking, lifetime, ioctl/UAPI, xattrs, hostile lower, memory), each with source and MoobFS compliance status |
 | [distribution-strategy.md](distribution-strategy.md) | EN | Proposed deployment model, DKMS packaging, kernel matrix and release stages |
 | [community-plan.md](community-plan.md) | EN | Plan for external contributions (policies, templates, CI); largely executed |
 | [seo-geo-plan.md](seo-geo-plan.md) | EN | Discoverability audit and plan for the README, site and docs |
