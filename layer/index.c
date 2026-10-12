@@ -24,6 +24,8 @@
 #include <linux/limits.h>
 #include <linux/posix_acl.h>
 #include <linux/capability.h>
+#include <linux/random.h>
+#include <linux/siphash.h>
 #include "moobl.h"
 #include "moobfs_attr.h"
 #include "moobfs_ioctl.h"
@@ -791,6 +793,7 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 	xa_init(&ix->inodes);
 	xa_init(&ix->fallback);
 	ix->domain_depth = domain_depth;
+	get_random_bytes(&ix->cursor_key, sizeof(ix->cursor_key));
 	ix->budget = budget;
 	ix->enabled = enabled;
 	ix->initialized = true;
@@ -1081,6 +1084,21 @@ static bool inode_matches_rest(struct moobl_ix_inode *rec, const struct moob_que
 	return true;
 }
 
+/* Ordered scans walk the order attribute: every term is tested on the inode. */
+static bool inode_matches_all(struct moobl_ix_inode *rec, const struct moob_query_term *terms,
+			      u32 nterms)
+{
+	u32 i;
+
+	for (i = 0; i < nterms; i++) {
+		struct moobl_ix_entry *e = entry_find(rec, terms[i].name);
+
+		if (!e || !entry_matches(e, &terms[i]))
+			return false;
+	}
+	return true;
+}
+
 static void fill_result(struct moobl_index *ix, struct moobl_ix_inode *rec,
 			struct moob_query_result *r, char *pathbuf)
 {
@@ -1134,6 +1152,9 @@ static void fill_result(struct moobl_index *ix, struct moobl_ix_inode *rec,
 struct moobl_candidate {
 	u64 ino;
 	char *path;	/* mount-relative, or NULL when unknown */
+	u8 type;	/* scan key of the entry that produced it (QUERY2 cursors) */
+	u16 len;
+	u8 *value;
 };
 
 struct moobl_resume {
@@ -1177,6 +1198,46 @@ static struct rb_node *first_after(struct moobl_ix_name *nm, const struct moobl_
 			best = n;
 			n = n->rb_left;
 		} else {
+			n = n->rb_right;
+		}
+	}
+	return best;
+}
+
+/* Last entry strictly before the resume key (descending scans). */
+static struct rb_node *last_before(struct moobl_ix_name *nm, const struct moobl_resume *r)
+{
+	struct rb_node *n = nm->entries.rb_node, *best = NULL;
+
+	while (n) {
+		struct moobl_ix_entry *e = rb_entry(n, struct moobl_ix_entry, node);
+
+		if (entry_cmp(e, r->type, r->value, r->len, r->ino) < 0) {
+			best = n;
+			n = n->rb_right;
+		} else {
+			n = n->rb_left;
+		}
+	}
+	return best;
+}
+
+/* Ordered scans: the first (ascending) or last (descending) entry of the order type. */
+static struct rb_node *seek_type(struct moobl_ix_name *nm, u8 type, bool desc)
+{
+	struct rb_node *n = nm->entries.rb_node, *best = NULL;
+
+	while (n) {
+		struct moobl_ix_entry *e = rb_entry(n, struct moobl_ix_entry, node);
+		bool go_left = desc ? e->type > type : e->type >= type;
+
+		if (go_left) {
+			if (!desc)
+				best = n;
+			n = n->rb_left;
+		} else {
+			if (desc)
+				best = n;
 			n = n->rb_right;
 		}
 	}
@@ -1243,6 +1304,10 @@ struct moobl_qscope {
 	u64 domain;		/* QUERY2: the domain's homogeneous partition */
 	bool check;		/* authorize each result with the caller's credentials */
 	unsigned int strip;	/* leading path components dropped from mount-relative paths */
+	const char *scan;	/* attribute tree walked: order_by, or terms[0].name */
+	bool ordered;		/* walk the order_type run of scan; test every term */
+	bool desc;
+	u8 otype;
 };
 
 /* Path relative to the scope: the mount-relative path without its first `strip` names. */
@@ -1257,9 +1322,14 @@ static const char *scope_path(const char *path, unsigned int strip)
 	return *path ? path : NULL;
 }
 
+/*
+ * Runs one query. start (may be NULL) resumes strictly after (or, descending, before) a
+ * scan key; last (may be NULL) receives the key of the last result returned.
+ */
 static long query_run(struct super_block *sb, struct file *file,
 		      const struct moob_query_term *terms, u32 nterms, u32 limit, u64 results,
-		      const struct moobl_qscope *sc, u32 *count_out, u32 *truncated_out)
+		      const struct moobl_qscope *sc, const struct moobl_resume *start,
+		      struct moobl_resume *last, u32 *count_out, u32 *truncated_out)
 {
 	struct moobl_index *ix = IX(sb);
 	struct moob_query_result __user *uout = u64_to_user_ptr(results);
@@ -1282,7 +1352,11 @@ static long query_run(struct super_block *sb, struct file *file,
 		err = -ENOMEM;
 		goto out;
 	}
-	resume->pdomain = sc->all ? 0 : sc->domain;
+	if (start)
+		*resume = *start;
+	resume->pdomain = sc->all ? resume->pdomain : sc->domain;
+	if (last)
+		last->valid = false;
 	while (!exhausted && !err) {
 		struct moobl_ix_name *nm;
 		struct rb_node *n;
@@ -1290,23 +1364,30 @@ static long query_run(struct super_block *sb, struct file *file,
 		bool more = false;
 
 		down_read(&ix->lock);
-		nm = sc->all ? name_lower_bound(ix, terms[0].name, resume->pdomain, resume->phetero)
-			     : name_find(ix, terms[0].name, sc->domain, false);
+		nm = sc->all ? name_lower_bound(ix, sc->scan, resume->pdomain, resume->phetero)
+			     : name_find(ix, sc->scan, sc->domain, false);
 		if (nm && (nm->domain != resume->pdomain || nm->hetero != resume->phetero)) {
 			resume->pdomain = nm->domain;	/* the partition we stopped in is gone */
 			resume->phetero = nm->hetero;
 			resume->valid = false;
 		}
-		n = !nm ? NULL : resume->valid ? first_after(nm, resume) : seek_first(nm, &terms[0]);
+		if (!nm)
+			n = NULL;
+		else if (resume->valid)
+			n = sc->desc ? last_before(nm, resume) : first_after(nm, resume);
+		else
+			n = sc->ordered ? seek_type(nm, sc->otype, sc->desc) : seek_first(nm, &terms[0]);
 		while (nm && !err) {
-			struct moobl_ix_entry *e;
+			struct moobl_ix_entry *e = n ? rb_entry(n, struct moobl_ix_entry, node) : NULL;
+			bool end = !e || (sc->ordered ? e->type != sc->otype : past_end(e, &terms[0]));
+			bool match;
 
-			if (!n || past_end(rb_entry(n, struct moobl_ix_entry, node), &terms[0])) {
+			if (end) {
 				struct rb_node *next = sc->all ? rb_next(&nm->node) : NULL;
 				struct moobl_ix_name *nx = next ? rb_entry(next, struct moobl_ix_name, node)
 								: NULL;
 
-				if (!nx || strcmp(nx->name, terms[0].name))
+				if (!nx || strcmp(nx->name, sc->scan))
 					break;
 				nm = nx;	/* v1: next partition of the same name */
 				resume->pdomain = nm->domain;
@@ -1315,18 +1396,23 @@ static long query_run(struct super_block *sb, struct file *file,
 				n = seek_first(nm, &terms[0]);
 				continue;
 			}
-			e = rb_entry(n, struct moobl_ix_entry, node);
 			resume->valid = true;
 			resume->type = e->type;
 			resume->len = e->len;
 			resume->ino = e->owner->ino;
 			memcpy(resume->value, e->value, e->len);
-			n = rb_next(n);
-			if (!entry_matches(e, &terms[0]) || !inode_matches_rest(e->owner, terms, nterms))
+			n = sc->desc ? rb_prev(n) : rb_next(n);
+			if (sc->ordered)
+				match = inode_matches_all(e->owner, terms, nterms);
+			else
+				match = entry_matches(e, &terms[0]) &&
+					inode_matches_rest(e->owner, terms, nterms);
+			if (!match)
 				continue;
 			fill_result(ix, e->owner, &tmp, pathbuf);
 			cand[ncand].ino = tmp.ino;
 			cand[ncand].path = NULL;
+			cand[ncand].value = NULL;
 			if (!(tmp.flags & MOOB_RES_PATH_UNKNOWN)) {
 				const char *rel = scope_path(tmp.path, sc->strip);
 
@@ -1335,6 +1421,15 @@ static long query_run(struct super_block *sb, struct file *file,
 					if (!cand[ncand].path)
 						err = -ENOMEM;
 				}
+			}
+			if (last) {
+				cand[ncand].type = e->type;
+				cand[ncand].len = e->len;
+				cand[ncand].value = kmalloc(max_t(u16, e->len, 1), GFP_ATOMIC);
+				if (cand[ncand].value)
+					memcpy(cand[ncand].value, e->value, e->len);
+				else
+					err = -ENOMEM;
 			}
 			ncand++;
 			if (ncand == MOOBL_QUERY_CHUNK) {
@@ -1362,22 +1457,34 @@ static long query_run(struct super_block *sb, struct file *file,
 					} else {
 						one->flags = MOOB_RES_PATH_UNKNOWN;
 					}
-					if (copy_to_user(&uout[count], one, sizeof(*one)))
+					if (copy_to_user(&uout[count], one, sizeof(*one))) {
 						err = -EFAULT;
-					else
+					} else {
 						count++;
+						if (last) {
+							last->valid = true;
+							last->type = cand[i].type;
+							last->len = cand[i].len;
+							last->ino = cand[i].ino;
+							memcpy(last->value, cand[i].value, cand[i].len);
+						}
+					}
 				}
 			}
 			kfree(cand[i].path);
 			cand[i].path = NULL;
+			kfree(cand[i].value);
+			cand[i].value = NULL;
 		}
 	}
 	*count_out = count;
 	*truncated_out = truncated;
 out:
 	if (cand)
-		for (i = 0; i < MOOBL_QUERY_CHUNK; i++)
+		for (i = 0; i < MOOBL_QUERY_CHUNK; i++) {
 			kfree(cand[i].path);
+			kfree(cand[i].value);
+		}
 	kfree(cand);
 	kfree(resume);
 	if (pathbuf)
@@ -1410,9 +1517,10 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 	}
 	for (i = 0; i < q->nterms && !err; i++)
 		err = term_check(&q->terms[i]);
+	sc.scan = q->terms[0].name;
 	if (!err)
-		err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, &q->count,
-				&q->truncated);
+		err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, NULL, NULL,
+				&q->count, &q->truncated);
 	if (!err && copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 out:
@@ -1431,18 +1539,148 @@ static bool all_zero(const void *p, size_t n)
 }
 
 /*
+ * QUERY2 cursor (docs/spec-query-v2.md §4.1): the scan key of the last result returned,
+ * a hash of the query (domain, fallback state, order and terms; not the limit) and a MAC,
+ * both keyed with a per-mount random key, so a cursor from another mount or query, a
+ * corrupted one, or one issued before the domain fell back is refused with ESTALE. Values
+ * longer than the inline space are recovered from the inode's current entry and must
+ * still agree with the stored prefix and length.
+ */
+#define MOOBL_CURSOR_MAGIC 0xc2
+#define MOOBL_CURSOR_INLINE 96
+
+struct moobl_cursor {
+	u8 magic;
+	u8 type;
+	u16 len;
+	u8 pad[4];
+	u64 ino;
+	u64 qhash;
+	u8 value[MOOBL_CURSOR_INLINE];
+	u64 mac;
+} __packed;
+
+struct moobl_qhash_head {
+	u64 domain;
+	u8 fallback;
+	u8 order;
+	u8 order_type;
+	u8 pad;
+	u32 nterms;
+	char order_by[MOOB_QUERY_NAME_MAX + 1];
+};
+
+static int query_hash(struct moobl_index *ix, const struct moob_query2 *q, u64 domain,
+		      bool fallback, u64 *out)
+{
+	size_t tsz = (size_t)q->nterms * sizeof(q->terms[0]);
+	struct moobl_qhash_head *h = kzalloc(sizeof(*h) + tsz, GFP_KERNEL);
+
+	if (!h)
+		return -ENOMEM;
+	h->domain = domain;
+	h->fallback = fallback;
+	h->order = q->order;
+	h->order_type = q->order_type;
+	h->nterms = q->nterms;
+	memcpy(h->order_by, q->order_by, sizeof(h->order_by));
+	memcpy(h + 1, q->terms, tsz);
+	*out = siphash(h, sizeof(*h) + tsz, &ix->cursor_key);
+	kfree(h);
+	return 0;
+}
+
+static void cursor_encode(struct moobl_index *ix, u8 *out, const struct moobl_resume *r,
+			  u64 qhash)
+{
+	struct moobl_cursor c;
+
+	BUILD_BUG_ON(sizeof(c) != MOOB_QUERY2_CURSOR);
+	memset(&c, 0, sizeof(c));
+	c.magic = MOOBL_CURSOR_MAGIC;
+	c.type = r->type;
+	c.len = r->len;
+	c.ino = r->ino;
+	c.qhash = qhash;
+	memcpy(c.value, r->value, min_t(u16, r->len, MOOBL_CURSOR_INLINE));
+	c.mac = siphash(&c, offsetof(struct moobl_cursor, mac), &ix->cursor_key);
+	memcpy(out, &c, sizeof(c));
+}
+
+static int cursor_decode(struct moobl_index *ix, const u8 *in, u64 qhash, const char *scan,
+			 const struct moobl_qscope *sc, struct moobl_resume *r)
+{
+	struct moobl_cursor c;
+
+	memcpy(&c, in, sizeof(c));
+	if (c.magic != MOOBL_CURSOR_MAGIC ||
+	    c.mac != siphash(&c, offsetof(struct moobl_cursor, mac), &ix->cursor_key) ||
+	    c.qhash != qhash || c.len > MOOB_QUERY_VALUE_MAX ||
+	    (sc->ordered && c.type != sc->otype))
+		return -ESTALE;
+	r->valid = true;
+	r->type = c.type;
+	r->len = c.len;
+	r->ino = c.ino;
+	if (c.len <= MOOBL_CURSOR_INLINE) {
+		memcpy(r->value, c.value, c.len);
+	} else {
+		struct moobl_ix_inode *rec;
+		struct moobl_ix_entry *e = NULL;
+		int err = -ESTALE;
+
+		down_read(&ix->lock);
+		rec = xa_load(&ix->inodes, c.ino);
+		if (rec)
+			e = entry_find(rec, scan);
+		if (e && e->type == c.type && e->len == c.len &&
+		    !memcmp(e->value, c.value, MOOBL_CURSOR_INLINE)) {
+			memcpy(r->value, e->value, e->len);
+			err = 0;
+		}
+		up_read(&ix->lock);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+static int order_check(const struct moob_query2 *q)
+{
+	size_t n = strnlen(q->order_by, sizeof(q->order_by));
+
+	if (!n)
+		return (q->order || q->order_type || !q->nterms) ? -EINVAL : 0;
+	if (n == sizeof(q->order_by) || !moob_attr_name_ok(q->order_by, n))
+		return -EINVAL;
+	if (q->order != MOOB_ORDER_ASC && q->order != MOOB_ORDER_DESC)
+		return -EINVAL;
+	switch (q->order_type) {
+	case MOOB_T_STRING:
+	case MOOB_T_INT64:
+	case MOOB_T_DOUBLE:
+	case MOOB_T_TIME:
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
+/*
  * QUERY2 on a domain directory (docs/spec-query-v2.md §4): the caller must be able to read
  * and traverse the domain directory now; results come from the domain's homogeneous
  * partition without per-result checks, unless a permission change inside the domain made
- * it fall back to them.
+ * it fall back to them. With order_by the attribute's entries of order_type are walked in
+ * the requested direction; a cursor resumes after the last result of a previous call.
  */
 static long do_query2(struct super_block *sb, struct file *file, void __user *arg)
 {
 	struct moobl_index *ix = IX(sb);
 	struct moobl_qscope sc = { 0 };
+	struct moobl_resume *start = NULL, *last = NULL;
 	struct moob_query2 *q;
 	unsigned int depth;
-	u64 domain;
+	u64 domain, qhash;
 	u32 i;
 	long err = 0;
 
@@ -1459,13 +1697,13 @@ static long do_query2(struct super_block *sb, struct file *file, void __user *ar
 	q = memdup_user(arg, sizeof(*q));
 	if (IS_ERR(q))
 		return PTR_ERR(q);
-	if (q->version != MOOB_QUERY2_VERSION || !q->nterms || q->nterms > MOOB_QUERY_MAX_TERMS ||
-	    !q->limit || q->limit > MOOB_QUERY_MAX_LIMIT || q->flags || q->order ||
-	    !all_zero(q->order_by, sizeof(q->order_by)) || !all_zero(q->pad, sizeof(q->pad)) ||
-	    !all_zero(q->cursor, sizeof(q->cursor)) || !all_zero(q->reserved, sizeof(q->reserved))) {
+	if (q->version != MOOB_QUERY2_VERSION || q->nterms > MOOB_QUERY_MAX_TERMS ||
+	    !q->limit || q->limit > MOOB_QUERY_MAX_LIMIT || q->flags ||
+	    !all_zero(q->pad, sizeof(q->pad)) || !all_zero(q->reserved, sizeof(q->reserved))) {
 		err = -EINVAL;
 		goto out;
 	}
+	err = order_check(q);
 	for (i = 0; i < q->nterms && !err; i++)
 		err = term_check(&q->terms[i]);
 	if (err)
@@ -1473,11 +1711,36 @@ static long do_query2(struct super_block *sb, struct file *file, void __user *ar
 	sc.domain = domain;
 	sc.strip = depth;
 	sc.check = xa_load(&ix->fallback, (unsigned long)domain) != NULL;
-	err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, &q->count,
-			&q->truncated);
-	if (!err && copy_to_user(arg, q, sizeof(*q)))
+	sc.ordered = q->order_by[0] != '\0';
+	sc.desc = q->order == MOOB_ORDER_DESC;
+	sc.otype = q->order_type;
+	sc.scan = sc.ordered ? q->order_by : q->terms[0].name;
+	err = query_hash(ix, q, domain, sc.check, &qhash);
+	if (err)
+		goto out;
+	start = kzalloc(sizeof(*start), GFP_KERNEL);
+	last = kzalloc(sizeof(*last), GFP_KERNEL);
+	if (!start || !last) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (!all_zero(q->cursor, sizeof(q->cursor))) {
+		err = cursor_decode(ix, q->cursor, qhash, sc.scan, &sc, start);
+		if (err)
+			goto out;
+	}
+	err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, start, last,
+			&q->count, &q->truncated);
+	if (err)
+		goto out;
+	memset(q->cursor, 0, sizeof(q->cursor));
+	if (q->truncated && last->valid)
+		cursor_encode(ix, q->cursor, last, qhash);
+	if (copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 out:
+	kfree(start);
+	kfree(last);
 	kfree(q);
 	return err;
 }

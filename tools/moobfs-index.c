@@ -4,13 +4,15 @@
  * reads every typed attribute with the shared encoding and answers the same
  * conjunctive queries, printing "<ino>\t<path>" lines sorted by inode number.
  *
- *   moobfs-index [--uid N] [--domain] <dir> <name> <op> <type> <value> [... up to 4 terms]
+ *   moobfs-index [--uid N] [--domain] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]
  * --uid N drops privileges first, so the walk sees only what that user may reach.
  * --domain treats <dir> as a domain directory (docs/spec-query-v2.md §3): its own
  * attributes are left out, and an entry is listed only when it passes the homogeneity
  * rule, evaluated here independently of the kernel from mode bits, owner, group, link
  * count and the presence of an access ACL on <dir>, every directory below it on the way,
  * and the entry itself.
+ * --order lists only entries whose NAME attribute has TYPE, sorted by (value, ino) ascending
+ * or descending (the QUERY2 order); terms may then be empty. --limit keeps the first N.
  */
 #define _GNU_SOURCE
 #include <ftw.h>
@@ -74,9 +76,12 @@ static int homogeneous(const char *path, const struct stat *st)
 	return reach_ok(path, st, 1);
 }
 
-struct hit { uint64_t ino; char *path; };
+struct hit { uint64_t ino; char *path; ma_u8 *ov; size_t olen; };
 static struct hit *hits;
 static size_t nhits, cap;
+static char order_name[MOOB_QUERY_NAME_MAX + 1];
+static int order_type, order_desc;
+static long out_limit = -1;
 
 static int value_cmp(int type, const ma_u8 *a, size_t alen, const ma_u8 *b, size_t blen)
 {
@@ -140,6 +145,17 @@ static int visit(const char *path, const struct stat *sb, int flag, struct FTW *
 	for (i = 0; i < nterms; i++)
 		if (!term_matches(path, &terms[i]))
 			return 0;
+	ma_u8 ov[MOOB_ATTR_VALUE_MAX + 1];
+	ssize_t on = 0;
+
+	if (order_name[0]) {
+		char full[MOOB_ATTR_PREFIX_LEN + MOOB_QUERY_NAME_MAX + 1];
+
+		snprintf(full, sizeof full, "%s%s", MOOB_ATTR_PREFIX, order_name);
+		on = lgetxattr(path, full, ov, sizeof ov);
+		if (on <= 0 || moob_attr_validate(ov, (size_t)on) != MOOB_ATTR_OK || ov[0] != order_type)
+			return 0;
+	}
 	if (nhits == cap) {
 		cap = cap ? cap * 2 : 64;
 		hits = realloc(hits, cap * sizeof *hits);
@@ -147,6 +163,14 @@ static int visit(const char *path, const struct stat *sb, int flag, struct FTW *
 	}
 	hits[nhits].ino = sb->st_ino;
 	hits[nhits].path = strdup(path + root_len + (path[root_len] == '/'));
+	hits[nhits].ov = NULL;
+	hits[nhits].olen = 0;
+	if (on > 0) {
+		hits[nhits].olen = (size_t)on - 1;
+		hits[nhits].ov = malloc((size_t)on);
+		if (!hits[nhits].ov) return 1;
+		memcpy(hits[nhits].ov, ov + 1, (size_t)on - 1);
+	}
 	nhits++;
 	return 0;
 }
@@ -155,6 +179,16 @@ static int by_ino(const void *a, const void *b)
 {
 	const struct hit *x = a, *y = b;
 	return x->ino < y->ino ? -1 : x->ino > y->ino;
+}
+
+static int by_order(const void *a, const void *b)
+{
+	const struct hit *x = a, *y = b;
+	int c = value_cmp(order_type, x->ov, x->olen, y->ov, y->olen);
+
+	if (!c)
+		c = x->ino < y->ino ? -1 : x->ino > y->ino;
+	return order_desc ? -c : c;
 }
 
 int main(int argc, char **argv)
@@ -170,12 +204,28 @@ int main(int argc, char **argv)
 		domain_mode = 1;
 		argv++; argc--;
 	}
-	if (argc < 6) {
-		fprintf(stderr, "usage: moobfs-index [--uid N] [--domain] <dir> <name> <op> <type> <value> [...]\n");
+	for (;;) {
+		if (argc >= 5 && !strcmp(argv[1], "--order")) {
+			size_t olen = strlen(argv[2]);
+
+			order_type = parse_type(argv[3]);
+			if (order_type < 0 || olen >= sizeof order_name) return 64;
+			memcpy(order_name, argv[2], olen + 1);
+			order_desc = !strcmp(argv[4], "desc");
+			argv += 4; argc -= 4;
+		} else if (argc >= 3 && !strcmp(argv[1], "--limit")) {
+			out_limit = strtol(argv[2], NULL, 10);
+			argv += 2; argc -= 2;
+		} else {
+			break;
+		}
+	}
+	if (argc < (order_name[0] ? 2 : 6)) {
+		fprintf(stderr, "usage: moobfs-index [--uid N] [--domain] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]\n");
 		return 64;
 	}
 	nterms = parse_terms(argc, argv, 2, terms);
-	if (nterms < 1) {
+	if (nterms < (order_name[0] ? 0 : 1)) {
 		fprintf(stderr, "moobfs-index: invalid query terms\n");
 		return 65;
 	}
@@ -191,7 +241,9 @@ int main(int argc, char **argv)
 		perror("nftw");
 		return 1;
 	}
-	qsort(hits, nhits, sizeof *hits, by_ino);
+	qsort(hits, nhits, sizeof *hits, order_name[0] ? by_order : by_ino);
+	if (out_limit >= 0 && (size_t)out_limit < nhits)
+		nhits = (size_t)out_limit;
 	for (i = 0; i < nhits; i++)
 		printf("%" PRIu64 "\t%s\n", hits[i].ino, hits[i].path);
 	return 0;

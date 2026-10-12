@@ -8,6 +8,7 @@
 #include <linux/rwsem.h>
 #include <linux/path.h>
 #include <linux/cred.h>
+#include <linux/siphash.h>
 
 #define MOOBL_SUPER_MAGIC 0x4d4f4f42	/* "MOOB" */
 #define MOOBL_NAME "moobfs_layer"
@@ -27,6 +28,7 @@ struct moobl_index {
 	unsigned int domain_depth;	/* depth of domain directories below the root; 0: off */
 	struct xarray fallback;		/* domain ino -> value: answer with per-result checks */
 	u32 hetero_count;		/* indexed inodes failing the homogeneity rule */
+	siphash_key_t cursor_key;	/* per-mount key authenticating QUERY2 cursors */
 };
 
 struct moobl_sb {

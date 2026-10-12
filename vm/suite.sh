@@ -294,6 +294,53 @@ run_lower() {
     q2cmp 1001 da 5 remount-a
     q2cmp 1002 db 3 remount-b
     q2cmp 1002 dshared 2 remount-shared
+    # QUERY2 ordering and cursor (phase Q2b, spec test 7): 30 files in domain da with a time
+    # attribute (ties included), two of them with an int64 under the same name, and string
+    # titles, ten of them longer than the cursor's inline space
+    long=$(head -c 100 /dev/zero | tr '\0' x)
+    for i in $(seq 1 30); do
+        f=$LAYER/da/o$i.md; echo "o $i" > $f
+        if [ $i -ge 29 ]; then t="int64"; else t="time"; fi
+        $BIN/moobfs-attr set $f created $t $(( (i % 10) * 1000 )) >/dev/null || fail "q2b-attr-$fs"
+        [ $((i % 2)) -eq 1 ] && { $BIN/moobfs-attr set $f kind string note >/dev/null || fail "q2b-kind-$fs"; }
+        if [ $i -le 10 ]; then ti="$long$((40 - i))"; else ti="t$i"; fi
+        $BIN/moobfs-attr set $f title string "$ti" >/dev/null || fail "q2b-title-$fs"
+        chown 1001:1001 $f && chmod 0600 $f || fail "q2b-mode-$fs"
+    done
+    q2ord() {   # tag expected-count query-options... -- oracle-options...
+        tag=$1; want=$2; shift 2
+        kq=""; while [ "$1" != "--" ]; do kq="$kq $1"; shift; done; shift
+        # shellcheck disable=SC2086
+        $BIN/query --uid 1001 $LAYER/da q2 $kq > /tmp/k.txt || fail "q2b-query-$tag-$fs"
+        # shellcheck disable=SC2086
+        $BIN/moobfs-index --domain "$@" > /tmp/o.txt || fail "q2b-oracle-$tag-$fs"
+        cmp -s /tmp/k.txt /tmp/o.txt || { echo "kernel:"; cat /tmp/k.txt; echo "oracle:"; cat /tmp/o.txt; fail "q2b-mismatch-$tag-$fs"; }
+        [ "$(wc -l < /tmp/k.txt)" -eq $want ] || { cat /tmp/k.txt; fail "q2b-count-$tag-$fs"; }
+    }
+    q2ord asc 28 --order created time asc -- --order created time asc $LOWER/da
+    q2ord desc 28 --order created time desc -- --order created time desc $LOWER/da
+    q2ord int64 2 --order created int64 desc -- --order created int64 desc $LOWER/da
+    q2ord top5 5 --order created time desc --limit 5 kind eq string note -- --order created time desc --limit 5 $LOWER/da kind eq string note
+    q2ord pages-desc 14 --order created time desc --limit 4 --pages kind eq string note -- --order created time desc $LOWER/da kind eq string note
+    q2ord pages-asc 28 --order created time asc --limit 1 --pages -- --order created time asc $LOWER/da
+    q2ord pages-long 30 --order title string asc --limit 3 --pages -- --order title string asc $LOWER/da
+    q2ord pages-long-desc 30 --order title string desc --limit 4 --pages -- --order title string desc $LOWER/da
+    q2ord range 8 --order created time asc --pages --limit 2 created ge time 7000 -- --order created time asc $LOWER/da created ge time 7000
+    q2ord unordered-pages 20 --limit 3 --pages kind eq string note -- $LOWER/da kind eq string note
+    # cursors: the same query continues; another query, a remount or a fallback refuses it
+    $BIN/query --uid 1001 $LAYER/da q2 --limit 3 --cursor-out /tmp/c1 kind eq string note > /dev/null 2>&1 || fail "q2b-cursor-out-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/da q2errno --limit 3 --cursor-in /tmp/c1 kind eq string note)" = "q2 0" ] || fail "q2b-cursor-same-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/da q2errno --limit 9 --cursor-in /tmp/c1 kind eq string note)" = "q2 0" ] || fail "q2b-cursor-other-limit-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/da q2errno --cursor-in /tmp/c1 kind exists x x)" = "q2 116" ] || fail "q2b-cursor-other-query-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/da q2errno --cursor-in /tmp/c1 --order created time asc kind eq string note)" = "q2 116" ] || fail "q2b-cursor-other-order-$fs"
+    chmod 0700 $LAYER/da/sub || fail "q2b-fallback-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/da q2errno --limit 3 --cursor-in /tmp/c1 kind eq string note)" = "q2 116" ] || fail "q2b-cursor-fallback-$fs"
+    q2ord fallback-pages 14 --order created time desc --limit 4 --pages kind eq string note -- --order created time desc $LOWER/da kind eq string note
+    $BIN/query --uid 1001 $LAYER/da q2 --limit 3 --cursor-out /tmp/c1 kind eq string note > /dev/null 2>&1 || fail "q2b-cursor-out2-$fs"
+    umount $LAYER && mount -t moobfs_layer -o lower=$LOWER none $LAYER || fail "q2b-remount-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/da q2errno --limit 3 --cursor-in /tmp/c1 kind eq string note)" = "q2 116" ] || fail "q2b-cursor-remount-$fs"
+    q2ord remount-pages 30 --order title string desc --limit 7 --pages -- --order title string desc $LOWER/da
+    echo "QUERY2_ORDER_PASS: $fs"
     echo "kind eq string note" > /tmp/q2q.txt
     $BIN/bench-load --workload W3 --target $LAYER/da --root $LAYER/da --query2 1 --uid 1001 --queries /tmp/q2q.txt --repeat 3 --out /tmp/q2w3 || fail "q2-bench-w3-$fs"
     rm -rf $LAYER/da $LAYER/db $LAYER/dshared || fail "q2-cleanup-$fs"

@@ -5,9 +5,15 @@
  *   --uid N drops privileges to uid/gid N before opening, to test isolation.
  *   query <mount> info                               prints GET_INFO fields
  *   query <mount> invalid                            checks that malformed requests are refused
- *   query [--uid N] <domain-dir> q2 <terms...>       QUERY2 on a domain directory (paths relative to it)
+ *   query [--uid N] <domain-dir> q2 [opts] <terms...>  QUERY2 on a domain directory (paths relative
+ *                                                    to it); sorted by ino unless --order is given
+ *     opts: --order NAME TYPE asc|desc   order by an attribute (terms may then be empty)
+ *           --limit N                    results per call (default 4096)
+ *           --pages                      follow the cursor until the answer is complete
+ *           --cursor-in FILE             start from a cursor saved by --cursor-out
+ *           --cursor-out FILE            save the cursor returned by the (first) call
  *   query <domain-dir> q2invalid                     malformed QUERY2 requests are refused
- *   query [--uid N] <dir> q2errno <terms...>         prints the errno of QUERY2 (0 on success)
+ *   query [--uid N] <dir> q2errno [opts] <terms...>  prints the errno of QUERY2 (0 on success)
  *   query [--uid N] <x> rename <old> <new>           prints the errno of rename(2) (0 on success)
  *   query [--uid N] <mount> race <seconds>           repeats QUERY kind eq note while another
  *                                                    process changes modes, names and inodes;
@@ -75,23 +81,68 @@ int main(int argc, char **argv)
 
 	if (!strcmp(argv[2], "q2") || !strcmp(argv[2], "q2errno")) {
 		struct moob_query2 q2;
-		int n, r;
-		__u32 i;
+		struct moob_query_result *all = NULL;
+		const char *cin = NULL, *cout = NULL;
+		size_t nall = 0;
+		int n, r, k = 3, pages = 0, first = 1, errmode = !strcmp(argv[2], "q2errno");
+		__u32 i, limit = MOOB_QUERY_MAX_LIMIT;
 
 		memset(&q2, 0, sizeof q2);
-		n = parse_terms(argc, argv, 3, q2.terms);
-		if (n < 1) { fprintf(stderr, "query: invalid terms\n"); return 65; }
+		while (k < argc && !strncmp(argv[k], "--", 2)) {
+			if (!strcmp(argv[k], "--order") && k + 3 < argc) {
+				int t = parse_type(argv[k + 2]);
+				size_t olen = strlen(argv[k + 1]);
+
+				if (t < 0 || olen >= sizeof q2.order_by) return 65;
+				memcpy(q2.order_by, argv[k + 1], olen + 1);
+				q2.order_type = (__u8)t;
+				q2.order = !strcmp(argv[k + 3], "desc") ? MOOB_ORDER_DESC : MOOB_ORDER_ASC;
+				k += 4;
+			} else if (!strcmp(argv[k], "--limit") && k + 1 < argc) {
+				limit = (__u32)strtoul(argv[k + 1], NULL, 10); k += 2;
+			} else if (!strcmp(argv[k], "--pages")) {
+				pages = 1; k++;
+			} else if (!strcmp(argv[k], "--cursor-in") && k + 1 < argc) {
+				cin = argv[k + 1]; k += 2;
+			} else if (!strcmp(argv[k], "--cursor-out") && k + 1 < argc) {
+				cout = argv[k + 1]; k += 2;
+			} else {
+				fprintf(stderr, "query: bad q2 option %s\n", argv[k]); return 64;
+			}
+		}
+		n = parse_terms(argc, argv, k, q2.terms);
+		if (n < 0) { fprintf(stderr, "query: invalid terms\n"); return 65; }
+		if (cin) {
+			FILE *f = fopen(cin, "rb");
+			if (!f || fread(q2.cursor, 1, sizeof q2.cursor, f) != sizeof q2.cursor) { perror(cin); return 1; }
+			fclose(f);
+		}
 		q2.version = MOOB_QUERY2_VERSION;
 		q2.nterms = (__u32)n;
-		q2.limit = MOOB_QUERY_MAX_LIMIT;
+		q2.limit = limit;
 		q2.results = (__u64)(uintptr_t)res;
-		r = ioctl(fd, MOOB_IOC_QUERY2, &q2);
-		if (!strcmp(argv[2], "q2errno")) { printf("q2 %d\n", r ? errno : 0); return 0; }
-		if (r) { perror("MOOB_IOC_QUERY2"); return 1; }
-		qsort(res, q2.count, sizeof *res, by_ino);
-		for (i = 0; i < q2.count; i++)
-			printf("%" PRIu64 "\t%s%s\n", (uint64_t)res[i].ino, res[i].path,
-			       (res[i].flags & MOOB_RES_PATH_UNKNOWN) ? "?" : "");
+		for (;;) {
+			r = ioctl(fd, MOOB_IOC_QUERY2, &q2);
+			if (errmode) { printf("q2 %d\n", r ? errno : 0); return 0; }
+			if (r) { perror("MOOB_IOC_QUERY2"); return 1; }
+			if (first && cout) {
+				FILE *f = fopen(cout, "wb");
+				if (!f || fwrite(q2.cursor, 1, sizeof q2.cursor, f) != sizeof q2.cursor) { perror(cout); return 1; }
+				fclose(f);
+			}
+			first = 0;
+			all = realloc(all, (nall + q2.count + 1) * sizeof *all);
+			if (!all) return 1;
+			memcpy(all + nall, res, q2.count * sizeof *res);
+			nall += q2.count;
+			if (!q2.truncated || !pages)
+				break;
+		}
+		if (!q2.order_by[0])
+			qsort(all, nall, sizeof *all, by_ino);
+		for (i = 0; i < nall; i++)
+			printf("%" PRIu64 "\t%s%s\n", (uint64_t)all[i].ino, all[i].path,
+			       (all[i].flags & MOOB_RES_PATH_UNKNOWN) ? "?" : "");
 		if (q2.truncated)
 			fprintf(stderr, "query: results truncated\n");
 		return 0;
@@ -113,13 +164,31 @@ int main(int argc, char **argv)
 		Q2BAD(q2.limit = 0);
 		Q2BAD(q2.limit = MOOB_QUERY_MAX_LIMIT + 1);
 		Q2BAD(q2.flags = 1);
-		Q2BAD(strcpy(q2.order_by, "created"));
-		Q2BAD(q2.order = 1);
+		Q2BAD(q2.order = MOOB_ORDER_ASC);			/* order without order_by */
+		Q2BAD(q2.order_type = MOOB_T_INT64);
+		Q2BAD(strcpy(q2.order_by, "created"));			/* order_by without order */
+		Q2BAD(strcpy(q2.order_by, "created"); q2.order = 3; q2.order_type = MOOB_T_TIME);
+		Q2BAD(strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_BOOL);
+		Q2BAD(strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_RAW);
+		Q2BAD(strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = 0);
+		Q2BAD(strcpy(q2.order_by, "Created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_TIME);
+		Q2BAD(memset(q2.order_by, 'a', sizeof q2.order_by); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_TIME);
 		Q2BAD(q2.pad[3] = 1);
-		Q2BAD(q2.cursor[127] = 1);
 		Q2BAD(q2.reserved[3] = 1);
 		Q2BAD(q2.terms[0].reserved[0] = 1);			/* MISSING_OK is a later phase */
 		Q2BAD(strcpy(q2.terms[0].name, "Kind"));
+		/* a cursor not issued by this mount for this query is refused with ESTALE */
+		memset(&q2, 0, sizeof q2); q2.version = MOOB_QUERY2_VERSION; q2.nterms = 1; q2.limit = 10;
+		q2.results = (__u64)(uintptr_t)res; strcpy(q2.terms[0].name, "kind"); q2.terms[0].op = MOOB_OP_EXISTS;
+		q2.cursor[0] = 0xc2; q2.cursor[127] = 1;
+		errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY2, &q2) == -1 && errno == ESTALE);
+		memset(q2.cursor, 0xff, sizeof q2.cursor);
+		errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY2, &q2) == -1 && errno == ESTALE);
+		/* an order attribute that no file carries gives an empty answer, not an error */
+		memset(&q2, 0, sizeof q2); q2.version = MOOB_QUERY2_VERSION; q2.limit = 10;
+		q2.results = (__u64)(uintptr_t)res; strcpy(q2.order_by, "no_such_attr");
+		q2.order = MOOB_ORDER_DESC; q2.order_type = MOOB_T_TIME;
+		CHECK(!ioctl(fd, MOOB_IOC_QUERY2, &q2) && q2.count == 0 && !q2.truncated);
 		/* QUERY2 answers only on a domain directory, never on a subdirectory of it */
 		{
 			char sub_path[4096];

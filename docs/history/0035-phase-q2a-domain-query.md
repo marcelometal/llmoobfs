@@ -85,3 +85,9 @@ depende de um host de medição.
 
 Pull request com KASAN. No host de medição: `bench/timing-v2.sh` (teste 4) e W3 por domínio
 comparado ao registro 0029. Depois, fase Q2b (`order_by` e `cursor`).
+
+## Atualização (2026-10-11)
+
+KASAN e lockdep no CI do pull request 31 (kernel 6.12.112-virtme): `QUERY2_PASS` em ext4,
+btrfs e XFS e `MOOBFS_LAYER_PASS`, sem relatório do KASAN; execução 38170220257. Merge na main
+no mesmo dia.

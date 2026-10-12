@@ -90,6 +90,26 @@ Campos novos em relação à v1:
   cursor de outra consulta, de outra montagem ou após reavaliação da partição devolve `ESTALE`.
 - Resultados: `ino`, `flags` e caminho **relativo ao diretório do domínio**.
 
+**Implementação Q2b (2026-10-11, registro 0036), complementos ao texto acima.**
+
+- O tipo de ordenação é explícito: campo `order_type` (`string`, `int64`, `double` ou `time`),
+  tirado do preenchimento da estrutura, sem mudar o tamanho. Um atributo pode ter entradas de
+  tipos diferentes; só as do tipo pedido entram na ordem. Isso torna "tipo errado" um erro de
+  entrada verificável (`EINVAL`), enquanto `order_by` com um nome válido que nenhum arquivo do
+  domínio tem devolve resposta vazia, e não erro: a ausência de um atributo não é um pedido
+  malformado.
+- Empates no valor são desfeitos pelo número do inode, no mesmo sentido da ordem.
+- O cursor é a chave (tipo, valor, inode) do último resultado entregue, mais um resumo da
+  consulta (domínio, estado de fallback, ordenação e termos; o `limit` pode mudar entre
+  páginas) e um código de autenticação, ambos com uma chave aleatória da montagem. Corrompido,
+  de outra consulta, de outra montagem ou emitido antes de o domínio entrar em fallback:
+  `ESTALE`. Valores de até 96 bytes vão no cursor; os maiores são recuperados da entrada atual
+  do inode, que precisa ainda ter o mesmo tipo, tamanho e prefixo, senão `ESTALE`.
+- A paginação é por chave, como em bancos de dados: entradas criadas, removidas ou com valor
+  alterado entre páginas podem aparecer duas vezes ou não aparecer; as que não mudaram aparecem
+  exatamente uma vez.
+- Sem `order_by`, o cursor também funciona, sobre a ordem de varredura do primeiro termo.
+
 ### 4.2 Autorização
 
 Ao receber a chamada, o kernel verifica `MAY_EXEC | MAY_READ` no diretório do domínio com as

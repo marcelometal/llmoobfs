@@ -14,7 +14,8 @@
  *    result = count, or -EOVERFLOW when the answer was truncated. Query records carry the
  *    line number as the shape (BENCH_QUERY_OP). --uid N runs as that user, to measure the
  *    per-result authorization of a regular caller. --query2 1 issues MOOB_IOC_QUERY2 instead,
- *    with --root naming a domain directory (docs/spec-query-v2.md).
+ *    with --root naming a domain directory (docs/spec-query-v2.md); --order NAME:TYPE:asc|desc
+ *    and --limit N give the ordered "N most recent" shape.
  * W4 rewrites "score" and then sets and removes a "scratch" attribute per memory.
  * W5 (needs --queries and --root): processes 1..N-1 walk their share of the manifest renaming
  *    each memory away and back, then unlinking and recreating it with its attributes, while
@@ -54,7 +55,9 @@
 
 static const char *manifest, *target, *out, *queries, *root, *lower;
 static const char *mount_opts;
-static int use_query2;	/* W3: MOOB_IOC_QUERY2 on --root, a domain directory */	/* extra layer mount options for W6/W7, e.g. domain_depth=0 */
+static int use_query2;	/* W3: MOOB_IOC_QUERY2 on --root, a domain directory */
+static const char *q2_order;	/* W3 v2: NAME:TYPE:asc|desc */
+static unsigned q2_limit = MOOB_QUERY_MAX_LIMIT;	/* extra layer mount options for W6/W7, e.g. domain_depth=0 */
 static int workload, nprocs = 1, repeat = 1, run_uid = -1;
 static FILE *recf;
 static unsigned proc_id;
@@ -317,6 +320,26 @@ static int w5_reader(pid_t *kids, int nkids)
 	return rc;
 }
 
+/* --order NAME:TYPE:asc|desc for W3 with --query2 (an ordered "N most recent" shape). */
+static int q2_order_set(struct moob_query2 *q2)
+{
+	char buf[MOOB_QUERY_NAME_MAX + 32], *t, *d;
+	int type;
+
+	size_t olen = strlen(q2_order);
+
+	if (olen >= sizeof buf) return -1;
+	memcpy(buf, q2_order, olen + 1);
+	t = strchr(buf, ':'); if (!t) return -1; *t++ = 0;
+	d = strchr(t, ':'); if (!d) return -1; *d++ = 0;
+	type = parse_type(t);
+	if (type < 0 || strlen(buf) >= sizeof q2->order_by) return -1;
+	memcpy(q2->order_by, buf, strlen(buf) + 1);
+	q2->order_type = (__u8)type;
+	q2->order = !strcmp(d, "desc") ? MOOB_ORDER_DESC : MOOB_ORDER_ASC;
+	return 0;
+}
+
 static int w3_queries(void)
 {
 	struct moob_query_result *res;
@@ -341,8 +364,9 @@ static int w3_queries(void)
 
 				memset(&q2, 0, sizeof q2);
 				q2.version = MOOB_QUERY2_VERSION; q2.nterms = q.nterms;
-				q2.limit = MOOB_QUERY_MAX_LIMIT; q2.results = (__u64)(uintptr_t)res;
+				q2.limit = q2_limit; q2.results = (__u64)(uintptr_t)res;
 				memcpy(q2.terms, q.terms, sizeof q2.terms);
+				if (q2_order && q2_order_set(&q2)) { result = -EINVAL; t0 = now_ns(); record((int)BENCH_QUERY_OP(i + 1), t0, result); continue; }
 				t0 = now_ns();
 				if (ioctl(fd, MOOB_IOC_QUERY2, &q2)) result = -errno;
 				else result = q2.truncated ? -EOVERFLOW : (int32_t)q2.count;
@@ -516,6 +540,8 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[a], "--lower")) lower = argv[a + 1];
 		else if (!strcmp(argv[a], "--mount-opts")) mount_opts = argv[a + 1];
 		else if (!strcmp(argv[a], "--query2")) use_query2 = atoi(argv[a + 1]);
+		else if (!strcmp(argv[a], "--order")) q2_order = argv[a + 1];
+		else if (!strcmp(argv[a], "--limit")) q2_limit = (unsigned)atoi(argv[a + 1]);
 		else if (!strcmp(argv[a], "--repeat")) repeat = atoi(argv[a + 1]);
 		else if (!strcmp(argv[a], "--uid")) run_uid = atoi(argv[a + 1]);
 		else if (!strcmp(argv[a], "--workload") && argv[a + 1][0] == 'W') workload = atoi(argv[a + 1] + 1);
@@ -525,7 +551,7 @@ int main(int argc, char **argv)
 	    !(workload == 1 || workload == 2 || workload == 3 || workload == 4 || workload == 5 || workload == 6 || workload == 7 || workload == 8) ||
 	    (workload == 3 ? !queries : (workload == 6 || workload == 7) ? (!queries || !lower || repeat < 1) :
 	     workload == 5 ? (!manifest || !queries || !root || nprocs < 2) : !manifest)) {
-		fprintf(stderr, "usage: load --manifest FILE --target DIR --workload W1|W2|W3|W4|W5|W8 --out PREFIX [--procs N] [--queries FILE] [--root DIR] [--uid N] [--query2 1]\n"
+		fprintf(stderr, "usage: load --manifest FILE --target DIR --workload W1|W2|W3|W4|W5|W8 --out PREFIX [--procs N] [--queries FILE] [--root DIR] [--uid N] [--query2 1 [--order NAME:TYPE:asc|desc] [--limit N]]\n"
 				"       load --workload W6|W7 --target MOUNT --lower DIR --queries FILE --out PREFIX [--repeat N] [--mount-opts OPTS]   (root)\n");
 		return 64;
 	}

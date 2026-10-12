@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Phase Q2b (journal 0036): `QUERY2` orders by an attribute (`order_by`, `order`,
+  `order_type`, ties by inode) and pages with an authenticated 128-byte cursor (`ESTALE` for
+  a cursor from another query or mount, corrupt, or issued before a fallback). Oracle
+  `--order`/`--limit`, test client paging, `bench-load --order/--limit`.
 - KASAN workflow: `virtme-ng` 1.41 and its dependencies are installed from
   `vm/kasan-requirements.txt` with `pip --require-hashes` instead of a version-only pin
   (journal 0046; OpenSSF Scorecard Pinned-Dependencies).

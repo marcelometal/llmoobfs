@@ -102,24 +102,33 @@ struct moob_info {
 /*
  * QUERY2 (docs/spec-query-v2.md): issued on an open descriptor of a domain directory.
  * Answers from that domain's partition only; results are paths relative to the domain
- * directory. order_by, order, cursor and per-term flags (terms[i].reserved[0]) are
- * reserved for later phases and must be zero in this version.
+ * directory. With order_by, results come in (value, ino) order of that attribute's entries
+ * of order_type, ascending or descending, and every term is tested on each; without it, in
+ * the scan order of terms[0]. When truncated is set, cursor holds the position after the last
+ * result: sending the same query (any limit) with that cursor continues from there. A cursor
+ * that is corrupt, from another query or mount, or issued before the domain fell back to
+ * per-result checks gives ESTALE. Per-term flags (terms[i].reserved[0]) are reserved for a
+ * later phase and must be zero.
  */
 #define MOOB_QUERY2_VERSION 2U
 #define MOOB_QUERY2_CURSOR 128U
+#define MOOB_ORDER_ASC 1U
+#define MOOB_ORDER_DESC 2U
 
 struct moob_query2 {
 	__u32 version;				/* MOOB_QUERY2_VERSION */
-	__u32 nterms;				/* 1..MOOB_QUERY_MAX_TERMS */
+	__u32 nterms;				/* 1..MOOB_QUERY_MAX_TERMS; 0 only with order_by */
 	__u32 limit;				/* 1..MOOB_QUERY_MAX_LIMIT */
 	__u32 flags;				/* must be 0 */
 	__u64 results;				/* user pointer to struct moob_query_result[limit] */
 	__u32 count;				/* out */
 	__u32 truncated;			/* out */
-	char order_by[MOOB_QUERY_NAME_MAX + 1];	/* must be empty for now */
-	__u8 order;				/* must be 0 for now */
-	__u8 pad[6];
-	__u8 cursor[MOOB_QUERY2_CURSOR];	/* must be zero for now */
+	char order_by[MOOB_QUERY_NAME_MAX + 1];	/* attribute to order by; empty: scan order */
+	__u8 order;				/* MOOB_ORDER_ASC or _DESC with order_by, else 0 */
+	__u8 order_type;			/* string, int64, double or time with order_by, else 0 */
+	__u8 pad[5];				/* must be 0 */
+	__u8 cursor[MOOB_QUERY2_CURSOR];	/* in: zero or a cursor returned by the same query;
+						 * out: next position when truncated, else zero */
 	__u64 reserved[4];			/* must be 0 */
 	struct moob_query_term terms[MOOB_QUERY_MAX_TERMS];
 };
