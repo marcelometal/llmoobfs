@@ -8,6 +8,11 @@
   results per question; `memory_query` p50 14 vs 15 ms in one run.
 - Measurement gaps closed (journal 0055): cold cache, mount time at 60 000 files and write cost,
   `bench/q2-gaps.sh`.
+- **Fix** (journal 0057): renaming a file or directory over a name whose previous file was just
+  deleted failed with `EINVAL` (the atomic "write a temporary file, rename it over" pattern). Found
+  by running ai-memory's own tests on the layer; regression test in `tests/layer.c`.
+- `vm/kasan-local.sh` (journal 0058): the KASAN/lockdep job on a local KVM host, with the kernel
+  built once and cached; 17.5 minutes per run on the benchmark host against about an hour in CI.
 - `docs/references.md` (journal 0053): verified list of the papers, projects and tools MoobFS builds
   on, includes, compares against or used to decide; five citation and license errors corrected in
   the research documents, the fsx notice and `docs/ecosystem.md`.
