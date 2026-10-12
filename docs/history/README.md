@@ -85,3 +85,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0058 — The KASAN job runs locally on a KVM host](0058-kasan-local.md)
 - [0059 — Roadmap brought up to date and work order agreed](0059-roadmap-refresh.md)
 - [0060 — S1: threat and credential model proposed (ADR-0011)](0060-threat-model-adr.md)
+- [0061 — `GET_INFO` counters only for administrators (ADR-0011, F1)](0061-get-info-counters.md)

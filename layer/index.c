@@ -2053,6 +2053,7 @@ static long do_get_info(struct super_block *sb, void __user *arg)
 	struct moobl_index *ix = &sbi->index;
 	struct moob_info info;
 	const char *fs = sbi->lower.dentry->d_sb->s_type->name;
+	bool admin = ns_capable_noaudit(&init_user_ns, CAP_SYS_ADMIN);
 
 	memset(&info, 0, sizeof(info));
 	info.uapi_version = MOOB_UAPI_VERSION;
@@ -2079,15 +2080,19 @@ static long do_get_info(struct super_block *sb, void __user *arg)
 	if (ix->incomplete)
 		info.flags |= MOOB_FLAG_INDEX_INCOMPLETE;
 	info.index_budget = ix->budget;
-	info.index_used = ix->used;
-	info.index_entries = ix->entries;
-	info.index_inodes = ix->inode_count;
 	info.domain_depth = ix->domain_depth;
-	info.heterogeneous = ix->hetero_count;
 	if (ix->domain_depth)
 		info.flags |= MOOB_FLAG_DOMAINS;
+	/* The counters sum every user's memories: administrators only (ADR-0011, F1). */
+	if (admin) {
+		info.flags |= MOOB_FLAG_COUNTERS;
+		info.index_used = ix->used;
+		info.index_entries = ix->entries;
+		info.index_inodes = ix->inode_count;
+		info.heterogeneous = ix->hetero_count;
+	}
 	up_read(&ix->lock);
-	{
+	if (admin) {
 		unsigned long idx;
 		void *v;
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **UAPI change** (journal 0061, ADR-0011 F1): `GET_INFO` fills the index counters only for
+  `CAP_SYS_ADMIN`, flagged by the new `MOOB_FLAG_COUNTERS`; other callers get zeros, because the
+  counters sum every user's memories.
 - ADR-0011 (proposed; journal 0060): threat and credential model of the layer (security roadmap S1),
   with two findings: `GET_INFO` counters cross users (F1) and one index budget for all users (F2).
 - `ROADMAP.md` brought up to date, planned items in the agreed order (journal 0059).

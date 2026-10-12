@@ -114,6 +114,6 @@ domains on, the v1 `QUERY` is limited to `CAP_SYS_ADMIN` (`docs/spec-query-v2.md
 The VM suite, the KASAN/lockdep workflow and the attribute fuzzer are not a
 security audit; no external audit has taken place. The threat and credential
 model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
-(proposed): adversaries, promises, non-promises, unprivileged surfaces and two
+(accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and two
 known findings. [docs/security-roadmap.md](docs/security-roadmap.md) lists
 fstests, syzkaller, hostile-lower handling and the other open items.

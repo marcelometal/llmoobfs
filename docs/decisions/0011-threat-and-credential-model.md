@@ -1,6 +1,6 @@
 # ADR-0011 — Threat and credential model of the stacked layer
 
-Date: 2026-10-12. Status: **proposed**, awaiting the maintainer. Item S1 of
+Date: 2026-10-12. Status: **accepted by the maintainer on 2026-10-12**. Item S1 of
 `docs/security-roadmap.md`; community action 16. Describes the module as implemented on `main`
 (ADR-0007, ADR-0009, phases Q2a to Q2e); where the code and this text disagree, the findings
 below say so and a later step fixes the code, not the text.
@@ -105,14 +105,15 @@ and S7 (fuzzing).
   `fallback_domains`), which sum every user's memories. Polling them shows another user's write
   rate. This contradicts promise 3 and `SECURITY.md` ("including through counts"). Proposed fix:
   the counters only for `CAP_SYS_ADMIN`, zero for others, with the static fields (limits, lower
-  type, capabilities, flags) unchanged; a UAPI note and a test.
+  type, capabilities, flags) unchanged; a UAPI note and a test. **Fixed on 2026-10-12** (journal
+  0061): `MOOB_FLAG_COUNTERS` marks a reply that carries them.
 - **F2 — One budget for all users.** `index_budget` (128 MiB by default) is shared by the mount. A1
   with write access can fill it with attributes; the index is then marked incomplete for everyone
   until remount (`MOOB_FLAG_INDEX_INCOMPLETE`, one `pr_warn`). Not a crash, but a cross-user
   degradation of the query service. Kept as a known limitation under S9 (per-uid or per-domain
   accounting is the candidate); `GET_INFO` and `moobfs-check` make it visible.
 
-## Decision (proposed)
+## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that
 `SECURITY.md`, reviews and the S-items test against. Fix F1 before asking for independent review

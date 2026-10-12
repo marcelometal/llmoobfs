@@ -43,7 +43,7 @@ accepted but may be only partly implemented, and only the journals and
 Key decisions for newcomers: [ADR-0007](decisions/0007-stacked-memory-layer.md) (a stacked layer
 over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-space-index.md)
 (the in-kernel index partitioned by permission domain); for security,
-[ADR-0011](decisions/0011-threat-and-credential-model.md) (threat and credential model, proposed).
+[ADR-0011](decisions/0011-threat-and-credential-model.md) (threat and credential model).
 
 ## Benchmarks (M4)
 

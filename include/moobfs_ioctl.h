@@ -80,6 +80,7 @@ struct moob_query {
 #define MOOB_FLAG_PATHS_STALE 0x4U
 #define MOOB_FLAG_INDEX_INCOMPLETE 0x8U
 #define MOOB_FLAG_DOMAINS 0x10U			/* domain_depth > 0: QUERY2 on domain directories */
+#define MOOB_FLAG_COUNTERS 0x20U		/* the index counters below are filled (CAP_SYS_ADMIN) */
 
 struct moob_info {
 	__u32 uapi_version;
@@ -91,6 +92,11 @@ struct moob_info {
 	__u32 caps;				/* MOOB_CAP_*, advertised from the lower fs type */
 	__u32 flags;				/* MOOB_FLAG_* */
 	__u64 index_budget;			/* bytes */
+	/*
+	 * index_used, index_entries, index_inodes, heterogeneous and fallback_domains sum every
+	 * user's memories, so they are filled only for CAP_SYS_ADMIN (MOOB_FLAG_COUNTERS) and are
+	 * zero for everyone else (ADR-0011, finding F1).
+	 */
 	__u64 index_used;			/* bytes accounted to the index */
 	__u32 index_entries;			/* typed attribute entries indexed */
 	__u32 index_inodes;			/* inodes with at least one typed attribute */
