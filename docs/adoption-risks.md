@@ -1,8 +1,10 @@
 # Adoption risks and what answers each one
 
 Date: 2026-10-12. Status: **proposal**, written for the maintainer's review (journal
-[0067](history/0067-adoption-risks.md)). It lists the risks a client such as ai-memory takes by
+[0067](history/0067-adoption-risks.md)). It lists the risks any agent-memory system takes by
 putting MoobFS under its data, the evidence for each, what already exists, and a proposed answer.
+MoobFS is meant for every system of that kind, not for one client: ai-memory appears below only
+because it is the one client tested so far, and risk 15 is about exactly that.
 It orders work; it does not change the roadmap by itself. [when-not-to-use.md](when-not-to-use.md)
 says who should not adopt the layer today; this document says what would have to be true for that
 list to shrink.
@@ -32,6 +34,7 @@ list to shrink.
 | 12 | Content and attributes are separate writes | contain | The temporary-file, attributes, rename convention | proposed here |
 | 13 | Slower than SQLite on some operations | build + accept | Profile the per-call floor; publish where it loses | M4 |
 | 14 | One maintainer, no outside review | build | Review requests, the KASAN check enforced, a second reviewer | actions 15 and 18 |
+| 15 | The design is fitted to one client | build + contain | A client contract, a second and a third client, client quirks kept out of the layer | proposed here |
 
 ## 1. A module defect takes the host down
 
@@ -278,6 +281,41 @@ statement in `SECURITY.md` of the response time the project actually offers.
 **Residual.** Until a second person can review and release kernel changes, this risk is open, and
 it caps how far risks 1 and 6 can be reduced.
 
+## 15. The design is fitted to one client
+
+**Risk.** MoobFS is meant for any memory system for agents, but every real-client result so far
+comes from ai-memory. Choices made to make that client work (projects as domains at depth 2, the
+six query shapes, `umask 077`, the attribute names of the mirror) can become the design, and a
+second system may then not fit. A related mistake is to read a client's own behaviour as a
+property of the layer, or to change the layer to suit it.
+
+**Evidence.** `research-client-query-patterns.md` read the source of six systems (ai-memory, mem0,
+two generations of Letta, Graphiti, the LangGraph store, OpenAI Agents SDK sessions) and `QUERY2`
+was designed from their common needs: scope by equality, a time range or ordering with a small
+limit, "missing or greater than", and lists handled by batches. Only ai-memory has been run. Two
+findings of stage 2 are that client's own and say nothing about the layer: its write cost grows
+with the store, on plain ext4 as on the layer, because every write checkpoints the whole tree in
+git, and its scheduled maintenance rewrites the workload (journals 0065 and 0068). Not known: how
+many of the other five keep each memory as a file, which the layer requires.
+
+**Answer.**
+
+1. *Build* a client contract, one document that any system can be checked against without reading
+   ai-memory's test plan: memories are files; scope maps to a directory that is a domain;
+   structured fields are typed attributes with a naming convention; the write sequence of risk 12;
+   detection and fallback of risk 5; what stays in the client's own store.
+2. *Build* stage 2 for a second and a third system from the survey, chosen to differ from
+   ai-memory (a different scope depth, a different store). For a system that keeps memories in a
+   database and not in files, first decide and record whether it is in scope at all.
+3. *Contain*: a change to the layer or to the UAPI needs a reason that holds for more than one
+   surveyed system. Client-specific handling goes in that client's adapter or in the library of
+   risk 10, never in `layer/`.
+4. In every journal of a client test, separate what was learnt about the layer from what was learnt
+   about the client.
+
+**Residual.** Until a second client runs, generality is a claim supported by reading code, not by
+a test.
+
 ## Proposed order
 
 1. Risk 1, item 1 and risk 4: the two fixes from the review (small, both against stated promises).
@@ -285,5 +323,7 @@ it caps how far risks 1 and 6 can be reduced.
 3. S4 and S2 (risks 2 and 3), already next in the roadmap after stage 2.
 4. Risk 8 (S9) and risk 7 items 1 and 2.
 5. Risks 6, 9 and 10 with the distribution stage; risk 14 in parallel throughout.
+6. Risk 15: the client contract before stage 3, so the fork is written against it; a second client
+   after stage 2 closes.
 
 This order is a proposal; the agreed order of journal 0059 stands until the maintainer changes it.

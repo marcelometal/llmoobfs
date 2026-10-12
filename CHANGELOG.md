@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- `docs/adoption-risks.md` (proposal; journal 0067): fourteen risks a client takes by adopting the
-  layer, each with its evidence, what exists and an answer (fix, build, contain or accept).
+- `docs/adoption-risks.md` (proposal; journal 0067): fifteen risks any agent-memory system takes by
+  adopting the layer, each with its evidence, what exists and an answer (fix, build, contain or
+  accept).
 - Real-client test, stage 2 (journals 0063 to 0065): ai-memory's structured queries against `QUERY2`
   with projects as domains. Tools in `bench/client/` (workload through its MCP, mirror, comparator)
   and `bench-aimem-latency`, which runs the six shapes on SQLite and on `QUERY2` in one process,

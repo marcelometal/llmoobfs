@@ -11,7 +11,7 @@ The maintainer asked for the risks to be documented, each with a way out.
 ## Decision
 
 A risk register, `docs/adoption-risks.md`, separate from `docs/when-not-to-use.md`: that document
-tells a reader not to adopt the layer today; the register says what would have to change. Fourteen
+tells a reader not to adopt the layer today; the register says what would have to change. Fifteen
 risks, each with its evidence, what exists, an answer of a stated kind (fix, build, contain or
 accept) and what remains after it. Every answer points to the roadmap item that already covers it,
 or says that it is proposed here.
@@ -33,6 +33,14 @@ the first time:
   unprivileged owner can read;
 - a crash-consistency test of the temporary-file, attributes, rename sequence;
 - a second-reviewer rule for `layer/` and a stated response time.
+
+## Addendum, same day: the client is any memory system
+
+The maintainer pointed out that the project targets every system of ai-memory's kind, not that
+client. The register now says so in its opening, and gains risk 15: the design fitted to the one
+client tested. Its answer is a client contract any system can be checked against, stage 2 for a
+second and a third system of the six surveyed in `research-client-query-patterns.md`, and a rule
+that a change to the layer needs a reason valid for more than one of them.
 
 ## Sources and limits
 
