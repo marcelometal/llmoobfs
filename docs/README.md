@@ -49,6 +49,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
+| [client-test-plan.md](client-test-plan.md) | EN | Proposal: test with a real agent memory client (ai-memory), in three stages |
 | [benchmark-plan.md](benchmark-plan.md) | EN | M4 plan: questions, baselines, workloads, what a result must show |
 | [benchmark-harness.md](benchmark-harness.md) | PT (English translation in review) | Harness specification: dataset, SQLite baselines, latency records, report, where raw archives go |
 | [bench-accelerated-guest.md](bench-accelerated-guest.md) | EN | How to run a campaign in an accelerated guest or a cloud VM |

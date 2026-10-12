@@ -8,6 +8,15 @@
 - ADR-0011 (proposed; journal 0060): threat and credential model of the layer (security roadmap S1),
   with two findings: `GET_INFO` counters cross users (F1) and one index budget for all users (F2).
 - `ROADMAP.md` brought up to date, planned items in the agreed order (journal 0059).
+- First real-client test (journal 0054, `docs/client-test-plan.md`): ai-memory v2.6.3 unchanged on
+  the layer. Stage 1a, its own test suites: 1 147 pass on plain ext4 and on the layer once the
+  rename fix (journal 0057) is in. Stage 1b, LongMemEval-S retrieval (50 questions): identical
+  results per question; `memory_query` p50 14 vs 15 ms in one run.
+- Measurement gaps closed (journal 0055): cold cache, mount time at 60 000 files and write cost,
+  `bench/q2-gaps.sh`.
+- **Fix** (journal 0057): renaming a file or directory over a name whose previous file was just
+  deleted failed with `EINVAL` (the atomic "write a temporary file, rename it over" pattern). Found
+  by running ai-memory's own tests on the layer; regression test in `tests/layer.c`.
 - `vm/kasan-local.sh` (journal 0058): the KASAN/lockdep job on a local KVM host, with the kernel
   built once and cached; 17.5 minutes per run on the benchmark host against about an hour in CI.
 - `docs/references.md` (journal 0053): verified list of the papers, projects and tools MoobFS builds
