@@ -13,7 +13,7 @@ help:
 	@echo '  make / make tools  build mkfs.moobfs, fsck.moobfs and attr_test into $$(BUILD)'
 	@echo '  make test          attr_test unit tests and malformed-image tests'
 	@echo '  make lint          shellcheck on vm/ and scripts/ shell scripts, SPDX headers on C sources (same as CI)'
-	@echo '  make checkpatch    kernel checkpatch.pl --no-tree on layer/ and kernel/ (advisory in CI; needs curl, perl)'
+	@echo '  make checkpatch    kernel checkpatch.pl --no-tree on layer/ and kernel/ (required in CI; needs curl, perl)'
 	@echo '  make fuzz          libFuzzer over the attribute encoding (LLVM clang with libFuzzer)'
 	@echo 'Linux-only targets:'
 	@echo '  make attr-tools    moobfs-attr, moobfs-check, moobfs-index'
@@ -64,7 +64,7 @@ lint:
 	@command -v shellcheck >/dev/null 2>&1 || { echo 'shellcheck not found: apt install shellcheck, or brew install shellcheck'; exit 1; }
 	shellcheck --shell=sh --severity=warning $$(git ls-files 'vm/*.sh' 'scripts/*.sh')
 	sh scripts/check-spdx.sh
-# Advisory style check; the script pins and verifies checkpatch.pl from a stable kernel tag.
+# Style check, required in CI since journal 0050; the script pins and verifies checkpatch.pl from a stable kernel tag.
 checkpatch:
 	sh scripts/checkpatch.sh
 module:
