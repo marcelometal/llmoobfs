@@ -3,7 +3,7 @@
 Same host, dataset and files as `../2026-10-12-macmini-q2/` (60 000 memories, profile 8, seed 1),
 read from the lower ext4 directory; the database lives on the same SSD file system, outside the
 layer root. SQLite 3.46.1 (Debian), schema and composite indexes of `bench/sqlbase.sh`, WAL,
-timed through the library by `bench-sqlclient`. Analysis: journal 0046.
+timed through the library by `bench-sqlclient`. Analysis: journal 0047.
 
 Command: `sh bench/sqlite-baseline.sh --manifest <q2-campaign>/manifest.txt --target /srv/moob/ext4/root --db /srv/moob/ext4/sqlite/base.db --queries <q2-campaign>/q-v1.txt --extra-sql extra.sql --out <dir>`
 

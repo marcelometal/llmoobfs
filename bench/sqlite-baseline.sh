@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
-# sqlite-baseline.sh: the SQLite side of an existing dataset (journal 0046). Builds the
+# sqlite-baseline.sh: the SQLite side of an existing dataset (journal 0047). Builds the
 # baseline database of bench/sqlbase.sh from the files a W1 run left in --target, then times
 # with bench-sqlclient the SQL of every line of --queries plus every statement of --extra-sql
 # (one per line), --reps repetitions of --repeat executions, and writes the report.

@@ -1,4 +1,4 @@
-# 0046 — `QUERY2` contra o SQLite no mesmo hardware
+# 0047 — `QUERY2` contra o SQLite no mesmo hardware
 
 Data: 2026-10-12. Estado: medido no host do registro 0042; resultados em
 `bench/results/2026-10-12-macmini-sqlite/` e `bench/results/2026-10-12-macmini-q2/`.
