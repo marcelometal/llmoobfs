@@ -306,10 +306,13 @@ work must distinguish proposals from implemented and tested behavior.
 
 MoobFS builds on work it acknowledges: the Semantic File System (1991) and the Be File System
 (1997) for attribute queries, overlayfs and ecryptfs for the stacked-filesystem model, and
-YoloFS (2026), which already demonstrates a stacked kernel module aimed at agents. The project
-claims none of these ideas as new; what it explores is their combination with per-result POSIX
-authorization in a kernel query, and whether that has measurable value
-([research-originality.md](docs/research-originality.md) §4, §5, §9).
+YoloFS (2026), which already demonstrates a stacked kernel module aimed at agents. The
+domain-scoped `QUERY2` follows research on access-controlled search: partitioning the index by
+reader set (Singh et al. 2007; GUFI, SC22) closes the leaks that filtering after the search leaves
+open (Büttcher and Clarke, FAST 2005; Wang et al., S&P 2017). The project claims none of these ideas
+as new; what it explores is their combination in a stacked kernel layer, and whether that has
+measurable value ([research-originality.md](docs/research-originality.md) §4, §5, §9). Every work,
+project and tool used is listed with verified sources in [references.md](docs/references.md).
 
 ## Contributing and security
 
