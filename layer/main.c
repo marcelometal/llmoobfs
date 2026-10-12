@@ -457,7 +457,7 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	struct dentry *lower_old_dir = moobl_lower_dentry(old_dentry->d_parent);
 	struct dentry *lower_new_dir = moobl_lower_dentry(new_dentry->d_parent);
 	struct dentry *lower_old = dget(moobl_lower_dentry(old_dentry));
-	struct dentry *lower_new = dget(moobl_lower_dentry(new_dentry));
+	struct dentry *lower_new = NULL;
 	struct inode *target = d_inode(new_dentry);
 	struct dentry *trap;
 	struct renamedata rd = {
@@ -466,7 +466,6 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 		.old_dentry = lower_old,
 		.new_mnt_idmap = &nop_mnt_idmap,
 		.new_dir = d_inode(lower_new_dir),
-		.new_dentry = lower_new,
 		.flags = flags,
 	};
 	int err;
@@ -486,6 +485,25 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 		err = PTR_ERR(trap);
 		goto out_put;
 	}
+	/*
+	 * Re-look up the target under the parents' locks, as create does (moobl_lock_parent): a
+	 * negative upper dentry left by an unlink still references the unhashed lower dentry of
+	 * the deleted file, and renaming onto that name (write a temporary file, then rename it
+	 * over the old name) would otherwise fail with EINVAL.
+	 */
+	lower_new = lookup_one_len(new_dentry->d_name.name, lower_new_dir, new_dentry->d_name.len);
+	if (IS_ERR(lower_new)) {
+		err = PTR_ERR(lower_new);
+		lower_new = NULL;
+		goto out_unlock;
+	}
+	rd.new_dentry = lower_new;
+	/* the lower tree changed behind the layer: refuse instead of acting on another file */
+	err = -ESTALE;
+	if (d_really_is_positive(new_dentry) != d_really_is_positive(lower_new))
+		goto out_unlock;
+	if (target && moobl_lower_inode(target) != d_inode(lower_new))
+		goto out_unlock;
 	err = -EINVAL;
 	if (lower_old->d_parent != lower_old_dir || lower_new->d_parent != lower_new_dir)
 		goto out_unlock;
@@ -515,7 +533,8 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 out_unlock:
 	unlock_rename(lower_old_dir, lower_new_dir);
 out_put:
-	dput(lower_new);
+	if (lower_new)
+		dput(lower_new);
 	dput(lower_old);
 	return err;
 }

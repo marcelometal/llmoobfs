@@ -205,6 +205,21 @@ int main(int argc, char **argv)
 	CHECK(!rmdir(up("d2/moved")) && !rmdir(up("d2")));
 	errno = 0; CHECK(renameat2(AT_FDCWD, up("a.txt"), AT_FDCWD, up("a.txt"), RENAME_NOREPLACE) == -1 && errno == EEXIST);
 	CHECK(same_content(up("a.txt"), lo("a.txt")));
+	/* atomic replace after an unlink: delete a name, then rename a new file over it (a cached
+	 * negative dentry must not keep the deleted lower dentry; found with ai-memory, journal 0057) */
+	fd = open(up("gone.md"), O_WRONLY | O_CREAT, 0600); CHECK(fd >= 0 && write(fd, "old", 3) == 3); close(fd);
+	CHECK(!stat(up("gone.md"), &st) && !unlink(up("gone.md")));
+	errno = 0; CHECK(stat(up("gone.md"), &st) == -1 && errno == ENOENT);
+	fd = open(up("gone.md.tmp"), O_WRONLY | O_CREAT, 0600); CHECK(fd >= 0 && write(fd, "new!", 4) == 4); close(fd);
+	CHECK(!rename(up("gone.md.tmp"), up("gone.md")));
+	CHECK(!stat(lo("gone.md"), &lst) && lst.st_size == 4);
+	CHECK(!stat(up("gone.md"), &st) && st.st_ino == lst.st_ino && st.st_size == 4);
+	errno = 0; CHECK(stat(lo("gone.md.tmp"), &lst) == -1 && errno == ENOENT);
+	/* the same for a directory name removed with rmdir */
+	CHECK(!mkdir(up("gonedir"), 0700) && !stat(up("gonedir"), &st) && !rmdir(up("gonedir")));
+	CHECK(!mkdir(up("gonedir.tmp"), 0700) && !rename(up("gonedir.tmp"), up("gonedir")));
+	CHECK(!stat(lo("gonedir"), &lst) && S_ISDIR(lst.st_mode) && !rmdir(up("gonedir")));
+	CHECK(!unlink(up("gone.md")));
 
 	/* xattr: opaque pass-through to the lower file */
 	CHECK(!setxattr(up("a.txt"), "user.other.kind", "note", 4, 0));
