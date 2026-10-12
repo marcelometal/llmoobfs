@@ -91,3 +91,11 @@ Later update (2026-10-12): the exception above ended up not being used. Before t
 also received PR 42 (CodeQL triage, with changes in `bench/`) and PRs 43 to 48 from the DX side;
 since the change was no longer documentation only, the branch was updated with the final main, the
 changelog resolved by keeping both entries, and the merge awaits a new KASAN run.
+
+Update (2026-10-12, written in English per ADR-0010): KASAN and lockdep run 38256378430 on commit
+`8346648` (Q2b on the final `main`) passed: `QUERY2_ORDER_PASS` and `QUERY2_PASS` on ext4, btrfs
+and XFS, `DEMO_PASS` and `MOOBFS_LAYER_PASS`. The first attempt hit a KASAN report at 1.28 s of
+boot (`wild-memory-access in do_raw_spin_lock`), before the layer module was loaded; the workflow
+classified it as `MOOBFS_VM_ENV_FAIL` and retried once, as designed for the debug kernel under
+emulation (journal 0016). The second attempt loaded the module and ran the whole suite with no
+report. Merged into `main` on 2026-10-12 at 14:24 UTC.
