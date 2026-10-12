@@ -1,39 +1,39 @@
-# 0010 — ADR-0007: camada empilhada sobre filesystem maduro; M2 reescrito
+# 0010 — ADR-0007: stacked layer over a mature filesystem; M2 rewritten
 
-Data: 2026-10-10, America/Sao_Paulo.
+Date: 2026-10-10, America/Sao_Paulo.
 
-## Pedido
+## Request
 
-Após o princípio registrado em 0009, foi avaliado se empilhar sobre um FS maduro perde
-novidade e se valeria manter dois caminhos (camada e FS próprio). Avaliação registrada: a
-novidade (atributos tipados, índice, `QUERY`, proveniência) fica toda na camada; perde-se
-controle do layout em disco e há um teto de desempenho por dupla camada; dois caminhos em
-paralelo dividem o esforço e adiam a medição. Decisão do usuário: um caminho só, com o FS
-próprio condicionado a evidência do M4; ADR-0007 e reescrita da especificação.
+After the principle recorded in 0009, it was evaluated whether stacking over a mature FS loses
+novelty and whether it would be worth keeping two paths (layer and own FS). Recorded evaluation: the
+novelty (typed attributes, index, `QUERY`, provenance) lies entirely in the layer; control
+of the on-disk layout is lost and there is a performance ceiling from the double layer; two paths in
+parallel split the effort and delay measurement. User decision: a single path, with our own
+FS conditional on M4 evidence; ADR-0007 and a rewrite of the specification.
 
-## Mudanças
+## Changes
 
-- `docs/decisions/0007-stacked-memory-layer.md` (nova; substitui a ADR-0006, que recebe nota
-  datada e é preservada).
-- `docs/spec-m2.md` reescrita como camada empilhada; a versão anterior preservada em
+- `docs/decisions/0007-stacked-memory-layer.md` (new; replaces ADR-0006, which receives a dated
+  note and is preserved).
+- `docs/spec-m2.md` rewritten as a stacked layer; the previous version preserved in
   `docs/spec-m2-full-volume-superseded.md`.
-- `docs/kernel-infrastructure.md`: adendo com `fs/backing-file.c`, overlayfs, ecryptfs e
-  reflink delegado, verificados no v6.12 e na configuração da VM (`OVERLAY_FS=m`,
+- `docs/kernel-infrastructure.md`: addendum with `fs/backing-file.c`, overlayfs, ecryptfs and
+  delegated reflink, verified on v6.12 and in the VM configuration (`OVERLAY_FS=m`,
   `ECRYPT_FS=m`).
-- `ROADMAP.md`, `README.md`, índice do histórico, `CHANGELOG.md`.
+- `ROADMAP.md`, `README.md`, history index, `CHANGELOG.md`.
 
-## Evidências
+## Evidence
 
-Símbolos exportados de `fs/backing-file.c` e uso pelo overlayfs lidos do código v6.12; contagem
-de linhas de overlayfs e ecryptfs por `wc -l` nos arquivos principais; `README.overlay` do
-xfstests confirma suporte a FS empilhados. Nenhum código compilado ou executado.
+Exported symbols of `fs/backing-file.c` and their use by overlayfs read from the v6.12 code; line
+count of overlayfs and ecryptfs by `wc -l` on the main files; xfstests `README.overlay`
+confirms support for stacked FSs. No code compiled or executed.
 
-## Limitações
+## Limitations
 
-Especificação é proposta. O M1 fica congelado como experimento concluído e regressão; não é
-mais a base do produto. Riscos próprios de FS empilhado (aliasing de inodes, mmap, modificação do
-inferior por fora) estão listados, não resolvidos.
+The specification is a proposal. M1 is frozen as a concluded experiment and regression; it is no
+longer the product's base. Pitfalls specific to stacked FSs (inode aliasing, mmap, modification of the
+lower from outside) are listed, not resolved.
 
-## Próximo passo
+## Next step
 
-Fase 2a: passagem mínima estilo wrapfs com `backing_file_*` sobre ext4, `fsx` e KASAN, em VM.
+Phase 2a: minimal wrapfs-style pass-through with `backing_file_*` over ext4, `fsx` and KASAN, in a VM.

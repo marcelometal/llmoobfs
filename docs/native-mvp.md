@@ -1,81 +1,81 @@
-# MoobFS: MVP nativo no Linux
+# MoobFS: native MVP on Linux
 
-Data: 10 de outubro de 2026. Estado: proposta de arquitetura, sem implementação.
+Date: October 10, 2026. Status: architecture proposal, no implementation.
 
-## 1. Objetivo e recorte
+## 1. Goal and scope
 
-Construir um filesystem de blocos que o Linux monte como tipo `moobfs`, implementado por um módulo carregável `moobfs.ko`. Ele deve armazenar memórias persistentes, compartilhar conteúdo idêntico e expor versões estáveis como arquivos convencionais. O módulo atende as leituras diretamente pelo VFS; não há FUSE ou serviço obrigatório no caminho de leitura.
+Build a block filesystem that Linux mounts as type `moobfs`, implemented by a loadable module `moobfs.ko`. It must store persistent memories, share identical content and expose stable versions as conventional files. The module serves reads directly through the VFS; there is no FUSE or mandatory service in the read path.
 
-O MVP completo precisa aceitar novas memórias enquanto está montado e recuperá-las após reinicialização. Uma imagem somente para leitura será a primeira entrega técnica, não o término do MVP.
+The complete MVP must accept new memories while mounted and recover them after reboot. A read-only image will be the first technical deliverable, not the end of the MVP.
 
-Decisões iniciais:
+Initial decisions:
 
-| Aspecto | Decisão |
+| Aspect | Decision |
 | --- | --- |
-| Implementação | Módulo externo em C e ferramentas de usuário em C; testes podem usar Python/shell. |
-| Ambiente | VM Linux x86-64, páginas de 4 KiB, kernel e configuração fixados antes da primeira compilação. Registrar versão exata, commit, configuração e compilador. |
-| Dispositivo | Um dispositivo de blocos local; arquivo de imagem com loop para testes básicos e disco virtual dedicado para falhas. |
-| Unidade de conteúdo | Objeto de até 64 KiB, identificado internamente por ID e pesquisável pelo hash de seus bytes. |
-| Gravação | Publicação transacional de objetos/revisões/snapshots; um commit por vez por volume. |
-| Leitura | `open`, `read`, `pread`, `stat`, enumeração de diretórios e `lseek` em arquivos imutáveis. |
-| Compartilhamento | Objetos inteiros idênticos, sem normalização do texto. |
-| Histórico | Revisões e snapshots imutáveis, preservados durante toda a vida do volume v0. |
-| Permissões | Um domínio de confiança por volume; proprietário definido na montagem. Sem isolamento entre agentes no v0. |
+| Implementation | External module in C and user tools in C; tests may use Python/shell. |
+| Environment | Linux x86-64 VM, 4 KiB pages, kernel and configuration pinned before the first build. Record exact version, commit, configuration and compiler. |
+| Device | One local block device; image file with loop for basic tests and a dedicated virtual disk for failures. |
+| Content unit | Object of up to 64 KiB, identified internally by ID and searchable by the hash of its bytes. |
+| Writing | Transactional publication of objects/revisions/snapshots; one commit at a time per volume. |
+| Reading | `open`, `read`, `pread`, `stat`, directory enumeration and `lseek` on immutable files. |
+| Sharing | Whole identical objects, without text normalization. |
+| History | Immutable revisions and snapshots, preserved for the whole life of the v0 volume. |
+| Permissions | One trust domain per volume; owner defined at mount. No isolation between agents in v0. |
 
-Não fazem parte do v0: edição POSIX arbitrária, `mmap`, I/O direto, hard links criados pelo usuário, reflink ioctl padrão, exclusão, coleta de lixo, compressão, rede, ACLs, montagem simultânea em máquinas diferentes ou processamento semântico no kernel. Uma operação não suportada deve falhar explicitamente.
+Not part of v0: arbitrary POSIX editing, `mmap`, direct I/O, user-created hard links, standard reflink ioctl, deletion, garbage collection, compression, network, ACLs, simultaneous mount on different machines or semantic processing in the kernel. An unsupported operation must fail explicitly.
 
-## 2. Arquitetura
+## 2. Architecture
 
 ```mermaid
 flowchart TD
-    A[Agente e ferramentas comuns] -->|open / read / stat| V[VFS do Linux]
-    T[moobctl] -->|ioctl transacional| V
-    V --> K[MoobFS no kernel]
-    K --> R[Namespace e revisões imutáveis]
-    K --> P[Publicação e recuperação de commits]
-    R --> C[Cache de páginas / iomap]
-    P --> B[Camada de blocos]
+    A[Agent and common tools] -->|open / read / stat| V[Linux VFS]
+    T[moobctl] -->|transactional ioctl| V
+    V --> K[MoobFS in the kernel]
+    K --> R[Namespace and immutable revisions]
+    K --> P[Commit publication and recovery]
+    R --> C[Page cache / iomap]
+    P --> B[Block layer]
     C --> B
-    B --> D[Volume MoobFS]
-    S[Busca opcional em espaço de usuário] -->|leitura de arquivos| V
-    A -->|consulta| S
+    B --> D[MoobFS volume]
+    S[Optional user-space search] -->|file reads| V
+    A -->|query| S
 ```
 
-O módulo implementa o registro no VFS, montagem, inodes, diretórios, leitura, controle transacional e acesso ao dispositivo de blocos. Usa os drivers de disco existentes.
+The module implements registration with the VFS, mount, inodes, directories, reading, transactional control and access to the block device. It uses the existing disk drivers.
 
-O serviço opcional de busca mantém índices reconstruíveis fora do volume, por exemplo em SQLite. Ele pode selecionar memórias e montar contexto, mas não participa de uma leitura comum nem é necessário para montar ou recuperar o filesystem. Conteúdo e origem persistem no MoobFS.
+The optional search service keeps rebuildable indexes outside the volume, for example in SQLite. It can select memories and assemble context, but it does not take part in an ordinary read and is not needed to mount or recover the filesystem. Content and origin persist in MoobFS.
 
-A integração será baseada na API de montagem com `fs_context`, cache de páginas com folios e mapeamento de leitura por `iomap`. As assinaturas concretas serão verificadas no código do kernel fixado, pois documentação de versões diferentes não substitui a compilação contra esse alvo.
+The integration will be based on the mount API with `fs_context`, the page cache with folios and read mapping by `iomap`. The concrete signatures will be checked in the code of the pinned kernel, since documentation of different versions does not replace compiling against that target.
 
-## 3. Modelo de dados
+## 3. Data model
 
-| Entidade | Campos conceituais |
+| Entity | Conceptual fields |
 | --- | --- |
-| Objeto | `object_id`, SHA-256, tamanho original, localização do payload. |
-| Memória | `memory_id`, número da última revisão confirmada. |
-| Revisão | `memory_id`, `revision`, `object_id`, metadados opacos, instante de publicação. |
-| Snapshot | `snapshot_id`, lista ordenada de pares `(memory_id, revision)`. |
-| Transação | `request_id`, geração, resultado, registros e limite final confirmado. |
+| Object | `object_id`, SHA-256, original size, payload location. |
+| Memory | `memory_id`, number of the last confirmed revision. |
+| Revision | `memory_id`, `revision`, `object_id`, opaque metadata, publication instant. |
+| Snapshot | `snapshot_id`, ordered list of `(memory_id, revision)` pairs. |
+| Transaction | `request_id`, generation, result, records and final confirmed boundary. |
 
-IDs são inteiros de 64 bits, relativos ao UUID do volume. IDs confirmados nunca são reutilizados. O hash não é usado como inode ou como única prova de igualdade.
+IDs are 64-bit integers, relative to the volume UUID. Confirmed IDs are never reused. The hash is not used as an inode or as the sole proof of equality.
 
 ```text
-Memória 41, revisão 1 ─┐
-                      ├─ objeto 18 ─ payload no volume
-Memória 72, revisão 1 ─┘
+Memory 41, revision 1 ─┐
+                      ├─ object 18 ─ payload in the volume
+Memory 72, revision 1 ─┘
 
-Memória 41, revisão 2 ─── objeto 25 ─ outro payload
+Memory 41, revision 2 ─── object 25 ─ another payload
 ```
 
-Na inserção, o módulo calcula SHA-256, consulta candidatos por hash e tamanho e compara seus bytes. Só reutiliza um objeto após igualdade exata. Uma colisão de hash com bytes diferentes cria outro `object_id` no mesmo grupo de candidatos.
+On insertion, the module computes SHA-256, looks up candidates by hash and size and compares their bytes. It only reuses an object after exact equality. A hash collision with different bytes creates another `object_id` in the same candidate group.
 
-Origem, classificação e demais informações ficam na revisão, não no objeto compartilhado. O módulo aceita até 4 KiB de metadados opacos por revisão; a CLI os apresenta como JSON UTF-8. O kernel valida tamanho e enquadramento, não interpreta JSON ou linguagem natural. Texto de conteúdo é preservado como bytes, inclusive diferenças de espaços e quebras de linha.
+Origin, classification and other information live in the revision, not in the shared object. The module accepts up to 4 KiB of opaque metadata per revision; the CLI presents it as UTF-8 JSON. The kernel validates size and framing, it does not interpret JSON or natural language. Content text is preserved as bytes, including differences in whitespace and line breaks.
 
-O snapshot fixa no máximo uma revisão por memória. Ele copia referências, não os dados dos objetos. Não se promete snapshot em tempo constante: o manifesto inicial é uma lista e seu custo é proporcional ao número de entradas.
+The snapshot pins at most one revision per memory. It copies references, not the objects' data. Constant-time snapshots are not promised: the initial manifest is a list and its cost is proportional to the number of entries.
 
-## 4. Namespace e semântica de leitura
+## 4. Namespace and read semantics
 
-Exemplo ilustrativo, ainda não existente:
+Illustrative example, not yet existing:
 
 ```text
 /mnt/moob/
@@ -98,173 +98,173 @@ Exemplo ilustrativo, ainda não existente:
           metadata.json
 ```
 
-`content` contém exatamente os bytes publicados. `metadata.json` contém os metadados daquela revisão; a CLI exige JSON válido, embora o filesystem os trate como bytes. `manifest` é uma representação determinística do conjunto fixado pelo snapshot.
+`content` contains exactly the published bytes. `metadata.json` contains the metadata of that revision; the CLI requires valid JSON, although the filesystem treats it as bytes. `manifest` is a deterministic representation of the set pinned by the snapshot.
 
-Cada arquivo publicado tem inode estável durante a vida do volume. A alocação de inodes e IDs faz parte da transação; não usar o hash truncado para produzi-los. O registro de snapshot reserva os inodes necessários às suas entradas.
+Each published file has a stable inode during the life of the volume. Allocation of inodes and IDs is part of the transaction; do not use the truncated hash to produce them. The snapshot record reserves the inodes needed for its entries.
 
-Abrir uma revisão fixa sua identidade; uma nova publicação não altera o arquivo aberto. O v0 não expõe um arquivo `latest` cujo conteúdo mude. Para descobrir a revisão atual, a CLI consulta o controle ou lista revisões.
+Opening a revision pins its identity; a new publication does not change the open file. v0 does not expose a `latest` file whose content changes. To discover the current revision, the CLI queries the control file or lists revisions.
 
-Os arquivos de conteúdo são imutáveis, com tamanho lógico igual ao tamanho original. Bytes de alinhamento em disco não aparecem na leitura. Leituras além do fim retornam EOF.
+Content files are immutable, with a logical size equal to the original size. On-disk alignment bytes do not appear on read. Reads past the end return EOF.
 
-Arquivos diferentes que referenciam o mesmo objeto podem ter inodes e páginas de cache separados. Deduplicação no disco não implica deduplicação de RAM. Compartilhar também o cache não é uma meta do v0.
+Different files that reference the same object may have separate inodes and cache pages. Deduplication on disk does not imply deduplication in RAM. Also sharing the cache is not a goal of v0.
 
-Novas entradas devem invalidar dentries negativas correspondentes. Diretórios usam cookies de enumeração baseados em IDs estáveis. Uma enumeração concorrente pode exigir uma nova chamada para encontrar entradas recém-publicadas; um snapshot mantém conteúdo fixo. Publicação no índice de lookup é atômica em relação aos leitores.
+New entries must invalidate the corresponding negative dentries. Directories use enumeration cookies based on stable IDs. A concurrent enumeration may require a new call to find newly published entries; a snapshot keeps content fixed. Publication in the lookup index is atomic with respect to readers.
 
-## 5. Interface de gravação
+## 5. Write interface
 
-`.control` é um arquivo de controle do próprio filesystem. Em um mount gravável, a CLI o abre com acesso de escrita e usa ioctls específicos; o módulo verifica modo do descritor, proprietário e estado do mount. Montagem `ro` rejeita qualquer mutação com `EROFS`. As operações de mutação participam do controle de escritores do VFS, para coordenar freeze, remount somente para leitura e desmontagem; conferir apenas uma flag local não é suficiente.
+`.control` is a control file of the filesystem itself. On a writable mount, the CLI opens it with write access and uses specific ioctls; the module checks descriptor mode, owner and mount state. An `ro` mount rejects any mutation with `EROFS`. Mutating operations take part in the VFS writer control, to coordinate freeze, read-only remount and unmount; checking only a local flag is not sufficient.
 
-| Operação proposta | Contrato |
+| Proposed operation | Contract |
 | --- | --- |
-| `GET_INFO` | UUID, versão do formato/UAPI, limites, geração e contadores de uso. |
-| `PUT` | Cria memória ou nova revisão; recebe conteúdo, metadados, `expected_revision` e `request_id`. Retorna os IDs e a geração confirmada. |
-| `SNAPSHOT` | Publica uma lista explícita de revisões existentes, com `request_id`. |
-| `GET_REQUEST` | Recupera o resultado durável de uma operação pelo `request_id`. |
+| `GET_INFO` | UUID, format/UAPI version, limits, generation and usage counters. |
+| `PUT` | Creates a memory or a new revision; receives content, metadata, `expected_revision` and `request_id`. Returns the IDs and the confirmed generation. |
+| `SNAPSHOT` | Publishes an explicit list of existing revisions, with `request_id`. |
+| `GET_REQUEST` | Retrieves the durable result of an operation by `request_id`. |
 
-Criação usa `memory_id=0` e `expected_revision=0`. Atualização exige correspondência com a revisão atual; conflito retorna `EAGAIN`. Cada PUT publica uma única memória. Atualização atômica de várias memórias fica fora do v0; um snapshot pode reunir revisões já existentes.
+Creation uses `memory_id=0` and `expected_revision=0`. Update requires a match with the current revision; a conflict returns `EAGAIN`. Each PUT publishes a single memory. Atomic update of several memories is out of v0; a snapshot can gather already existing revisions.
 
-O `request_id` é um identificador de 128 bits gerado pela CLI e persistido com o resultado. Repetir a mesma operação com a mesma chave retorna o resultado original; reutilizar a chave com entrada diferente retorna `EINVAL`. A comparação da entrada precisa ser exata, não apenas um hash. Isso resolve a situação em que o commit conclui mas a resposta ao processo é perdida.
+The `request_id` is a 128-bit identifier generated by the CLI and persisted with the result. Repeating the same operation with the same key returns the original result; reusing the key with a different input returns `EINVAL`. The comparison of the input must be exact, not just a hash. This resolves the situation in which the commit completes but the response to the process is lost.
 
-Os argumentos terão inteiros de largura fixa, alinhamento explícito, campos reservados zerados e descritores de buffers limitados. Os textos maiores são copiados de buffers de usuário, não embutidos na estrutura que codifica o número do ioctl. Cada pedido é copiado e validado antes de sua publicação; não continuar lendo memória mutável do usuário durante o commit.
+The arguments will have fixed-width integers, explicit alignment, zeroed reserved fields and bounded buffer descriptors. Larger texts are copied from user buffers, not embedded in the structure that encodes the ioctl number. Each request is copied and validated before its publication; do not keep reading mutable user memory during the commit.
 
-A numeração e o layout binário da UAPI são entregáveis da implementação. Mudança incompatível exige novo comando, sem reinterpretar silenciosamente um comando publicado. Comando desconhecido retorna `ENOTTY`.
+The numbering and binary layout of the UAPI are implementation deliverables. An incompatible change requires a new command, without silently reinterpreting a published command. An unknown command returns `ENOTTY`.
 
-Gravação POSIX via `write`, truncamento, criação e renomeação arbitrários não são suportados no v0. Portanto, montar e ler com ferramentas comuns funciona, mas salvar com um editor convencional não faz parte deste MVP. A CLI não substitui o filesystem: toda persistência continua sendo feita pelo módulo no volume nativo.
+POSIX writing via `write`, arbitrary truncation, creation and renaming are not supported in v0. Therefore, mounting and reading with common tools works, but saving with a conventional editor is not part of this MVP. The CLI does not replace the filesystem: all persistence continues to be done by the module on the native volume.
 
-## 6. Formato em disco v0
+## 6. On-disk format v0
 
-Bloco de formato: 4.096 bytes; campos inteiros little-endian; offsets e comprimentos de 64 bits. O formato terá serialização explícita, sem depender do padding de structs C. Checksums de metadados usam CRC32C; conteúdo usa SHA-256. M0 deve especificar exatamente a cobertura de cada checksum, seu campo zerado durante o cálculo e vetores de teste compartilhados pelas ferramentas e módulo.
+Format block: 4 096 bytes; little-endian integer fields; 64-bit offsets and lengths. The format will have explicit serialization, without depending on the padding of C structs. Metadata checksums use CRC32C; content uses SHA-256. M0 must specify exactly the coverage of each checksum, its field zeroed during computation and test vectors shared by the tools and the module.
 
 ```text
-bloco 0      Superbloco estático A
-bloco 1      Superbloco estático B
-bloco 2      Checkpoint A
-bloco 3      Checkpoint B
-bloco 4...   Log de registros e payloads
+block 0      Static superblock A
+block 1      Static superblock B
+block 2      Checkpoint A
+block 3      Checkpoint B
+block 4...   Log of records and payloads
 ```
 
-Os superblocos contêm magic, versão, UUID, tamanho do volume, tamanho de bloco, flags de compatibilidade e checksum. Se as duas cópias válidas divergirem em identidade/configuração, a montagem falha.
+The superblocks contain magic, version, UUID, volume size, block size, compatibility flags and checksum. If the two valid copies diverge in identity/configuration, the mount fails.
 
-Cada checkpoint contém geração, limite exclusivo do log confirmado, referência ao último COMMIT, próximos IDs e checksum. As duas posições alternam a cada commit; 4 KiB não é considerado atomicamente gravável por pressuposto.
+Each checkpoint contains generation, exclusive boundary of the confirmed log, reference to the last COMMIT, next IDs and checksum. The two positions alternate on each commit; 4 KiB is not assumed to be atomically writable.
 
-Os registros têm tipo, comprimento, transação, IDs e checksum. Tipos iniciais: `OBJECT`, `REVISION`, `SNAPSHOT` e `COMMIT`. O COMMIT enquadra os registros da transação, seu predecessor e resultado idempotente. Referências só podem apontar para registros anteriores confirmados ou pertencentes à mesma transação.
+Records have type, length, transaction, IDs and checksum. Initial types: `OBJECT`, `REVISION`, `SNAPSHOT` and `COMMIT`. The COMMIT frames the records of the transaction, its predecessor and its idempotent result. References may only point to earlier confirmed records or ones belonging to the same transaction.
 
-Cabeçalhos e payloads novos começam em limites de bloco. Payloads possuem padding zerado e tamanho original explícito. Uma transação nunca modifica o último bloco de uma transação confirmada. Isso simplifica durabilidade e leitura por extents, mas desperdiça espaço para memórias pequenas; medir esse custo é obrigatório. Empacotamento de objetos pequenos poderá mudar o formato em uma versão futura.
+New headers and payloads start at block boundaries. Payloads have zeroed padding and an explicit original size. A transaction never modifies the last block of a confirmed transaction. This simplifies durability and reading by extents, but wastes space for small memories; measuring this cost is mandatory. Packing of small objects may change the format in a future version.
 
-O catálogo por ID e o índice de hash são reconstruídos em RAM ao montar, percorrendo os registros até o checkpoint selecionado. Payloads são pulados conforme comprimentos validados. O tempo de montagem é proporcional ao histórico e o índice consome RAM proporcional ao número de registros; não é uma solução de escala ilimitada.
+The catalog by ID and the hash index are rebuilt in RAM at mount, walking the records up to the selected checkpoint. Payloads are skipped according to validated lengths. Mount time is proportional to history and the index consumes RAM proportional to the number of records; it is not an unbounded-scale solution.
 
-Checksums dos metadados são verificados no replay. O verificador offline lê todos os payloads e valida SHA-256. O v0 não promete verificação de integridade de todos os dados em cada leitura normal pelo cache: checksums de dados no caminho de leitura são uma extensão distinta.
+Metadata checksums are verified on replay. The offline verifier reads all payloads and validates SHA-256. v0 does not promise integrity verification of all data on every normal read through the cache: data checksums in the read path are a separate extension.
 
-## 7. Publicação e durabilidade
+## 7. Publication and durability
 
-Um mutex por volume serializa os commits. Leitores usam estruturas imutáveis e sincronização apropriada para acessar a geração publicada. Toda memória necessária ao índice de uma nova transação é reservada antes de iniciar sua publicação durável.
+A per-volume mutex serializes commits. Readers use immutable structures and appropriate synchronization to access the published generation. All memory needed for the index of a new transaction is reserved before starting its durable publication.
 
-Sequência proposta:
+Proposed sequence:
 
-1. Copiar e validar o pedido; resolver idempotência e conflitos.
-2. Reservar IDs, espaço no log e memória para a publicação. Rejeitar `ENOSPC` antes de alterar o estado confirmado.
-3. Gravar objetos novos, revisão ou snapshot e registro COMMIT no sufixo do log; esperar conclusão e verificar erros.
-4. Forçar a persistência das escritas anteriores usando as garantias de flush da camada de blocos.
-5. Gravar o checkpoint da nova geração no slot alternado com garantia de persistência, usando FUA/flush conforme a camada de blocos. Esperar sua conclusão.
-6. Publicar a nova geração nos índices em RAM, atualizar/invalidar as entradas VFS necessárias e retornar sucesso.
+1. Copy and validate the request; resolve idempotence and conflicts.
+2. Reserve IDs, log space and memory for the publication. Reject `ENOSPC` before changing the confirmed state.
+3. Write new objects, revision or snapshot and the COMMIT record in the log suffix; wait for completion and check errors.
+4. Force persistence of the previous writes using the flush guarantees of the block layer.
+5. Write the checkpoint of the new generation in the alternate slot with a persistence guarantee, using FUA/flush according to the block layer. Wait for its completion.
+6. Publish the new generation in the in-RAM indexes, update/invalidate the necessary VFS entries and return success.
 
-O checkpoint anterior e todos os registros confirmados permanecem preservados durante essa sequência. O slot de checkpoint mais antigo pode ser substituído porque o outro contém a geração anterior completa.
+The previous checkpoint and all confirmed records remain preserved during this sequence. The oldest checkpoint slot can be replaced because the other one contains the complete previous generation.
 
-Sucesso de PUT/SNAPSHOT significa commit durável, assumindo que a pilha de armazenamento cumpre flush/FUA. `close` não é o ponto de commit. Como não há edição bufferizada de arquivos, `fsync` não é necessário para concluir um PUT bem-sucedido. `syncfs` deve coordenar com commits em andamento e propagar erros persistentes.
+Success of PUT/SNAPSHOT means a durable commit, assuming the storage stack honors flush/FUA. `close` is not the commit point. Since there is no buffered file editing, `fsync` is not needed to complete a successful PUT. `syncfs` must coordinate with commits in progress and propagate persistent errors.
 
-Se ocorrer erro de I/O depois de começar a gravação, bloquear novas mutações e marcar o mount como abortado para escrita, mantendo leituras do estado publicado quando possível. Não sobrescrever o sufixo incerto em novas tentativas na mesma montagem. Um erro ou interrupção pode deixar o resultado indeterminado para o chamador; remontagem e `GET_REQUEST` resolvem se o pedido foi confirmado.
+If an I/O error occurs after writing has started, block new mutations and mark the mount as aborted for writing, keeping reads of the published state when possible. Do not overwrite the uncertain suffix on new attempts in the same mount. An error or interruption may leave the result undetermined for the caller; remounting and `GET_REQUEST` resolve whether the request was confirmed.
 
-Recuperação:
+Recovery:
 
-- Validar as cópias de superbloco e os dois checkpoints.
-- Escolher o checkpoint de maior geração cujo próprio checksum e estrutura sejam válidos.
-- Validar o log confirmado e todas as referências de metadados até seu limite.
-- Se um checkpoint válido apontar para metadados corrompidos, falhar a montagem, sem esconder o problema revertendo silenciosamente para uma geração antiga.
-- Se a gravação do checkpoint mais novo foi interrompida e seu checksum for inválido, usar o checkpoint anterior válido.
-- Ignorar registros após o limite confirmado; esse sufixo pode ser reutilizado após recuperação.
-- Reconstruir índices, resultados de pedidos e contadores a partir do estado escolhido.
+- Validate the superblock copies and both checkpoints.
+- Choose the checkpoint of highest generation whose own checksum and structure are valid.
+- Validate the confirmed log and all metadata references up to its boundary.
+- If a valid checkpoint points to corrupted metadata, fail the mount, without hiding the problem by silently reverting to an old generation.
+- If the write of the newest checkpoint was interrupted and its checksum is invalid, use the previous valid checkpoint.
+- Ignore records after the confirmed boundary; that suffix may be reused after recovery.
+- Rebuild indexes, request results and counters from the chosen state.
 
-Checksums detectam rasgos/corrupção com probabilidade elevada, mas não são prova matemática de atomicidade. Não há recuperação de defeitos permanentes do hardware por redundância dos payloads no v0.
+Checksums detect tears/corruption with high probability, but are not a mathematical proof of atomicity. There is no recovery from permanent hardware defects through payload redundancy in v0.
 
-## 8. Limites e operação
+## 8. Limits and operation
 
-Limites propostos para tornar o experimento controlado: volume de até 16 GiB, payload de até 64 KiB, metadados de até 4 KiB e snapshot com até 4.096 referências. O mount limita o índice em RAM a 256 MiB; uma publicação que exceda o orçamento é rejeitada. Uma imagem cujo replay exceda esse limite falha a montagem de forma controlada com erro de memória. Esses são tetos do MVP, não capacidades já medidas.
+Proposed limits to keep the experiment controlled: volume of up to 16 GiB, payload of up to 64 KiB, metadata of up to 4 KiB and snapshot with up to 4 096 references. The mount limits the in-RAM index to 256 MiB; a publication that exceeds the budget is rejected. An image whose replay exceeds this limit fails the mount in a controlled way with a memory error. These are MVP ceilings, not capacities already measured.
 
-Sem exclusão ou coleta de lixo, o volume eventualmente enche. Referências históricas não são liberadas. Remover uma memória de um snapshot futuro não apaga conteúdo anterior. Não prometer esquecimento ou apagamento físico neste formato.
+Without deletion or garbage collection, the volume eventually fills up. Historical references are not freed. Removing a memory from a future snapshot does not erase earlier content. Do not promise forgetting or physical erasure in this format.
 
-Montagem padrão não permite executar binários ou interpretar dispositivos/setuid do volume. O proprietário da montagem lê e publica memórias; outros usuários não têm acesso por padrão. O formato de metadados não substitui permissões verificadas pelo VFS. O v0 não suporta user namespaces ou exportação NFS.
+The default mount does not allow executing binaries or interpreting devices/setuid from the volume. The mount owner reads and publishes memories; other users have no access by default. The metadata format does not replace permissions checked by the VFS. v0 does not support user namespaces or NFS export.
 
-O módulo obtém acesso exclusivo adequado ao dispositivo montado. `mkfs` e importadores de imagem só atuam em dispositivos desmontados. Ferramentas de usuário não alteram diretamente um volume montado.
+The module obtains appropriate exclusive access to the mounted device. `mkfs` and image importers only act on unmounted devices. User tools do not directly change a mounted volume.
 
-## 9. Componentes e entregas
+## 9. Components and deliverables
 
-Estrutura futura, ainda não implementada:
+Future structure, not yet implemented:
 
 ```text
-include/uapi/       contrato entre módulo e ferramentas
-include/format/     layout e constantes em disco
-kernel/            montagem, inode, diretórios, leitura, log, commit, ioctl
+include/uapi/       contract between module and tools
+include/format/     on-disk layout and constants
+kernel/            mount, inode, directories, read, log, commit, ioctl
 tools/             mkfs.moobfs, moobctl, fsck.moobfs
-tests/             formato, montagem, concorrência, recuperação, benchmarks
-vm/                configuração reproduzível do Linux de teste
+tests/             format, mount, concurrency, recovery, benchmarks
+vm/                reproducible configuration of the test Linux
 ```
 
-`mkfs.moobfs` cria um volume vazio; uma opção de importação offline ajuda a produzir a primeira imagem. `moobctl` publica, inspeciona e cria snapshots pelo mount. `fsck.moobfs` começa como verificador somente para leitura: valida comprimentos, checksums, referências e conteúdo, sem reparar automaticamente.
+`mkfs.moobfs` creates an empty volume; an offline import option helps produce the first image. `moobctl` publishes, inspects and creates snapshots through the mount. `fsck.moobfs` starts as a read-only verifier: it validates lengths, checksums, references and content, without repairing automatically.
 
-| Etapa | Entrega | Critério de saída |
+| Stage | Deliverable | Exit criterion |
 | --- | --- | --- |
-| M0 | Kernel/configuração fixados, formato serializado e ferramentas offline. | Imagens determinísticas são verificadas; imagens inválidas são rejeitadas. |
-| M1 | Módulo monta imagem `ro`, lista e lê. | Bytes corretos, limites corretos e nenhum aviso de memória/locking nos testes. |
-| M2 | PUT persistente com revisão e deduplicação. | Publicação durante mount, duas referências ao mesmo objeto, conflito detectado e recuperação após reinício. |
-| M3 | Snapshots, idempotência e falhas. | Snapshots preservados, pedidos repetidos não duplicam commits e falhas não expõem estado parcial. |
-| M4 | Benchmark e uma integração simples com agente. | Relatório separa custo de I/O, espaço e qualidade da recuperação de memória. |
+| M0 | Kernel/configuration pinned, serialized format and offline tools. | Deterministic images are verified; invalid images are rejected. |
+| M1 | Module mounts an `ro` image, lists and reads. | Correct bytes, correct limits and no memory/locking warnings in the tests. |
+| M2 | Persistent PUT with revision and deduplication. | Publication during mount, two references to the same object, conflict detected and recovery after restart. |
+| M3 | Snapshots, idempotence and failures. | Snapshots preserved, repeated requests do not duplicate commits and failures do not expose partial state. |
+| M4 | Benchmark and a simple integration with an agent. | Report separates I/O cost, space and memory retrieval quality. |
 
-M3 completa o núcleo funcional do filesystem. M4 completa a avaliação do MVP para uso como memória de LLM. Não é necessário adicionar embeddings para concluir a avaliação inicial; busca lexical e filtragem por snapshot são uma linha de base explícita.
+M3 completes the functional core of the filesystem. M4 completes the evaluation of the MVP for use as LLM memory. It is not necessary to add embeddings to conclude the initial evaluation; lexical search and filtering by snapshot are an explicit baseline.
 
-## 10. Validação
+## 10. Validation
 
-Correção e recuperação são requisitos de saída, não atividades opcionais após otimizar:
+Correctness and recovery are exit requirements, not optional activities after optimizing:
 
-1. Gravar bytes idênticos em duas memórias: conferir IDs de memória diferentes, mesmo `object_id`, tamanho lógico correto e aumento real de espaço só para metadados/padding necessários.
-2. Publicar revisão diferente: a memória anterior, o descritor já aberto e os snapshots antigos continuam retornando os mesmos bytes.
-3. Publicar após lookup inexistente: uma nova abertura encontra a entrada criada, sem dentry negativa persistente.
-4. Disputar a mesma revisão esperada com dois clientes: somente um vence; o outro recebe conflito. Leitores nunca veem revisão parcial.
-5. Interromper antes/depois de cada etapa de commit: resultado recuperado é antigo ou novo completo. Todo sucesso observado pelo cliente persiste após recuperação.
-6. Perder a resposta após persistência: repetir `request_id` devolve o resultado original sem nova revisão.
-7. Injetar escrita parcial, erro de leitura, erro de flush e falta de espaço. Não substituir erros por sucesso; abortar novas escritas quando o estado durável for incerto.
-8. Montar imagens com comprimentos excessivos, overflow, IDs repetidos, referências fora do volume ou checksums inválidos: falha controlada, sem crash do kernel.
-9. Forçar colisões no índice de deduplicação em testes: comparação de bytes impede compartilhar conteúdos diferentes.
-10. Executar em kernel com KASAN e lockdep para os testes de correção; usar configuração separada documentada para desempenho.
+1. Write identical bytes into two memories: check different memory IDs, the same `object_id`, correct logical size and real space growth only for the necessary metadata/padding.
+2. Publish a different revision: the previous memory, the already open descriptor and the old snapshots keep returning the same bytes.
+3. Publish after a lookup of a nonexistent entry: a new open finds the created entry, without a persistent negative dentry.
+4. Contend for the same expected revision with two clients: only one wins; the other receives a conflict. Readers never see a partial revision.
+5. Interrupt before/after each commit step: the recovered result is the complete old or complete new. Every success observed by the client persists after recovery.
+6. Lose the response after persistence: repeating the `request_id` returns the original result without a new revision.
+7. Inject partial write, read error, flush error and lack of space. Do not replace errors with success; abort new writes when the durable state is uncertain.
+8. Mount images with excessive lengths, overflow, repeated IDs, references outside the volume or invalid checksums: controlled failure, without a kernel crash.
+9. Force collisions in the deduplication index in tests: byte comparison prevents sharing different contents.
+10. Run on a kernel with KASAN and lockdep for the correctness tests; use a separate documented configuration for performance.
 
-Desligar uma VM ou usar loop não demonstra sozinho resistência à perda de energia: caches do host podem preservar dados. O teste precisa controlar/injetar reordenação, perda e rasgos na camada de blocos e verificar a semântica de flush da pilha virtual usada. O alvo `dm-log-writes` pode registrar a ordem de persistência para replay, complementado por injeção de erros e rasgos. Testes em armazenamento físico vêm depois.
+Powering off a VM or using loop does not by itself demonstrate resistance to power loss: host caches may preserve data. The test must control/inject reordering, loss and tears in the block layer and verify the flush semantics of the virtual stack used. The `dm-log-writes` target can record the persistence order for replay, complemented by injection of errors and tears. Tests on physical storage come later.
 
-## 11. Medições e critérios de decisão
+## 11. Measurements and decision criteria
 
-Comparar no mesmo Linux, dispositivo e configuração de cache:
+Compare on the same Linux, device and cache configuration:
 
-- MoobFS montado.
-- Arquivos convencionais em ext4, com as mesmas memórias e revisões.
-- Para avaliar utilidade do agente, mesma busca, mesmo modelo, mesmo tokenizer e mesmo orçamento de tokens nos dois caminhos.
+- Mounted MoobFS.
+- Conventional files on ext4, with the same memories and revisions.
+- To evaluate usefulness for the agent, the same search, the same model, the same tokenizer and the same token budget on both paths.
 
-Conjuntos iniciais: 10 mil e 100 mil memórias, tamanhos de 1, 4 e 16 KiB, taxas de repetição de 0%, 50% e 90%, com 1 e 8 leitores concorrentes. Registrar falhas por limites, em vez de excluir configurações que não caibam.
+Initial sets: 10 thousand and 100 thousand memories, sizes of 1, 4 and 16 KiB, repetition rates of 0%, 50% and 90%, with 1 and 8 concurrent readers. Record failures due to limits, instead of excluding configurations that do not fit.
 
-Medir p50/p95/p99 de abrir+ler e `pread` com descritor já aberto, operações/s, CPU, RAM do módulo, cache de páginas, latência de PUT durável, tempo de montagem/replay e espaço total alocado incluindo metadados, padding e índices auxiliares. Separar cache aquecido e frio; descrever exatamente quais caches foram esvaziados.
+Measure p50/p95/p99 of open+read and of `pread` with an already open descriptor, operations/s, CPU, module RAM, page cache, durable PUT latency, mount/replay time and total allocated space including metadata, padding and auxiliary indexes. Separate warm and cold cache; describe exactly which caches were emptied.
 
-No teste do agente, medir recuperação da revisão correta, origem citada, tokens entregues e tempo de montar o contexto. A capacidade do modelo de entender um texto não muda por ele estar num filesystem nativo.
+In the agent test, measure retrieval of the correct revision, cited origin, tokens delivered and time to assemble the context. The model's ability to understand a text does not change because it is in a native filesystem.
 
-Não há meta de velocidade inventada. Primeiro medir a linha de base. A decisão de evoluir depende de demonstrar benefício de compartilhamento/versionamento com custo aceitável no fluxo real; se o formato desperdiçar mais espaço que economiza ou leitura ficar dominada por metadados, revisar o layout antes de expandir funcionalidades.
+There is no invented speed target. First measure the baseline. The decision to evolve depends on demonstrating a benefit of sharing/versioning at an acceptable cost in the real flow; if the format wastes more space than it saves or reading becomes dominated by metadata, revise the layout before expanding features.
 
-## 12. Referências técnicas
+## 12. Technical references
 
-As decisões de modelo e formato acima são propostas do MoobFS. As referências abaixo fundamentam os mecanismos do Linux; não comprovam desempenho do projeto.
+The model and format decisions above are MoobFS proposals. The references below ground the Linux mechanisms; they do not prove the project's performance.
 
-- [VFS](https://docs.kernel.org/filesystems/vfs.html): integração de filesystem, inodes e operações.
-- [API de montagem](https://docs.kernel.org/filesystems/mount_api.html): contexto e criação da árvore montada.
-- [iomap](https://docs.kernel.org/filesystems/iomap/design.html): mapeamento e infraestrutura de I/O.
-- [Novos filesystems](https://docs.kernel.org/filesystems/adding-new-filesystems.html): interfaces e expectativas de ferramentas.
-- [Módulos externos](https://docs.kernel.org/kbuild/modules.html): compilação contra o kernel escolhido.
-- [Flush e FUA](https://docs.kernel.org/block/writeback_cache_control.html): ordenação e persistência em dispositivos com cache.
-- [Contratos ioctl](https://docs.kernel.org/driver-api/ioctl.html): layout, compatibilidade, validação e evolução da UAPI.
-- [dm-log-writes](https://docs.kernel.org/admin-guide/device-mapper/log-writes.html): registro e replay de escritas para testes de consistência.
+- [VFS](https://docs.kernel.org/filesystems/vfs.html): filesystem integration, inodes and operations.
+- [Mount API](https://docs.kernel.org/filesystems/mount_api.html): context and creation of the mounted tree.
+- [iomap](https://docs.kernel.org/filesystems/iomap/design.html): mapping and I/O infrastructure.
+- [New filesystems](https://docs.kernel.org/filesystems/adding-new-filesystems.html): interfaces and tooling expectations.
+- [External modules](https://docs.kernel.org/kbuild/modules.html): building against the chosen kernel.
+- [Flush and FUA](https://docs.kernel.org/block/writeback_cache_control.html): ordering and persistence on devices with a cache.
+- [ioctl contracts](https://docs.kernel.org/driver-api/ioctl.html): layout, compatibility, validation and evolution of the UAPI.
+- [dm-log-writes](https://docs.kernel.org/admin-guide/device-mapper/log-writes.html): recording and replay of writes for consistency tests.
 
-Consultados em 10 de outubro de 2026, incluindo busca pelo Context7 CLI. A implementação deverá conferir os detalhes contra o kernel fixado em M0.
+Consulted on October 10, 2026, including a search via the Context7 CLI. The implementation must check the details against the kernel pinned in M0.

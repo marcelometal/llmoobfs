@@ -1,27 +1,27 @@
-# 0001 — Origem e definição do projeto
+# 0001 — Origin and definition of the project
 
-Data do registro: 2026-10-10, America/Sao_Paulo. Registro retrospectivo resumido da conversa.
+Journal date: 2026-10-10, America/Sao_Paulo. Brief retrospective journal of the conversation.
 
-## Objetivo que emergiu
+## Goal that emerged
 
-O usuário propôs compartilhar endereços de armazenamento entre arquivos. A conversa distinguiu hard links, reflinks, deduplicação e copy-on-write. O uso pretendido foi então esclarecido: memória persistente de LLM, no nível de filesystem.
+The user proposed sharing storage addresses between files. The conversation distinguished hard links, reflinks, deduplication and copy-on-write. The intended use was then clarified: persistent LLM memory, at the filesystem level.
 
-## Evolução e decisões
+## Evolution and decisions
 
-1. Diferenciou-se economia de espaço de economia de contexto do modelo: compartilhar bytes em disco não reduz automaticamente tokens entregues à LLM.
-2. Uma proposta inicial usava FUSE com motor de memória e SQLite. O usuário pediu uma alternativa sem FUSE.
-3. Foi considerada uma biblioteca/motor local. O usuário esclareceu que montar como filesystem é requisito; essa alternativa não satisfaz o projeto.
-4. Foi escolhido módulo nativo do Linux, formato próprio em dispositivo de blocos e leitura convencional pelo VFS.
-5. A proposta completa foi salva em `docs/native-mvp.md`, com revisões, snapshots, deduplicação, transações e recuperação. É arquitetura proposta, não implementação concluída.
-6. O usuário autorizou implementar o primeiro marco: imagem MoobFS e módulo que monta e lê dois arquivos compartilhando conteúdo.
-7. Antes da implementação, pediu histórico das decisões, alterações e construção do projeto. Informou que criará um repositório no GitHub; a captura mostra uma tela de criação, não comprova criação ou publicação.
+1. Space savings were distinguished from model context savings: sharing bytes on disk does not automatically reduce the tokens delivered to the LLM.
+2. An initial proposal used FUSE with a memory engine and SQLite. The user asked for an alternative without FUSE.
+3. A local library/engine was considered. The user clarified that mounting as a filesystem is a requirement; that alternative does not satisfy the project.
+4. A native Linux module was chosen, with its own format on a block device and conventional reading through the VFS.
+5. The full proposal was saved in `docs/native-mvp.md`, with revisions, snapshots, deduplication, transactions and recovery. It is a proposed architecture, not a completed implementation.
+6. The user authorized implementing the first milestone: a MoobFS image and a module that mounts and reads two files sharing content.
+7. Before the implementation, the user asked for a history of the decisions, changes and construction of the project. The user said they will create a GitHub repository; the screenshot shows a creation screen, it does not prove creation or publication.
 
-## Estado ao iniciar implementação
+## State when starting implementation
 
-Diretório local continha somente README e proposta do MVP, sem Git inicializado ou código. Ambiente de trabalho é macOS arm64, com Docker Desktop Linux arm64 disponível. Validação do módulo exige Linux separado.
+The local directory contained only the README and the MVP proposal, without Git initialized or code. The work environment is macOS arm64, with Docker Desktop Linux arm64 available. Validating the module requires a separate Linux.
 
-## Referências
+## References
 
 - [ADR-0001](../decisions/0001-native-filesystem.md)
 - [ADR-0002](../decisions/0002-project-history.md)
-- [Proposta original](../native-mvp.md)
+- [Original proposal](../native-mvp.md)

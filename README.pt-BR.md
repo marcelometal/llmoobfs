@@ -86,9 +86,9 @@ que cada marcador de sucesso prova está em [docs/testing.md](docs/testing.md) (
 >   [0035](docs/history/0035-phase-q2a-domain-query.md)).
 > - Reflink, deduplicação e durabilidade vêm do filesystem inferior, não do MoobFS.
 >
-> Contribuições são bem-vindas ([CONTRIBUTING.md](CONTRIBUTING.md)). Código, commits, issues,
-> pull requests e o README principal são em inglês; `docs/` mistura português e inglês
-> ([índice com os idiomas](docs/README.md)).
+> Contribuições são bem-vindas ([CONTRIBUTING.md](CONTRIBUTING.md)). Todo o repositório é em
+> inglês, inclusive os documentos de projeto e o diário técnico; este arquivo é uma cópia de
+> cortesia do README ([índice da documentação](docs/README.md)).
 
 ## Em resumo
 

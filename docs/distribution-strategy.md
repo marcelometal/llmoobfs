@@ -1,153 +1,153 @@
-# Estratégia de distribuição e operação do MoobFS
+# MoobFS distribution and operation strategy
 
-Estado: **proposta** (branch `m3/3b-query-authz`). Nada marcado FUTURO ou DEPENDE DO M4 está
-implementado. Não altera ADRs, formato, UAPI nem código. Base: ADR-0001, ADR-0007, specs M2/M3,
-`docs/security-roadmap.md`, registros `docs/history/0015` a `0020`.
+Status: **proposal** (branch `m3/3b-query-authz`). Nothing marked FUTURE or DEPENDS ON M4 is
+implemented. It does not change ADRs, format, UAPI or code. Basis: ADR-0001, ADR-0007, M2/M3 specs,
+`docs/security-roadmap.md`, journals `docs/history/0015` to `0020`.
 
-Legenda:
+Legend:
 
-- **EXISTE**: está no repositório e foi exercitado pela suíte descrita em `docs/testing.md`.
-- **FUTURO**: proposta; depende só de trabalho de engenharia, sem medição nova.
-- **DEPENDE DO M4**: só se decide depois dos números de `docs/benchmark-plan.md`.
+- **EXISTS**: it is in the repository and was exercised by the suite described in `docs/testing.md`.
+- **FUTURE**: proposal; depends only on engineering work, with no new measurement.
+- **DEPENDS ON M4**: only decided after the numbers from `docs/benchmark-plan.md`.
 
-## 0. Fatos que limitam o desenho
+## 0. Facts that constrain the design
 
-| Fato | Fonte | Consequência operacional |
+| Fact | Source | Operational consequence |
 | --- | --- | --- |
-| Módulo nativo empilhado sobre ext4, btrfs ou XFS; tipo de filesystem `moobfs_layer` | `layer/main.c`, ADR-0007 | O administrador monta com `mount -t moobfs_layer -o lower=<dir> none <ponto>` |
-| Testado apenas com o kernel Debian 6.12.111+deb13-amd64 (suíte em QEMU) e o kernel upstream 6.12.112 com KASAN/UBSAN/lockdep (workflow sob demanda e semanal) | `vm/Dockerfile`, `.github/workflows/kasan.yml` | Nenhuma outra versão de kernel é suportada |
-| Ferramentas de espaço de usuário: `moobfs-attr`, `moobfs-check`, `moobfs-index` (mais binários de teste); `mkfs.moobfs` e `fsck.moobfs` são do M1, congelado | `tools/`, `Makefile` | Não há ferramenta que emita `QUERY` para uso geral; `tests/query.c` é binário de teste |
-| `QUERY` e `GET_INFO` exigem descritor aberto da **raiz** da montagem (`file->f_path.dentry == sb->s_root`, senão `ENOTTY`) | `layer/index.c` (`moobl_root_ioctl`) | Vale para qualquer cliente, inclusive em contêiner |
-| Fase 3b: `QUERY` resolve cada caminho com as credenciais do chamador e aplica `inode_permission(MAY_READ)`; omite em silêncio o inacessível; `truncated` conta só o visível | `layer/index.c`, `docs/spec-m3.md` §3.1, registro 0020 | O isolamento entre agentes é o do POSIX do inferior, inclusive ACLs |
-| `FS_USERNS_MOUNT` e `FS_ALLOW_IDMAP` não definidos | `layer/main.c`, registro 0020 | Montar exige `CAP_SYS_ADMIN` no user namespace inicial; mount idmapped é recusado pelo VFS com `EINVAL` |
-| Nada preso (desmontado, o inferior é árvore comum com xattr); o inferior não pode ser modificado com a camada montada (regra do overlayfs); identidade é convenção do cliente `(namespace, memory_id)` | ADR-0007, `docs/spec-m3.md` §2 | Backup, recuperação e provisionamento se apoiam nisso; o kernel não valida unicidade |
-| Índice em RAM reconstruído a cada montagem dentro de `index_budget`; sem persistência (decisão do M4) | `layer/index.c`, `docs/spec-m2.md` | Tempo de montagem cresce com o número de inodes tipados |
+| Native module stacked over ext4, btrfs or XFS; filesystem type `moobfs_layer` | `layer/main.c`, ADR-0007 | The administrator mounts with `mount -t moobfs_layer -o lower=<dir> none <mountpoint>` |
+| Tested only with the Debian kernel 6.12.111+deb13-amd64 (suite in QEMU) and the upstream kernel 6.12.112 with KASAN/UBSAN/lockdep (on-demand and weekly workflow) | `vm/Dockerfile`, `.github/workflows/kasan.yml` | No other kernel version is supported |
+| User-space tools: `moobfs-attr`, `moobfs-check`, `moobfs-index` (plus test binaries); `mkfs.moobfs` and `fsck.moobfs` belong to M1, frozen | `tools/`, `Makefile` | There is no tool that issues `QUERY` for general use; `tests/query.c` is a test binary |
+| `QUERY` and `GET_INFO` require an open descriptor of the mount's **root** (`file->f_path.dentry == sb->s_root`, otherwise `ENOTTY`) | `layer/index.c` (`moobl_root_ioctl`) | Applies to any client, including in a container |
+| Phase 3b: `QUERY` resolves each path with the caller's credentials and applies `inode_permission(MAY_READ)`; silently omits what is inaccessible; `truncated` counts only what is visible | `layer/index.c`, `docs/spec-m3.md` §3.1, journal 0020 | Isolation between agents is the lower's POSIX isolation, including ACLs |
+| `FS_USERNS_MOUNT` and `FS_ALLOW_IDMAP` not defined | `layer/main.c`, journal 0020 | Mounting requires `CAP_SYS_ADMIN` in the initial user namespace; an idmapped mount is refused by the VFS with `EINVAL` |
+| No lock-in (unmounted, the lower is an ordinary tree with xattrs); the lower cannot be modified with the layer mounted (overlayfs rule); identity is the client convention `(namespace, memory_id)` | ADR-0007, `docs/spec-m3.md` §2 | Backup, recovery and provisioning rely on this; the kernel does not validate uniqueness |
+| Index in RAM rebuilt at every mount within `index_budget`; no persistence (M4 decision) | `layer/index.c`, `docs/spec-m2.md` | Mount time grows with the number of typed inodes |
 
-## 1. Arquitetura de implantação recomendada
+## 1. Recommended deployment architecture
 
-Três camadas. Cada uma pode ser adotada sem a seguinte; nenhuma impõe daemon.
+Three tiers. Each can be adopted without the next; none imposes a daemon.
 
 ```text
-Integração   agente: grava arquivos + define atributos tipados + QUERY (ioctl) + GET_INFO
-Workspace    espaço de usuário: diretórios, namespaces lógicos, donos, modos, ACLs
-Core         módulo moobfs_layer: instalação, compatibilidade de kernel, mount, diagnóstico, update
------------  ext4 / btrfs / XFS (inferior) em disco
+Integration  agent: writes files + sets typed attributes + QUERY (ioctl) + GET_INFO
+Workspace    user space: directories, logical namespaces, owners, modes, ACLs
+Core         moobfs_layer module: installation, kernel compatibility, mount, diagnostics, update
+-----------  ext4 / btrfs / XFS (lower) on disk
 ```
 
 ### 1.1 Core
 
-| Item | Estado | Detalhe |
+| Item | Status | Detail |
 | --- | --- | --- |
-| Compilar (`make layer KDIR=...`), `insmod`/`mount -t moobfs_layer` (só em VM de teste; `MODULE_ALIAS_FS` permite `modprobe`) | EXISTE | |
-| DKMS, assinatura de módulo e Secure Boot | FUTURO | seção 6 (S10) |
-| Diagnóstico por `GET_INFO` (caps, flags, orçamento e uso do índice, tipo do inferior) | EXISTE | ioctl; sem ferramenta de linha de comando de uso geral |
-| Diagnóstico offline do inferior (`moobfs-check`, `moobfs-index` como oráculo) | EXISTE | `moobfs-check` sai com 0 limpo, 2 problemas, 1 erro |
+| Compile (`make layer KDIR=...`), `insmod`/`mount -t moobfs_layer` (only in a test VM; `MODULE_ALIAS_FS` allows `modprobe`) | EXISTS | |
+| DKMS, module signing and Secure Boot | FUTURE | section 6 (S10) |
+| Diagnostics via `GET_INFO` (caps, flags, index budget and usage, lower type) | EXISTS | ioctl; no general-purpose command-line tool |
+| Offline diagnostics of the lower (`moobfs-check`, `moobfs-index` as oracle) | EXISTS | `moobfs-check` exits with 0 clean, 2 problems, 1 error |
 
-Regra do Core (FUTURO): carregar só em hosts cujo `uname -r` está na matriz testada; fora dela,
-DKMS e `moobfs mount` recusam.
+Core rule (FUTURE): load only on hosts whose `uname -r` is in the tested matrix; outside it,
+DKMS and `moobfs mount` refuse.
 
 ### 1.2 Workspace
 
-Camada de espaço de usuário que o módulo deliberadamente **não** tem (`docs/spec-m3.md` §3).
+User-space tier that the module deliberately does **not** have (`docs/spec-m3.md` §3).
 
-| Responsabilidade | Mecanismo | Estado |
+| Responsibility | Mechanism | Status |
 | --- | --- | --- |
-| Criar diretório de namespace e subdiretórios (`shared/`, `agents/<agent>/`) | `mkdir`, `chown`, `chmod`, `setfacl` pela camada | EXISTE como comandos POSIX; ACLs funcionam pela camada desde `d0c8911`; nenhuma ferramenta os encapsula |
-| Conceder e revogar acesso | `setfacl -m`/`-x` e `usermod -aG`, encapsulados | FUTURO |
-| Auditar permissões e identidades | `moobfs-check` (identidade e atributos) mais varredura de modos | EXISTE (identidade/atributos); FUTURO (modos) |
+| Create the namespace directory and subdirectories (`shared/`, `agents/<agent>/`) | `mkdir`, `chown`, `chmod`, `setfacl` through the layer | EXISTS as POSIX commands; ACLs work through the layer since `d0c8911`; no tool wraps them |
+| Grant and revoke access | `setfacl -m`/`-x` and `usermod -aG`, wrapped | FUTURE |
+| Audit permissions and identities | `moobfs-check` (identity and attributes) plus a scan of modes | EXISTS (identity/attributes); FUTURE (modes) |
 
-### 1.3 Integração (contrato mínimo para clientes de agentes)
+### 1.3 Integration (minimum contract for agent clients)
 
-O contrato é o que `tests/` e a convenção do cliente de memória já exercitam. Nenhum servidor.
+The contract is what `tests/` and the memory client convention already exercise. No server.
 
-1. **Gravar** o conteúdo como arquivo comum dentro do diretório do agente (`write`, `fsync`,
-   `rename` atômico a partir de arquivo temporário no mesmo diretório). EXISTE.
-2. **Definir atributos tipados** `user.moob.*` pela API de xattr (`setxattr`, ou
-   `moobfs-attr set`). O kernel valida tipo e tamanho e recusa codificação inválida. Atributos
-   mínimos da convenção M3: `namespace`, `memory_id` (recomendado UUID v7), `agent`; proveniência
-   opcional `origin_namespace`, `origin_id`. EXISTE (validação); convenção documentada em
+1. **Write** the content as an ordinary file inside the agent's directory (`write`, `fsync`,
+   atomic `rename` from a temporary file in the same directory). EXISTS.
+2. **Set typed attributes** `user.moob.*` through the xattr API (`setxattr`, or
+   `moobfs-attr set`). The kernel validates type and size and refuses invalid encoding. Minimum
+   attributes of the M3 convention: `namespace`, `memory_id` (UUID v7 recommended), `agent`; optional
+   provenance `origin_namespace`, `origin_id`. EXISTS (validation); convention documented in
    `docs/spec-m3.md` §2.
-3. **Consultar** com `open(<raiz da montagem>, O_RDONLY|O_DIRECTORY)` e `ioctl(MOOB_IOC_QUERY)`
-   (até 4 termos, operadores `EQ/LT/LE/GT/GE/PREFIX/EXISTS`, `limit` até 4.096). O resultado é
-   caminho relativo à raiz; o cliente abre o arquivo normalmente e aceita `EACCES`/`ENOENT`
-   (contrato TOCTOU, `docs/spec-m3.md` §3.1). EXISTE.
-4. **Descobrir** capacidades com `MOOB_IOC_GET_INFO` antes de depender de algo (seção 2.8). EXISTE.
-5. Sem ioctl o cliente segue funcional (arquivos, xattr, varredura): nada preso. Biblioteca de
-   cliente que empacote os passos 2 a 4: FUTURO; `include/moobfs_ioctl.h` e `moobfs_attr.h` já
-   são compartilhados com o módulo (campos de largura fixa).
+3. **Query** with `open(<mount root>, O_RDONLY|O_DIRECTORY)` and `ioctl(MOOB_IOC_QUERY)`
+   (up to 4 terms, operators `EQ/LT/LE/GT/GE/PREFIX/EXISTS`, `limit` up to 4 096). The result is a
+   path relative to the root; the client opens the file normally and accepts `EACCES`/`ENOENT`
+   (TOCTOU contract, `docs/spec-m3.md` §3.1). EXISTS.
+4. **Discover** capabilities with `MOOB_IOC_GET_INFO` before depending on anything (section 2.8). EXISTS.
+5. Without the ioctl the client remains functional (files, xattr, scan): no lock-in. A client
+   library that packages steps 2 to 4: FUTURE; `include/moobfs_ioctl.h` and `moobfs_attr.h` are already
+   shared with the module (fixed-width fields).
 
-## 2. Perguntas operacionais
+## 2. Operational questions
 
-### 2.1 Um mount por host ou um mount por agente
+### 2.1 One mount per host or one mount per agent
 
-| Critério | Um mount por host (por inferior) | Um mount por agente |
+| Criterion | One mount per host (per lower) | One mount per agent |
 | --- | --- | --- |
-| Isolamento | POSIX por diretório; `QUERY` filtrado pelo chamador (fase 3b, `ISOLATION_PASS` em ext4/btrfs/XFS) | acrescenta isolamento por caminho: o agente só vê seu `lower=` |
-| Memória do índice | um índice, um `index_budget` (padrão 128 MiB) | `N` orçamentos somados; nada é compartilhado entre montagens |
-| Reconstrução | uma varredura do inferior inteiro por montagem | varreduras menores e independentes |
-| `QUERY` | varre candidatos de todos e descarta os inacessíveis (lotes de 256, uma resolução de caminho por candidato) | só candidatos do agente |
-| Administração | um `fstab`, um `moobfs-check` | `N` de cada |
-| Contêineres | `QUERY` exige a raiz (2.5) | cada contêiner recebe a raiz do seu superbloco |
+| Isolation | POSIX per directory; `QUERY` filtered by the caller (phase 3b, `ISOLATION_PASS` on ext4/btrfs/XFS) | adds path isolation: the agent only sees its own `lower=` |
+| Index memory | one index, one `index_budget` (default 128 MiB) | `N` budgets added up; nothing is shared between mounts |
+| Rebuild | one scan of the whole lower per mount | smaller, independent scans |
+| `QUERY` | scans candidates from everyone and discards the inaccessible ones (batches of 256, one path resolution per candidate) | only the agent's candidates |
+| Administration | one `fstab`, one `moobfs-check` | `N` of each |
+| Containers | `QUERY` requires the root (2.5) | each container receives the root of its superblock |
 
-**Recomendação (EXISTE como configuração):** um mount por host por filesystem inferior,
-namespaces como diretórios (`/<ns>/shared/`, `/<ns>/agents/<agent>/`), um uid/grupo por agente
-e `nolinks`. Menos memória, um ponto de administração, compartilhamento por permissão. O custo
-de varrer candidatos alheios no `QUERY` não foi medido: **DEPENDE DO M4** (W3).
-**Mount por agente faz sentido** quando: o agente roda em contêiner e precisa de `QUERY`;
-agentes de confiança muito diferente (um erro de ACL não pode expor o outro); é preciso
-remontar, restaurar ou apagar um agente isoladamente; há `index_budget` ou `noindex`
-distintos; ou os inferiores diferem (btrfs com snapshots versus ext4). Não há testes com
-dezenas de montagens nem dados de escala.
+**Recommendation (EXISTS as configuration):** one mount per host per lower filesystem,
+namespaces as directories (`/<ns>/shared/`, `/<ns>/agents/<agent>/`), one uid/group per agent
+and `nolinks`. Less memory, one point of administration, sharing by permission. The cost
+of scanning other agents' candidates in `QUERY` has not been measured: **DEPENDS ON M4** (W3).
+**A mount per agent makes sense** when: the agent runs in a container and needs `QUERY`;
+agents of very different trust (an ACL mistake must not expose the other); it is necessary to
+remount, restore or delete one agent in isolation; there are distinct `index_budget` or `noindex`
+settings; or the lowers differ (btrfs with snapshots versus ext4). There are no tests with
+dozens of mounts and no scale data.
 
-### 2.2 Diretórios privados e compartilhados
+### 2.2 Private and shared directories
 
-Criar com a camada montada (ou desmontada). Comandos POSIX EXISTEM; automação é FUTURO.
+Create with the layer mounted (or unmounted). The POSIX commands EXIST; automation is FUTURE.
 
-| Necessidade | Dono:grupo | Modo / ACL |
+| Need | Owner:group | Mode / ACL |
 | --- | --- | --- |
-| Raiz da montagem | `root:root` | `0755` (o ioctl exige abrir a raiz; `0711`/`0700` bloqueiam o agente, achado do registro 0020) |
-| Diretório do namespace `/<ns>` | `root:moob-<ns>` | `0750` |
-| Privada do agente `/<ns>/agents/<a>` | `<a>:<a>` | `0700`, arquivos `0600` |
-| Privada com auditor, ou compartilhada só leitura (`2750`) | idem | `0700` + `setfacl -m u:auditor:rX` e `-d -m u:auditor:rX` |
-| Compartilhada com escrita `/<ns>/shared` | `root:moob-<ns>` | `2770` (setgid: novos arquivos herdam o grupo) + `setfacl -d -m g:moob-<ns>:rwX` |
+| Mount root | `root:root` | `0755` (the ioctl requires opening the root; `0711`/`0700` block the agent, finding from journal 0020) |
+| Namespace directory `/<ns>` | `root:moob-<ns>` | `0750` |
+| Agent-private `/<ns>/agents/<a>` | `<a>:<a>` | `0700`, files `0600` |
+| Private with auditor, or read-only shared (`2750`) | same | `0700` + `setfacl -m u:auditor:rX` and `-d -m u:auditor:rX` |
+| Shared with write access `/<ns>/shared` | `root:moob-<ns>` | `2770` (setgid: new files inherit the group) + `setfacl -d -m g:moob-<ns>:rwX` |
 
-Fatos: todo diretório do caminho precisa de `x` para o chamador, senão o resultado do `QUERY`
-é omitido; mudar `user.moob.namespace`/`agent` não concede acesso; `chmod`/`setfacl` valem no
-próximo `QUERY`; ACLs POSIX atravessam a camada desde `d0c8911`; renomear diretório deixa
-caminhos obsoletos até remontar (seção 7); `nolinks` evita hard links entre agentes.
+Facts: every directory in the path needs `x` for the caller, otherwise the `QUERY` result
+is omitted; changing `user.moob.namespace`/`agent` does not grant access; `chmod`/`setfacl` take effect on the
+next `QUERY`; POSIX ACLs pass through the layer since `d0c8911`; renaming a directory leaves
+stale paths until remount (section 7); `nolinks` prevents hard links between agents.
 
-### 2.3 Impedir que agentes contornem a camada pelo diretório inferior
+### 2.3 Preventing agents from bypassing the layer through the lower directory
 
-Quem escreve no inferior por fora ignora a validação de atributos e o filtro do `QUERY` e
-viola a regra "inferior imutável com a camada montada". Medidas, da mais simples à mais forte:
+Whoever writes to the lower from outside skips attribute validation and the `QUERY` filter and
+violates the rule "lower immutable with the layer mounted". Measures, from simplest to strongest:
 
-1. `lower=` em `/var/lib/moobfs/<nome>` com `root:root 0700` (todos os componentes sem `x` para outros).
-2. Montagem em `/srv/memory`, inferior em caminho que o agente não alcança.
-3. Separação de mount namespace: agentes iniciam em outro namespace (`unshare -m` ou contêiner)
-   onde só o ponto da camada existe (por bind mount), com propagação `private`/`slave` para o
-   inferior não vazar.
-4. Agentes sem `CAP_DAC_OVERRIDE`, `CAP_DAC_READ_SEARCH`, `CAP_SYS_ADMIN` (`--cap-drop=ALL`, uid não root);
-   perfil AppArmor/SELinux para o caminho do inferior é opcional (FUTURO).
+1. `lower=` at `/var/lib/moobfs/<name>` with `root:root 0700` (all components without `x` for others).
+2. Mount at `/srv/memory`, lower at a path the agent cannot reach.
+3. Mount namespace separation: agents start in another namespace (`unshare -m` or a container)
+   where only the layer's mount point exists (via bind mount), with `private`/`slave` propagation so the
+   lower does not leak.
+4. Agents without `CAP_DAC_OVERRIDE`, `CAP_DAC_READ_SEARCH`, `CAP_SYS_ADMIN` (`--cap-drop=ALL`, non-root uid);
+   an AppArmor/SELinux profile for the lower's path is optional (FUTURE).
 
-**Limite honesto:** root, `CAP_SYS_ADMIN`, `CAP_DAC_OVERRIDE` ou acesso ao dispositivo sempre
-contornam. A camada não é fronteira contra root e não promete confidencialidade além do
-inferior (S1); para isso, dm-crypt/fscrypt no inferior. Modificação indevida do inferior só é
-detectada na remontagem ou por `moobfs-check`, nunca em tempo real.
+**Honest limit:** root, `CAP_SYS_ADMIN`, `CAP_DAC_OVERRIDE` or access to the device always
+bypass it. The layer is not a boundary against root and does not promise confidentiality beyond the
+lower (S1); for that, dm-crypt/fscrypt on the lower. Improper modification of the lower is only
+detected at remount or by `moobfs-check`, never in real time.
 
-### 2.4 Identidade e proveniência ao compartilhar ou clonar
+### 2.4 Identity and provenance when sharing or cloning
 
-Chave `(namespace, memory_id)`; conteúdo igual não é identidade igual; reflink é
-compartilhamento físico (`docs/spec-m3.md` §2).
+Key `(namespace, memory_id)`; equal content is not equal identity; reflink is
+physical sharing (`docs/spec-m3.md` §2).
 
-| Operação | Efeito | Ação do cliente |
+| Operation | Effect | Client action |
 | --- | --- | --- |
-| Compartilhar no mesmo namespace | nenhuma cópia | conceder ACL ao diretório |
-| `cp --reflink=auto` ou `FICLONE` (reflink só em btrfs/XFS; ext4 copia) | novo inode; xattr só se a ferramenta o copiar (`cp -a`) | novo `memory_id`, `namespace` de destino, `origin_namespace`, `origin_id` do original |
-| `ln` (hard link) | mesmo inode e atributos | não usar para identidades distintas; `nolinks` impede |
-| `rename` | identidade preservada | nada |
+| Share within the same namespace | no copy | grant an ACL on the directory |
+| `cp --reflink=auto` or `FICLONE` (reflink only on btrfs/XFS; ext4 copies) | new inode; xattrs only if the tool copies them (`cp -a`) | new `memory_id`, destination `namespace`, `origin_namespace`, `origin_id` of the original |
+| `ln` (hard link) | same inode and attributes | do not use for distinct identities; `nolinks` prevents it |
+| `rename` | identity preserved | nothing |
 
-Receita manual (grava sob nome temporário e só então faz `rename`, porque entre `cp` e a troca
-do `memory_id` há dois inodes com a mesma chave, exatamente o erro de `moobfs-check`):
+Manual recipe (writes under a temporary name and only then does the `rename`, because between `cp` and the change
+of `memory_id` there are two inodes with the same key, which is exactly the `moobfs-check` error):
 
 ```sh
 cp --reflink=auto -p ns-a/shared/x.md ns-b/agents/b/.x.tmp
@@ -158,243 +158,243 @@ moobfs-attr set ns-b/agents/b/.x.tmp namespace string ns-b
 mv ns-b/agents/b/.x.tmp ns-b/agents/b/x.md
 ```
 
-`moobfs-check` classifica: normal (mesmo id em namespaces distintos), aviso (mesmo id e
-conteúdo idêntico sem proveniência), erro (dois inodes com a mesma chave). EXISTE (verificação);
-`moobfs memory clone` é FUTURO.
+`moobfs-check` classifies: normal (same id in different namespaces), warning (same id and
+identical content without provenance), error (two inodes with the same key). EXISTS (check);
+`moobfs memory clone` is FUTURE.
 
-### 2.5 Subdiretórios para contêineres com bind mount
+### 2.5 Subdirectories for containers with bind mounts
 
-Restrições do código: sem mount idmapped (`mount_setattr` com idmap dá `EINVAL`; sem
-`FS_ALLOW_IDMAP`) e sem montar dentro de user namespace (sem `FS_USERNS_MOUNT`; exige
-`CAP_SYS_ADMIN` no namespace inicial). O contêiner nunca monta a camada; recebe bind mount de
-algo montado no host.
+Constraints in the code: no idmapped mount (`mount_setattr` with idmap gives `EINVAL`; no
+`FS_ALLOW_IDMAP`) and no mounting inside a user namespace (no `FS_USERNS_MOUNT`; requires
+`CAP_SYS_ADMIN` in the initial namespace). The container never mounts the layer; it receives a bind mount of
+something mounted on the host.
 
-Padrão: (1) montar a camada no host; (2) bind-mount, leitura e escrita, apenas do diretório do
-agente (`/srv/memory/ns-a/agents/a1`); (3) **alinhar uids**: o processo roda com o mesmo
-uid/gid numérico dono dos arquivos (`--user 20001:20001`, sem userns do runtime ou com
-mapeamento 1:1), pois não há idmap para corrigir; (4) leitura, escrita e `setxattr` funcionam e
-o kernel valida a codificação.
+Pattern: (1) mount the layer on the host; (2) bind-mount, read-write, only the agent's
+directory (`/srv/memory/ns-a/agents/a1`); (3) **align uids**: the process runs with the same
+numeric uid/gid that owns the files (`--user 20001:20001`, without the runtime's userns or with
+1:1 mapping), since there is no idmap to correct it; (4) read, write and `setxattr` work and
+the kernel validates the encoding.
 
-**Limitação, dita sem rodeios:** `QUERY` e `GET_INFO` só aceitam descritor cujo dentry é a
-raiz do superbloco (`ENOTTY` caso contrário). Um bind mount de subdiretório **não pode emitir
-`QUERY`**. Alternativas (nenhuma implementada):
+**Limitation, stated plainly:** `QUERY` and `GET_INFO` only accept a descriptor whose dentry is the
+root of the superblock (`ENOTTY` otherwise). A bind mount of a subdirectory **cannot issue
+`QUERY`**. Alternatives (none implemented):
 
-| Alternativa | Custo / risco | Estado |
+| Alternative | Cost / risk | Status |
 | --- | --- | --- |
-| Bind-mount adicional da **raiz inteira** em leitura, ao lado do subdiretório gravável | resultados continuam filtrados pelas credenciais do agente, mas a raiz fica navegável conforme o POSIX; o ioctl não verifica `MNT_READONLY`, porém **não foi testado** em bind `ro` | FUTURO, a validar |
-| Um mount por agente, com a raiz dele montada no contêiner | mais memória e administração | EXISTE como configuração |
-| Helper fora do contêiner que abre a raiz e emite `QUERY`, entregando o resultado por socket Unix local ou descritor herdado (sem rede, sem daemon HTTP) | precisa assumir o uid do agente antes do ioctl, senão consulta com outras credenciais (confused deputy) | FUTURO, desenho não detalhado |
-| Cliente varre árvore e xattr (`find` + `moobfs-attr list`) | perde o índice; custo linear | EXISTE |
+| An additional read-only bind mount of the **entire root**, next to the writable subdirectory | results remain filtered by the agent's credentials, but the root becomes browsable according to POSIX; the ioctl does not check `MNT_READONLY`, but it **has not been tested** on an `ro` bind | FUTURE, to be validated |
+| One mount per agent, with its root mounted in the container | more memory and administration | EXISTS as configuration |
+| A helper outside the container that opens the root and issues `QUERY`, delivering the result over a local Unix socket or an inherited descriptor (no network, no HTTP daemon) | must assume the agent's uid before the ioctl, otherwise it queries with other credentials (confused deputy) | FUTURE, design not detailed |
+| Client scans the tree and xattrs (`find` + `moobfs-attr list`) | loses the index; linear cost | EXISTS |
 
-Contêiner em userns mapeado: não testado.
+Container in a mapped userns: not tested.
 
-### 2.6 Instalação em distribuições
+### 2.6 Installation on distributions
 
-| Aspecto | Proposta | Estado |
+| Aspect | Proposal | Status |
 | --- | --- | --- |
-| DKMS | fontes de `layer/`, `include/`, `common/attr.c` em `/usr/src/moobfs-<v>/`; `dkms.conf` com módulo `moobfs_layer`, `AUTOINSTALL=yes` | FUTURO |
-| Política de kernel | instalar só se `uname -r` está na matriz (seção 6); fora dela, `BUILD_EXCLUSIVE_KERNEL` e mensagem. A API de VFS muda entre séries (o módulo usa `backing_file_*`, `fs_context`, `mnt_idmap` do 6.12) | FUTURO |
+| DKMS | sources of `layer/`, `include/`, `common/attr.c` in `/usr/src/moobfs-<v>/`; `dkms.conf` with module `moobfs_layer`, `AUTOINSTALL=yes` | FUTURE |
+| Kernel policy | install only if `uname -r` is in the matrix (section 6); outside it, `BUILD_EXCLUSIVE_KERNEL` and a message. The VFS API changes between series (the module uses `backing_file_*`, `fs_context`, `mnt_idmap` from 6.12) | FUTURE |
 
-### 2.7 Atualizar, desmontar, fazer backup e recuperar sem perda
+### 2.7 Upgrading, unmounting, backing up and recovering without loss
 
-O inferior é a fonte de verdade; o único formato próprio é a codificação versionada do xattr.
+The lower is the source of truth; the only format of our own is the versioned xattr encoding.
 
-- **Desmontar:** `umount`; nada próprio é gravado, o índice some. Durabilidade é a do inferior
-  e do `fsync` do cliente (validada com `dm-log-writes` e `dm-flakey`). EXISTE.
-- **Atualizar o módulo:** parar agentes, `sync`, `umount`, `rmmod moobfs_layer`, instalar o
-  novo, `modprobe`, `moobfs-check <lower>`, montar, conferir `GET_INFO`. Reverter é o caminho
-  inverso; o módulo recusa montar se `user.moob.format` for de versão maior que a suportada.
-  Mudança de formato exige especificação, testes de entradas inválidas e decisão de compatibilidade.
-- **Backup:** `rsync -aHAX --numeric-ids <lower>/ destino/` (`-X` é obrigatório: sem ele os
-  `user.moob.*` se perdem; `-A` preserva ACLs). `git` versiona conteúdo, **não** xattr
-  arbitrários; usar com exportação dos atributos (FUTURO). Snapshot read-only de btrfs do
-  inferior não o modifica e é consistente por subvolume. Imagem de dispositivo só desmontado.
-- **Restaurar:** copiar para diretório novo, `moobfs-check`, montar, comparar `QUERY` com o
-  oráculo `moobfs-index`. Ferramentas EXISTEM; roteiro automatizado é FUTURO.
-- **Recuperar:** após queda, `fsck` do inferior, `moobfs-check`, remontar (o índice é
-  reconstruído). Atributo inválido: `moobfs-check` lista caminho e motivo (saída 2), conserto
-  manual com `moobfs-attr`; não repara. Sem módulo: montar o inferior diretamente
-  (`grep`, `getfattr`, `git`, `rsync` funcionam); escritas diretas não passam pela validação,
-  então rodar `moobfs-check` antes de remontar. Índice estourado (`MOOB_FLAG_INDEX_INCOMPLETE`):
-  aumentar `index_budget` ou usar `noindex`.
+- **Unmount:** `umount`; nothing of our own is written, the index disappears. Durability is that of the lower
+  and of the client's `fsync` (validated with `dm-log-writes` and `dm-flakey`). EXISTS.
+- **Upgrade the module:** stop agents, `sync`, `umount`, `rmmod moobfs_layer`, install the
+  new one, `modprobe`, `moobfs-check <lower>`, mount, check `GET_INFO`. Rolling back is the reverse
+  path; the module refuses to mount if `user.moob.format` is of a higher version than the supported one.
+  A format change requires a specification, tests of invalid inputs and a compatibility decision.
+- **Backup:** `rsync -aHAX --numeric-ids <lower>/ target/` (`-X` is mandatory: without it the
+  `user.moob.*` attributes are lost; `-A` preserves ACLs). `git` versions content, **not** arbitrary
+  xattrs; use it with an export of the attributes (FUTURE). A read-only btrfs snapshot of the
+  lower does not modify it and is consistent per subvolume. Device image only when unmounted.
+- **Restore:** copy to a new directory, `moobfs-check`, mount, compare `QUERY` with the
+  `moobfs-index` oracle. The tools EXIST; an automated runbook is FUTURE.
+- **Recover:** after a crash, `fsck` of the lower, `moobfs-check`, remount (the index is
+  rebuilt). Invalid attribute: `moobfs-check` lists path and reason (exit 2), manual
+  fix with `moobfs-attr`; it does not repair. Without the module: mount the lower directly
+  (`grep`, `getfattr`, `git`, `rsync` work); direct writes do not go through validation,
+  so run `moobfs-check` before remounting. Index overflowed (`MOOB_FLAG_INDEX_INCOMPLETE`):
+  increase `index_budget` or use `noindex`.
 
-### 2.8 Descoberta de capacidades por `GET_INFO`
+### 2.8 Capability discovery via `GET_INFO`
 
-Primeira chamada de um cliente (ioctl na raiz, EXISTE; sem ferramenta de linha de comando).
-| Campo | Significado / uso |
+A client's first call (ioctl on the root, EXISTS; no command-line tool).
+| Field | Meaning / use |
 | --- | --- |
-| `uapi_version`, `format_version`, `attr_*_max` | recusar versão desconhecida; gravar atributos nesta versão e validar limites no cliente |
-| `caps` REFLINK / DATA_CHECKSUMS / SNAPSHOTS | anunciados pelo **tipo** do inferior (btrfs: os três; xfs, ocfs2, bcachefs: reflink), não por sonda; XFS sem `reflink=1` pode anunciar o que não tem, então tratar `EOPNOTSUPP` |
-| `caps` XATTR | inferior aceita xattr; sem isso atributos tipados não funcionam |
-| `flags` NOLINKS / INDEX_OFF | não tentar `ln`; com `noindex`, varrer em vez de `QUERY` |
-| `flags` PATHS_STALE | esperar falsos negativos no `QUERY` até remontar |
-| `flags` INDEX_INCOMPLETE | orçamento atingido; `QUERY` pode omitir |
-| `index_budget`, `index_used`, `index_entries`, `index_inodes`, `lower_fs` | monitorar ocupação (alertar perto do orçamento), registrar o inferior |
+| `uapi_version`, `format_version`, `attr_*_max` | refuse an unknown version; write attributes in this version and validate limits in the client |
+| `caps` REFLINK / DATA_CHECKSUMS / SNAPSHOTS | announced by the lower's **type** (btrfs: all three; xfs, ocfs2, bcachefs: reflink), not by probing; XFS without `reflink=1` may announce what it does not have, so handle `EOPNOTSUPP` |
+| `caps` XATTR | the lower accepts xattrs; without it typed attributes do not work |
+| `flags` NOLINKS / INDEX_OFF | do not attempt `ln`; with `noindex`, scan instead of `QUERY` |
+| `flags` PATHS_STALE | expect false negatives in `QUERY` until remount |
+| `flags` INDEX_INCOMPLETE | budget reached; `QUERY` may omit |
+| `index_budget`, `index_used`, `index_entries`, `index_inodes`, `lower_fs` | monitor occupancy (alert near the budget), record the lower |
 
-### 2.9 O que existe, o que falta, o que depende do M4
+### 2.9 What exists, what is missing, what depends on M4
 
-| Tema | EXISTE | FUTURO | DEPENDE DO M4 |
+| Topic | EXISTS | FUTURE | DEPENDS ON M4 |
 | --- | --- | --- | --- |
-| Passagem POSIX, atributos tipados, ACLs | sim | biblioteca de cliente | — |
-| `QUERY` autorizado pelo chamador | sim (VM Debian) | KASAN na branch; `chmod`/`rename` concorrentes | custo por candidato (W3) |
-| `moobfs-check` com identidade | sim | verificar modos e ACLs | — |
-| DKMS, pacotes, assinatura, CLI `moobfs` | não | sim | — |
-| `QUERY` em contêiner com subdiretório; persistência do índice | não | raiz `ro` ou helper | persistência: M4 |
-| `QUERY_BATCH`, `READ_BATCH`, cursor; escala suportada | não; sem números | — | M4 (decisão) |
+| POSIX passthrough, typed attributes, ACLs | yes | client library | — |
+| `QUERY` authorized by the caller | yes (Debian VM) | KASAN on the branch; concurrent `chmod`/`rename` | per-candidate cost (W3) |
+| `moobfs-check` with identity | yes | check modes and ACLs | — |
+| DKMS, packages, signing, `moobfs` CLI | no | yes | — |
+| `QUERY` in a container with a subdirectory; index persistence | no | `ro` root or helper | persistence: M4 |
+| `QUERY_BATCH`, `READ_BATCH`, cursor; supported scale | no; no numbers | — | M4 (decision) |
 
-## 3. Experiência CLI proposta (FUTURO)
+## 3. Proposed CLI experience (FUTURE)
 
-Um único executável `moobfs`, sem daemon, sem estado além de um manifesto de texto
-(`/etc/moobfs/moobfs.conf`); cada subcomando é *wrapper* fino de ferramentas ou syscalls
-existentes (`moobfs attr ...` repassa a `moobfs-attr`). Nada é implementado hoje.
+A single `moobfs` executable, no daemon, no state beyond a text manifest
+(`/etc/moobfs/moobfs.conf`); each subcommand is a thin *wrapper* around existing tools or syscalls
+(`moobfs attr ...` forwards to `moobfs-attr`). Nothing is implemented today.
 
-| Subcomando | Faz | Construído sobre | Estado |
+| Subcommand | Does | Built on | Status |
 | --- | --- | --- | --- |
-| `moobfs mount <lower> <ponto> [--nolinks] [--noindex] [--index-budget 256M]` | verifica kernel contra a matriz, verifica `lower` (modo, dono, não é outra camada), `mount -t moobfs_layer` | `mount(8)`, `uname`, matriz | FUTURO |
-| `moobfs status [ponto]` | imprime `GET_INFO` (caps, flags, orçamento e uso) e o módulo carregado/versão | `MOOB_IOC_GET_INFO` | FUTURO |
-| `moobfs workspace create <ns> [--agents a1,a2] [--shared]` | cria `/<ns>/shared`, `/<ns>/agents/<a>`, grupos, modos, ACLs padrão | `mkdir`, `chown`, `chmod`, `setfacl`, `groupadd` | FUTURO |
-| `moobfs check <lower\|ponto>` (wrapper de `moobfs-check`) | invoca verificações | `moobfs-check` | FUTURO |
-| `moobfs workspace grant\|revoke <ns> <agente\|usuario> [ro\|rw]`; `workspace list` | `setfacl -m`/`-x` (com `-d`); lista namespaces, donos, ACLs e contagem de memórias (`QUERY` `EXISTS memory_id`) | ACL POSIX, `getfacl`, `MOOB_IOC_QUERY` | FUTURO |
-| `moobfs query <ponto> --where namespace=ns-a --where tags~prefix ...` | abre a raiz, emite `QUERY` com as credenciais de quem executa, imprime caminhos (JSON linha a linha) | `MOOB_IOC_QUERY`, `tests/query.c` como base | FUTURO |
-| `moobfs memory clone <origem> <destino-ns>` | seção 2.4, com troca atômica | `cp --reflink`, `moobfs-attr`, `rename` | FUTURO |
+| `moobfs mount <lower> <mountpoint> [--nolinks] [--noindex] [--index-budget 256M]` | checks the kernel against the matrix, checks `lower` (mode, owner, not another layer), `mount -t moobfs_layer` | `mount(8)`, `uname`, matrix | FUTURE |
+| `moobfs status [mountpoint]` | prints `GET_INFO` (caps, flags, budget and usage) and the loaded module/version | `MOOB_IOC_GET_INFO` | FUTURE |
+| `moobfs workspace create <ns> [--agents a1,a2] [--shared]` | creates `/<ns>/shared`, `/<ns>/agents/<a>`, groups, modes, default ACLs | `mkdir`, `chown`, `chmod`, `setfacl`, `groupadd` | FUTURE |
+| `moobfs check <lower\|mountpoint>` (wrapper of `moobfs-check`) | invokes checks | `moobfs-check` | FUTURE |
+| `moobfs workspace grant\|revoke <ns> <agent\|user> [ro\|rw]`; `workspace list` | `setfacl -m`/`-x` (with `-d`); lists namespaces, owners, ACLs and memory count (`QUERY` `EXISTS memory_id`) | POSIX ACL, `getfacl`, `MOOB_IOC_QUERY` | FUTURE |
+| `moobfs query <mountpoint> --where namespace=ns-a --where tags~prefix ...` | opens the root, issues `QUERY` with the credentials of whoever runs it, prints paths (JSON line by line) | `MOOB_IOC_QUERY`, `tests/query.c` as a base | FUTURE |
+| `moobfs memory clone <source> <target-ns>` | section 2.4, with atomic swap | `cp --reflink`, `moobfs-attr`, `rename` | FUTURE |
 
-Princípios: saída `--json`, códigos de saída como os de `moobfs-check` (0 limpo, 2 problemas,
-1 erro), nada é sobrescrito, nada destrutivo sem `--yes`, nenhuma rede.
+Principles: `--json` output, exit codes like those of `moobfs-check` (0 clean, 2 problems,
+1 error), nothing is overwritten, nothing destructive without `--yes`, no network.
 
-## 4. Fluxo completo (alvo; hoje só os passos 2 e 3 manuais em VM são EXISTE)
+## 4. Complete flow (target; today only steps 2 and 3, manual in a VM, are EXISTS)
 
-Cenário: host Debian com kernel da matriz, inferior ext4 em `/dev/vdb`.
-1. **Instalar (FUTURO):** `apt install moobfs-dkms moobfs-tools`; DKMS compila para o kernel em
-   uso e recusa kernel fora da matriz; com Secure Boot, assinar com MOK. Hoje: `make layer KDIR=...`, `insmod`.
-2. **Inferior (EXISTE, POSIX):** `mkfs.ext4 /dev/vdb`, montar em `/var/lib/moobfs/store`, `chmod 0700`.
-3. **Montar (EXISTE; `moobfs mount` FUTURO):**
+Scenario: Debian host with a kernel from the matrix, ext4 lower on `/dev/vdb`.
+1. **Install (FUTURE):** `apt install moobfs-dkms moobfs-tools`; DKMS compiles for the running kernel
+   and refuses a kernel outside the matrix; with Secure Boot, sign with MOK. Today: `make layer KDIR=...`, `insmod`.
+2. **Lower (EXISTS, POSIX):** `mkfs.ext4 /dev/vdb`, mount at `/var/lib/moobfs/store`, `chmod 0700`.
+3. **Mount (EXISTS; `moobfs mount` FUTURE):**
    `mount -t moobfs_layer -o lower=/var/lib/moobfs/store,nolinks,index_budget=256M none /srv/memory`;
-   `chmod 0755 /srv/memory`; conferir `/proc/mounts` e `GET_INFO`.
-4. **Workspace (FUTURO; hoje manual):** `moobfs workspace create projeto-x --agents planner,coder --shared`
-   cria grupo, usuários, diretórios `2770`/`0700` e ACLs padrão (2.2).
-5. **Integrar o agente:** roda com seu uid; recebe o caminho do seu diretório e o da raiz;
-   segue o contrato da seção 1.3 (gravar com `fsync` + `rename`, definir `namespace`, `agent`,
-   `memory_id`, `QUERY` na raiz, `open()` tratando `EACCES`/`ENOENT`). Em contêiner: bind mount
-   do diretório do agente e, para `QUERY`, uma das alternativas de 2.5.
-6. **Operar:** `moobfs status`, `moobfs check` periódico sobre inferior desmontado ou snapshot,
-   backup `rsync -aHAX`; compartilhar entre namespaces por clonagem com nova identidade (2.4).
-7. **Remover agente:** `moobfs workspace revoke`, arquivar `agents/<a>` preservando xattr,
-   `userdel`. **Remover workspace:** arquivar e apagar `/<ns>` pela camada (nunca por fora com
-   ela montada), `groupdel`.
-8. **Desinstalar:** `umount`, `rmmod moobfs_layer`, remover pacotes. O inferior permanece como
-   árvore comum com `user.moob.*` legível por `grep`, `getfattr`, `git`, `rsync`.
+   `chmod 0755 /srv/memory`; check `/proc/mounts` and `GET_INFO`.
+4. **Workspace (FUTURE; manual today):** `moobfs workspace create project-x --agents planner,coder --shared`
+   creates the group, users, `2770`/`0700` directories and default ACLs (2.2).
+5. **Integrate the agent:** it runs with its own uid; receives the path of its directory and that of the root;
+   follows the contract in section 1.3 (write with `fsync` + `rename`, set `namespace`, `agent`,
+   `memory_id`, `QUERY` on the root, `open()` handling `EACCES`/`ENOENT`). In a container: bind mount
+   of the agent's directory and, for `QUERY`, one of the alternatives in 2.5.
+6. **Operate:** `moobfs status`, periodic `moobfs check` on an unmounted lower or a snapshot,
+   backup with `rsync -aHAX`; share between namespaces by cloning with a new identity (2.4).
+7. **Remove an agent:** `moobfs workspace revoke`, archive `agents/<a>` preserving xattrs,
+   `userdel`. **Remove a workspace:** archive and delete `/<ns>` through the layer (never from outside with
+   it mounted), `groupdel`.
+8. **Uninstall:** `umount`, `rmmod moobfs_layer`, remove packages. The lower remains as an
+   ordinary tree with `user.moob.*` readable by `grep`, `getfattr`, `git`, `rsync`.
 
-## 5. Modelo de permissões e isolamento
+## 5. Permission and isolation model
 
-Apenas POSIX (bits, grupos, ACLs, setgid). Atributos tipados não concedem nem negam acesso.
-Autorização do `QUERY`: resolução do caminho com as credenciais do chamador mais
-`inode_permission(MAY_READ)`, igual a um `open()` (registro 0020).
+POSIX only (bits, groups, ACLs, setgid). Typed attributes neither grant nor deny access.
+`QUERY` authorization: path resolution with the caller's credentials plus
+`inode_permission(MAY_READ)`, the same as an `open()` (journal 0020).
 
-| Ator | Pode | Não pode | Observação |
+| Actor | Can | Cannot | Note |
 | --- | --- | --- | --- |
-| Administrador (root, `CAP_SYS_ADMIN`) | montar/desmontar, carregar módulo, ler e escrever o inferior, contornar toda permissão, criar workspaces | — | única fronteira que a camada não protege |
-| Agente (uid próprio, sem capacidades) | ler e escrever seu diretório; ler `shared/` conforme grupo/ACL; definir `user.moob.*` em arquivos que pode escrever; `QUERY` sobre o que enxerga | ver resultados de diretórios inacessíveis (omitidos em silêncio); montar; acessar o inferior | trocar `namespace` ou `agent` num atributo não amplia acesso |
-| Processo em contêiner (uid alinhado) | igual ao agente, limitado aos mounts recebidos | `QUERY` se só tem subdiretório (2.5); montar a camada | mount em userns e idmapped recusados |
-| Quem tem acesso ao disco/inferior | tudo (fora da camada) | — | mitigação: dm-crypt/fscrypt no inferior, fora do escopo da camada |
+| Administrator (root, `CAP_SYS_ADMIN`) | mount/unmount, load the module, read and write the lower, bypass every permission, create workspaces | — | the only boundary the layer does not protect |
+| Agent (own uid, no capabilities) | read and write its directory; read `shared/` according to group/ACL; set `user.moob.*` on files it can write; `QUERY` over what it can see | see results from inaccessible directories (silently omitted); mount; access the lower | changing `namespace` or `agent` in an attribute does not widen access |
+| Process in a container (aligned uid) | same as the agent, limited to the mounts it receives | `QUERY` if it only has a subdirectory (2.5); mount the layer | mount in a userns and idmapped mount refused |
+| Whoever has access to the disk/lower | everything (outside the layer) | — | mitigation: dm-crypt/fscrypt on the lower, outside the layer's scope |
 
-Verificado na suíte da fase 3b (ext4, btrfs, XFS): sem vazamento entre dois uids e namespaces;
-reatribuição de atributo não concede acesso; `chmod` vale de imediato; isolamento após
-remontagem; 600 candidatos privados e 6 autorizados em mais de um lote. Também verificado em 2026-10-10 (registro 0020): ACLs POSIX pela camada, identidade com
-`moobfs-check`, `mount_setattr` idmap recusado com `EINVAL` e mount em user namespace recusado
-com `EPERM`. Pendente: KASAN na branch e concorrência `chmod`/`rename`/`unlink` com consultas.
+Verified in the phase 3b suite (ext4, btrfs, XFS): no leak between two uids and namespaces;
+attribute reassignment does not grant access; `chmod` takes effect immediately; isolation after
+remount; 600 private candidates and 6 authorized ones across more than one batch. Also verified on 2026-10-10 (journal 0020): POSIX ACLs through the layer, identity with
+`moobfs-check`, `mount_setattr` idmap refused with `EINVAL` and mount in a user namespace refused
+with `EPERM`. Pending: KASAN on the branch and `chmod`/`rename`/`unlink` concurrency with queries.
 
-## 6. Empacotamento e compatibilidade
+## 6. Packaging and compatibility
 
-| Tópico | Proposta | Estado |
+| Topic | Proposal | Status |
 | --- | --- | --- |
-| DKMS | `dkms.conf` com nome `moobfs`, versão do repositório, `PRE_BUILD` que recusa kernel fora da matriz, `POST_INSTALL` que roda `depmod`; árvore de fontes: `layer/*.c`, `layer/moobl.h`, `include/*.h`, `common/attr.c` | FUTURO |
-| Pacotes | `moobfs-dkms` (fontes + `dkms.conf`), `moobfs-tools` (`moobfs-attr`, `moobfs-check`, `moobfs-index`, futuro `moobfs`). Não empacotar `mkfs.moobfs`/`fsck.moobfs` (M1 congelado) por padrão | FUTURO |
-| Matriz de kernels | ver tabela abaixo | EXISTE (duas linhas) |
-| Assinatura | gerar chave de projeto para builds de release; usuários com Secure Boot assinam o `.ko` do DKMS com MOK própria; `CONFIG_MODULE_SIG_FORCE` rejeita módulos sem assinatura | FUTURO (S10) |
+| DKMS | `dkms.conf` with name `moobfs`, repository version, `PRE_BUILD` that refuses a kernel outside the matrix, `POST_INSTALL` that runs `depmod`; source tree: `layer/*.c`, `layer/moobl.h`, `include/*.h`, `common/attr.c` | FUTURE |
+| Packages | `moobfs-dkms` (sources + `dkms.conf`), `moobfs-tools` (`moobfs-attr`, `moobfs-check`, `moobfs-index`, future `moobfs`). Do not package `mkfs.moobfs`/`fsck.moobfs` (M1 frozen) by default | FUTURE |
+| Kernel matrix | see table below | EXISTS (two rows) |
+| Signing | generate a project key for release builds; users with Secure Boot sign the DKMS `.ko` with their own MOK; `CONFIG_MODULE_SIG_FORCE` rejects unsigned modules | FUTURE (S10) |
 
-Matriz de kernels (o que foi realmente rodado):
+Kernel matrix (what was actually run):
 
-| Kernel | Suíte funcional (`make vm-test`) | KASAN/UBSAN/lockdep | Estado |
+| Kernel | Functional suite (`make vm-test`) | KASAN/UBSAN/lockdep | Status |
 | --- | --- | --- | --- |
-| Debian 6.12.111+deb13-amd64 | sim, em QEMU TCG | não (kernel de distro sem esses detectores) | EXISTE |
-| Upstream 6.12.112 (virtme-ng, `vm/kasan.config`) | `vm/suite.sh` completa | sim | EXISTE; para a branch `m3/3b-query-authz` o registro 0020 lista KASAN como pendente |
-| Qualquer outro kernel, série ou arquitetura (6.1/6.6 LTS, 6.13+, ARM64, outros 6.12.x de distro) | não | não | não suportado; exige porte e a suíte completa mais KASAN |
-| macOS / Windows | — | — | só as ferramentas portáteis de M1 compilam; o módulo é Linux |
+| Debian 6.12.111+deb13-amd64 | yes, in QEMU TCG | no (distro kernel without these detectors) | EXISTS |
+| Upstream 6.12.112 (virtme-ng, `vm/kasan.config`) | full `vm/suite.sh` | yes | EXISTS; for the branch `m3/3b-query-authz`, journal 0020 lists KASAN as pending |
+| Any other kernel, series or architecture (6.1/6.6 LTS, 6.13+, ARM64, other distro 6.12.x) | no | no | not supported; requires a port and the full suite plus KASAN |
+| macOS / Windows | — | — | only the portable M1 tools compile; the module is Linux |
 
-## 7. Riscos operacionais e de segurança
+## 7. Operational and security risks
 
-| Risco | Efeito | Mitigação | Estado |
+| Risk | Effect | Mitigation | Status |
 | --- | --- | --- | --- |
-| Módulo é código em anel 0 | bug vira falha do kernel inteiro, inclusive DoS por usuário comum | VM descartável para desenvolvimento; S1 a S9; não instalar em hosts de produção críticos antes do preview técnico e das etapas S1 a S4 | EXISTE (VM); S1-S9 FUTURO |
-| Sem KASAN/lockdep em kernels de distro | corrupção de memória pode passar sem diagnóstico | suíte sob KASAN antes de cada release; kernel de debug em staging | EXISTE (workflow); sem cobertura contínua da branch atual |
-| Secure Boot/lockdown, hosts de produção, ausência de syzkaller e fstests | módulo não carrega sem assinatura; superfície de ioctl e xattr não fuzzada no kernel | assinatura MOK; S2, S3, S10; não usar em produção antes do preview | FUTURO |
-| Root contorna a camada | leitura e escrita irrestritas no inferior | documentar; dm-crypt/fscrypt; auditoria | limite estrutural |
-| Inferior modificado com a camada montada | índice e caminhos desatualizados; comportamento indefinido (regra do overlayfs) | permissões 0700; não fazer backup por escrita; `moobfs-check` depois | EXISTE (regra); detecção em tempo real não existe |
-| Memória do índice | `index_budget` de até 4 GiB por montagem; vários mounts somam; não verificado se a memória é contabilizada em cgroup | orçamento por montagem; `GET_INFO` monitorado; `MOOB_FLAG_INDEX_INCOMPLETE` | EXISTE (orçamento); teto por usuário FUTURO (S9) |
-| Caminhos obsoletos após renomear diretório | `QUERY` com falsos negativos até remontar (`MOOB_FLAG_PATHS_STALE`) | evitar renomear diretórios de namespace em produção; remontar após; alias de dentry cobre entradas em cache | EXISTE (documentado, medido pendente) |
-| TOCTOU entre `QUERY` e `open()` | resultado listado e depois recusado | cliente trata `EACCES`/`ENOENT` | contrato v1 |
-| Mount/userns/idmap | classe de CVEs do overlayfs evitada por flags desligadas | flags desligadas; testes de `EINVAL` e `EPERM` na suíte (registro 0020) | EXISTE (código e teste) |
+| The module is ring 0 code | a bug becomes a failure of the whole kernel, including DoS by an ordinary user | disposable VM for development; S1 to S9; do not install on critical production hosts before the technical preview and stages S1 to S4 | EXISTS (VM); S1-S9 FUTURE |
+| No KASAN/lockdep on distro kernels | memory corruption can go undiagnosed | suite under KASAN before each release; debug kernel in staging | EXISTS (workflow); no continuous coverage of the current branch |
+| Secure Boot/lockdown, production hosts, absence of syzkaller and fstests | module does not load without a signature; ioctl and xattr surface not fuzzed in the kernel | MOK signing; S2, S3, S10; do not use in production before the preview | FUTURE |
+| Root bypasses the layer | unrestricted read and write on the lower | document; dm-crypt/fscrypt; auditing | structural limit |
+| Lower modified with the layer mounted | stale index and paths; undefined behavior (overlayfs rule) | 0700 permissions; do not back up by writing; `moobfs-check` afterwards | EXISTS (rule); real-time detection does not exist |
+| Index memory | `index_budget` of up to 4 GiB per mount; several mounts add up; not verified whether the memory is accounted to a cgroup | per-mount budget; `GET_INFO` monitored; `MOOB_FLAG_INDEX_INCOMPLETE` | EXISTS (budget); per-user ceiling FUTURE (S9) |
+| Stale paths after renaming a directory | `QUERY` with false negatives until remount (`MOOB_FLAG_PATHS_STALE`) | avoid renaming namespace directories in production; remount afterwards; dentry alias covers cached entries | EXISTS (documented, measurement pending) |
+| TOCTOU between `QUERY` and `open()` | result listed and then refused | client handles `EACCES`/`ENOENT` | v1 contract |
+| Mount/userns/idmap | overlayfs CVE class avoided by flags turned off | flags turned off; `EINVAL` and `EPERM` tests in the suite (journal 0020) | EXISTS (code and test) |
 
-## 8. Plano incremental
+## 8. Incremental plan
 
-### Etapa 1 — Laboratório (agora; somente VM)
+### Stage 1 — Lab (now; VM only)
 
-Escopo: o que existe, em QEMU descartável (Debian 6.12.111; KASAN 6.12.112). Falta para fechar
-a fase 3b (registro 0020): KASAN sobre a branch e `chmod`/`rename`/`unlink` concorrentes com
-consultas; os testes de `unshare -Ur`+mount (`EPERM`) e `mount_setattr` idmap (`EINVAL`) já
-estão em `vm/suite.sh` e passaram.
-Aceitação: `make vm-test` termina com `MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS` e
-`ISOLATION_PASS` nos três inferiores; o workflow KASAN termina com `MOOBFS_KASAN_PASS`.
-Pronto quando: ambos verdes na revisão marcada, com registro e `CHANGELOG.md` atualizados.
+Scope: what exists, in disposable QEMU (Debian 6.12.111; KASAN 6.12.112). Missing to close
+phase 3b (journal 0020): KASAN over the branch and `chmod`/`rename`/`unlink` concurrent with
+queries; the `unshare -Ur`+mount (`EPERM`) and `mount_setattr` idmap (`EINVAL`) tests are already
+in `vm/suite.sh` and passed.
+Acceptance: `make vm-test` ends with `MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS` and
+`ISOLATION_PASS` on the three lowers; the KASAN workflow ends with `MOOBFS_KASAN_PASS`.
+Done when: both green at the tagged revision, with the journal and `CHANGELOG.md` updated.
 
-### Etapa 2 — Preview técnico (DKMS em kernels fixados, limites documentados)
+### Stage 2 — Technical preview (DKMS on pinned kernels, documented limits)
 
-Escopo: usuários técnicos em VM ou host dedicado com kernel da matriz.
-Entregáveis: `dkms.conf` com bloqueio de kernel fora da matriz; pacote `.deb` experimental
-(`moobfs-dkms`, `moobfs-tools`); CLI `moobfs` mínima (seção 3); documentos de operação e de
-contêiner; S1 (ADR de ameaça), S4 (inferior hostil), S5 (lint), S6 (`SECURITY.md`, política de
-versões) concluídos; S2 (fstests) com resultados registrados; assinatura documentada e testada
-em VM com lockdown (S10).
-Aceitação:
+Scope: technical users in a VM or on a dedicated host with a kernel from the matrix.
+Deliverables: `dkms.conf` blocking kernels outside the matrix; experimental `.deb` package
+(`moobfs-dkms`, `moobfs-tools`); minimal `moobfs` CLI (section 3); operations and
+container documents; S1 (threat ADR), S4 (hostile lower), S5 (lint), S6 (`SECURITY.md`, versioning
+policy) completed; S2 (fstests) with recorded results; signing documented and tested
+in a VM with lockdown (S10).
+Acceptance:
 
-1. instalar numa Debian limpa da matriz, montar, `workspace create`, rodar o contrato de
-   integração como dois uids; sem vazamento entre eles;
-2. atualizar e reverter o módulo sem perda (`moobfs-check` e `QUERY` igual ao oráculo antes e depois);
-3. backup e restauração `rsync -aHAX`: `getfattr -R` e `cmp` idênticos;
-4. kernel fora da matriz: DKMS recusa; módulo assinado carrega com lockdown, não assinado é recusado;
-5. contêiner com bind mount do diretório do agente: leitura, escrita e xattr funcionam com
-   uid alinhado; `QUERY` no subdiretório devolve `ENOTTY` como documentado.
+1. install on a clean Debian from the matrix, mount, `workspace create`, run the integration
+   contract as two uids; no leak between them;
+2. upgrade and roll back the module without loss (`moobfs-check` and `QUERY` equal to the oracle before and after);
+3. backup and restore with `rsync -aHAX`: `getfattr -R` and `cmp` identical;
+4. kernel outside the matrix: DKMS refuses; a signed module loads with lockdown, an unsigned one is refused;
+5. container with a bind mount of the agent's directory: read, write and xattr work with an
+   aligned uid; `QUERY` on the subdirectory returns `ENOTTY` as documented.
 
-Pronto quando: um terceiro reproduz tudo, a matriz e as limitações cabem numa página e nenhum vazamento é conhecido.
+Done when: a third party reproduces everything, the matrix and the limitations fit on one page and no leak is known.
 
-### Etapa 3 — Versão pública
+### Stage 3 — Public release
 
-Pré-condições: **M4 concluído e publicado** (W3 com autorização por candidato, tempo de
-montagem e reconstrução, memória do índice, p50/p95/p99, amplificação de escrita) e decisões
-sobre `QUERY_BATCH`, `READ_BATCH` e persistência registradas (DEPENDE DO M4);
-**roadmap de segurança** com S1 a S6 e S8 a S10 concluídos (S2 fstests, S3 syzkaller com
-cobertura definida, S9 limites, S10 assinatura/DKMS), S7 agendado e S11 revisado; KASAN,
-lockdep, KFENCE e opções de S8 verdes na matriz completa.
-Entregáveis: pacotes das distribuições da matriz, política de suporte, divulgação e
-compatibilidade da UAPI, README sem promessas além do medido.
-Aceitação: etapa 2 repetida em cada distribuição/kernel da matriz; syzkaller sem relatos
-abertos por período definido; upgrade de kernel com DKMS; escala acima do medido documentada
-como não validada.
-Pronto quando: tudo verde e os registros trazem os números.
+Preconditions: **M4 completed and published** (W3 with per-candidate authorization, mount
+and rebuild time, index memory, p50/p95/p99, write amplification) and decisions
+on `QUERY_BATCH`, `READ_BATCH` and persistence recorded (DEPENDS ON M4);
+**security roadmap** with S1 to S6 and S8 to S10 completed (S2 fstests, S3 syzkaller with
+defined coverage, S9 limits, S10 signing/DKMS), S7 scheduled and S11 reviewed; KASAN,
+lockdep, KFENCE and S8 options green on the full matrix.
+Deliverables: packages for the distributions in the matrix, support policy, disclosure and
+UAPI compatibility policy, README without promises beyond what was measured.
+Acceptance: stage 2 repeated on each distribution/kernel in the matrix; syzkaller with no open
+reports for a defined period; kernel upgrade with DKMS; scale above what was measured documented
+as not validated.
+Done when: everything is green and the journals carry the numbers.
 
-## 9. Arquivos do repositório que precisariam mudar
+## 9. Repository files that would need to change
 
-Este documento cria somente `docs/distribution-strategy.md`.
-| Arquivo | Mudança | Etapa |
+This document creates only `docs/distribution-strategy.md`.
+| File | Change | Stage |
 | --- | --- | --- |
-| `dkms.conf` ou `packaging/dkms/` (novo) | definição DKMS | 2 |
-| `packaging/debian/`, `packaging/rpm/moobfs.spec` (novos) | pacotes `.deb` (2) e `.rpm` (3) | 2-3 |
-| `tools/moobfs.c` (novo), `tools/query-common.h`, `Makefile` | CLI `moobfs`; alvos `install`, `dist`, `dkms-test` | 2 |
-| `vm/suite.sh`, `vm/Dockerfile`, `vm/in-container.sh` | testes de userns, idmap, bind mount (`ENOTTY`), upgrade/rollback; pacotes `dkms`, `rsync` | 1-2 |
-| `.github/workflows/ci.yml`, `kasan.yml` | job DKMS, matriz de kernel, assinatura, jobs agendados | 2-3 |
-| `docs/operations.md`, `docs/container-integration.md`, `docs/compatibility.md` (novos) | operação, contêineres, matriz e política de UAPI | 2 |
-| `docs/testing.md`, `docs/spec-m3.md`, `docs/security-roadmap.md` | pacotes e instalação; referência cruzada de clonagem e da raiz em contêineres (§2, §3.1); estado de S1-S10 | 2-3 |
-| `docs/decisions/` | ADR nova de modelo de ameaça (S1) com ID sequencial; nenhuma ADR existente é alterada | 2 |
-| `docs/history/`, `CHANGELOG.md` | registro por entrega com comandos reproduzíveis | todas |
-| `README.md`, `README.pt-BR.md`, `ROADMAP.md`, `SECURITY.md`, `site/` | link para este documento, matriz de kernel, avisos, divulgação, página de instalação | 2-3 |
-| `include/moobfs_ioctl.h`, `layer/index.c`, `layer/main.c` | sem mudança prevista; qualquer ajuste (por exemplo, `QUERY` em bind de subdiretório) exigiria especificação, testes de entradas inválidas e decisão de compatibilidade da UAPI | — |
+| `dkms.conf` or `packaging/dkms/` (new) | DKMS definition | 2 |
+| `packaging/debian/`, `packaging/rpm/moobfs.spec` (new) | `.deb` (2) and `.rpm` (3) packages | 2-3 |
+| `tools/moobfs.c` (new), `tools/query-common.h`, `Makefile` | `moobfs` CLI; `install`, `dist`, `dkms-test` targets | 2 |
+| `vm/suite.sh`, `vm/Dockerfile`, `vm/in-container.sh` | userns, idmap, bind mount (`ENOTTY`), upgrade/rollback tests; `dkms`, `rsync` packages | 1-2 |
+| `.github/workflows/ci.yml`, `kasan.yml` | DKMS job, kernel matrix, signing, scheduled jobs | 2-3 |
+| `docs/operations.md`, `docs/container-integration.md`, `docs/compatibility.md` (new) | operations, containers, matrix and UAPI policy | 2 |
+| `docs/testing.md`, `docs/spec-m3.md`, `docs/security-roadmap.md` | packages and installation; cross-reference for cloning and for the root in containers (§2, §3.1); status of S1-S10 | 2-3 |
+| `docs/decisions/` | new threat model ADR (S1) with a sequential ID; no existing ADR is changed | 2 |
+| `docs/history/`, `CHANGELOG.md` | journal per delivery with reproducible commands | all |
+| `README.md`, `README.pt-BR.md`, `ROADMAP.md`, `SECURITY.md`, `site/` | link to this document, kernel matrix, warnings, disclosure, installation page | 2-3 |
+| `include/moobfs_ioctl.h`, `layer/index.c`, `layer/main.c` | no change planned; any adjustment (for example, `QUERY` on a subdirectory bind) would require a specification, tests of invalid inputs and a UAPI compatibility decision | — |

@@ -1,93 +1,93 @@
-# 0036 — Fase Q2b: ordenação e cursor no `QUERY2`
+# 0036 — Phase Q2b: ordering and cursor in `QUERY2`
 
-Data: 2026-10-11. Estado: implementado e testado na VM QEMU da suíte (kernel Debian 6.12.111,
-ext4, btrfs e XFS); KASAN pelo CI no pull request; medição **não executada** (sem host de
-medição: a VM da Azure está desligada e o Mac mini local ainda será configurado).
+Date: 2026-10-11. Status: implemented and tested in the suite's QEMU VM (Debian kernel 6.12.111,
+ext4, btrfs and XFS); KASAN by CI on the pull request; measurement **not executed** (no
+measurement host: the Azure VM is shut down and the local Mac mini is yet to be configured).
 
-## Objetivo
+## Goal
 
-Fase Q2b de `docs/spec-query-v2.md`: `order_by` com `ASC`/`DESC` e `cursor` de paginação,
-para a consulta mais comum dos clientes reais ("os N mais recentes", registro 0033).
+Phase Q2b of `docs/spec-query-v2.md`: `order_by` with `ASC`/`DESC` and a pagination `cursor`,
+for the most common query of real clients ("the N most recent", journal 0033).
 
-## Decisões
+## Decisions
 
-- **Tipo de ordenação explícito** (`order_type`, tirado do preenchimento; a estrutura não muda
-  de tamanho). Alternativa: ordenar todas as entradas do nome, de todos os tipos, na ordem do
-  índice (tipo primeiro); descartada porque misturaria tempos com inteiros e não daria como
-  recusar "tipo errado", que a especificação pede.
-- **Atributo de ordenação ausente no domínio** devolve resposta vazia, não `EINVAL`: a ausência
-  não é erro de entrada. O teste 1 da especificação foi lido assim; registrado nela.
-- **Cursor por chave** (tipo, valor, inode do último resultado entregue), autenticado com
-  SipHash e uma chave aleatória por montagem, junto com um resumo da consulta que inclui o
-  estado de fallback do domínio. Alternativa: guardar no cursor um ponteiro ou um contador de
-  posição; descartada porque não sobrevive a mudanças na árvore e permitiria cursores forjados
-  apontando para estado interno. O cursor não é segredo: forjar um só deixa retomar de outra
-  posição do mesmo domínio, ao qual o chamador já tem acesso; a autenticação serve para
-  detectar cursor de outra consulta ou montagem e corrompido.
-- **Valores longos** (mais de 96 bytes) são recuperados da entrada atual do inode; se ela mudou
-  de tipo, tamanho ou prefixo, `ESTALE`.
-- **Sem `order_by`, `nterms` continua ≥ 1; com `order_by`, pode ser 0** ("os N mais recentes"
-  do domínio inteiro).
-- O motor (`query_run`) foi generalizado: percorre a árvore do atributo de varredura nos dois
-  sentidos, retoma estritamente depois (ou antes) de uma chave e devolve a chave do último
-  resultado. A v1 usa o mesmo caminho, sem cursor, com comportamento inalterado.
+- **Explicit ordering type** (`order_type`, taken from the padding; the structure does not change
+  size). Alternative: order all entries of the name, of all types, in index
+  order (type first); discarded because it would mix times with integers and would give no way to
+  reject "wrong type", which the specification requires.
+- **Ordering attribute missing in the domain** returns an empty response, not `EINVAL`: absence
+  is not an input error. Test 1 of the specification was read this way; recorded there.
+- **Key-based cursor** (type, value, inode of the last result delivered), authenticated with
+  SipHash and a random per-mount key, together with a digest of the query that includes the
+  domain's fallback state. Alternative: store a pointer or a position counter in the cursor;
+  discarded because it does not survive changes to the tree and would allow forged cursors
+  pointing to internal state. The cursor is not a secret: forging one only allows resuming from another
+  position in the same domain, to which the caller already has access; the authentication serves to
+  detect a cursor from another query or mount, and a corrupted one.
+- **Long values** (more than 96 bytes) are retrieved from the inode's current entry; if it changed
+  type, size or prefix, `ESTALE`.
+- **Without `order_by`, `nterms` remains ≥ 1; with `order_by`, it can be 0** ("the N most recent"
+  of the whole domain).
+- The engine (`query_run`) was generalized: it walks the scan attribute's tree in both
+  directions, resumes strictly after (or before) a key and returns the key of the last
+  result. v1 uses the same path, without a cursor, with unchanged behavior.
 
-## Mudanças
+## Changes
 
-- `include/moobfs_ioctl.h`: `MOOB_ORDER_ASC`, `MOOB_ORDER_DESC`, `order_type`, contrato do
-  cursor no comentário.
+- `include/moobfs_ioctl.h`: `MOOB_ORDER_ASC`, `MOOB_ORDER_DESC`, `order_type`, the cursor
+  contract in the comment.
 - `layer/index.c`: `inode_matches_all`, `last_before`, `seek_type`, cursor (`query_hash`,
-  `cursor_encode`, `cursor_decode`), `order_check`, `do_query2` com ordenação e cursor.
-- `layer/moobl.h`: chave do cursor por montagem.
-- `tests/query.c`: `q2` com `--order`, `--limit`, `--pages`, `--cursor-in`, `--cursor-out`;
-  `q2invalid` com os campos de ordenação, cursor lixo (`ESTALE`) e atributo ausente.
-- `tools/moobfs-index.c`: `--order NAME TYPE asc|desc` e `--limit N`.
-- `bench/load.c`: W3 v2 com `--order NAME:TYPE:asc|desc` e `--limit N`.
-- `vm/suite.sh`: bloco `QUERY2_ORDER_PASS` (ver `docs/testing.md`).
+  `cursor_encode`, `cursor_decode`), `order_check`, `do_query2` with ordering and cursor.
+- `layer/moobl.h`: per-mount cursor key.
+- `tests/query.c`: `q2` with `--order`, `--limit`, `--pages`, `--cursor-in`, `--cursor-out`;
+  `q2invalid` with the ordering fields, garbage cursor (`ESTALE`) and missing attribute.
+- `tools/moobfs-index.c`: `--order NAME TYPE asc|desc` and `--limit N`.
+- `bench/load.c`: v2 W3 with `--order NAME:TYPE:asc|desc` and `--limit N`.
+- `vm/suite.sh`: `QUERY2_ORDER_PASS` block (see `docs/testing.md`).
 
-## Evidências
+## Evidence
 
-`make vm-test`: `QUERY2_ORDER_PASS` e `QUERY2_PASS` em ext4, btrfs e XFS, e todos os
-marcadores anteriores até `MOOBFS_LAYER_PASS`. A suíte passou na primeira execução. O
-`bench-load` com `--order` só foi compilado; não foi executado.
+`make vm-test`: `QUERY2_ORDER_PASS` and `QUERY2_PASS` on ext4, btrfs and XFS, and all the
+previous markers up to `MOOBFS_LAYER_PASS`. The suite passed on the first run. The
+`bench-load` with `--order` was only compiled; it was not executed.
 
-## Limitações
+## Limitations
 
-- Paginação sob mudanças concorrentes não foi testada; a semântica documentada é a de
-  paginação por chave.
-- Cursor de valor longo depende do valor atual do inode.
-- Sem medição: o custo de "N mais recentes" com termos seletivos é proporcional às entradas
-  percorridas na ordem até completar o limite, e isso ainda não foi medido.
+- Pagination under concurrent changes was not tested; the documented semantics is that of
+  key-based pagination.
+- A long-value cursor depends on the current value of the inode.
+- No measurement: the cost of "N most recent" with selective terms is proportional to the entries
+  walked in order until the limit is filled, and this has not yet been measured.
 
-## Próximo passo
+## Next step
 
-PR da Q2b depois do merge da Q2a. No host de medição: o teste do canal de tempo, o W3 por
-domínio e "N mais recentes". Depois, fase Q2c (interseção por leapfrog).
+Q2b PR after the Q2a merge. On the measurement host: the timing channel test, the per-domain W3
+and "N most recent". Then, phase Q2c (intersection by leapfrog).
 
-## Atualização (2026-10-11)
+## Update (2026-10-11)
 
-O job `Lint` do pull request 32 falhou: o shellcheck (SC2209) leu a atribuição literal
-`t=time` da suíte como atribuição da saída de um comando. Corrigido com aspas no commit
-`vm: quote a literal assignment...`; o shellcheck 0.10.0 com `--severity=warning` passou
-localmente nos scripts de `vm/` e `scripts/` antes do novo push. O `make lint` local não roda
-dentro do contêiner a partir de uma worktree, porque `git ls-files` não encontra o repositório;
-os arquivos foram passados diretamente.
+The `Lint` job of pull request 32 failed: shellcheck (SC2209) read the literal assignment
+`t=time` in the suite as an assignment of a command's output. Fixed with quotes in commit
+`vm: quote a literal assignment...`; shellcheck 0.10.0 with `--severity=warning` passed
+locally on the scripts in `vm/` and `scripts/` before the new push. The local `make lint` does not run
+inside the container from a worktree, because `git ls-files` does not find the repository;
+the files were passed directly.
 
-KASAN e lockdep no CI do pull request 32 (kernel 6.12.112-virtme), execução 38173795652:
-`QUERY2_ORDER_PASS` e `QUERY2_PASS` em ext4, btrfs e XFS e `MOOBFS_LAYER_PASS`, sem relatório.
-A etapa da suíte levou 50 minutos (22 na Q2a), pelo custo das consultas paginadas no kernel
-instrumentado. O merge foi recusado por conflito com a main (lote 2 de ferramentas da outra
-sessão, registro 0039, só no changelog e no índice de registros); resolvido mantendo as duas
-entradas, o que exige nova execução do CI antes do merge.
+KASAN and lockdep in the CI of pull request 32 (kernel 6.12.112-virtme), run 38173795652:
+`QUERY2_ORDER_PASS` and `QUERY2_PASS` on ext4, btrfs and XFS and `MOOBFS_LAYER_PASS`, with no report.
+The suite step took 50 minutes (22 in Q2a), due to the cost of the paginated queries in the
+instrumented kernel. The merge was refused due to a conflict with main (tools batch 2 from the other
+session, journal 0039, only in the changelog and in the journal index); resolved by keeping both
+entries, which requires a new CI run before the merge.
 
-O CodeQL, que entrou na main com o lote 2 da outra sessão, apontou duas escritas "sem limite"
-(`cpp/unbounded-write`) em `strcpy` de argumentos de linha de comando, em `tools/moobfs-index.c`
-e `bench/load.c`. Os dois casos já eram precedidos de verificação de tamanho (falsos
-positivos), mas foram trocados por `memcpy` com o tamanho verificado contra o destino, o que
-torna o limite explícito; o mesmo padrão em `tests/query.c`, que o CodeQL não compila, também
-foi trocado.
+CodeQL, which entered main with batch 2 from the other session, flagged two "unbounded" writes
+(`cpp/unbounded-write`) in `strcpy` of command-line arguments, in `tools/moobfs-index.c`
+and `bench/load.c`. Both cases were already preceded by a size check (false
+positives), but were replaced by `memcpy` with the size checked against the destination, which
+makes the bound explicit; the same pattern in `tests/query.c`, which CodeQL does not compile, was also
+replaced.
 
-Atualização posterior (2026-10-12): a exceção acima não chegou a ser usada. Antes do merge, a main
-recebeu também o PR 42 (triagem do CodeQL, com mudanças em `bench/`) e os PRs 43 a 48 do lado DX;
-como a mudança deixou de ser só documentação, a branch foi atualizada com a main final, o
-changelog resolvido mantendo as duas entradas, e o merge espera uma nova execução do KASAN.
+Later update (2026-10-12): the exception above ended up not being used. Before the merge, main
+also received PR 42 (CodeQL triage, with changes in `bench/`) and PRs 43 to 48 from the DX side;
+since the change was no longer documentation only, the branch was updated with the final main, the
+changelog resolved by keeping both entries, and the merge awaits a new KASAN run.

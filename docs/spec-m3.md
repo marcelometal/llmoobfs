@@ -1,154 +1,154 @@
-# Especificação do M3 — identidade, isolamento e operações de consulta
+# M3 specification — identity, isolation and query operations
 
-Estado: **proposta** (2026-10-10, revisada no mesmo dia após revisão externa; ver registro
-0019). Nada implementado. Decisões de base: ADR-0005, ADR-0007. Depende do M2 concluído.
+Status: **proposal** (2026-10-10, revised on the same day after an external review; see journal
+0019). Nothing implemented. Base decisions: ADR-0005, ADR-0007. Depends on M2 being concluded.
 
-## 1. Diagnóstico do que existe (evidência no código)
+## 1. Diagnosis of what exists (evidence in the code)
 
-| Proposta | Já existe? | Evidência | Mudança necessária | Risco |
+| Proposal | Already exists? | Evidence | Change needed | Risk |
 | --- | --- | --- | --- | --- |
-| Atributos `namespace`, `agent`, `memory_id` como strings tipadas | Sim, como qualquer `user.moob.<nome>` de tipo `string` até 1 KiB, nome `[a-z0-9_.]` ≤ 64 bytes | `include/moobfs_attr.h` (`MOOB_ATTR_STRING_MAX`, `MOOB_ATTR_NAME_MAX`), validação em `moobl_typed_check` (`layer/main.c`), índice por nome em `layer/index.c` | Nenhuma no kernel; só convenção documentada | nenhum |
-| `QUERY` por esses atributos, em conjunção, com prefixo | Sim | `do_query`, `entry_matches` em `layer/index.c`; fase 2d comparada ao oráculo (registro 0014) | nenhuma | nenhum |
-| **`QUERY` respeita permissões do chamador** | **Não** | `fill_result` (`layer/index.c`) devolve inode e caminho de toda entrada do índice; a única verificação é `file->f_path.dentry == sb->s_root` em `moobl_root_ioctl`; o índice é construído com as credenciais do montador (`override_creds` em `moobl_index_build`) | filtrar resultados pelas credenciais do chamador | **vazamento de existência e de caminhos entre usuários; corrigir antes de qualquer uso multiusuário** |
-| Identidade estável sob `rename` | Parcial | o índice é por inode; `moobl_index_renamed` só atualiza o caminho | nenhuma para identidade por atributo (o atributo acompanha o inode) | nenhum |
-| Revisão lógica, histórico, cursor de mudanças | Não | índice volátil, reconstruído na montagem (`moobl_index_build`); nenhum contador de revisão | ver §5 | — |
-| Consulta em lote | Não | um `QUERY` por chamada, até 4.096 resultados (`MOOB_QUERY_MAX_LIMIT`) | ver §4 | — |
-| Leitura em lote de conteúdo | Não | resultados trazem caminho; o cliente abre um a um | ver §4 | — |
+| Attributes `namespace`, `agent`, `memory_id` as typed strings | Yes, like any `user.moob.<name>` of type `string` up to 1 KiB, name `[a-z0-9_.]` ≤ 64 bytes | `include/moobfs_attr.h` (`MOOB_ATTR_STRING_MAX`, `MOOB_ATTR_NAME_MAX`), validation in `moobl_typed_check` (`layer/main.c`), per-name index in `layer/index.c` | None in the kernel; only a documented convention | none |
+| `QUERY` by these attributes, in conjunction, with prefix | Yes | `do_query`, `entry_matches` in `layer/index.c`; phase 2d compared with the oracle (journal 0014) | none | none |
+| **`QUERY` respects the caller's permissions** | **No** | `fill_result` (`layer/index.c`) returns the inode and path of every index entry; the only check is `file->f_path.dentry == sb->s_root` in `moobl_root_ioctl`; the index is built with the mounter's credentials (`override_creds` in `moobl_index_build`) | filter results by the caller's credentials | **leak of existence and of paths between users; fix before any multi-user use** |
+| Stable identity under `rename` | Partial | the index is per inode; `moobl_index_renamed` only updates the path | none for identity by attribute (the attribute follows the inode) | none |
+| Logical revision, history, change cursor | No | volatile index, rebuilt at mount (`moobl_index_build`); no revision counter | see §5 | — |
+| Batch query | No | one `QUERY` per call, up to 4 096 results (`MOOB_QUERY_MAX_LIMIT`) | see §4 | — |
+| Batch content read | No | results carry a path; the client opens them one by one | see §4 | — |
 
-## 2. Modelo de identidade
+## 2. Identity model
 
-Identidade lógica `(namespace, agent, memory_id)` expressa em três atributos tipados comuns,
-gerados e garantidos únicos **pelo cliente**:
+Logical identity `(namespace, agent, memory_id)` expressed in three ordinary typed attributes,
+generated and guaranteed unique **by the client**:
 
-| Atributo | Tipo | Regra |
+| Attribute | Type | Rule |
 | --- | --- | --- |
-| `user.moob.namespace` | string, ≤ 128 bytes recomendados | domínio lógico; opaco para o kernel |
-| `user.moob.agent` | string, ≤ 128 bytes | identidade do agente que criou ou atualizou; opaco |
-| `user.moob.memory_id` | string, ≤ 128 bytes; recomendação UUID v7 em texto | identidade estável; sobrevive a `rename` e a `FICLONE` (cópia carrega o atributo, o cliente decide se gera outro) |
+| `user.moob.namespace` | string, ≤ 128 bytes recommended | logical domain; opaque to the kernel |
+| `user.moob.agent` | string, ≤ 128 bytes | identity of the agent that created or updated; opaque |
+| `user.moob.memory_id` | string, ≤ 128 bytes; UUID v7 as text recommended | stable identity; survives `rename` and `FICLONE` (a copy carries the attribute, the client decides whether to generate another) |
 
-Chave lógica: `(namespace, memory_id)`. `agent` é autoria ou responsabilidade, não parte da
-chave, para que outro agente atualize uma memória sem lhe mudar a identidade. O mesmo
-`memory_id` em namespaces diferentes são duas memórias distintas, que podem partilhar origem,
-conteúdo ou blocos; conteúdo igual não é identidade igual. `FICLONE` e cópia criam outro inode:
-quando a operação é uma clonagem de memória, o cliente gera um `memory_id` novo e registra a
-origem em `user.moob.origin_namespace` e `user.moob.origin_id` (strings; convenção, não
-verificação). Hard link é o mesmo inode e os mesmos atributos, logo não serve para duas
-identidades; para isso, cópia ou reflink. `moobfs-check` classifica: normal, o mesmo id em
-namespaces distintos; aviso, o mesmo id com conteúdo idêntico e sem proveniência (comparação
-de conteúdo opcional); erro, dois inodes distintos com o mesmo `(namespace, memory_id)`;
-vários caminhos para o mesmo inode não são duplicidade.
+Logical key: `(namespace, memory_id)`. `agent` is authorship or responsibility, not part of the
+key, so that another agent can update a memory without changing its identity. The same
+`memory_id` in different namespaces are two distinct memories, which may share origin,
+content or blocks; equal content is not equal identity. `FICLONE` and copy create another inode:
+when the operation is a memory clone, the client generates a new `memory_id` and records the
+origin in `user.moob.origin_namespace` and `user.moob.origin_id` (strings; convention, not
+verification). A hard link is the same inode and the same attributes, so it does not serve for two
+identities; for that, copy or reflink. `moobfs-check` classifies: normal, the same id in
+distinct namespaces; warning, the same id with identical content and no provenance (optional content
+comparison); error, two distinct inodes with the same `(namespace, memory_id)`;
+several paths to the same inode are not duplication.
 
-O kernel não valida unicidade nem formato além das regras gerais de tipo e nome, não
-interpreta esses atributos como credenciais nem proveniência, e não os altera. Comparação é por bytes.
-Nenhum tipo novo e nenhum atributo reservado. A alternativa de identificadores atribuídos
-pelo kernel (`id`, `rev`, `mrev` como atributos reservados, gravados a cada escrita) foi
-avaliada e **adiada**: custaria um `setxattr` no inferior por mudança e criaria estado que o
-cliente não pode reproduzir sozinho; só volta se o M4 mostrar que o cliente não consegue
-manter identidade e revisão com custo aceitável.
+The kernel does not validate uniqueness or format beyond the general type and name rules, does not
+interpret these attributes as credentials or provenance, and does not change them. Comparison is by bytes.
+No new type and no reserved attribute. The alternative of identifiers assigned
+by the kernel (`id`, `rev`, `mrev` as reserved attributes, written on each write) was
+evaluated and **postponed**: it would cost a `setxattr` on the lower filesystem per change and would create state that the
+client cannot reproduce on its own; it only comes back if M4 shows that the client cannot
+maintain identity and revision at an acceptable cost.
 
-## 3. Isolamento por POSIX e correção do `QUERY`
+## 3. Isolation by POSIX and correction of `QUERY`
 
-Invariantes: alterar `namespace` ou `agent` não concede acesso; `QUERY` não revela memórias
-inacessíveis; o índice não contorna permissões; isolamento vale após remontagem; `rename` não
-muda identidade; hard links e reflinks não acrescentam privilégio; consultas concorrentes com
-mudanças de permissão não vazam.
+Invariants: changing `namespace` or `agent` does not grant access; `QUERY` does not reveal
+inaccessible memories; the index does not bypass permissions; isolation holds after remount; `rename` does not
+change identity; hard links and reflinks do not add privilege; concurrent queries with
+permission changes do not leak.
 
-Layout de referência (não imposto): `/<ns>/shared/` e `/<ns>/agents/<agent>/`, com donos,
-grupos e modos POSIX definidos por quem administra o mount. O módulo não provisiona nada.
+Reference layout (not imposed): `/<ns>/shared/` and `/<ns>/agents/<agent>/`, with POSIX owners,
+groups and modes defined by whoever administers the mount. The module provisions nothing.
 
-Mudança no kernel, a única do M3 nesta forma: em `do_query`, para cada entrada candidata,
-antes de copiá-la ao usuário, resolver o caminho registrado com as credenciais do **chamador**
-por `vfs_path_lookup(sb->s_root, mnt, caminho, 0, &p)`; a resolução falha com `EACCES` se
-faltar permissão de busca em qualquer diretório do caminho, e a entrada é omitida sem erro e
-sem contar em `truncated`. Se resolver, exigir que o inode obtido seja o da entrada (protege
-contra caminho obsoleto) e `inode_permission(MAY_READ)` com as credenciais do chamador. Sem
-caminho registrado, tentar o alias de dentry em cache e aplicar as mesmas verificações;
-sem alias, omitir. `truncated` passa a contar só resultados visíveis. O lock de leitura do
-índice é liberado antes das resoluções para não dormir com ele; a lista de candidatos é
-copiada primeiro. Custo: uma resolução de caminho por resultado, limitada por `limit`; medido
-no M4 (W3).
+Change in the kernel, the only one in M3 in this form: in `do_query`, for each candidate entry,
+before copying it to the user, resolve the recorded path with the **caller's** credentials
+via `vfs_path_lookup(sb->s_root, mnt, path, 0, &p)`; the resolution fails with `EACCES` if
+search permission is missing on any directory of the path, and the entry is omitted without error and
+without counting in `truncated`. If it resolves, require that the obtained inode be that of the entry (protects
+against a stale path) and `inode_permission(MAY_READ)` with the caller's credentials. Without
+a recorded path, try the cached dentry alias and apply the same checks;
+without an alias, omit. `truncated` now counts only visible results. The index read
+lock is released before the resolutions so as not to sleep holding it; the list of candidates is
+copied first. Cost: one path resolution per result, bounded by `limit`; measured
+in M4 (W3).
 
-Responsabilidades do cliente: criar diretórios, usuários, grupos e ACLs; gerar
-identificadores; decidir o que compartilhar por `FICLONE` ou link.
+Client responsibilities: create directories, users, groups and ACLs; generate
+identifiers; decide what to share via `FICLONE` or link.
 
-Testes: na VM, dois uids e dois namespaces com modos distintos; consultas cruzadas devem
-omitir o namespace alheio e `truncated` não pode revelar contagem; `chmod` durante consultas
-concorrentes; remontagem e repetição; o oráculo em espaço de usuário executado como cada
-uid deve coincidir com o kernel. Regressão completa (POSIX, git, SQLite, dm-log-writes,
-dm-flakey, KASAN/lockdep). Critério de pronto: identidade estável e consultável sem segunda
-política de autorização; zero vazamento entre usuários em todos os inferiores.
+Tests: in the VM, two uids and two namespaces with distinct modes; cross queries must
+omit the other namespace and `truncated` cannot reveal a count; `chmod` during concurrent
+queries; remount and repetition; the user-space oracle run as each
+uid must match the kernel. Full regression (POSIX, git, SQLite, dm-log-writes,
+dm-flakey, KASAN/lockdep). Done-when criterion: identity stable and queryable without a second
+authorization policy; zero leakage between users on all lower filesystems.
 
-### 3.1 Contrato de autorização do `QUERY` (UAPI v1, semântica)
+### 3.1 `QUERY` authorization contract (UAPI v1, semantics)
 
-- A autorização é verificada no instante da consulta, com as credenciais efetivas do
-  chamador, pela resolução do caminho no VFS e por `inode_permission(MAY_READ)` no objeto
-  resolvido, que precisa pertencer à montagem consultada e ter o inode indexado.
-- Um resultado não concede acesso: o cliente faz `open()` normalmente e deve aceitar `EACCES`
-  ou `ENOENT` se permissões ou nomes mudaram depois da consulta. Não há garantia de ausência
-  de janela TOCTOU na v1 e não haverá handle especial para fechá-la sem necessidade medida.
-- `count`, `limit` e `truncated` referem-se só a resultados visíveis ao chamador. O número de
-  candidatos examinados não é limitado pelo `limit`: a varredura percorre todos os candidatos
-  em lotes, com retomada por chave ordenada.
-- **Canal de tempo (medido em 2026-10-11, registro 0030).** O tempo de resposta cresce cerca de
-  1,15 µs por candidato invisível ao chamador, com variação abaixo de 3%: um chamador consegue
-  estimar quantas entradas de outros donos casam com a sua consulta, e testar se algum valor
-  existe em qualquer lugar da montagem. O contrato garante que resultados e contagens
-  devolvidos não revelam entradas invisíveis; não garante isso contra medição de tempo. Fechar
-  o canal exige que a consulta não percorra entradas de outros domínios de permissão (ADR-0009).
-- Falhas de autorização omitem o resultado em silêncio. Falhas operacionais (`ENOMEM`,
-  `EFAULT`) retornam erro.
-- Entradas cujo caminho registrado ficou obsoleto (diretório renomeado) são resolvidas pelo
-  alias de dentry quando existe; sem caminho verificável, são omitidas. Isso pode produzir
-  falsos negativos até a próxima montagem; é limitação documentada, não vazamento.
+- Authorization is checked at the moment of the query, with the caller's effective
+  credentials, by path resolution in the VFS and by `inode_permission(MAY_READ)` on the resolved
+  object, which must belong to the queried mount and have its inode indexed.
+- A result does not grant access: the client does `open()` normally and must accept `EACCES`
+  or `ENOENT` if permissions or names changed after the query. There is no guarantee of absence
+  of a TOCTOU window in v1 and there will be no special handle to close it without a measured need.
+- `count`, `limit` and `truncated` refer only to results visible to the caller. The number of
+  candidates examined is not bounded by `limit`: the scan goes through all candidates
+  in batches, resuming by ordered key.
+- **Timing channel (measured on 2026-10-11, journal 0030).** Response time grows about
+  1.15 µs per candidate invisible to the caller, with variation below 3%: a caller can
+  estimate how many entries of other owners match its query, and test whether some value
+  exists anywhere in the mount. The contract guarantees that the returned results and counts
+  do not reveal invisible entries; it does not guarantee this against timing measurement. Closing
+  the channel requires that the query not traverse entries of other permission domains (ADR-0009).
+- Authorization failures omit the result silently. Operational failures (`ENOMEM`,
+  `EFAULT`) return an error.
+- Entries whose recorded path became stale (renamed directory) are resolved through the
+  dentry alias when it exists; without a verifiable path, they are omitted. This may produce
+  false negatives until the next mount; it is a documented limitation, not a leak.
 
-## 4. Operações em lote: contrato, decisão condicionada a medição
+## 4. Batch operations: contract, decision conditional on measurement
 
-Duas candidatas, com propósitos diferentes:
+Two candidates, with different purposes:
 
-- `QUERY_BATCH`: várias consultas independentes numa chamada, cada uma com a semântica exata
-  de `QUERY`, resultado e erro por consulta, sem atomicidade nem snapshot entre elas,
-  limite explícito (proposta: 64 consultas por chamada, `limit` individual ≤ 4.096,
-  memória total ≤ 64 MiB), permissões verificadas por resultado, UAPI v2 aditiva (comando
-  novo, estruturas v1 intactas).
-- `READ_BATCH`: para uma lista de inodes já obtida, devolver atributos escolhidos e os
-  primeiros K bytes de conteúdo com permissões por inode, para substituir N aberturas.
+- `QUERY_BATCH`: several independent queries in one call, each with the exact semantics
+  of `QUERY`, result and error per query, with no atomicity or snapshot among them,
+  explicit limit (proposal: 64 queries per call, individual `limit` ≤ 4,096,
+  total memory ≤ 64 MiB), permissions checked per result, additive UAPI v2 (new
+  command, v1 structures intact).
+- `READ_BATCH`: for an already obtained list of inodes, return chosen attributes and the
+  first K bytes of content with per-inode permissions, to replace N opens.
 
-Decisão: **nenhuma das duas entra antes do M4 medir** W3 (consultas) e W2 (leitura por
-caminho) contra chamadas individuais. Se o custo de chamada ao kernel não dominar, a
-implementação é dispensada e isso fica registrado. Testes obrigatórios se implementadas:
-versão desconhecida, contagem zero e acima do limite, ponteiro nulo e inválido, overflow de
-tamanho, reservados não zerados, consulta interna inválida, falha parcial, remoção, renomeação
-e `setxattr` concorrentes, resultados inacessíveis, compatibilidade com cliente v1, fuzzing
-dos parsers.
+Decision: **neither enters before M4 measures** W3 (queries) and W2 (read by
+path) against individual calls. If the cost of the kernel call does not dominate, the
+implementation is dropped and that is recorded. Mandatory tests if implemented:
+unknown version, zero count and above the limit, null and invalid pointer, size
+overflow, reserved fields not zeroed, invalid inner query, partial failure, concurrent removal, rename
+and `setxattr`, inaccessible results, compatibility with a v1 client, fuzzing
+of the parsers.
 
-## 5. Revisão lógica e cursor de mudanças: decisão
+## 5. Logical revision and change cursor: decision
 
-Dois conceitos distintos: **revisão lógica persistente** (evolução de uma memória) e **cursor
-de enumeração** (progresso de uma consulta, válido no máximo por montagem).
+Two distinct concepts: **persistent logical revision** (evolution of a memory) and **enumeration
+cursor** (progress of a query, valid at most per mount).
 
-Decisão: a revisão lógica e o histórico ficam **no cliente**, com os mecanismos que já
-existem: git para conteúdo, um atributo tipado `user.moob.rev` (int64) mantido pelo cliente
-quando quiser consultá-lo pelo `QUERY`, e `modified`/`ctime` do inferior para ordenação
-grosseira. Motivos: o índice é volátil e não constitui histórico; alterações feitas fora da
-montagem não seriam vistas por um log do kernel; um log persistente no kernel duplicaria o
-git; e nenhum cliente pediu essa operação com um benefício medido. A forma de cursor
-avaliada (lista circular por montagem, `EOVERFLOW` quando expirado, `CHANGES_SINCE`) fica
-documentada como alternativa e só é reconsiderada se o M4 mostrar que a varredura do cliente
-após uma sessão custa mais do que o aceitável. Perguntas que qualquer implementação teria de
-responder antes: identidade e escopo da revisão, persistência, ordenação, concorrência,
-recuperação após falha, validade do cursor, códigos de erro, integração com git.
+Decision: logical revision and history stay **in the client**, with the mechanisms that already
+exist: git for content, a typed attribute `user.moob.rev` (int64) maintained by the client
+when it wants to query it through `QUERY`, and `modified`/`ctime` of the lower filesystem for coarse
+ordering. Reasons: the index is volatile and does not constitute history; changes made outside the
+mount would not be seen by a kernel log; a persistent log in the kernel would duplicate
+git; and no client asked for this operation with a measured benefit. The cursor form
+evaluated (circular list per mount, `EOVERFLOW` when expired, `CHANGES_SINCE`) stays
+documented as an alternative and is only reconsidered if M4 shows that the client's scan
+after a session costs more than acceptable. Questions any implementation would have to
+answer first: identity and scope of the revision, persistence, ordering, concurrency,
+recovery after failure, cursor validity, error codes, integration with git.
 
-## 6. Fases
+## 6. Phases
 
-| Fase | Entrega | Saída |
+| Phase | Deliverable | Exit |
 | --- | --- | --- |
-| 3a | Convenção de identidade documentada; `moobfs-check` opcionalmente verifica unicidade de `memory_id` por namespace | documento e verificação offline |
-| 3b | `QUERY` com permissões do chamador; teste multiusuário; regressão completa com KASAN/lockdep | zero vazamento; números preliminares do custo |
-| 3c | Decisões de §4 e §5 revisitadas com os números do M4 | registro em `docs/history/` |
+| 3a | Identity convention documented; `moobfs-check` optionally checks uniqueness of `memory_id` per namespace | document and offline check |
+| 3b | `QUERY` with the caller's permissions; multi-user test; full regression with KASAN/lockdep | zero leakage; preliminary cost numbers |
+| 3c | Decisions of §4 and §5 revisited with the M4 numbers | journal in `docs/history/` |
 
-## 7. Riscos e limitações
+## 7. Risks and limitations
 
-Resolver caminhos por resultado pode ser caro em consultas largas; mitigação: `limit` e
-medição. Caminhos registrados ficam obsoletos após renomear diretórios; o fallback por alias
-cobre entradas em cache e as demais são omitidas até a próxima montagem, comportamento que
-deve ser documentado e medido. Nada aqui altera a UAPI v1.
+Resolving paths per result may be expensive in broad queries; mitigation: `limit` and
+measurement. Recorded paths become stale after renaming directories; the alias fallback
+covers cached entries and the others are omitted until the next mount, a behavior that
+must be documented and measured. Nothing here changes UAPI v1.

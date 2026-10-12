@@ -1,19 +1,19 @@
-# ADR-0003 — Formato experimental de leitura para M1
+# ADR-0003 — Experimental read format for M1
 
-Data: 2026-10-10. Estado: adotado para o primeiro marco.
+Date: 2026-10-10. Status: adopted for the first milestone.
 
-## Contexto
+## Context
 
-A proposta completa inclui log transacional, checkpoints, snapshots e namespace de revisões. O primeiro marco autorizado é menor: criar imagem, montar e ler dois arquivos independentes que compartilham conteúdo.
+The full proposal includes a transactional log, checkpoints, snapshots and a revision namespace. The first authorized milestone is smaller: create an image, mount it and read two independent files that share content.
 
-## Decisão
+## Decision
 
-Criar um formato experimental de imagem somente para leitura, com superbloco, tabela de objetos, tabela de arquivos e payloads alinhados. O magic identifica esse formato M1 separadamente. Não será apresentado como implementação do formato transacional completo.
+Create an experimental read-only image format, with a superblock, an object table, a file table and aligned payloads. The magic identifies this M1 format separately. It will not be presented as an implementation of the full transactional format.
 
-Cada arquivo tem inode próprio; entradas distintas podem apontar para o mesmo objeto físico. A ferramenta offline agrupa somente bytes idênticos. O módulo verifica estrutura, checksums e conteúdo durante a montagem, e serve leituras pelo cache de páginas/iomap.
+Each file has its own inode; distinct entries may point to the same physical object. The offline tool groups only identical bytes. The module verifies structure, checksums and content during mount, and serves reads through the page cache/iomap.
 
-Começar com namespace plano, até 128 arquivos/objetos, nomes em ASCII imprimível de até 63 bytes e objetos de até 64 KiB. Os bytes de conteúdo não têm restrição de codificação. Uma imagem publicada é imutável e só pode ser montada em modo de leitura. Não implementar escrita, ioctls de publicação, checkpoints ou snapshots neste marco. FIEMAP serve para verificar os extents compartilhados.
+Start with a flat namespace, up to 128 files/objects, names in printable ASCII of up to 63 bytes and objects of up to 64 KiB. The content bytes have no encoding restriction. A published image is immutable and can only be mounted read-only. Do not implement writes, publication ioctls, checkpoints or snapshots in this milestone. FIEMAP serves to verify the shared extents.
 
-## Consequências
+## Consequences
 
-O marco permite validar o caminho real VFS → módulo → blocos e o compartilhamento, com testes reproduzíveis. O formato futuro exigirá conversão offline ou nova imagem, sem prometer compatibilidade binária. A proposta original permanece em `docs/native-mvp.md`.
+The milestone makes it possible to validate the real VFS → module → blocks path and the sharing, with reproducible tests. The future format will require offline conversion or a new image, without promising binary compatibility. The original proposal remains in `docs/native-mvp.md`.

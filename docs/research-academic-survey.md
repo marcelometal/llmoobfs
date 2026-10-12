@@ -1,4 +1,4 @@
-# Levantamento sistemático da literatura acadêmica para a ADR-0009
+# Systematic survey of the academic literature for ADR-0009
 
 ## Abstract (English)
 
@@ -22,393 +22,393 @@ inherits from asynchronous change streams; and the Notre Dame "search should be 
 attribute index with per-result POSIX authorization; no work measures a timing channel of the kind
 measured in MoobFS. All sources accessed 2026-10-11.
 
-## Escopo, método e convenções
+## Scope, method and conventions
 
-Data da pesquisa e de acesso a todas as fontes: **2026-10-11**. Documento de pesquisa; não altera
-especificação nem decisão. Complementa `docs/research-metadata-search.md` e
-`docs/research-metadata-search-addendum.md` (branch `docs/adr-0009-query-role`), cujos itens não foram
-refeitos: Spyglass, Magellan, SmartStore, Propeller, TagIt, GUFI (código e slides), Brindexer, Robinhood,
-Büttcher e Clarke (FAST 2005), Parker-Wood et al. (MSST 2010), BFS/Haiku e o livro de Giampaolo, WinFS,
-Spotlight, Windows Search, Tracker/LocalSearch, Baloo, changelogs do Lustre, histórico do `fanotify`,
-Semantic File System (SOSP 1991), Inversion FS, Culpepper e Moffat, Lemire et al. e Icicle.
+Date of the research and of access to all sources: **2026-10-11**. Research document; it does not change
+the specification or any decision. It complements `docs/research-metadata-search.md` and
+`docs/research-metadata-search-addendum.md` (branch `docs/adr-0009-query-role`), whose items were not
+redone: Spyglass, Magellan, SmartStore, Propeller, TagIt, GUFI (code and slides), Brindexer, Robinhood,
+Büttcher and Clarke (FAST 2005), Parker-Wood et al. (MSST 2010), BFS/Haiku and Giampaolo's book, WinFS,
+Spotlight, Windows Search, Tracker/LocalSearch, Baloo, Lustre changelogs, `fanotify` history,
+Semantic File System (SOSP 1991), Inversion FS, Culpepper and Moffat, Lemire et al. and Icicle.
 
-Tudo o que foi lido na web, em PDFs e em APIs foi tratado como dado, não como instrução. Nenhum número
-abaixo foi medido no MoobFS; são números dos autores, citados como relatados.
+Everything read on the web, in PDFs and through APIs was treated as data, not as instructions. No number
+below was measured in MoobFS; they are the authors' numbers, cited as reported.
 
-Níveis de leitura:
+Reading levels:
 
-- **[texto]**: li o texto completo ou as seções relevantes (PDF baixado e extraído com `pdftotext`).
-- **[resumo]**: li só o resumo (abstract) ou a página de catálogo.
-- **[código]**: li código-fonte (não houve leitura de código nova nesta rodada).
-- **[secundária]**: informação obtida de terceiros (por exemplo, a seção de trabalhos relacionados de
-  outro artigo), não da fonte primária.
+- **[text]**: I read the full text or the relevant sections (PDF downloaded and extracted with `pdftotext`).
+- **[abstract]**: I read only the abstract or the catalog page.
+- **[code]**: I read source code (there was no new code reading in this round).
+- **[secondary]**: information obtained from third parties (for example, the related-work section of
+  another paper), not from the primary source.
 
-Método:
+Method:
 
-1. **Perseguição de citações** pela API do OpenAlex (`filter=cites:`), porque a API do Semantic Scholar
-   respondeu 429 (limite de requisições) e a API do dblp também respondeu 429 depois da primeira
-   consulta. Âncoras: Spyglass (OpenAlex W148271226, 129 citações registradas), Büttcher e Clarke
-   (W2054801486, 23), Parker-Wood et al. (W2134181838, 10), GUFI SC22 (W4321636719, 4) e, por
-   transitividade, Singh et al. 2007 (W2161817975, 13). Todos os títulos citantes foram triados; só os
-   relevantes aparecem nas tabelas.
-2. **Buscas temáticas** no OpenAlex (2012-2026), na API do arXiv (cs.OS, cs.DB, cs.CR, cs.IR por
-   palavras-chave), no OSTI (`/api/v1/records`), no HAL (`api.archives-ouvertes.fr`) e na web.
-3. **Leitura em profundidade** dos trabalhos que pareceram mudar a análise (marcados [texto]).
+1. **Citation chasing** through the OpenAlex API (`filter=cites:`), because the Semantic Scholar API
+   answered 429 (rate limit) and the dblp API also answered 429 after the first
+   query. Anchors: Spyglass (OpenAlex W148271226, 129 recorded citations), Büttcher and Clarke
+   (W2054801486, 23), Parker-Wood et al. (W2134181838, 10), GUFI SC22 (W4321636719, 4) and, by
+   transitivity, Singh et al. 2007 (W2161817975, 13). All citing titles were triaged; only the
+   relevant ones appear in the tables.
+2. **Thematic searches** in OpenAlex (2012-2026), in the arXiv API (cs.OS, cs.DB, cs.CR, cs.IR by
+   keywords), in OSTI (`/api/v1/records`), in HAL (`api.archives-ouvertes.fr`) and on the web.
+3. **In-depth reading** of the works that seemed to change the analysis (marked [text]).
 
-Google Scholar não foi consultado diretamente (sem API); a perseguição de citações pelo OpenAlex cumpre
-o mesmo papel com cobertura menor, o que está registrado em "Ainda não verificado".
+Google Scholar was not consulted directly (no API); citation chasing through OpenAlex plays
+the same role with smaller coverage, which is recorded under "Not yet verified".
 
-## Resumo executivo
+## Executive summary
 
-- **"Domínio de permissão" tem definição e medida na literatura, e não é "diretório".** Singh, Srivatsa e
-  Liu (2007) particionam por *expressão de controle de acesso* (o conjunto de credenciais que pode ler o
-  arquivo): 2132 partições para 339 466 arquivos, 926 usuários e 1203 grupos, média de 6,31 partições
-  por usuário. Lethe (2014-2015) encontra 1475 conjuntos de permissão distintos em 50 000 documentos.
-  A alternativa E, como escrita (partição = diretório de primeiro nível), só fecha o canal de tempo se
-  todo arquivo da partição tiver o mesmo conjunto de leitores; senão o canal reaparece dentro dela.
-- **O canal lateral é conhecido, explorado e aceito como inerente ao filtro posterior.** Wang et al.
-  (S&P 2017) extraíram termos e contagens de documentos alheios no GitHub e em outros serviços sobre
-  Elasticsearch; a Elastic respondeu que índice por inquilino resolve, mas pode ser caro; a documentação
-  atual do Elasticsearch avisa que o usuário pode "contar" documentos inacessíveis que contêm um termo.
-  Nenhum trabalho encontrado trata canal de **tempo** em índice de metadados de filesystem; o mais
-  próximo é o ataque de busca entre sites por tempo de resposta (Gelernter e Herzberg, CCS 2015).
-- **Autorizar por coleção, em lote, e cachear alcance por diretório** são as técnicas medidas para baixar
-  o custo por resultado: Bailey et al. (CIKM 2006, 0,11 ms por documento local, 6,4 ms por consulta LDAP,
-  recomendação de lote), IndexFS (concessões temporárias de permissão por componente de caminho) e SPMeta
-  (ICDE 2026, bits de alcance por diretório e classe u/g/o, 99,7% dos caminhos reais elegíveis).
-- **Índices externos herdam o problema de ordem entre mudança de ACL e consulta** ("new enemy",
-  Zanzibar, ATC 2019). A alternativa B precisa de um marcador de consistência, não só de reconstrução
-  após `FAN_Q_OVERFLOW`.
-- **Bancos vetoriais refizeram em 2024-2026 a mesma troca** (índice por papel contra índice comum com
-  filtro): HoneyBee mede 13,5x menos latência que row-level security do PostgreSQL com 1,24x de memória.
-- **Nenhum trabalho publicado põe um índice de atributos no kernel Linux com autorização POSIX por
-  resultado.** O único precedente de interface de busca no kernel Linux é um relatório técnico de Notre
-  Dame (2013), sem índice. A combinação do MoobFS continua sem precedente direto.
+- **"Permission domain" has a definition and a measurement in the literature, and it is not "directory".** Singh, Srivatsa and
+  Liu (2007) partition by *access-control expression* (the set of credentials that can read the
+  file): 2132 partitions for 339 466 files, 926 users and 1203 groups, an average of 6.31 partitions
+  per user. Lethe (2014-2015) finds 1475 distinct permission sets in 50 000 documents.
+  Alternative E, as written (partition = first-level directory), only closes the timing channel if
+  every file in the partition has the same set of readers; otherwise the channel reappears inside it.
+- **The side channel is known, exploited and accepted as inherent to post-filtering.** Wang et al.
+  (S&P 2017) extracted terms and counts of other people's documents on GitHub and other services built on
+  Elasticsearch; Elastic answered that an index per tenant solves it, but can be expensive; the current
+  Elasticsearch documentation warns that the user can "count" inaccessible documents that contain a term.
+  No work found treats a **timing** channel in a filesystem metadata index; the
+  closest is the cross-site search attack by response time (Gelernter and Herzberg, CCS 2015).
+- **Authorizing per collection, in batch, and caching reachability per directory** are the measured techniques for lowering
+  the per-result cost: Bailey et al. (CIKM 2006, 0.11 ms per local document, 6.4 ms per LDAP query,
+  batch recommendation), IndexFS (temporary permission grants per path component) and SPMeta
+  (ICDE 2026, reachability bits per directory and u/g/o class, 99.7% of real paths eligible).
+- **External indexes inherit the ordering problem between an ACL change and a query** ("new enemy",
+  Zanzibar, ATC 2019). Alternative B needs a consistency marker, not only a rebuild
+  after `FAN_Q_OVERFLOW`.
+- **Vector databases redid the same trade-off in 2024-2026** (index per role versus a common index with
+  filter): HoneyBee measures 13.5x lower latency than PostgreSQL row-level security with 1.24x memory.
+- **No published work puts an attribute index in the Linux kernel with per-result POSIX
+  authorization.** The only precedent of a search interface in the Linux kernel is a technical report from Notre
+  Dame (2013), without an index. The MoobFS combination remains without direct precedent.
 
-## 1. Conferências e periódicos
+## 1. Conferences and journals
 
-Varredura por citação a partir das âncoras e por buscas temáticas. A maioria dos trabalhos de FAST,
-SC, MSST e TPDS que citam Spyglass trata de escala e organização semântica, não de permissão.
+Scan by citation from the anchors and by thematic searches. Most of the FAST,
+SC, MSST and TPDS works that cite Spyglass deal with scale and semantic organization, not with permission.
 
-| Trabalho | Mecanismo | Permissões | Resultados relatados | Implicação para E ou B | Nível e URL |
+| Work | Mechanism | Permissions | Reported results | Implication for E or B | Level and URL |
 | --- | --- | --- | --- | --- | --- |
-| Singh, Srivatsa, Liu. "Efficient and Secure Search of Enterprise File Systems", IEEE ICWS 2007 (versão longa GIT-CERCS-07-07) | Ver 1.1 | Partição por expressão de credenciais; sem filtro em tempo de consulta | Ver 1.1 | Define domínio por conjunto de leitores | [texto] https://cercs.gatech.edu/www.cercs.gatech.edu/tech-reports/tr2007/git-cercs-07-07.pdf ; DOI 10.1109/ICWS.2007.80 |
-| Bailey, Hawking, Matson. "Secure Search in Enterprise Webs: Tradeoffs in Efficient Implementation for Document Level Security", ACM CIKM 2006 | Ver 1.2 | Checagem por documento no momento da consulta | Ver 1.2 | Lote e checagem por coleção | [texto] https://david-hawking.net/pubs/cikm127_bailey.pdf |
-| Johnson, Keeton, Morrey, Soules et al. (HP). "From research to practice: experiences engineering a production metadata database for a scale out file system", USENIX FAST 2014 | StoreAll com Express Query: banco de metadados baseado no LazyBase (pipeline) ao lado de um FS distribuído; API REST de busca e marcação | Não consta no resumo | Relato de experiência; sem números no resumo | Precedente industrial de "banco ao lado do FS" com consistência por pipeline (próximo de B) | [resumo] https://dl.acm.org/doi/10.5555/2591305.2591324 |
-| Ren, Gibson. TableFS, USENIX ATC 2013 | FS empilhado sobre FS local; todos os metadados numa tabela LSM (LevelDB); versão FUSE | Herda do FS (não é busca) | 50% a 1000% sobre ext4/XFS/btrfs em cargas de metadados (resumo) | Precedente de camada empilhada que reorganiza metadados; não trata consulta nem autorização | [resumo] OpenAlex "TABLEFS" |
-| Ren, Zheng, Patil, Gibson. IndexFS, SC 2014 | Particionamento incremental por diretório; cache de componentes de caminho e suas permissões no cliente com concessões (leases) curtas | Mutação de permissão espera as concessões expirarem | Até duas ordens de grandeza sobre PVFS/Lustre/HDFS em metadados (resumo) | Mecanismo de cache de travessia autorizada aplicável a E ("autorizar uma vez até o diretório") | [texto parcial] https://www.pdl.cmu.edu/PDL-FTP/FS/IndexFS-SC14.pdf |
-| Zheng et al. DeltaFS Indexed Massive Directories, ACM TOS 2020 | Reorganização em fluxo da saída de simulações, indexada | Não trata | Leituras 1740x mais rápidas (resumo) | Sem relação com permissão; descartado | [resumo] https://doi.org/10.1145/3415581 |
-| Naps, Mokbel, Du. "Toward efficient search for ultrascale storage systems", PDSW 2011; Pantheon, 2011 | Propõe mover componentes de SGBD para dentro do sistema de armazenamento | Não consta | Posição, sem números no resumo | Argumento a favor de E (índice dentro), sem avaliação | [resumo] https://doi.org/10.1145/2125636.2125638 |
-| Parker-Wood et al. "Examining extended and scientific metadata for scalable index designs", SYSTOR 2013 | Caracteriza metadados científicos; sugere armazenamento em colunas | Não trata | Qualitativo (resumo) | Pouca relação | [resumo] https://escholarship.org/uc/item/30b0g251 |
-| Ohara. HCTrie, IEEE MSST 2013 | Trie de hipercubo para centenas de dimensões | Não trata | 5 milhões de entradas com 100 atributos; supera MySQL em faixas com menos de 100 dimensões (resumo) | Estrutura multiatributo; não atende o caso de igualdade conjuntiva do MoobFS melhor que interseção de listas | [resumo] https://doi.org/10.1109/MSST.2013.6558431 |
-| Frank et al. Percival, IEEE MSST 2015 | Busca sobre dados com divisão de segredo, via hash salgado em HSM | Custódios cegos para consulta e resultado | Menos de 1 s por busca em ~1 milhão de arquivos (resumo) | Outro modelo de ameaça (servidor não confiável); descartado | [resumo] https://doi.org/10.1109/MSST.2015.7208296 |
-| Ismail, Ronström, Haridi, Dowling. ePipe, IEEE/ACM CCGrid 2019 | Barramento que produz fluxo de mudanças consistente e ordenado do HopsFS para outros motores (Elasticsearch) | Não consta no resumo | Até 56x de vazão sobre HDFS INotify; atraso médio de 330 ms até o Elasticsearch na carga do Spotify (resumo) | Mostra o que B exige do fluxo de mudanças: ordem e entrega garantidas, que o `fanotify` não dá | [resumo] https://doi.org/10.1109/CCGRID.2019.00020 |
-| Koyama, Tatebe. "Lustre Query", ACM HPDC 2026 | Monitoramento offline a partir de backups do MDT | Ferramenta de administrador | Não verificado | Descartado | [resumo] https://doi.org/10.1145/3806645.3816126 |
-| Bjornson. "A Comparison of Three Open-source File Indexers: Robinhood, GUFI, XDU", 2026 | Comparação com Starfish, `find` e `du` | Não consta no resumo | Texto bloqueado ao download | Possível fonte de números independentes do GUFI | [resumo] https://doi.org/10.1145/3785462.3815846 |
+| Singh, Srivatsa, Liu. "Efficient and Secure Search of Enterprise File Systems", IEEE ICWS 2007 (long version GIT-CERCS-07-07) | See 1.1 | Partition by credential expression; no filter at query time | See 1.1 | Defines domain by set of readers | [text] https://cercs.gatech.edu/www.cercs.gatech.edu/tech-reports/tr2007/git-cercs-07-07.pdf ; DOI 10.1109/ICWS.2007.80 |
+| Bailey, Hawking, Matson. "Secure Search in Enterprise Webs: Tradeoffs in Efficient Implementation for Document Level Security", ACM CIKM 2006 | See 1.2 | Per-document check at query time | See 1.2 | Batch and per-collection check | [text] https://david-hawking.net/pubs/cikm127_bailey.pdf |
+| Johnson, Keeton, Morrey, Soules et al. (HP). "From research to practice: experiences engineering a production metadata database for a scale out file system", USENIX FAST 2014 | StoreAll with Express Query: metadata database based on LazyBase (pipeline) beside a distributed FS; REST API for search and tagging | Not stated in the abstract | Experience report; no numbers in the abstract | Industrial precedent of "database beside the FS" with pipeline consistency (close to B) | [abstract] https://dl.acm.org/doi/10.5555/2591305.2591324 |
+| Ren, Gibson. TableFS, USENIX ATC 2013 | Stacked FS over a local FS; all metadata in an LSM table (LevelDB); FUSE version | Inherits from the FS (it is not search) | 50% to 1000% over ext4/XFS/btrfs on metadata workloads (abstract) | Precedent of a stacked layer that reorganizes metadata; does not handle query or authorization | [abstract] OpenAlex "TABLEFS" |
+| Ren, Zheng, Patil, Gibson. IndexFS, SC 2014 | Incremental partitioning by directory; cache of path components and their permissions on the client with short grants (leases) | Permission mutation waits for the leases to expire | Up to two orders of magnitude over PVFS/Lustre/HDFS on metadata (abstract) | Authorized-traversal cache mechanism applicable to E ("authorize once up to the directory") | [partial text] https://www.pdl.cmu.edu/PDL-FTP/FS/IndexFS-SC14.pdf |
+| Zheng et al. DeltaFS Indexed Massive Directories, ACM TOS 2020 | In-stream reorganization of simulation output, indexed | Does not handle | Reads 1740x faster (abstract) | No relation to permission; discarded | [abstract] https://doi.org/10.1145/3415581 |
+| Naps, Mokbel, Du. "Toward efficient search for ultrascale storage systems", PDSW 2011; Pantheon, 2011 | Proposes moving DBMS components into the storage system | Not stated | Position paper, no numbers in the abstract | Argument in favor of E (index inside), without evaluation | [abstract] https://doi.org/10.1145/2125636.2125638 |
+| Parker-Wood et al. "Examining extended and scientific metadata for scalable index designs", SYSTOR 2013 | Characterizes scientific metadata; suggests columnar storage | Does not handle | Qualitative (abstract) | Little relation | [abstract] https://escholarship.org/uc/item/30b0g251 |
+| Ohara. HCTrie, IEEE MSST 2013 | Hypercube trie for hundreds of dimensions | Does not handle | 5 million entries with 100 attributes; beats MySQL on ranges with fewer than 100 dimensions (abstract) | Multi-attribute structure; does not serve the MoobFS conjunctive-equality case better than list intersection | [abstract] https://doi.org/10.1109/MSST.2013.6558431 |
+| Frank et al. Percival, IEEE MSST 2015 | Search over secret-shared data, via salted hash in an HSM | Custodians blind to query and result | Under 1 s per search over ~1 million files (abstract) | Different threat model (untrusted server); discarded | [abstract] https://doi.org/10.1109/MSST.2015.7208296 |
+| Ismail, Ronström, Haridi, Dowling. ePipe, IEEE/ACM CCGrid 2019 | Bus that produces a consistent, ordered change stream from HopsFS to other engines (Elasticsearch) | Not stated in the abstract | Up to 56x throughput over HDFS INotify; average delay of 330 ms to Elasticsearch on the Spotify workload (abstract) | Shows what B requires from the change stream: guaranteed ordering and delivery, which `fanotify` does not give | [abstract] https://doi.org/10.1109/CCGRID.2019.00020 |
+| Koyama, Tatebe. "Lustre Query", ACM HPDC 2026 | Offline monitoring from MDT backups | Administrator tool | Not verified | Discarded | [abstract] https://doi.org/10.1145/3806645.3816126 |
+| Bjornson. "A Comparison of Three Open-source File Indexers: Robinhood, GUFI, XDU", 2026 | Comparison with Starfish, `find` and `du` | Not stated in the abstract | Text blocked from download | Possible source of independent GUFI numbers | [abstract] https://doi.org/10.1145/3785462.3815846 |
 
-### 1.1 Singh, Srivatsa e Liu: barris de controle de acesso (2007)
+### 1.1 Singh, Srivatsa and Liu: access-control barrels (2007)
 
-**Mecanismo.** [texto] A "pesquisabilidade" é definida como permissão de leitura **e** execução em todo
-o caminho e leitura no arquivo; diretórios só com execução contam como não pesquisáveis (mais restritivo
-que Büttcher e Clarke, que exigem só execução). Os arquivos são agrupados em *access-control barrels*
-(ACB): cada barril contém exatamente os arquivos com a mesma expressão de credenciais (por exemplo,
-"uid bob" ou "grupo students"), e cada arquivo pertence a um só barril. Um grafo de hierarquia de acesso
-liga cada usuário aos barris que ele alcança; a consulta é feita em todos esses barris e os resultados
-são combinados com algoritmos de busca distribuída. Não há filtro por permissão na consulta. Duas
-otimizações reduzem o número de barris: duplicar índices de arquivos em barris dominantes, ou fundir
-barris aceitando violação controlada da propriedade de não vazamento.
+**Mechanism.** [text] "Searchability" is defined as read **and** execute permission along the whole
+path and read on the file; directories with execute only count as not searchable (more restrictive
+than Büttcher and Clarke, who require only execute). Files are grouped into *access-control barrels*
+(ACB): each barrel contains exactly the files with the same credential expression (for example,
+"uid bob" or "group students"), and each file belongs to only one barrel. An access hierarchy graph
+links each user to the barrels the user reaches; the query is run on all of those barrels and the results
+are combined with distributed search algorithms. There is no permission filter at query time. Two
+optimizations reduce the number of barrels: duplicating file indexes in dominant barrels, or merging
+barrels while accepting a controlled violation of the no-leak property.
 
-**Permissões e vazamento.** O texto mostra o ataque de contagem sobre o índice único com filtro
-(contagem de arquivos com "bankruptcy") e prova que não dá para ter menos barris sem duplicar índices ou
-violar a propriedade. ACLs POSIX entram como expressões de credenciais. O limite teórico de barris por
-usuário é exponencial no número de grupos do usuário.
+**Permissions and leakage.** The text shows the counting attack on the single index with a filter
+(count of files with "bankruptcy") and proves that one cannot have fewer barrels without duplicating indexes or
+violating the property. POSIX ACLs enter as credential expressions. The theoretical bound on barrels per
+user is exponential in the number of the user's groups.
 
-**Resultados.** Sistema real com 926 usuários, 1203 grupos, 339 466 arquivos, 23 741 diretórios:
-2132 barris; barris por usuário com máximo 25, média 6,31, mediana 4,26 (segunda empresa: 21, 5,78,
-3,96). Pré-processamento 38,7 s (hierarquia) e 263,1 s (barris), percorrendo só 60% da árvore porque
-subárvores com credencial restritiva são atribuídas inteiras. Indexação 38% mais rápida que o índice
-central (2902 s contra 4640 s), dominada pelo barril "todos". Consulta média: 131,12 ms (central) contra
-112,89, 130,68 e 149,90 ms combinando 2, 5 e 10 barris.
+**Results.** Real system with 926 users, 1203 groups, 339 466 files, 23 741 directories:
+2132 barrels; barrels per user with maximum 25, mean 6.31, median 4.26 (second company: 21, 5.78,
+3.96). Preprocessing 38.7 s (hierarchy) and 263.1 s (barrels), walking only 60% of the tree because
+subtrees with a restrictive credential are assigned whole. Indexing 38% faster than the central
+index (2902 s versus 4640 s), dominated by the "everyone" barrel. Mean query: 131.12 ms (central) versus
+112.89, 130.68 and 149.90 ms combining 2, 5 and 10 barrels.
 
-**Implicação.** Para E, a partição natural não é o diretório de primeiro nível, mas o conjunto de
-leitores; o diretório só serve se o projeto garantir (por política de criação) que tudo dentro dele tem
-o mesmo conjunto de leitores. Para B, um banco SQLite por barril em vez de por namespace é o desenho
-com prova de minimalidade; o número de bancos que um agente abre (média 6 neste dado) é o custo.
+**Implication.** For E, the natural partition is not the first-level directory, but the set of
+readers; the directory only works if the project guarantees (by creation policy) that everything inside it has
+the same set of readers. For B, one SQLite database per barrel instead of per namespace is the design
+with a minimality proof; the number of databases an agent opens (mean 6 in this data) is the cost.
 
-### 1.2 Bailey, Hawking e Matson: custo da segurança por documento (CIKM 2006)
+### 1.2 Bailey, Hawking and Matson: cost of per-document security (CIKM 2006)
 
-**Mecanismo.** [texto] Modelo de busca com segurança por documento (DLS) em duas implementações (Sytadel, um
-sistema de gestão de conteúdo, e o buscador Panoptic do CSIRO, depois Funnelback): candidatos percorridos linearmente, cada um checado contra o sistema de origem.
-**Resultados.** Checagem local custou cerca de 0,11 ms por documento; uma consulta LDAP a outro servidor,
-6,4 ms. Com orçamento de 1 s e 0,25 s de sobrecarga, o modelo admite 5454 checagens locais ou 93
-remotas. Contar o total exato de resultados visíveis é o que torna o custo inaceitável; parar ao
-completar uma página (20 resultados) estabiliza a consulta em 75 a 90 ms. **Recomendações dos autores:**
-organizar documentos para que a maior parte da checagem seja por coleção, abrir mão de contagens exatas,
-cachear e **checar em lote** (uma requisição com 100 a 1000 URIs).
+**Mechanism.** [text] Search model with document-level security (DLS) in two implementations (Sytadel, a
+content management system, and CSIRO's Panoptic search engine, later Funnelback): candidates walked linearly, each one checked against the source system.
+**Results.** A local check cost about 0.11 ms per document; an LDAP query to another server,
+6.4 ms. With a 1 s budget and 0.25 s of overhead, the model allows 5454 local checks or 93
+remote ones. Counting the exact total of visible results is what makes the cost unacceptable; stopping when
+a page is complete (20 results) stabilizes the query at 75 to 90 ms. **Authors' recommendations:**
+organize documents so that most of the checking is per collection, give up exact counts,
+cache, and **check in batch** (one request with 100 to 1000 URIs).
 
-**Implicação.** O custo medido no MoobFS (cerca de 1,7 µs por resultado) já é duas ordens abaixo da
-checagem local de 2006, mas a forma do problema é a mesma: a alternativa E é exatamente "checagem por
-coleção" (autorizar a travessia até o diretório uma vez), e a autorização em lote de B é a recomendação
-de lote. O trabalho também confirma que não expor contagem total é escolha de desempenho, além de
-segurança.
+**Implication.** The cost measured in MoobFS (about 1.7 µs per result) is already two orders below the
+local check of 2006, but the shape of the problem is the same: alternative E is exactly "per-collection
+check" (authorize the traversal up to the directory once), and B's batch authorization is the batch
+recommendation. The work also confirms that not exposing a total count is a performance choice, as well as a
+security one.
 
-## 2. Grupos de pesquisa
+## 2. Research groups
 
-| Grupo | O que foi encontrado | Relevância |
+| Group | What was found | Relevance |
 | --- | --- | --- |
-| UC Santa Cruz SSRC/CRSS | Parker-Wood, dissertação "Improving File Management Through Provenance And Rich Metadata" (2014), cujo resumo cita "secure, effective, and efficient search" [resumo] https://escholarship.org/uc/item/6pc1t0nw ; LiFS (Ames et al., MSST 2005) [resumo]; Percival (MSST 2015) [resumo]; SYSTOR 2013 (tabela 1) | A dissertação provavelmente estende o MSST 2010; o PDF respondeu 403 e não foi lido |
-| CMU Parallel Data Lab | TableFS, IndexFS, DeltaFS (tabela 1); Patil et al. "In Search of an API for Scalable File Systems: Under the Table or Above it?" (registro no repositório da CMU; local e ano originais não verificados) [resumo]; Soules e Ganger, atribuição de atributos por contexto (CMU-PDL-04-105) [resumo] | Só o cache de permissões com concessões do IndexFS é relevante |
-| UW-Madison ADSL | Nada sobre indexação ou busca de metadados com permissões nas buscas feitas | Sem resultado |
-| MIT PDOS e sucessores do SFS | Semantic File System (já coberto); HAC, Gopal e Manber (OSDI 1999, Arizona) [resumo]; Logic File System, Padioleau e Ridoux (IRISA/INRIA, 2002-2005) [resumo]; hFAD, Seltzer e Murphy (HotOS 2009, Harvard) [resumo] | Nenhum resumo trata permissões por resultado |
-| Stony Brook FSL | VT-trees (FAST 2013) e trabalhos de atualização de metadados citam Spyglass, mas tratam de estruturas de armazenamento | Sem resultado |
-| Microsoft Research | Bhatt et al. "Enterprise AI Must Enforce Participant-Aware Access Control" (arXiv 2509.14608, 2025; MSR Índia) [resumo] | Ver seção 4 |
-| Google | Goods (SIGMOD 2016) [texto]; Zanzibar (USENIX ATC 2019) [texto] | Ver 2.1 e 2.2 |
+| UC Santa Cruz SSRC/CRSS | Parker-Wood, dissertation "Improving File Management Through Provenance And Rich Metadata" (2014), whose abstract mentions "secure, effective, and efficient search" [abstract] https://escholarship.org/uc/item/6pc1t0nw ; LiFS (Ames et al., MSST 2005) [abstract]; Percival (MSST 2015) [abstract]; SYSTOR 2013 (table 1) | The dissertation probably extends MSST 2010; the PDF answered 403 and was not read |
+| CMU Parallel Data Lab | TableFS, IndexFS, DeltaFS (table 1); Patil et al. "In Search of an API for Scalable File Systems: Under the Table or Above it?" (record in the CMU repository; original venue and year not verified) [abstract]; Soules and Ganger, context-based attribute assignment (CMU-PDL-04-105) [abstract] | Only IndexFS's permission cache with leases is relevant |
+| UW-Madison ADSL | Nothing on metadata indexing or search with permissions in the searches made | No result |
+| MIT PDOS and successors of SFS | Semantic File System (already covered); HAC, Gopal and Manber (OSDI 1999, Arizona) [abstract]; Logic File System, Padioleau and Ridoux (IRISA/INRIA, 2002-2005) [abstract]; hFAD, Seltzer and Murphy (HotOS 2009, Harvard) [abstract] | No abstract deals with per-result permissions |
+| Stony Brook FSL | VT-trees (FAST 2013) and metadata-update works cite Spyglass, but deal with storage structures | No result |
+| Microsoft Research | Bhatt et al. "Enterprise AI Must Enforce Participant-Aware Access Control" (arXiv 2509.14608, 2025; MSR India) [abstract] | See section 4 |
+| Google | Goods (SIGMOD 2016) [text]; Zanzibar (USENIX ATC 2019) [text] | See 2.1 and 2.2 |
 
 ### 2.1 Goods (Halevy et al., SIGMOD 2016)
 
-[texto] https://storage.googleapis.com/gweb-research2023-media/pubtools/pdf/45390.pdf (DOI
-10.1145/2882903.2903730). Catálogo de metadados de conjuntos de dados da Google (armazenamento chave-valor
-mais índice invertido). **Permissões:** o texto diz que o catálogo indexa mais de 26 bilhões de conjuntos
-"embora inclua apenas" os que são legíveis por todos os engenheiros, e que o tamanho deve mais que dobrar
-quando os de acesso restrito forem indexados. **Implicação:** o maior catálogo de metadados publicado
-evitou o problema indexando só o domínio público. Para E e B, um domínio "compartilhado por todos" pode
-ter índice único sem risco; o problema real fica nos domínios privados.
+[text] https://storage.googleapis.com/gweb-research2023-media/pubtools/pdf/45390.pdf (DOI
+10.1145/2882903.2903730). Google's dataset metadata catalog (key-value store
+plus inverted index). **Permissions:** the text says the catalog indexes more than 26 billion datasets
+"although it includes only" those that are readable by all engineers, and that the size should more than double
+when the restricted-access ones are indexed. **Implication:** the largest published metadata catalog
+avoided the problem by indexing only the public domain. For E and B, a domain "shared by everyone" can
+have a single index without risk; the real problem lies in the private domains.
 
 ### 2.2 Zanzibar (Pang et al., USENIX ATC 2019)
 
-[texto] https://www.usenix.org/system/files/atc19-pang.pdf. Sistema global de ACLs da Google (Drive,
-Calendar, YouTube e outros), sobre Spanner. **Mecanismo relevante:** (1) o problema do **"new enemy"**:
-avaliar uma ACL fora de ordem em relação a mudanças de ACL ou de conteúdo, por exemplo aplicar a ACL
-antiga a conteúdo novo; resolvido com *zookies*, fichas que carregam um carimbo de tempo do conteúdo e
-obrigam a checagem a usar um instantâneo pelo menos tão novo; (2) **Leopard**, índice que achata grupos
-aninhados em conjuntos para checagens rápidas, alimentado por um fluxo ordenado de mudanças (Watch);
-(3) a API Expand existe para que clientes construam **índices de busca com controle de acesso**, e o
-texto diz que servir resultados de busca exige dezenas a centenas de checagens, com pontos quentes em
-grupos comuns. **Resultados:** percentil 95 abaixo de 10 ms e disponibilidade acima de 99,999% em três
-anos (resumo do artigo). **Implicação:** B herda o "new enemy": entre um `chmod` e o índice externo
-refletir a mudança, o índice pode devolver nomes e atributos ao leitor antigo. A autorização em lote no
-kernel resolve o conteúdo, não os metadados copiados no índice. O "contador monotônico de mudanças" já
-proposto na ADR-0009 para o `GET_INFO` é o equivalente local de um zookie; a literatura sugere que ele
-seja exigido na consulta, não só exposto. E não tem esse problema (índice e permissão mudam na mesma
-chamada).
+[text] https://www.usenix.org/system/files/atc19-pang.pdf. Google's global ACL system (Drive,
+Calendar, YouTube and others), on Spanner. **Relevant mechanism:** (1) the **"new enemy"** problem:
+evaluating an ACL out of order with respect to ACL or content changes, for example applying the old
+ACL to new content; solved with *zookies*, tokens that carry a content timestamp and
+force the check to use a snapshot at least as new; (2) **Leopard**, an index that flattens nested groups
+into sets for fast checks, fed by an ordered change stream (Watch);
+(3) the Expand API exists so that clients can build **access-controlled search indexes**, and the
+text says that serving search results requires tens to hundreds of checks, with hot spots on
+common groups. **Results:** 95th percentile below 10 ms and availability above 99.999% over three
+years (paper abstract). **Implication:** B inherits the "new enemy": between a `chmod` and the external index
+reflecting the change, the index can return names and attributes to the old reader. Batch authorization in the
+kernel solves the content, not the metadata copied into the index. The "monotonic change counter" already
+proposed in ADR-0009 for `GET_INFO` is the local equivalent of a zookie; the literature suggests that it
+be required in the query, not only exposed. E does not have this problem (index and permission change in the same
+call).
 
-## 3. Laboratórios nacionais e institutos
+## 3. National laboratories and institutes
 
-| Fonte | O que foi encontrado | Nível e URL | Implicação |
+| Source | What was found | Level and URL | Implication |
 | --- | --- | --- | --- |
-| LANL, artigo GUFI SC22 | Continua sem cópia aberta: a página do SC22 e o LARO só têm resumo; o resumo da página do USRC/LANL diz que os bancos são "sharded" de modo a impor permissões POSIX e que o "rollup" sobe informação de subárvores com mesmas permissões | [resumo] https://usrc.lanl.gov/emc3-project-gufi.php | Nada novo além do adendo |
-| LANL, patente "Grand unified file indexing", US 11 048 699 (2021; Grider, Manno, Poole, Bonnie, Inman) | Árvore que replica a hierarquia, um armazenamento de metadados por diretório, "controles de acesso eficientes em espaço de usuário", tabelas de resumo para podar travessia | [resumo] https://www.osti.gov/biblio/1824127 | O desenho do GUFI está patenteado; o código é BSD-3 (adendo). Licença de patente não verificada |
-| LANL, LA-UR-22-21380 (slides DisrupTECH, 2022) | Material de divulgação; afirma que o GUFI "preserva e honra" permissões | [texto] https://www.osti.gov/biblio/1846115 | Sem dados técnicos novos |
-| LANL, Jacobi, "Applied Parallel Metadata Indexing" (2012) | Arquivo GPFS de 4+ PB e 170 milhões de arquivos; metadados importados para MongoDB e indexados por atributo; **uma tabela por usuário com só os registros que ele pode ler**, acesso por credenciais; interface FUSE | [resumo] https://www.osti.gov/servlets/purl/1048692 | Precursor de "um índice por domínio" no próprio LANL, com domínio = usuário |
-| LANL, "Access Controlled AI Context with GUFI" (LA-UR-26-24285) | Já lido no adendo; o OSTI não devolveu registro para esse título nesta data | — | — |
-| SNL, Lofstead, "Metadata Driven Data Management" (2019) e Lawson e Lofstead, "SystemX" (HPDC 2020) | Registros sem resumo no OSTI | [resumo] https://www.osti.gov/biblio/1641766 ; https://www.osti.gov/biblio/1764669 | Não verificado |
-| LLNL, Ames, Gokhale, Maltzahn, QFS/Quasar (2009-2010) | FS rico em metadados com modelo de grafo e linguagem de consulta derivada de XPath; ingestão superior e consulta comparável ao padrão "FS + banco relacional" | [resumo] https://www.osti.gov/biblio/975221 | Precedente de consulta dentro do FS; resumo não fala de permissões |
-| ORNL | TagIt (já coberto); "Scientific user behavior and data-sharing trends in a petascale file system" (SC 2017) cita Spyglass; MOSIQS (IEEE Access 2021) indexa metadados em memória persistente | [resumo] | Sem tratamento de permissões nos resumos |
-| ANL, NERSC | Nada específico nas buscas OSTI e OpenAlex | — | Sem resultado |
-| CEA (HAL) | Buscas no HAL por "metadata search file system", "indexation métadonnées système de fichiers" e "robinhood policy engine" não trouxeram trabalho novo sobre busca com permissões (só "Multicriteria File-Level Placement Policy for HPC Storage", 2025, sobre posicionamento) | https://api.archives-ouvertes.fr | Sem resultado |
-| INRIA | Logic File System (IRISA) | [resumo] | Sem tratamento de permissões no resumo |
-| Jülich, HLRS | Nada encontrado | — | Sem resultado |
+| LANL, GUFI SC22 paper | Still no open copy: the SC22 page and LARO only have the abstract; the abstract on the USRC/LANL page says the databases are "sharded" so as to enforce POSIX permissions and that the "rollup" lifts information from subtrees with the same permissions | [abstract] https://usrc.lanl.gov/emc3-project-gufi.php | Nothing new beyond the addendum |
+| LANL, patent "Grand unified file indexing", US 11 048 699 (2021; Grider, Manno, Poole, Bonnie, Inman) | Tree that replicates the hierarchy, one metadata store per directory, "efficient user-space access controls", summary tables to prune traversal | [abstract] https://www.osti.gov/biblio/1824127 | The GUFI design is patented; the code is BSD-3 (addendum). Patent license not verified |
+| LANL, LA-UR-22-21380 (DisrupTECH slides, 2022) | Outreach material; states that GUFI "preserves and honors" permissions | [text] https://www.osti.gov/biblio/1846115 | No new technical data |
+| LANL, Jacobi, "Applied Parallel Metadata Indexing" (2012) | GPFS archive of 4+ PB and 170 million files; metadata imported into MongoDB and indexed by attribute; **one table per user with only the records that user can read**, access by credentials; FUSE interface | [abstract] https://www.osti.gov/servlets/purl/1048692 | Precursor of "one index per domain" at LANL itself, with domain = user |
+| LANL, "Access Controlled AI Context with GUFI" (LA-UR-26-24285) | Already read in the addendum; OSTI returned no record for that title on this date | — | — |
+| SNL, Lofstead, "Metadata Driven Data Management" (2019) and Lawson and Lofstead, "SystemX" (HPDC 2020) | Records without abstract in OSTI | [abstract] https://www.osti.gov/biblio/1641766 ; https://www.osti.gov/biblio/1764669 | Not verified |
+| LLNL, Ames, Gokhale, Maltzahn, QFS/Quasar (2009-2010) | Metadata-rich FS with a graph model and a query language derived from XPath; superior ingestion and query comparable to the "FS + relational database" pattern | [abstract] https://www.osti.gov/biblio/975221 | Precedent of query inside the FS; abstract does not talk about permissions |
+| ORNL | TagIt (already covered); "Scientific user behavior and data-sharing trends in a petascale file system" (SC 2017) cites Spyglass; MOSIQS (IEEE Access 2021) indexes metadata in persistent memory | [abstract] | No handling of permissions in the abstracts |
+| ANL, NERSC | Nothing specific in the OSTI and OpenAlex searches | — | No result |
+| CEA (HAL) | Searches in HAL for "metadata search file system", "indexation métadonnées système de fichiers" and "robinhood policy engine" brought no new work on search with permissions (only "Multicriteria File-Level Placement Policy for HPC Storage", 2025, on placement) | https://api.archives-ouvertes.fr | No result |
+| INRIA | Logic File System (IRISA) | [abstract] | No handling of permissions in the abstract |
+| Jülich, HLRS | Nothing found | — | No result |
 
-## 4. arXiv e busca com controle de acesso
+## 4. arXiv and access-controlled search
 
-### 4.1 Tabela
+### 4.1 Table
 
-| Trabalho | Mecanismo | Permissões | Resultados | Implicação para E ou B | Nível e URL |
+| Work | Mechanism | Permissions | Results | Implication for E or B | Level and URL |
 | --- | --- | --- | --- | --- | --- |
-| Wang, Grubbs, Lu, Bindschaedler, Cash, Ristenpart. "Side-Channel Attacks on Shared Search Indexes", IEEE S&P 2017, pp. 673-692 | Ver 4.2 | Filtro depois da pontuação | Ver 4.2 | Partição é a mitigação aceita | [texto] http://seclab.illinois.edu/wp-content/uploads/2018/01/sp17stress.pdf ; DOI 10.1109/SP.2017.50 |
-| Micheli, Margaritis, Anastasiadis. Lethe: "Efficient Multi-User Indexing for Secure Keyword Search" (2014, local de publicação não verificado); IEEE BigData Congress 2014; Transactions on Data Privacy 8(1) 2015, 29-53 | Ver 4.3 | Índice compartilhado só por quem pode ler tudo nele | Ver 4.3 | Quantos domínios existem e o custo de fundi-los | [texto] https://csl.cse.uoi.gr/wp-content/uploads/lethe-tdp2015.pdf |
-| Zerr, Demidova, Olmedilla, Nejdl, Winslett, Mitra. Zerber, EDBT 2008 | r-confidencialidade: grau de vazamento sobre termos de documentos inacessíveis; divisão de segredo e fusão de termos | Confiança limitada num índice central | Inserção e busca com bom desempenho em dados reais (resumo) | Wang et al. dizem não estar claro que garantia a variante estatística dá | [resumo] https://doi.org/10.1145/1353343.1353380 |
-| Bjørklund, Götz, Gehrke. "Search in social networks with access control", 2010 (local não verificado); Bjørklund et al. "Workload-aware indexing for keyword search in social networks", CIKM 2011 | Organização dos metadados de controle de acesso escolhida por modelos de custo da carga; operador HeapUnion | Cada usuário vê um subconjunto único | Até 2x no operador e até 3x sobre trabalhos anteriores (resumo de 2011) | Se E crescer para "QUERY em vários domínios", a escolha de organização por custo é o precedente | [resumo] https://doi.org/10.1145/1868366.1868370 ; https://doi.org/10.1145/2063576.2063656 |
-| Gelernter, Herzberg. "Cross-Site Search Attacks", ACM CCS 2015 | Usa o **tempo** de resposta de buscas, medido do navegador, para extrair informação privada | Contorna a política de mesma origem | Ataques eficazes com ferramentas melhores, apesar da variância de rede (resumo) | Único ataque por tempo a índice de busca encontrado; confirma que canal de tempo em busca é explorável | [resumo] https://doi.org/10.1145/2810103.2813688 |
-| Zhong, Lentz, Narodytska, Szekeres, Rong. HoneyBee, arXiv 2505.01538, 2025 | Partições sobrepostas guiadas pela estrutura RBAC, com réplicas escolhidas por otimização (memória, latência, recall) | Índice por papel ou índice comum com row-level security | Até 13,5x menos latência que RLS do PostgreSQL (pgvector, HNSW) com 1,24x de memória; partição por papel custou 7x a memória do índice único; 90,4% menos memória extra que índices por papel | Mesma troca de B e E em outro tipo de índice; replicar entre domínios é opção medida | [texto parcial] https://arxiv.org/abs/2505.01538 |
-| Han, Chakraborty, Mehrotra. Veda/EffVeda, arXiv 2605.01342, 2026 | Particiona por combinação de papéis em blocos disjuntos, organizados num reticulado com cópia e fusão sob orçamento de memória | Consulta cobre só nós autorizados; nós "impuros" podados por limite de distância | Maior vazão com recall alto, perto do orçamento (resumo) | Formaliza "domínio = combinação de papéis", o mesmo que os barris de 2007 | [resumo] https://arxiv.org/abs/2605.01342 |
-| Jin, Wu, Hu, Maggs, Zhang, Zhuo. Curator, arXiv 2401.07119, 2024 | Árvore de agrupamento por inquilino codificada como subárvore de uma árvore comum | Inquilino | Desempenho de índice por inquilino com memória de índice único com filtro (resumo) | Mostra que índice comum com estrutura por domínio é viável; análogo a E com partições compartilhando a estrutura | [resumo] https://arxiv.org/abs/2401.07119 |
-| Yalamarthi, Pappachan. "Policy-aware Vector Search", arXiv 2606.19803, 2026 | Visão: formaliza controle de acesso fino em bancos vetoriais e compara estratégias | Fino, por política | Preliminares | Confirma que o tema segue aberto em 2026 | [resumo] https://arxiv.org/abs/2606.19803 |
-| Bhatt et al. (Microsoft). "Enterprise AI Must Enforce Participant-Aware Access Control", arXiv 2509.14608, 2025 | Todo conteúdo usado em treino, recuperação ou geração deve ser autorizado para **todos** os participantes da interação | Determinística, não probabilística | Ataques de exfiltração demonstrados; implantado no Microsoft Copilot Tuning (resumo) | O `QUERY` usa as credenciais de um processo; um agente que responde a vários usuários precisaria da interseção, que nem E nem B oferecem | [resumo] https://arxiv.org/abs/2509.14608 |
-| Jayaraman et al. "Permissioned LLMs", arXiv 2505.22860, 2025 | Controle de acesso sobreposto às respostas de um LLM ajustado (PEFT por domínio) | Por domínio de dados | Métricas DDI e UGI em cinco conjuntos (resumo) | Outro nível (modelo, não índice); descartado para a ADR | [resumo] https://arxiv.org/abs/2505.22860 |
-| Johnson et al. AIM, arXiv 2609.12320, 2026 | Memória de agentes multiusuário que classifica informação em privada ou pública e aplica controle no índice | Privado do dono ou público | 96,0% de acurácia na classificação de visibilidade (resumo) | Mesmo modelo de dois domínios de Goods; no MoobFS a classificação seria por modo do arquivo, não por modelo | [resumo] https://arxiv.org/abs/2609.12320 |
-| Li et al. BudgetLeak, arXiv 2511.12043, 2025 | Inferência de pertinência em RAG pelo orçamento de geração | — | Supera bases (resumo) | Canal lateral em RAG, mas de outra natureza; descartado | [resumo] https://arxiv.org/abs/2511.12043 |
+| Wang, Grubbs, Lu, Bindschaedler, Cash, Ristenpart. "Side-Channel Attacks on Shared Search Indexes", IEEE S&P 2017, pp. 673-692 | See 4.2 | Filter after scoring | See 4.2 | Partitioning is the accepted mitigation | [text] http://seclab.illinois.edu/wp-content/uploads/2018/01/sp17stress.pdf ; DOI 10.1109/SP.2017.50 |
+| Micheli, Margaritis, Anastasiadis. Lethe: "Efficient Multi-User Indexing for Secure Keyword Search" (2014, venue not verified); IEEE BigData Congress 2014; Transactions on Data Privacy 8(1) 2015, 29-53 | See 4.3 | Index shared only by those who can read everything in it | See 4.3 | How many domains exist and the cost of merging them | [text] https://csl.cse.uoi.gr/wp-content/uploads/lethe-tdp2015.pdf |
+| Zerr, Demidova, Olmedilla, Nejdl, Winslett, Mitra. Zerber, EDBT 2008 | r-confidentiality: degree of leakage about terms of inaccessible documents; secret sharing and term merging | Limited trust in a central index | Insertion and search with good performance on real data (abstract) | Wang et al. say it is not clear what guarantee the statistical variant gives | [abstract] https://doi.org/10.1145/1353343.1353380 |
+| Bjørklund, Götz, Gehrke. "Search in social networks with access control", 2010 (venue not verified); Bjørklund et al. "Workload-aware indexing for keyword search in social networks", CIKM 2011 | Organization of access-control metadata chosen by workload cost models; HeapUnion operator | Each user sees a unique subset | Up to 2x on the operator and up to 3x over previous work (2011 abstract) | If E grows into "QUERY over several domains", choosing the organization by cost is the precedent | [abstract] https://doi.org/10.1145/1868366.1868370 ; https://doi.org/10.1145/2063576.2063656 |
+| Gelernter, Herzberg. "Cross-Site Search Attacks", ACM CCS 2015 | Uses the response **time** of searches, measured from the browser, to extract private information | Bypasses the same-origin policy | Effective attacks with better tools, despite network variance (abstract) | Only timing attack on a search index found; confirms that a timing channel in search is exploitable | [abstract] https://doi.org/10.1145/2810103.2813688 |
+| Zhong, Lentz, Narodytska, Szekeres, Rong. HoneyBee, arXiv 2505.01538, 2025 | Overlapping partitions guided by the RBAC structure, with replicas chosen by optimization (memory, latency, recall) | Index per role or common index with row-level security | Up to 13.5x lower latency than PostgreSQL RLS (pgvector, HNSW) with 1.24x memory; partition per role cost 7x the memory of the single index; 90.4% less extra memory than per-role indexes | Same trade-off as B and E in another kind of index; replicating across domains is a measured option | [partial text] https://arxiv.org/abs/2505.01538 |
+| Han, Chakraborty, Mehrotra. Veda/EffVeda, arXiv 2605.01342, 2026 | Partitions by role combination into disjoint blocks, organized in a lattice with copying and merging under a memory budget | Query covers only authorized nodes; "impure" nodes pruned by distance bound | Higher throughput with high recall, near the budget (abstract) | Formalizes "domain = role combination", the same as the 2007 barrels | [abstract] https://arxiv.org/abs/2605.01342 |
+| Jin, Wu, Hu, Maggs, Zhang, Zhuo. Curator, arXiv 2401.07119, 2024 | Per-tenant clustering tree encoded as a subtree of a common tree | Tenant | Performance of a per-tenant index with the memory of a single index with filter (abstract) | Shows that a common index with per-domain structure is viable; analogous to E with partitions sharing the structure | [abstract] https://arxiv.org/abs/2401.07119 |
+| Yalamarthi, Pappachan. "Policy-aware Vector Search", arXiv 2606.19803, 2026 | Vision: formalizes fine-grained access control in vector databases and compares strategies | Fine-grained, by policy | Preliminary | Confirms that the topic remains open in 2026 | [abstract] https://arxiv.org/abs/2606.19803 |
+| Bhatt et al. (Microsoft). "Enterprise AI Must Enforce Participant-Aware Access Control", arXiv 2509.14608, 2025 | All content used in training, retrieval or generation must be authorized for **all** participants of the interaction | Deterministic, not probabilistic | Exfiltration attacks demonstrated; deployed in Microsoft Copilot Tuning (abstract) | `QUERY` uses the credentials of one process; an agent that answers several users would need the intersection, which neither E nor B offers | [abstract] https://arxiv.org/abs/2509.14608 |
+| Jayaraman et al. "Permissioned LLMs", arXiv 2505.22860, 2025 | Access control overlaid on the answers of a fine-tuned LLM (PEFT per domain) | Per data domain | DDI and UGI metrics on five datasets (abstract) | Another level (model, not index); discarded for the ADR | [abstract] https://arxiv.org/abs/2505.22860 |
+| Johnson et al. AIM, arXiv 2609.12320, 2026 | Multi-user agent memory that classifies information as private or public and applies control in the index | Owner-private or public | 96.0% accuracy in visibility classification (abstract) | Same two-domain model as Goods; in MoobFS the classification would be by file mode, not by model | [abstract] https://arxiv.org/abs/2609.12320 |
+| Li et al. BudgetLeak, arXiv 2511.12043, 2025 | Membership inference in RAG through the generation budget | — | Beats baselines (abstract) | Side channel in RAG, but of another nature; discarded | [abstract] https://arxiv.org/abs/2511.12043 |
 
-### 4.2 Wang et al.: ataques laterais a índices compartilhados (S&P 2017)
+### 4.2 Wang et al.: side-channel attacks on shared indexes (S&P 2017)
 
-**Mecanismo do sistema atacado.** [texto] Elasticsearch e Solr multi-inquilino guardam documentos de
-muitos usuários em índices compartilhados (fragmentos), com frequência de documento (DF) por termo
-calculada sobre todos; o controle de acesso é um filtro (por id de inquilino na consulta ou alias
-filtrado) aplicado depois. **Ataque (STRESS):** a pontuação TF-IDF de um documento do atacante depende do
-DF global; o atacante mapeia quantos fragmentos existem, coloca documentos próprios em cada um e, por
-co-residência, descobre termos de documentos alheios ou **quantos documentos alheios contêm um termo**.
-Demonstrado em GitHub, Xen.do e outros; uma variante só com a ordem dos resultados funciona sem
-pontuação. **Contramedidas discutidas:** índice por usuário ("received wisdom" o considera caro em
-escala); visão por usuário de Büttcher e Clarke; DFs "cegos" (só documentos públicos) ou DFs de um
-corpus público (aumento de latência de cerca de 1% em microbenchmarks com Lucene 6.3.0, qualidade de
-ranking igual). **Resposta da Elastic:** índice por inquilino para implantações pequenas, admitindo que
-pode ser proibitivo nas grandes; desligar pontuação quando aceitável. **Documentação atual** [texto]
+**Mechanism of the attacked system.** [text] Multi-tenant Elasticsearch and Solr store documents of
+many users in shared indexes (shards), with document frequency (DF) per term
+computed over all of them; access control is a filter (by tenant id in the query or a filtered
+alias) applied afterwards. **Attack (STRESS):** the TF-IDF score of an attacker's document depends on the
+global DF; the attacker maps how many shards exist, places its own documents in each one and, by
+co-residence, discovers terms of other people's documents or **how many other people's documents contain a term**.
+Demonstrated on GitHub, Xen.do and others; a variant using only the order of results works without
+scoring. **Countermeasures discussed:** index per user ("received wisdom" considers it expensive at
+scale); Büttcher and Clarke's per-user view; "blind" DFs (public documents only) or DFs from a
+public corpus (latency increase of about 1% in microbenchmarks with Lucene 6.3.0, equal ranking
+quality). **Elastic's answer:** index per tenant for small deployments, admitting that it
+can be prohibitive in large ones; turn off scoring when acceptable. **Current documentation** [text]
 https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/controlling-access-at-document-field-level :
-a segurança por documento não afeta as estatísticas globais de pontuação, e o usuário ainda pode
-descobrir termos que só existem em documentos inacessíveis e contar quantos os contêm.
+document-level security does not affect the global scoring statistics, and the user can still
+discover terms that exist only in inaccessible documents and count how many contain them.
 
-**Implicação.** O `QUERY` não devolve pontuação nem contagem, mas o canal de tempo medido no MoobFS
-(cerca de 1,15 µs por candidato invisível) entrega a mesma informação (contagem de entradas alheias que
-casam com um predicado) por outro meio. A literatura de busca não oferece mitigação por tempo constante;
-a mitigação aceita é não percorrer entradas de outros domínios, isto é, particionar (E, ou B com um
-banco por domínio).
+**Implication.** `QUERY` returns neither score nor count, but the timing channel measured in MoobFS
+(about 1.15 µs per invisible candidate) delivers the same information (count of other people's entries that
+match a predicate) by another means. The search literature offers no constant-time mitigation;
+the accepted mitigation is not to walk entries of other domains, that is, to partition (E, or B with one
+database per domain).
 
-### 4.3 Lethe: quantos domínios existem e quanto custa fundi-los (2014-2015)
+### 4.3 Lethe: how many domains exist and how much it costs to merge them (2014-2015)
 
-**Mecanismo.** [texto] Um índice compartilhado é confidencial se for usado só por usuários autorizados
-a buscar **todos** os documentos nele. Documentos são agrupados em "famílias" pelo conjunto de
-pesquisadores autorizados; famílias parecidas são agrupadas (DBSCAN ou K-medoids); cada grupo tem um
-índice para a interseção dos pesquisadores e índices privados ou adicionais para as diferenças, com um
-limiar de duplicação. **Resultados** (DocuShare: 50 000 documentos, 1475 famílias; Elasticsearch
-0.90.1): na configuração sugerida, 11,6 índices consultados por pesquisador e 7,8 índices atualizados por
-documento; baixar o limiar triplica o custo de busca (11,6 para 35,8) e reduz o de atualização só 41%.
-Tempo de resposta de 17,8 a 21,8 ms com 1 a 16 clientes nessa configuração; vazão de 37,0 para 339,8
-consultas/s; configurações com muita duplicação ficaram abaixo de 19% das consultas em 50 ms por não
-caberem em memória.
+**Mechanism.** [text] A shared index is confidential if it is used only by users authorized
+to search **all** the documents in it. Documents are grouped into "families" by the set of
+authorized searchers; similar families are clustered (DBSCAN or K-medoids); each cluster has an
+index for the intersection of the searchers and private or additional indexes for the differences, with a
+duplication threshold. **Results** (DocuShare: 50 000 documents, 1475 families; Elasticsearch
+0.90.1): in the suggested configuration, 11.6 indexes queried per searcher and 7.8 indexes updated per
+document; lowering the threshold triples the search cost (11.6 to 35.8) and reduces the update cost by only 41%.
+Response time of 17.8 to 21.8 ms with 1 to 16 clients in that configuration; throughput from 37.0 to 339.8
+queries/s; configurations with a lot of duplication stayed below 19% of queries within 50 ms because they did not
+fit in memory.
 
-**Implicação.** Mesmo com partição por permissão, um usuário real consulta da ordem de dez índices. Para
-E, isso favorece um `QUERY` sobre um diretório por vez, deixando a combinação de domínios ao cliente;
-para B, dez bancos SQLite abertos por consulta é o custo esperado se os domínios forem conjuntos de
-leitores e não namespaces.
+**Implication.** Even with partitioning by permission, a real user queries on the order of ten indexes. For
+E, this favors a `QUERY` on one directory at a time, leaving the combination of domains to the client;
+for B, ten SQLite databases opened per query is the expected cost if the domains are sets of
+readers and not namespaces.
 
-### 4.4 Outros sistemas industriais de segurança por documento
+### 4.4 Other industrial document-level security systems
 
-| Sistema | Mecanismo | Implicação | Nível e URL |
+| System | Mechanism | Implication | Level and URL |
 | --- | --- | --- | --- |
-| OpenSearch DLS | Consulta DSL por papel, combinada por OU entre papéis; modos "Lucene-level" (mais eficiente), "filter-level" e adaptativo; DLS não restringe escrita | Filtro dentro do motor; a página pede consultas simples para limitar impacto, sem números | [texto] https://docs.opensearch.org/latest/security/access-control/document-level-security/ |
-| Azure AI Search, controle por documento | Filtro por string de identidade ou ACL "POSIX-like" do ADLS Gen2 copiada no índice e comparada ao token Entra na consulta; mudanças de ACL na origem só valem depois de nova sincronização (execução do indexador ou push) | Vinculação antecipada com janela de desatualização declarada; é o modelo de B sem correção no kernel | [texto] https://learn.microsoft.com/en-us/azure/search/search-document-level-access-overview |
-| PostgreSQL row-level security | Políticas por linha; restrições de unicidade e chaves estrangeiras ignoram RLS; a documentação manda evitar "covert channel"; funções `leakproof` podem ser avaliadas antes da política | Um índice relacional com filtro por linha tem canais laterais documentados; SQLite não tem RLS | [texto] https://www.postgresql.org/docs/current/ddl-rowsecurity.html |
-| Vespa | Busca não encontrou documentação oficial de segurança por documento | Não verificado | — |
+| OpenSearch DLS | DSL query per role, combined by OR across roles; "Lucene-level" (more efficient), "filter-level" and adaptive modes; DLS does not restrict writes | Filter inside the engine; the page asks for simple queries to limit impact, without numbers | [text] https://docs.opensearch.org/latest/security/access-control/document-level-security/ |
+| Azure AI Search, per-document control | Filter by identity string or "POSIX-like" ADLS Gen2 ACL copied into the index and compared with the Entra token at query time; ACL changes at the source only take effect after a new sync (indexer run or push) | Early binding with a declared staleness window; it is B's model without correction in the kernel | [text] https://learn.microsoft.com/en-us/azure/search/search-document-level-access-overview |
+| PostgreSQL row-level security | Per-row policies; uniqueness constraints and foreign keys ignore RLS; the documentation says to avoid "covert channel"; `leakproof` functions can be evaluated before the policy | A relational index with per-row filter has documented side channels; SQLite has no RLS | [text] https://www.postgresql.org/docs/current/ddl-rowsecurity.html |
+| Vespa | Search found no official documentation on document-level security | Not verified | — |
 
-## 5. Indexação ou consulta no lado do kernel Linux
+## 5. Indexing or query on the Linux kernel side
 
-| Trabalho | Mecanismo | Permissões | Resultados | Implicação | Nível e URL |
+| Work | Mechanism | Permissions | Results | Implication | Level and URL |
 | --- | --- | --- | --- | --- | --- |
-| Kokoszka, Donnelly, Thain. "Search Should Be a System Call", Notre Dame TR-2013-03 | Ver 5.1 | Erros de permissão relatados por caminho no buffer de resultados | Redução de 5% a 95% das chamadas de sistema (resumo) | Único precedente de busca como chamada do kernel Linux | [texto] http://ccl.cse.nd.edu/research/papers/search-tr.pdf |
-| Wang, Meng, Li, Wu (China Telecom). SPMeta, "Accelerating Metadata Management of DFS via Speculative Permission Checking", IEEE ICDE 2026 | Ver 5.2 | POSIX u/g/o; ACLs não mencionadas | Ver 5.2 | Corta o custo por resultado sem particionar | [texto] https://cis.temple.edu/~jiewu/research/publications/Publication_files/ICDE2026-SpeculativePermissionChecking.pdf |
-| LSFMM+BPF 2026, Szeredi, "Caching for extended attributes" (LWN, Jake Edge, 2026-06-02) | Cache comum de xattrs (provavelmente tabela hash) para FUSE e outros, consolidando `simple_xattr` e o cache do NFS | Não discutido | Sem objeções; detalhes em aberto | Infraestrutura de cache, não de índice; nenhuma discussão de busca por valor | [secundária] https://lwn.net/Articles/1074919/ |
-| LSFMM+BPF 2024, Overstreet, "New APIs for filesystems" (LWN) | Pedido de interface iteradora para xattrs, no estilo `getdents()` | — | Discussão | Iterar xattrs é pré-requisito de varredura em B; ainda não existe | [secundária] https://lwn.net/Articles/975444/ |
-| LSFMM+BPF 2026, "An update on fanotify" | Já coberto no documento principal | — | — | — | [secundária] https://lwn.net/Articles/1075829/ |
-| Basani, "Filesystem-Native Metadata Indexing for Modern Workloads" (2026, depósito Zenodo, periódico indicado pelo OpenAlex: 工程科学与技术) | Utilitário de indexação de metadados dentro do volume, por pequena interface de chamadas de sistema, transacional com o FS | Menciona "indicadores de controle de acesso" como campo indexável | Sem números no resumo | Proposta próxima de E, sem avaliação verificável nem código encontrado; tratar com cautela | [resumo] https://doi.org/10.5281/zenodo.21925184 |
+| Kokoszka, Donnelly, Thain. "Search Should Be a System Call", Notre Dame TR-2013-03 | See 5.1 | Permission errors reported per path in the result buffer | Reduction of 5% to 95% in system calls (abstract) | Only precedent of search as a Linux kernel call | [text] http://ccl.cse.nd.edu/research/papers/search-tr.pdf |
+| Wang, Meng, Li, Wu (China Telecom). SPMeta, "Accelerating Metadata Management of DFS via Speculative Permission Checking", IEEE ICDE 2026 | See 5.2 | POSIX u/g/o; ACLs not mentioned | See 5.2 | Cuts the per-result cost without partitioning | [text] https://cis.temple.edu/~jiewu/research/publications/Publication_files/ICDE2026-SpeculativePermissionChecking.pdf |
+| LSFMM+BPF 2026, Szeredi, "Caching for extended attributes" (LWN, Jake Edge, 2026-06-02) | Common xattr cache (probably a hash table) for FUSE and others, consolidating `simple_xattr` and the NFS cache | Not discussed | No objections; details open | Cache infrastructure, not index; no discussion of search by value | [secondary] https://lwn.net/Articles/1074919/ |
+| LSFMM+BPF 2024, Overstreet, "New APIs for filesystems" (LWN) | Request for an iterator interface for xattrs, in the style of `getdents()` | — | Discussion | Iterating xattrs is a prerequisite for a scan in B; it does not exist yet | [secondary] https://lwn.net/Articles/975444/ |
+| LSFMM+BPF 2026, "An update on fanotify" | Already covered in the main document | — | — | — | [secondary] https://lwn.net/Articles/1075829/ |
+| Basani, "Filesystem-Native Metadata Indexing for Modern Workloads" (2026, Zenodo deposit, journal indicated by OpenAlex: 工程科学与技术) | Metadata indexing utility inside the volume, through a small system-call interface, transactional with the FS | Mentions "access control indicators" as an indexable field | No numbers in the abstract | Proposal close to E, without verifiable evaluation and no code found; treat with caution | [abstract] https://doi.org/10.5281/zenodo.21925184 |
 
-### 5.1 Busca como chamada de sistema (Notre Dame, 2013)
+### 5.1 Search as a system call (Notre Dame, 2013)
 
-[texto] Propõe `search` (com variantes de biblioteca `opensearch`/`readsearch`) que recebe caminhos e
-padrões e devolve um buffer de entradas (caminho, `stat` opcional, erro), como `getdents`. Três
-implementações de cerca de 500 linhas cada: no kernel Linux (camada portátil de chamadas, usando
-operações abstratas do VFS de leitura de diretório e `stat`; os autores dizem que uma versão completa
-acrescentaria uma operação de busca ao VFS para delegar a drivers otimizados), num sandbox `ptrace`
-(Parrot) e num FS distribuído em espaço de usuário (Chirp). Sem índice: é varredura feita no kernel.
-Permissões: a busca roda com as credenciais do chamador; diretório sem permissão de listagem gera um erro
-registrado no resultado (por exemplo, `EPERM` em "Private"), não aborta a busca. Recursão limitada a 16
-níveis (`EOVERFLOW`) pela pilha do kernel. **Implicação:** confirma que a forma "consulta emitida a partir
-de um diretório, autorizada como travessia normal" (a de E) é natural no VFS; também mostra que a ideia
-não foi adiante no mainline (nenhuma discussão no LKML foi encontrada).
+[text] Proposes `search` (with library variants `opensearch`/`readsearch`) that receives paths and
+patterns and returns a buffer of entries (path, optional `stat`, error), like `getdents`. Three
+implementations of about 500 lines each: in the Linux kernel (portable system-call layer, using
+abstract VFS operations for directory reading and `stat`; the authors say a complete version would
+add a search operation to the VFS to delegate to optimized drivers), in a `ptrace` sandbox
+(Parrot) and in a user-space distributed FS (Chirp). No index: it is a scan done in the kernel.
+Permissions: the search runs with the caller's credentials; a directory without list permission produces an error
+recorded in the result (for example, `EPERM` on "Private"), it does not abort the search. Recursion limited to 16
+levels (`EOVERFLOW`) by the kernel stack. **Implication:** confirms that the shape "query issued from
+a directory, authorized as a normal traversal" (that of E) is natural in the VFS; it also shows that the idea
+did not go forward in mainline (no LKML discussion was found).
 
-### 5.2 SPMeta: alcance especulativo por diretório (ICDE 2026)
+### 5.2 SPMeta: speculative reachability per directory (ICDE 2026)
 
-[texto] Observa que, em cinco namespaces reais de IA e HPC, mais de 99,7% dos caminhos seguem um
-"padrão descendente de permissão" (bits que não aumentam de dono para grupo para outros ao longo do
-caminho). Guarda, por diretório, um bit por classe (usuário, grupo, outros) dizendo se aquela classe
-certamente alcança o diretório; com isso a checagem de caminho vira O(1) na maioria dos casos, com recurso
-à checagem completa quando o padrão não vale. Um `chmod` invalida em faixa os estados de alcance da
-subárvore; renomeação usa realocação de subárvore num trie (MART). Resultados: chamadas remotas e
-consultas a banco de O(N) para O(1) na maioria das operações; 1,44x a 2,86x de vazão agregada sobre o
-estado da arte. ACLs e grupos suplementares não são mencionados no texto extraído.
-**Implicação:** o custo de 1,7 µs por resultado do `QUERY` vem da resolução de caminho com as
-credenciais do chamador; um cache de alcance por diretório, invalidado por `chmod`/`chown`/`rename`,
-ataca esse custo dentro da alternativa A ou E sem mudar a UAPI. Precisa de cuidado com ACLs, que o
-artigo não trata.
+[text] Observes that, in five real AI and HPC namespaces, more than 99.7% of paths follow a
+"descending permission pattern" (bits that do not increase from owner to group to others along the
+path). It stores, per directory, one bit per class (user, group, others) saying whether that class
+certainly reaches the directory; with this the path check becomes O(1) in most cases, falling back
+to the full check when the pattern does not hold. A `chmod` invalidates the reachability states of the
+subtree as a range; rename uses subtree relocation in a trie (MART). Results: remote calls
+and database queries go from O(N) to O(1) in most operations; 1.44x to 2.86x aggregate throughput over the
+state of the art. ACLs and supplementary groups are not mentioned in the extracted text.
+**Implication:** the 1.7 µs per-result cost of `QUERY` comes from path resolution with the
+caller's credentials; a per-directory reachability cache, invalidated by `chmod`/`chown`/`rename`,
+attacks that cost within alternative A or E without changing the UAPI. It needs care with ACLs, which the
+paper does not handle.
 
-## Trabalhos que mudam a análise da ADR-0009
+## Works that change the analysis of ADR-0009
 
-1. **Singh, Srivatsa e Liu (2007) e Lethe (2014-2015): o domínio é o conjunto de leitores.** A ADR
-   define E por "diretório de primeiro nível escolhido na montagem". Os dois trabalhos mostram que a
-   partição que fecha o vazamento é por expressão de credenciais, com prova de minimalidade (2007) e com
-   medida de quantos domínios aparecem (2132 para 339 mil arquivos; 1475 para 50 mil documentos). Se um
-   namespace do MoobFS tiver arquivos com conjuntos de leitores diferentes (um `0600` de outro uid
-   dentro de um namespace legível pelo grupo), o canal de tempo reaparece dentro da partição. Saídas: (a)
-   E com partição por (namespace, conjunto de leitores) e QUERY percorrendo só as partições do chamador,
-   ou (b) declarar como invariante que um namespace é homogêneo e recusar (ou contabilizar) arquivos que
-   a violem. A ADR precisa escolher.
-2. **Wang et al. (S&P 2017) e a documentação do Elasticsearch: o vazamento por contagem é inerente ao
-   filtro posterior e foi explorado em produção.** Isso fortalece o argumento da ADR de que só não
-   percorrer outros domínios fecha o canal, e mostra que a indústria convive com o vazamento por custo.
-   Para o MoobFS, que mediu o canal, documentar a escolha (fechar com partição ou aceitar como limitação)
-   passa a ter precedente explícito.
-3. **Bailey, Hawking e Matson (CIKM 2006): checagem por coleção e em lote.** Dá base medida às duas
-   peças novas da ADR (autorização uma vez até o diretório em E; autorização em lote em B) e à decisão de
-   não expor contagem total.
-4. **SPMeta (ICDE 2026) e IndexFS (SC 2014): o custo por resultado pode cair sem particionar.** Cache de
-   alcance por diretório e classe, invalidado por mudança de permissão, é uma alternativa C'' menor que
-   E para o problema de 1,7 µs por resultado. Não resolve o canal de tempo nem o crescimento por
-   candidato; por isso complementa E, não a substitui.
-5. **Zanzibar (ATC 2019): o "new enemy" é o risco de B.** A janela entre `chmod` e o índice externo não é
-   só atraso: é servir metadados a quem perdeu acesso. A literatura resolve com marcador de consistência
-   exigido na consulta. Se B for adiante, o contador monotônico do `GET_INFO` deve ser comparado pelo
-   cliente antes de usar o índice, e a autorização em lote deve recusar quando o índice estiver atrás.
-   Isso pesa a favor de E no critério "índice atualizado na hora".
-6. **Goods (SIGMOD 2016) e AIM (2026): separar o domínio público.** Um índice único para o que é legível
-   por todos e partições só para o privado reduz o número de domínios na prática; vale para E e para B.
+1. **Singh, Srivatsa and Liu (2007) and Lethe (2014-2015): the domain is the set of readers.** The ADR
+   defines E by "first-level directory chosen at mount". The two works show that the
+   partition that closes the leak is by credential expression, with a minimality proof (2007) and with a
+   measurement of how many domains appear (2132 for 339 thousand files; 1475 for 50 thousand documents). If a
+   MoobFS namespace has files with different sets of readers (a `0600` of another uid
+   inside a group-readable namespace), the timing channel reappears inside the partition. Ways out: (a)
+   E with partitioning by (namespace, set of readers) and QUERY walking only the caller's partitions,
+   or (b) declare as an invariant that a namespace is homogeneous and refuse (or account for) files that
+   violate it. The ADR needs to choose.
+2. **Wang et al. (S&P 2017) and the Elasticsearch documentation: count leakage is inherent to
+   post-filtering and was exploited in production.** This strengthens the ADR's argument that only not
+   walking other domains closes the channel, and shows that the industry lives with the leak for cost reasons.
+   For MoobFS, which measured the channel, documenting the choice (close it with partitioning or accept it as a limitation)
+   now has an explicit precedent.
+3. **Bailey, Hawking and Matson (CIKM 2006): per-collection and batch checking.** Gives a measured basis to the two
+   new pieces of the ADR (authorization once up to the directory in E; batch authorization in B) and to the decision to
+   not expose a total count.
+4. **SPMeta (ICDE 2026) and IndexFS (SC 2014): the per-result cost can drop without partitioning.** A
+   reachability cache per directory and class, invalidated by permission changes, is an alternative C'' smaller than
+   E for the problem of 1.7 µs per result. It does not solve the timing channel nor the growth per
+   candidate; therefore it complements E, it does not replace it.
+5. **Zanzibar (ATC 2019): the "new enemy" is B's risk.** The window between `chmod` and the external index is not
+   only delay: it is serving metadata to someone who lost access. The literature solves it with a consistency marker
+   required at query time. If B goes forward, the monotonic counter of `GET_INFO` must be compared by the
+   client before using the index, and batch authorization must refuse when the index is behind.
+   This weighs in favor of E on the "index updated immediately" criterion.
+6. **Goods (SIGMOD 2016) and AIM (2026): separate the public domain.** A single index for what is readable
+   by everyone and partitions only for the private reduces the number of domains in practice; it applies to E and to B.
 
-Não mudam a análise, apesar de próximos: HoneyBee, Veda e Curator (confirmam a troca em bancos vetoriais,
-sem tratar canais laterais); Search Should Be a System Call (precedente de interface, sem índice nem
-avaliação de segurança); "Participant-aware access control" (aponta uma lacuna, a de agentes que atendem
-vários usuários, fora do escopo da ADR-0009 mas digna de registro no roteiro de segurança).
+They do not change the analysis, although close: HoneyBee, Veda and Curator (confirm the trade-off in vector databases,
+without handling side channels); Search Should Be a System Call (interface precedent, with neither index nor
+security evaluation); "Participant-aware access control" (points to a gap, that of agents serving
+several users, outside the scope of ADR-0009 but worth recording in the security roadmap).
 
-## Fontes varridas sem resultado relevante
+## Sources scanned without relevant result
 
-- **Citantes de Spyglass no OpenAlex (129 registros):** triados todos; sem tratamento de permissões além
-  de Parker-Wood (MSST 2010, já coberto) e GUFI. Exemplos descartados: SmartCuckoo (ATC 2017), VT-trees
+- **Citers of Spyglass in OpenAlex (129 records):** all triaged; no handling of permissions beyond
+  Parker-Wood (MSST 2010, already covered) and GUFI. Examples discarded: SmartCuckoo (ATC 2017), VT-trees
   (FAST 2013), Haystack (OSDI 2010), "Optimizing Every Operation in a Write-optimized File System" (FAST
   2016), "Writes Wrought Right" (TOS 2017), D2-Tree (ICDCS 2018), MIQS (SC 2019), GraphMeta (CLUSTER
   2016), "The case for sampling on very large file systems" (MSST 2014), "Using Property Graphs for Rich
-  Metadata Management in HPC Systems" (PDSW 2014), VSFS (PDSW 2014), FAST (SC 2014, busca aproximada),
-  "Just-in-Time Analytics on Large File Systems" (TC 2011), DelveFS (CLUSTER 2020), SANE e Rapport
+  Metadata Management in HPC Systems" (PDSW 2014), VSFS (PDSW 2014), FAST (SC 2014, approximate search),
+  "Just-in-Time Analytics on Large File Systems" (TC 2011), DelveFS (CLUSTER 2020), SANE and Rapport
   (Nebraska), MBFS (J. Supercomputing 2015), "An Integrated Indexing and Search Service for Distributed
-  File Systems" (TPDS 2020, versão do TagIt), "Efficient Metadata Indexing for HPC Storage Systems"
-  (CCGrid 2020, Brindexer, já coberto).
-- **Citantes de GUFI SC22 (4):** SwiftKV (2025), Lustre Query (HPDC 2026), Bjornson (2026), SPMeta
-  (ICDE 2026). Só SPMeta é relevante.
-- **Citantes de Büttcher e Clarke (23) e de Parker-Wood (10):** além dos itens das tabelas, trabalhos de
-  busca sobre dados cifrados (Information Systems 2018; TIFS 2015), SeDas (TMAG 2013), "Using provenance
+  File Systems" (TPDS 2020, version of TagIt), "Efficient Metadata Indexing for HPC Storage Systems"
+  (CCGrid 2020, Brindexer, already covered).
+- **Citers of GUFI SC22 (4):** SwiftKV (2025), Lustre Query (HPDC 2026), Bjornson (2026), SPMeta
+  (ICDE 2026). Only SPMeta is relevant.
+- **Citers of Büttcher and Clarke (23) and of Parker-Wood (10):** besides the items in the tables, works on
+  search over encrypted data (Information Systems 2018; TIFS 2015), SeDas (TMAG 2013), "Using provenance
   to efficiently improve metadata searching performance" (FGCS 2014), "Privacy preserving document
   indexing infrastructure for a distributed environment" (PVLDB 2008), "Scalable full-text search for
   petascale file systems" (PDSW 2008), "Bring Precision and Access Control to Business Document Search"
-  (SNPD 2008) e "Access control for sharing semantic data across desktops" (2007): só títulos e resumos;
-  nenhum traz mecanismo além dos já descritos.
-- **Grupos:** UW-Madison ADSL, Stony Brook FSL, Jülich, HLRS, ANL, NERSC: nada sobre busca de metadados
-  com autorização.
-- **HAL (CEA, INRIA):** três consultas, nada relevante.
-- **OSTI:** "GUFI" (30 registros, só slides, patente e o pôster/divulgação); "Access Controlled AI
-  Context" e "GUFI retrieval augmented": sem registro nesta data.
-- **arXiv:** consultas por "access control" com "retrieval-augmented", "permission" com RAG, "side
-  channel" com RAG/vector database/search index, "permissioned LLM", "role-based access control" com
-  "vector database", "access control" com "agent memory". Itens fora de escopo descartados: RAGent
-  (geração de políticas), PrediQL, SmartLLM, FragFuse e SAMEP (protocolos de agentes), "Agent-Assisted
-  Side-Channel Attacks on Non-Prefix KV Cache in RAG" (canal em cache de KV do modelo, não no índice).
-- **Kernel:** OpenAlex por "extended attributes indexing Linux kernel", "in-kernel file search index
+  (SNPD 2008) and "Access control for sharing semantic data across desktops" (2007): titles and abstracts only;
+  none brings a mechanism beyond those already described.
+- **Groups:** UW-Madison ADSL, Stony Brook FSL, Jülich, HLRS, ANL, NERSC: nothing on metadata search
+  with authorization.
+- **HAL (CEA, INRIA):** three queries, nothing relevant.
+- **OSTI:** "GUFI" (30 records, only slides, patent and the poster/outreach); "Access Controlled AI
+  Context" and "GUFI retrieval augmented": no record on this date.
+- **arXiv:** queries for "access control" with "retrieval-augmented", "permission" with RAG, "side
+  channel" with RAG/vector database/search index, "permissioned LLM", "role-based access control" with
+  "vector database", "access control" with "agent memory". Out-of-scope items discarded: RAGent
+  (policy generation), PrediQL, SmartLLM, FragFuse and SAMEP (agent protocols), "Agent-Assisted
+  Side-Channel Attacks on Non-Prefix KV Cache in RAG" (channel in the model's KV cache, not in the index).
+- **Kernel:** OpenAlex for "extended attributes indexing Linux kernel", "in-kernel file search index
   Linux VFS", "attribute-based file system query kernel module", "tag-based file system Linux kernel":
-  nada além de S-VFS (IEICE 2007, só título) e de trabalhos sem relação. LWN: índice do LSFMM+BPF 2026
-  sem sessão de busca ou índice de xattrs.
-- **Vespa:** nenhuma página oficial sobre segurança por documento encontrada na busca.
+  nothing beyond S-VFS (IEICE 2007, title only) and unrelated works. LWN: LSFMM+BPF 2026 index
+  without a session on search or xattr indexing.
+- **Vespa:** no official page on document-level security found in the search.
 
-## Ainda não verificado
+## Not yet verified
 
-- **Google Scholar, Semantic Scholar e dblp não foram usados de fato** (sem API e respostas 429); a
-  cobertura de citações depende do OpenAlex, que registra menos citações que o Scholar. Uma segunda
-  rodada com dblp por venue (FAST, OSDI, ATC, HotStorage, SOSP, EuroSys, TOS, 2015-2026) pode achar
-  artigos que não citam as quatro âncoras.
-- **Proceedings de HotStorage, EuroSys e OSDI** não foram percorridos página a página.
-- **Texto completo** da dissertação de Parker-Wood (2014; o PDF respondeu 403), da tese de Büttcher
-  ("Multi-user file system search", 2007), de Bjørklund et al. (2010, 2011), de Zerber (2008), de
-  Bjornson (2026; bloqueado) e de Johnson et al. (FAST 2014).
-- **Artigo GUFI SC22** continua sem cópia aberta encontrada.
-- **SPMeta e ACLs/grupos suplementares:** o texto extraído não os menciona; não verificado se a versão
-  publicada os trata.
-- **HoneyBee:** só abstract, introdução e trechos foram lidos; não verifiquei como medem atualização de
-  permissões.
-- **Licença da patente US 11 048 699** frente ao código BSD-3 do GUFI.
-- **Mitigação de canal de tempo em índices** (tempo constante, ruído, limites de taxa): nenhuma fonte
-  encontrada propõe isso para busca de metadados; a afirmação de ausência vale só para as buscas feitas.
-- **Vespa** e **Solr**: mecanismo de segurança por documento não verificado nesta rodada.
+- **Google Scholar, Semantic Scholar and dblp were not actually used** (no API and 429 answers); the
+  citation coverage depends on OpenAlex, which records fewer citations than Scholar. A second
+  round with dblp per venue (FAST, OSDI, ATC, HotStorage, SOSP, EuroSys, TOS, 2015-2026) may find
+  papers that do not cite the four anchors.
+- **Proceedings of HotStorage, EuroSys and OSDI** were not walked page by page.
+- **Full text** of Parker-Wood's dissertation (2014; the PDF answered 403), of Büttcher's thesis
+  ("Multi-user file system search", 2007), of Bjørklund et al. (2010, 2011), of Zerber (2008), of
+  Bjornson (2026; blocked) and of Johnson et al. (FAST 2014).
+- **GUFI SC22 paper** still has no open copy found.
+- **SPMeta and ACLs/supplementary groups:** the extracted text does not mention them; not verified whether the
+  published version handles them.
+- **HoneyBee:** only the abstract, introduction and excerpts were read; I did not verify how they measure permission
+  updates.
+- **License of patent US 11 048 699** relative to GUFI's BSD-3 code.
+- **Timing-channel mitigation in indexes** (constant time, noise, rate limits): no source
+  found proposes it for metadata search; the claim of absence holds only for the searches made.
+- **Vespa** and **Solr**: document-level security mechanism not verified in this round.

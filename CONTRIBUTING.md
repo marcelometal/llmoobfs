@@ -34,13 +34,11 @@ in logs. Never load the module on your host; use the disposable VM.
 
 ## Language policy
 
-- Code, comments, commit messages, issues, pull requests and `README.md` are in
-  English.
-- Documents under `docs/` may be in Portuguese or English. Journals stay in the
-  author's language.
-- ADRs and specifications are translated on external demand; a translation is a
-  courtesy copy and the original prevails.
-- `README.pt-BR.md` mirrors the English README.
+Everything in the repository is in English: code, comments, commit messages, issues, pull
+requests, documentation, specifications, ADRs, journals and agent instructions
+([ADR-0010](docs/decisions/0010-english-everywhere.md)). `README.pt-BR.md` is a courtesy mirror
+of the English README. Translations of earlier Portuguese material are faithful: they do not
+change claims, statuses, numbers or decisions.
 
 ## Developer Certificate of Origin (DCO)
 

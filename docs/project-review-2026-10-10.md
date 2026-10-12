@@ -1,253 +1,253 @@
-# Revisão do projeto — 2026-10-10
+# Project review — 2026-10-10
 
-Base examinada: `36eb64b023bf2a3fdeaf99e0cf070843d036e4e1`, branch
-`m3/3b-query-authz`. Revisão de arquitetura, implementação, testes, planos e proposta
-de valor. Recomendações abaixo são propostas, não novas decisões arquiteturais.
-O arquivo não versionado `docs/community-plan.md` foi preservado.
+Base examined: `36eb64b023bf2a3fdeaf99e0cf070843d036e4e1`, branch
+`m3/3b-query-authz`. Review of architecture, implementation, tests, plans and value
+proposition. The recommendations below are proposals, not new architectural decisions.
+The unversioned file `docs/community-plan.md` was preserved.
 
-## Parecer
+## Assessment
 
-O projeto já ultrapassou a prova de leitura compartilhada. Existe uma camada nativa
-montável, escrita POSIX delegada, atributos tipados, índice e consulta estruturada,
-com uma infraestrutura de testes substancial. A ADR-0007 é a decisão mais importante:
-reutilizar um filesystem maduro concentra o esforço na interface de memória.
+The project has already gone beyond the shared-read proof. There is a mountable native
+layer, delegated POSIX writes, typed attributes, an index and structured query,
+with a substantial testing infrastructure. ADR-0007 is the most important decision:
+reusing a mature filesystem concentrates the effort on the memory interface.
 
-Ainda é um protótipo de pesquisa. A base não demonstra vantagem de desempenho, nem
-melhoria da qualidade da memória de um agente. Há defeitos de consistência de consulta
-identificados por leitura e configurações de identidade/permissão que precisam de
-reprodução específica antes de ampliar o uso.
+It is still a research prototype. The base does not demonstrate a performance advantage, nor
+an improvement in the quality of an agent's memory. There are query consistency defects
+identified by reading and identity/permission configurations that need specific
+reproduction before broadening use.
 
-Recomendação: fechar correção e contrato do QUERY, executar um M4 pequeno e produzir
-uma demonstração de memória entre sessões. Não iniciar um novo formato de disco,
-busca vetorial no kernel ou várias integrações simultaneamente.
+Recommendation: close correctness and the QUERY contract, run a small M4 and produce
+a demonstration of memory across sessions. Do not start a new disk format,
+vector search in the kernel or several integrations simultaneously.
 
-## O que existe e o que ainda é plano
+## What exists and what is still a plan
 
-| Área | Evidência atual | Limite |
+| Area | Current evidence | Limit |
 | --- | --- | --- |
-| Base open source | Licença GPL-2.0-only, README bilíngue, site, workflows, guias, ADRs, histórico e instruções para agentes | Os documentos de status já divergem entre si |
-| M1 | Imagem offline, fsck, módulo nativo somente leitura, dois inodes com conteúdo físico compartilhado | Experimento congelado; não é o backend atual da camada |
-| M2 | `layer/main.c`: filesystem empilhado sobre diretório inferior; operações POSIX e delegação de I/O/reflink | Não torna ext4 capaz de reflink nem oferece deduplicação automática universal |
-| Atributos | Validador compartilhado entre kernel/ferramentas, `user.moob.*`, tipos e limites | Atualização de conteúdo e vários atributos não forma uma transação única |
-| Índice | RAM, árvores por nome de atributo e registros por inode; reconstrução ao montar | Custo de montagem, orçamento e consistência sob falhas ainda exigem trabalho |
-| QUERY | Predicados conjuntivos, UAPI v1, comparação com oráculo | Busca estruturada, sem embeddings ou ranking semântico |
-| M3 | Convenções de identidade/proveniência, checker; autorização POSIX implementada nesta branch | Não confundir branch com release; batch e cursor de mudanças continuam propostas adiadas |
-| Validação Linux | Registros de ext4/Btrfs/XFS, fsx, git, SQLite WAL, cliente próprio, dm-log-writes/flakey e concorrência | Cobertura ampla para um protótipo, sem equivaler a certificação POSIX, auditoria de segurança ou todo fstests |
-| M4 | Plano e desenho de harness | Sem resultados de benchmark apresentados nesta revisão |
-| Memória de LLM | Arquivos e metadados utilizáveis por um cliente | Seleção, ranking, atualização de conhecimento e montagem de contexto pertencem ao cliente |
+| Open source base | GPL-2.0-only license, bilingual README, site, workflows, guides, ADRs, history and instructions for agents | The status documents already diverge from each other |
+| M1 | Offline image, fsck, native read-only module, two inodes with shared physical content | Frozen experiment; it is not the current backend of the layer |
+| M2 | `layer/main.c`: filesystem stacked over a lower directory; POSIX operations and delegation of I/O/reflink | Does not make ext4 reflink-capable nor offer universal automatic deduplication |
+| Attributes | Validator shared between kernel/tools, `user.moob.*`, types and limits | An update of content and several attributes does not form a single transaction |
+| Index | RAM, trees per attribute name and records per inode; rebuild at mount | Mount cost, budget and consistency under failures still require work |
+| QUERY | Conjunctive predicates, UAPI v1, comparison with oracle | Structured search, without embeddings or semantic ranking |
+| M3 | Identity/provenance conventions, checker; POSIX authorization implemented in this branch | Do not confuse branch with release; batch and change cursor remain postponed proposals |
+| Linux validation | Journals of ext4/Btrfs/XFS, fsx, git, SQLite WAL, own client, dm-log-writes/flakey and concurrency | Broad coverage for a prototype, without amounting to POSIX certification, a security audit or all of fstests |
+| M4 | Plan and harness design | No benchmark results presented in this review |
+| LLM memory | Files and metadata usable by a client | Selection, ranking, knowledge update and context assembly belong to the client |
 
-Fluxo atual: cliente → VFS/QUERY → camada MoobFS → filesystem inferior → disco.
-O conteúdo e os xattrs persistem no inferior; o índice é uma estrutura derivada.
-Essa separação é boa para recuperação e inspeção, mas exige tornar explícita qualquer
-resposta incompleta quando o índice falhar.
+Current flow: client → VFS/QUERY → MoobFS layer → lower filesystem → disk.
+Content and xattrs persist in the lower filesystem; the index is a derived structure.
+This separation is good for recovery and inspection, but requires making explicit any
+incomplete response when the index fails.
 
-## Achados de código prioritários
+## Priority code findings
 
-Os três primeiros achados decorrem diretamente do fluxo do código. Não foram
-reproduzidos em VM nesta revisão. P1 significa corrigir/investigar antes de tratar
-a funcionalidade como confiável; P2 significa corrigir no próximo ciclo.
+The first three findings follow directly from the code flow. They were not
+reproduced in a VM in this review. P1 means fix/investigate before treating
+the feature as reliable; P2 means fix in the next cycle.
 
-### R1 — P1: mudar um atributo indexado para RAW conserva o valor anterior
+### R1 — P1: changing an indexed attribute to RAW keeps the previous value
 
-Em `layer/index.c:238`, `index_put()` retorna para `MOOB_T_RAW` antes de localizar
-e remover a entrada anterior. `moobl_xattr_set()` escreve o novo xattr e chama
-`moobl_index_set()` sem remoção prévia (`layer/main.c:655`).
+In `layer/index.c:238`, `index_put()` returns for `MOOB_T_RAW` before locating
+and removing the previous entry. `moobl_xattr_set()` writes the new xattr and calls
+`moobl_index_set()` without prior removal (`layer/main.c:655`).
 
-Consequência prevista: depois de transformar `kind=string:note` em RAW, uma consulta
-por `kind=note` continua encontrando o arquivo até reconstruir o índice. O disco e
-o índice passam a discordar sem necessariamente marcar o índice como incompleto.
+Expected consequence: after turning `kind=string:note` into RAW, a query
+for `kind=note` keeps finding the file until the index is rebuilt. Disk and
+index start to disagree without necessarily marking the index as incomplete.
 
-Correção sugerida: remover a entrada anterior também na transição para RAW,
-preservando a regra de não indexar o novo payload. Testar string→RAW, RAW→string,
-EXISTS, remoção e igualdade com o oráculo antes/depois da remontagem.
+Suggested fix: remove the previous entry also on the transition to RAW,
+preserving the rule of not indexing the new payload. Test string→RAW, RAW→string,
+EXISTS, removal and equality with the oracle before/after remount.
 
-### R2 — P1: truncamento de caminho antes da autorização causa falsos negativos
+### R2 — P1: path truncation before authorization causes false negatives
 
-`fill_result()` (`layer/index.c:735`) limita o caminho a 255 bytes e sinaliza
-truncamento. `do_query()` copia esse caminho para o candidato (`:891`) e depois
-`caller_may_read()` tenta resolvê-lo. O indicador de truncamento não é preservado.
+`fill_result()` (`layer/index.c:735`) limits the path to 255 bytes and flags
+truncation. `do_query()` copies that path to the candidate (`:891`) and then
+`caller_may_read()` tries to resolve it. The truncation indicator is not preserved.
 
-Um caminho relativo válido com mais de 255 bytes normalmente deixa de resolver,
-e a consulta omite silenciosamente um arquivo legível. O limite da representação
-da UAPI está alterando a decisão de acesso.
+A valid relative path longer than 255 bytes normally stops resolving,
+and the query silently omits a readable file. The limit of the UAPI
+representation is altering the access decision.
 
-Correção sugerida: autorizar usando o caminho completo e definir separadamente
-como a UAPI representa resultados longos. Enquanto não houver representação
-adequada, retornar erro explícito/estado de incompletude documentado é preferível
-a uma resposta aparentemente completa. Testar caminhos próximos e acima do limite.
+Suggested fix: authorize using the full path and define separately
+how the UAPI represents long results. While there is no adequate
+representation, returning an explicit error/documented incompleteness state is preferable
+to a seemingly complete response. Test paths near and above the limit.
 
-### R3 — P2: erros operacionais podem virar ausência de resultados
+### R3 — P2: operational errors can turn into absence of results
 
-`caller_may_read()` (`layer/index.c:798`) retorna booleano e converte qualquer erro
-de `vfs_path_lookup()` em `false`; erros de `inode_permission()` também são
-indistintos. Isso inclui falhas diferentes de acesso negado ou objeto removido.
-Contradiz o contrato que promete propagar falhas operacionais.
+`caller_may_read()` (`layer/index.c:798`) returns a boolean and converts any error
+from `vfs_path_lookup()` into `false`; errors from `inode_permission()` are also
+indistinct. This includes failures other than access denied or object removed.
+It contradicts the contract that promises to propagate operational failures.
 
-Correção sugerida: retorno com erro/permitido/omitido e classificação explícita de
-errno. Injetar falhas e verificar que uma falha operacional não produz sucesso com
-zero resultados. EACCES/ENOENT durante concorrência exigem tratamento próprio.
+Suggested fix: a return with error/allowed/omitted and explicit classification of
+errno. Inject failures and check that an operational failure does not produce success with
+zero results. EACCES/ENOENT during concurrency require their own handling.
 
-### R4 — P1, hipótese a reproduzir: identidade de inode entre subvolumes Btrfs
+### R4 — P1, hypothesis to reproduce: inode identity across Btrfs subvolumes
 
-O índice usa apenas `ino` como chave do xarray (`layer/index.c:172`); o inode superior
-copia `lower->i_ino` (`layer/main.c:98`). A varredura percorre diretórios e não contém
-uma barreira explícita de subvolume. A validação do candidato compara novamente o
-número do inode (`layer/index.c:808`).
+The index uses only `ino` as the xarray key (`layer/index.c:172`); the upper inode
+copies `lower->i_ino` (`layer/main.c:98`). The scan walks directories and contains no
+explicit subvolume barrier. Candidate validation compares the
+inode number again (`layer/index.c:808`).
 
-Btrfs possui um espaço de números de inode por subvolume. Portanto, inodes distintos
-em subvolumes diferentes podem colidir nessa representação. A documentação oficial
-recomenda o par subvolume/inode para identidade no filesystem. Isso sustenta o risco;
-não prova, sozinho, a manifestação exata ou um vazamento no MoobFS.
+Btrfs has an inode number space per subvolume. Therefore, distinct inodes
+in different subvolumes can collide in this representation. The official documentation
+recommends the subvolume/inode pair for identity in the filesystem. This supports the risk;
+it does not prove, on its own, the exact manifestation or a leak in MoobFS.
 
-Teste prioritário: dois subvolumes aninhados, inodes numericamente iguais, atributos
-e permissões diferentes; comparar resultado, conteúdo aberto e oráculo. Até haver
-identidade interna adequada, considerar recusar cruzar subvolumes. A solução deve
-tratar também a identidade exposta pela camada, não apenas acrescentar um campo na
-árvore. [Fonte Btrfs](https://btrfs.readthedocs.io/en/latest/Subvolumes.html).
+Priority test: two nested subvolumes, numerically equal inodes, different attributes
+and permissions; compare result, opened content and oracle. Until there is
+adequate internal identity, consider refusing to cross subvolumes. The solution must
+also handle the identity exposed by the layer, not just add a field to the
+tree. [Btrfs source](https://btrfs.readthedocs.io/en/latest/Subvolumes.html).
 
-### R5 — P1, configuração a reproduzir: inferior com IDs remapeados
+### R5 — P1, configuration to reproduce: lower filesystem with remapped IDs
 
-`moobl_fill_super()` resolve o inferior (`layer/main.c:1107`) sem recusar explicitamente
-uma montagem idmapped; operações delegadas e permissões usam `nop_mnt_idmap`.
-Recusar idmap sobre a montagem superior não cobre automaticamente selecionar um
-inferior já remapeado.
+`moobl_fill_super()` resolves the lower filesystem (`layer/main.c:1107`) without explicitly refusing
+an idmapped mount; delegated operations and permissions use `nop_mnt_idmap`.
+Refusing idmap on the upper mount does not automatically cover selecting an
+already remapped lower filesystem.
 
-Teste: montar um inferior idmapped e usá-lo em `lower=`, verificando UID/GID, criação,
-ACL e QUERY. Para o primeiro release experimental, recusar a configuração pode ser
-mais simples que suportá-la. Não foi demonstrada exploração nesta revisão.
+Test: mount an idmapped lower filesystem and use it in `lower=`, checking UID/GID, creation,
+ACL and QUERY. For the first experimental release, refusing the configuration may be
+simpler than supporting it. No exploitation was demonstrated in this review.
 
-### R6 — P2: o lote limita resultados candidatos, não o trabalho de varredura
+### R6 — P2: the batch limits candidate results, not the scan work
 
-Em `layer/index.c:816`, a busca inicial começa em `rb_first()`. O laço a partir de
-`:881` percorre entradas até reunir candidatos que satisfaçam todos os termos.
-Uma consulta muito seletiva pode visitar a árvore inteira sob o lock de leitura.
-Ter uma árvore balanceada não torna essa consulta automaticamente logarítmica.
+In `layer/index.c:816`, the initial search starts at `rb_first()`. The loop from
+`:881` walks entries until it gathers candidates that satisfy all terms.
+A very selective query can visit the whole tree under the read lock.
+Having a balanced tree does not make that query automatically logarithmic.
 
-Medir número de entradas examinadas, duração do lock e latência dos escritores.
-Depois avaliar posicionamento no início do intervalo pesquisado, parada no fim,
-escolha do primeiro termo e lotes limitados por entradas examinadas. Essa limitação
-de trabalho é relevante mesmo antes de otimizações finas de desempenho.
+Measure the number of entries examined, lock duration and writer latency.
+Then evaluate positioning at the start of the searched range, stopping at the end,
+choice of the first term and batches bounded by entries examined. This limitation
+of work is relevant even before fine performance optimizations.
 
-### R7 — P2: checker pode transmitir confiança indevida
+### R7 — P2: checker may convey undue confidence
 
-`tools/moobfs-check.c:48` ignora `FTW_NS` e `FTW_DNR`; um diretório não inspecionado
-pode não aparecer como problema. O nome do atributo é interpolado sem escape no
-JSON (`:36`), embora nomes inválidos provenientes do inferior sejam justamente um
-dos casos que a ferramenta deve reportar.
+`tools/moobfs-check.c:48` ignores `FTW_NS` and `FTW_DNR`; an uninspected directory
+may not show up as a problem. The attribute name is interpolated without escaping into the
+JSON (`:36`), although invalid names coming from the lower filesystem are precisely
+one of the cases the tool must report.
 
-Sugestão: distinguir árvore limpa de inspeção incompleta, sinalizar erro na saída e
-escapar todas as strings. Testar diretório inacessível e xattr com aspas no nome.
+Suggestion: distinguish a clean tree from an incomplete inspection, signal an error in the output and
+escape all strings. Test an inaccessible directory and an xattr with quotes in the name.
 
-## Outros pontos de robustez
+## Other robustness points
 
-- O índice pode ficar incompleto após uma escrita bem-sucedida no inferior. O cliente
-  precisa observar esse estado; respostas não devem parecer completas inadvertidamente.
-- `index_used` não é a RAM real: alocador, xarray e buffers transitórios precisam de
-  medição. A lista temporária de nomes de um diretório merece teste separado de limite.
-- Os testes `--uid` usam setgid/setuid sem limpar grupos suplementares. Preparar a
-  identidade completa evita que os testes herdem acesso não intencional por grupo.
-- A corrida QUERY/open admite ENOENT/EACCES por contrato. Esse teste é útil para
-  estabilidade, mas não basta para provar ausência de resultados indevidos: adicionar
-  fases controladas de revogação, com barreiras e resultados esperados conhecidos.
-- Revisar especificamente readonly no inferior e congelamento do filesystem nas
-  operações de metadados delegadas. É uma área de revisão pendente, não um bug
-  confirmado aqui.
-- Reflink compartilha dados; não assumir que o ioctl FICLONE transfere xattrs. O
-  contrato do cliente deve dizer como copiar atributos e quando gerar nova identidade.
-- Git versiona os arquivos do projeto, mas não preserva automaticamente os xattrs das
-  memórias. Propor exportação/importação de conteúdo + metadados e teste de ida/volta.
-- `(namespace, memory_id)` é identidade lógica; `namespace` como atributo não é uma
-  barreira de segurança. O isolamento depende das credenciais e permissões POSIX.
+- The index may become incomplete after a successful write to the lower filesystem. The client
+  needs to observe that state; responses must not inadvertently look complete.
+- `index_used` is not the real RAM: allocator, xarray and transient buffers need
+  measurement. The temporary list of names of a directory deserves a separate limit test.
+- The `--uid` tests use setgid/setuid without clearing supplementary groups. Preparing the
+  complete identity prevents the tests from inheriting unintended access through a group.
+- The QUERY/open race admits ENOENT/EACCES by contract. That test is useful for
+  stability, but it is not enough to prove absence of improper results: add
+  controlled revocation phases, with barriers and known expected results.
+- Specifically review readonly on the lower filesystem and filesystem freezing in the
+  delegated metadata operations. It is a pending review area, not a bug
+  confirmed here.
+- Reflink shares data; do not assume that the FICLONE ioctl transfers xattrs. The
+  client contract must say how to copy attributes and when to generate a new identity.
+- Git versions the project files, but does not automatically preserve the xattrs of the
+  memories. Propose export/import of content + metadata and a round-trip test.
+- `(namespace, memory_id)` is logical identity; `namespace` as an attribute is not a
+  security barrier. Isolation depends on POSIX credentials and permissions.
 
-## Planos e comunicação
+## Plans and communication
 
-README anuncia no título apenas fase 2a e descreve 2a–2e no corpo. ROADMAP ainda
-lista KASAN como pendente genericamente, embora o histórico registre aprovação em
-main; a branch atual tem outra execução. A abertura da especificação M3 diz que nada
-foi implementado, embora já exista código parcial. O roadmap ainda cita cliente
-externo obrigatório e batch/cursor como se o escopo não tivesse sido refinado.
+The README announces only phase 2a in its title and describes 2a–2e in the body. ROADMAP still
+lists KASAN as pending generically, although the history records a pass on
+main; the current branch has another run. The opening of the M3 specification says nothing
+was implemented, although partial code already exists. The roadmap still cites a mandatory
+external client and batch/cursor as if the scope had not been refined.
 
-Não apagar o histórico: acrescentar notas datadas e manter um quadro curto de
-estado atual com commit, evidência e pendência. ADRs descrevem a decisão no momento
-em que foi tomada; precisam de ligação para o estado atual, não reescrita retrospectiva.
+Do not erase the history: add dated notes and keep a short table of
+current status with commit, evidence and pending item. ADRs describe the decision at the moment
+it was taken; they need a link to the current status, not retrospective rewriting.
 
-O benefício potencial mais específico é: arquivos e atributos consultáveis por
-vários processos, com autorização POSIX e persistência num filesystem comum. A
-ausência de daemon de banco não diferencia o projeto de SQLite, que também roda
-no processo da aplicação. [Documentação SQLite](https://www.sqlite.org/serverless.html).
+The most specific potential benefit is: files and attributes queryable by
+several processes, with POSIX authorization and persistence in an ordinary filesystem. The
+absence of a database daemon does not distinguish the project from SQLite, which also runs
+in the application's process. [SQLite documentation](https://www.sqlite.org/serverless.html).
 
-O fato de estar no kernel não prova menor latência de ponta a ponta. Travessia VFS,
-checagem de cada caminho, reconstrução e manutenção do índice podem dominar a carga.
-O custo de instalação privilegiada e compatibilidade com kernels também entra na
-avaliação de adoção. Manter Linux 6.12 como alvo inicial explícito e expandir a matriz
-depois de estabilizar o contrato é mais defensável que prometer suporte Linux amplo.
+Being in the kernel does not prove lower end-to-end latency. VFS traversal,
+checking each path, rebuilding and maintaining the index may dominate the load.
+The cost of privileged installation and compatibility with kernels also enters the
+adoption evaluation. Keeping Linux 6.12 as the explicit initial target and expanding the matrix
+after stabilizing the contract is more defensible than promising broad Linux support.
 
-Dois ajustes concretos no desenho do benchmark: `docs/benchmark-harness.md:59`
-declara `memory_id TEXT UNIQUE`, enquanto a identidade proposta é o par
-`(namespace, memory_id)`; alinhar os contratos antes de gerar o dataset. O uso de
-SQLite com `synchronous=NORMAL` (`:67`) também exige explicitar qual recuperação
-após perda de energia é esperada e tornar equivalente a política de sincronização
-dos sistemas comparados. Não interpretar configurações diferentes de durabilidade
-como vantagem intrínseca de desempenho.
+Two concrete adjustments to the benchmark design: `docs/benchmark-harness.md:59`
+declares `memory_id TEXT UNIQUE`, while the proposed identity is the pair
+`(namespace, memory_id)`; align the contracts before generating the dataset. The use of
+SQLite with `synchronous=NORMAL` (`:67`) also requires making explicit which recovery
+after power loss is expected and making the synchronization policy of the compared
+systems equivalent. Do not interpret different durability configurations
+as an intrinsic performance advantage.
 
-## Caminho recomendado
+## Recommended path
 
-1. **Correção do QUERY:** regressões R1–R3; reproduções R4/R5; estado de índice
-   incompleto; identidade dos testes. Concluir KASAN da branch e atualizar status.
-2. **M4 mínimo:** comparar inferior puro, camada com `noindex`, camada indexada e
-   arquivos + SQLite com índices adequados. Começar por leitura de caminho conhecido,
-   consulta seletiva, atualização concorrente e montagem/reconstrução.
-3. **Mesma semântica:** mesmo conteúdo e atributos, autorização equivalente,
-   durabilidade equivalente e resultados conferidos antes de cronometrar. Comparar
-   identidade lógica, não números físicos de inode entre backends. Medir p50/p95/p99,
-   CPU, RAM real, tempo de montagem e entradas examinadas. Usar Linux nativo/KVM;
-   não usar emulação TCG como evidência de desempenho para usuários Linux.
-4. **Demonstração de memória entre sessões:** agente A registra uma decisão;
-   agente B autorizado recupera após reinício; versão nova substitui uma informação;
-   outro UID não a recebe; exportação/importação mantém identidade e proveniência.
-   O cliente pequeno pode ter adaptadores MoobFS/SQLite para o experimento sem alterar
-   a decisão de que o produto é um filesystem nativo.
-5. **Só então ampliar:** integração de agente, empacotamento e matriz de kernel.
-   Adiar batch, cursor de revisão, índice persistente e ranking até que medições
-   identifiquem a necessidade concreta. Um cursor de mudanças precisa definir
-   persistência e reinício; um contador volátil não resolve o problema sozinho.
+1. **QUERY correctness:** regressions R1–R3; reproductions R4/R5; incomplete index
+   state; test identity. Complete the branch's KASAN and update the status.
+2. **Minimal M4:** compare plain lower filesystem, layer with `noindex`, indexed layer and
+   files + SQLite with adequate indexes. Start with reading a known path,
+   selective query, concurrent update and mount/rebuild.
+3. **Same semantics:** same content and attributes, equivalent authorization,
+   equivalent durability and results checked before timing. Compare
+   logical identity, not physical inode numbers across backends. Measure p50/p95/p99,
+   CPU, real RAM, mount time and entries examined. Use native Linux/KVM;
+   do not use TCG emulation as performance evidence for Linux users.
+4. **Demonstration of memory across sessions:** agent A records a decision;
+   authorized agent B retrieves it after restart; a new version replaces a piece of information;
+   another UID does not receive it; export/import keeps identity and provenance.
+   The small client may have MoobFS/SQLite adapters for the experiment without changing
+   the decision that the product is a native filesystem.
+5. **Only then broaden:** agent integration, packaging and kernel matrix.
+   Postpone batch, revision cursor, persistent index and ranking until measurements
+   identify the concrete need. A change cursor needs to define
+   persistence and restart; a volatile counter does not solve the problem on its own.
 
-Definir critérios antes do benchmark: correção obrigatória; limites aceitáveis de
-overhead, memória e tempo de montagem; uma carga relevante com benefício mensurável.
-Não é necessário vencer SQLite em tudo, mas é necessário justificar o custo da camada.
+Define criteria before the benchmark: mandatory correctness; acceptable limits of
+overhead, memory and mount time; a relevant load with measurable benefit.
+It is not necessary to beat SQLite at everything, but it is necessary to justify the cost of the layer.
 
-## Artigos e implicações para o projeto
+## Papers and implications for the project
 
-As aplicações abaixo são inferências de arquitetura, não resultados experimentais
-sobre MoobFS. Foram consultadas as páginas e os resumos dos artigos; não foi feita
-reprodução dos experimentos nem revisão exaustiva da literatura.
+The applications below are architecture inferences, not experimental results
+about MoobFS. The pages and abstracts of the papers were consulted; the experiments
+were not reproduced and no exhaustive literature review was made.
 
-- [MemGPT](https://arxiv.org/abs/2310.08560): trata gestão de contexto por níveis de
-  memória. Reforça a separação entre armazenamento persistente e a política que
-  decide o que entra na janela de contexto. Essa política permanece no cliente.
-- [LongMemEval](https://arxiv.org/abs/2410.10813): avalia extração, raciocínio entre
-  sessões, tempo, atualização de conhecimento e abstenção. Pode avaliar o fluxo de
-  memória depois do benchmark de armazenamento. Manter modelo, prompt e estratégia
-  de recuperação iguais ao comparar backends, para não atribuir ao FS ganhos do agente.
-- [A-MEM](https://arxiv.org/abs/2502.12110): explora organização e relações entre
-  memórias. Sugere valor em proveniência e relações explícitas; não implica implementar
-  um grafo semântico ou execução de LLM no kernel.
-- [Modelo de permissões do OverlayFS](https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html):
-  referência para distinguir credenciais do chamador e do acesso ao inferior.
-  Documentação atual não substitui verificar as APIs no kernel 6.12 usado pelo projeto.
+- [MemGPT](https://arxiv.org/abs/2310.08560): treats context management through memory
+  tiers. Reinforces the separation between persistent storage and the policy that
+  decides what enters the context window. That policy remains in the client.
+- [LongMemEval](https://arxiv.org/abs/2410.10813): evaluates extraction, cross-session
+  reasoning, time, knowledge update and abstention. It can evaluate the memory flow
+  after the storage benchmark. Keep model, prompt and retrieval strategy
+  the same when comparing backends, so as not to attribute agent gains to the FS.
+- [A-MEM](https://arxiv.org/abs/2502.12110): explores organization and relations between
+  memories. Suggests value in provenance and explicit relations; does not imply implementing
+  a semantic graph or LLM execution in the kernel.
+- [OverlayFS permission model](https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html):
+  reference for distinguishing the credentials of the caller and of access to the lower filesystem.
+  Current documentation does not replace checking the APIs in the kernel 6.12 used by the project.
 
-## Evidência desta revisão
+## Evidence of this review
 
-- Executado `make test BUILD=build/review-20261010`: 60 verificações de encoding e
-  9 testes Python de imagem aprovados. Isso não executa o módulo nem QUERY em Linux.
-- Consultados código, especificações, ADRs e registros de validação; os testes Linux
-  citados acima são evidências registradas pelo projeto, não reexecuções desta sessão.
-- O histórico 0016 registra `MOOBFS_KASAN_PASS` em main na execução
+- Ran `make test BUILD=build/review-20261010`: 60 encoding checks and
+  9 Python image tests passed. This does not run the module or QUERY on Linux.
+- Consulted code, specifications, ADRs and validation journals; the Linux tests
+  cited above are evidence recorded by the project, not re-runs in this session.
+- History 0016 records `MOOBFS_KASAN_PASS` on main in run
   [38074631812](https://github.com/studiomoob/llmoobfs/actions/runs/38074631812).
-- A execução KASAN da branch
+- The branch's KASAN run
   [38079499011](https://github.com/studiomoob/llmoobfs/actions/runs/38079499011)
-  estava `in_progress`, sem conclusão, na consulta realizada nesta revisão.
-- Nenhum módulo foi carregado no host macOS; nenhuma nova execução de VM foi feita.
-  As reproduções propostas ainda precisam ser implementadas/executadas.
-- Nenhuma correção de código, alteração no site ou publicação remota integra esta
-  entrega. Os achados não equivalem a uma auditoria completa de segurança do kernel.
+  was `in_progress`, without conclusion, at the check made in this review.
+- No module was loaded on the macOS host; no new VM run was made.
+  The proposed reproductions still need to be implemented/run.
+- No code fix, site change or remote publication is part of this
+  deliverable. The findings do not amount to a complete security audit of the kernel.

@@ -1,58 +1,58 @@
-# 0042 — Novo host de medição: Mac mini Server 2011 com Debian 13
+# 0042 — New measurement host: Mac mini Server 2011 with Debian 13
 
-Data: 2026-10-11 e 2026-10-12. Estado: host preparado e validado com a suíte completa; nenhuma
-medição de desempenho ainda.
+Date: 2026-10-11 and 2026-10-12. Status: host prepared and validated with the complete suite; no
+performance measurement yet.
 
-## Contexto
+## Context
 
-A VM da Azure usada nos registros 0026 a 0031 foi desligada pelo mantenedor. O novo host é uma
-máquina local do mantenedor. Endereço, usuário e chave não são registrados aqui.
+The Azure VM used in journals 0026 to 0031 was shut down by the maintainer. The new host is a
+local machine of the maintainer. Address, user and key are not recorded here.
 
-## Hardware e sistema
+## Hardware and system
 
-| Item | Valor |
+| Item | Value |
 | --- | --- |
-| Máquina | Mac mini Server Mid 2011 |
-| CPU | Intel Core i7-2635QM, 4 núcleos, 8 threads, 2,0 GHz |
-| Memória | 16 GB DDR3 1333 |
-| Disco do sistema | HD de 500 GB, 2,5", rotacional (Seagate ST9500420ASG) |
-| Disco dos testes | SSD OCZ Vertex 4 de 128 GB, SATA 6 Gb/s; SMART: aprovado, vida restante 92%, 0 setores realocados |
-| Sistema | Debian 13.7, kernel padrão `6.12.111+deb13-amd64` (o mesmo da VM da suíte) |
-| Volumes de teste | três partições GPT de 20 GB no SSD: ext4, btrfs, XFS, formatadas por `bench/host-setup.sh` |
+| Machine | Mac mini Server Mid 2011 |
+| CPU | Intel Core i7-2635QM, 4 cores, 8 threads, 2.0 GHz |
+| Memory | 16 GB DDR3 1333 |
+| System disk | 500 GB HDD, 2.5", rotational (Seagate ST9500420ASG) |
+| Test disk | OCZ Vertex 4 128 GB SSD, SATA 6 Gb/s; SMART: passed, remaining life 92%, 0 reallocated sectors |
+| System | Debian 13.7, default kernel `6.12.111+deb13-amd64` (the same as the suite's VM) |
+| Test volumes | three 20 GB GPT partitions on the SSD: ext4, btrfs, XFS, formatted by `bench/host-setup.sh` |
 
-Diferenças em relação à Azure: outra CPU (Sandy Bridge, 2011) e discos locais (SSD SATA em vez de
-disco gerenciado P6). Números absolutos não são comparáveis com os registros 0026 a 0031; as
-comparações da série Q2 serão feitas dentro deste host, incluindo uma nova medição de base da v1.
-Sem kernel próprio: o kernel padrão da Debian já é da série 6.12 validada.
+Differences from Azure: a different CPU (Sandy Bridge, 2011) and local disks (SATA SSD instead of
+a P6 managed disk). Absolute numbers are not comparable with journals 0026 to 0031; the
+comparisons of the Q2 series will be made within this host, including a new v1 baseline
+measurement. No custom kernel: Debian's default kernel is already from the validated 6.12 series.
 
-## Preparação
+## Preparation
 
-1. O SSD tinha macOS (APFS, 64 GB) e uma partição NTFS (55 GB). Antes de apagá-lo, com
-   autorização do mantenedor, foi feita uma imagem completa comprimida no HD (`zstd -3`):
-   128 GB lidos em 902 s, imagem de 23,8 GB, verificada pela igualdade entre o SHA-256 do disco
-   lido e o da imagem descomprimida (verificação total de 1 592 s). Instruções de restauração
-   ficam ao lado da imagem, no próprio host.
-2. O relógio do host estava cerca de 49 minutos adiantado e sem NTP; `systemd-timesyncd` foi
-   instalado e a sincronização ligada antes de qualquer medição.
-3. `sudo` e os headers do kernel (`linux-headers-$(uname -r)`) não vinham na instalação mínima;
-   foram instalados. O `bench/host-setup.sh` não instala os headers quando o kernel é o da
-   distribuição; fica como melhoria.
-4. Primeira execução de `bench/host-setup.sh`: falhou antes de compilar, porque o script gravava
-   o log de compilação em `build/` sem criar o diretório (cópia nova da árvore, sem `build/`).
-   Corrigido com `mkdir -p` (commit na branch da Q2d).
+1. The SSD had macOS (APFS, 64 GB) and an NTFS partition (55 GB). Before wiping it, with
+   the maintainer's authorization, a complete compressed image was made on the HDD (`zstd -3`):
+   128 GB read in 902 s, a 23.8 GB image, verified by the equality between the SHA-256 of the disk
+   read and that of the decompressed image (total verification of 1 592 s). Restore instructions
+   are next to the image, on the host itself.
+2. The host clock was about 49 minutes ahead and without NTP; `systemd-timesyncd` was
+   installed and synchronization turned on before any measurement.
+3. `sudo` and the kernel headers (`linux-headers-$(uname -r)`) did not come with the minimal installation;
+   they were installed. `bench/host-setup.sh` does not install the headers when the kernel is the
+   distribution's; left as an improvement.
+4. First run of `bench/host-setup.sh`: failed before compiling, because the script wrote
+   the compilation log into `build/` without creating the directory (fresh copy of the tree, without `build/`).
+   Fixed with `mkdir -p` (commit on the Q2d branch).
 
-## Evidência
+## Evidence
 
-Segunda execução de `bench/host-setup.sh`, com a árvore da branch `m3/query-v2-q2d` (Q2a a Q2d):
-`HOST_SETUP_PASS` no kernel `6.12.111+deb13-amd64`, com `QUERY2_ORDER_PASS`,
+Second run of `bench/host-setup.sh`, with the tree of branch `m3/query-v2-q2d` (Q2a to Q2d):
+`HOST_SETUP_PASS` on kernel `6.12.111+deb13-amd64`, with `QUERY2_ORDER_PASS`,
 `QUERY2_MISSING_BATCH_PASS`, `QUERY2_LEAPFROG_PASS`, `QUERY2_PASS`, `ISOLATION_PASS`, `EQUIV_PASS`,
-`BENCH_LAYER_PASS` e `LAYER_LOWER_PASS` em ext4, btrfs e XFS, `MOOBFS_ACCEPTANCE_PASS` (git,
-SQLite WAL, cliente de memória, replay de `dm-log-writes`, `dm-flakey`) e `MOOBFS_LAYER_PASS`;
-nenhuma linha `BUG:`, `Oops:` ou `WARNING:` no `dmesg`. É a primeira execução da série Q2 em
-hardware real, fora de VM.
+`BENCH_LAYER_PASS` and `LAYER_LOWER_PASS` on ext4, btrfs and XFS, `MOOBFS_ACCEPTANCE_PASS` (git,
+SQLite WAL, memory client, `dm-log-writes` replay, `dm-flakey`) and `MOOBFS_LAYER_PASS`;
+no `BUG:`, `Oops:` or `WARNING:` line in `dmesg`. This is the first run of the Q2 series on
+real hardware, outside a VM.
 
-## Próximo passo
+## Next step
 
-Medições neste host: base da v1 (W3 da série do registro 0029), W3 por domínio com a Q2,
-"N mais recentes", interseção (Q2c contra Q2b, módulos alternados) e o teste do canal de tempo
+Measurements on this host: v1 baseline (W3 of the series of journal 0029), per-domain W3 with Q2,
+"N most recent", intersection (Q2c against Q2b, alternating modules) and the timing channel test
 (`bench/timing-v2.sh`).

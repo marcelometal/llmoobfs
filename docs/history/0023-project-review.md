@@ -1,37 +1,37 @@
-# 0023 — Revisão de implementação, planos e próximo experimento
+# 0023 — Review of implementation, plans and next experiment
 
-Data: 2026-10-10. Estado: concluído como análise; correções e reproduções pendentes.
+Date: 2026-10-10. Status: completed as analysis; fixes and reproductions pending.
 Base: `36eb64b`, branch `m3/3b-query-authz`.
 
-## Objetivo e resultado
+## Goal and result
 
-Revisar maturidade, direção arquitetural, código e evidências antes de ampliar o
-escopo. Relatório: [revisão do projeto](../project-review-2026-10-10.md).
+Review maturity, architectural direction, code and evidence before widening the
+scope. Report: [project review](../project-review-2026-10-10.md).
 
-Mantida a ADR-0007 como direção. Recomendado fechar correção e autorização de QUERY,
-medir um M4 reduzido e demonstrar memória entre sessões. São recomendações, sem nova
-decisão de arquitetura ou autorização de implementação/publicação.
+ADR-0007 kept as the direction. Recommended: close the correctness and authorization of QUERY,
+measure a reduced M4 and demonstrate memory across sessions. These are recommendations, with no
+new architecture decision or authorization of implementation/publication.
 
-Achados por leitura: transição para RAW deixa entrada indexada anterior; caminho
-truncado antes da autorização pode desaparecer da consulta; falhas de lookup são
-convertidas em ausência; checker omite falhas de travessia. Riscos a reproduzir:
-identidade entre subvolumes Btrfs e uso de inferior idmapped. Registradas limitações
-de varredura, orçamento, metadados portáveis e divergências de status nos documentos.
+Findings by reading: the transition to RAW leaves the previous indexed entry; a path
+truncated before authorization can disappear from the query; lookup failures are
+converted into absence; the checker omits traversal failures. Risks to reproduce:
+identity across Btrfs subvolumes and use of an idmapped lower. Recorded limitations
+of scanning, budget, portable metadata and status divergences in the documents.
 
-Consultadas fontes primárias Btrfs, SQLite, OverlayFS e resumos de MemGPT,
-LongMemEval e A-MEM. Separadas implicações propostas de resultados medidos.
+Primary sources consulted for Btrfs, SQLite, OverlayFS and summaries of MemGPT,
+LongMemEval and A-MEM. Proposed implications separated from measured results.
 
-## Validação e limites
+## Validation and limits
 
-`make test BUILD=build/review-20261010`: 60 checks de atributos e 9 testes Python
-aprovados. Sem nova execução do módulo/VM nesta revisão. KASAN da branch, execução
-38079499011, ainda em andamento na consulta. Resultados Linux anteriores identificados
-como evidência do histórico, não testes reexecutados.
+`make test BUILD=build/review-20261010`: 60 attribute checks and 9 Python tests
+passed. No new run of the module/VM in this review. KASAN of the branch, run
+38079499011, still in progress at the time of the check. Earlier Linux results identified
+as historical evidence, not rerun tests.
 
-Somente documentação da revisão alterada. `docs/community-plan.md`, já não versionado
-na chegada, preservado. Sem push, issues públicas ou alterações no site.
+Only the review documentation changed. `docs/community-plan.md`, already unversioned
+on arrival, preserved. No push, public issues or changes to the site.
 
-## Próximo passo
+## Next step
 
-Transformar R1–R3 em regressões Linux e correções pequenas; reproduzir R4/R5 antes de
-afirmar suporte a essas configurações. Atualizar status após a conclusão real do KASAN.
+Turn R1–R3 into Linux regressions and small fixes; reproduce R4/R5 before
+claiming support for those configurations. Update status after KASAN actually completes.

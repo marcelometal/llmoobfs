@@ -1,84 +1,84 @@
-# 0041 — Experiência do desenvolvedor no GitHub: lote 3 (vitrine)
+# 0041 — Developer experience on GitHub: batch 3 (showcase)
 
-Data: 2026-10-11. Branch: `community/dx-batch3`, criada a partir de `origin/main` (`34f175b`,
-merge do PR #30). Estado: implementado no repositório; a consolidação das releases, o envio da
-imagem de social preview e a criação das issues de tradução ficam com o mantenedor (escritas no
-GitHub negadas nesta sessão; ver "Ações do mantenedor").
+Date: 2026-10-11. Branch: `community/dx-batch3`, created from `origin/main` (`34f175b`,
+merge of PR #30). Status: implemented in the repository; consolidating the releases, uploading the
+social preview image and creating the translation issues are left to the maintainer (writes on
+GitHub denied in this session; see "Maintainer actions").
 
-## Objetivo
+## Goal
 
-Executar o lote 3 de [`docs/dx-plan.md`](../dx-plan.md): README com demonstração real e
-quickstart antes do aviso de estágio experimental, imagem de social preview, índice de `docs/`
-com o idioma de cada documento e destino único para as evidências de benchmark. Nada em
-`layer/`, `kernel/` ou no formato mudou.
+Execute batch 3 of [`docs/dx-plan.md`](../dx-plan.md): README with a real demonstration and
+quickstart before the experimental-stage warning, social preview image, an index of `docs/`
+with the language of each document, and a single destination for the benchmark evidence. Nothing in
+`layer/`, `kernel/` or the format changed.
 
-Numeração: conferidas `origin/main` (último 0039), todas as branches remotas (as
-`m3/query-v2-q2b` a `q2d` usam 0036 a 0038) e as branches locais. O número 0040 ficou livre para
-a próxima fase da série `m3/query-v2-*`, que vem reservando números em sequência; este registro
-usa 0041. Achado: a branch local `codex/kernel-index-reuse-research` (checkout principal, não
-publicada) tem um `0039-kernel-index-reuse-research.md`, que colide com o 0039 de `main` e
-precisa ser renumerado antes de publicado.
+Numbering: `origin/main` (last 0039), all remote branches (the
+`m3/query-v2-q2b` to `q2d` ones use 0036 to 0038) and the local branches were checked. Number 0040 was left free for
+the next phase of the `m3/query-v2-*` series, which has been reserving numbers in sequence; this journal
+uses 0041. Finding: the local branch `codex/kernel-index-reuse-research` (main checkout, not
+published) has a `0039-kernel-index-reuse-research.md`, which collides with the 0039 of `main` and
+needs to be renumbered before being published.
 
-## Decisões
+## Decisions
 
-Decisões do mantenedor, tomadas antes desta sessão: uma release única para as evidências de
-benchmark; demonstração em texto com saída real, não GIF nem asciinema; social preview enviada
-à mão; issues de tradução redigidas aqui e criadas pelo mantenedor.
+Maintainer decisions, made before this session: a single release for the benchmark
+evidence; demonstration in text with real output, not a GIF or asciinema; social preview uploaded
+by hand; translation issues drafted here and created by the maintainer.
 
-| Tema | Decisão | Justificativa resumida |
+| Topic | Decision | Summary justification |
 | --- | --- | --- |
-| Fonte da demonstração | Bloco novo em `vm/suite.sh`, depois dos três inferiores, sobre ext4, com prefixo `DEMO| ` e marcador `DEMO_PASS` | A suíte não imprimia uma sequência legível; o bloco tem asserções, então a saída do README é também um teste e o CI (incluindo o KASAN, que roda em PRs que tocam `vm/`) a reexecuta |
-| Opções de montagem na demonstração | Padrão (`domain_depth=1`), `QUERY2` em diretório de domínio; v1 só como contraste (recusada ao usuário, respondida ao root) | Reflete o comportamento de `main` depois da fase Q2a |
-| Preparação dos domínios | `mkdir`/`chown`/`chmod` dos diretórios no ext4 inferior antes de montar | Mudar o modo de um diretório de domínio com a camada montada põe o domínio em fallback até a remontagem (spec-query-v2 §3, Q2a); preparar antes evita isso sem uma remontagem no roteiro |
-| Usuário que consulta | `query --uid 1001`, como no resto da suíte | Não há `su` nem `setpriv` no initramfs; o cliente de teste troca de uid antes da chamada, e o README diz isso |
-| Trecho no README | As linhas `DEMO| ` sem o prefixo e sem o `CR` do console serial, omitida só a chamada final de `GET_INFO` (comando e saída inteiros) | Bloco curto antes do aviso; nenhuma linha de saída alterada; o registro guarda a sequência completa |
-| Aviso experimental | Mesmo conteúdo em lista curta, logo depois do quickstart; fatos datados de 2026-10-11 | Pedido do mantenedor; ver "Fatos atualizados" |
-| Release de evidências | Tag `bench-evidence`, pré-release, `--latest=false`, criada como rascunho, publicada só depois de conferir os anexos pela API | Não aparece como "Latest"; o rascunho tolera releases imutáveis no momento da criação |
-| Manifesto das evidências | A tabela de `bench/evidence-release.md` (texto da release) é também o manifesto lido pelo script | Uma fonte só para nome, tamanho e SHA-256; o texto publicado e o que o script confere não divergem |
-| Verificação depois do envio | Tamanho e digest pela API do GitHub e novo download pela URL pública, com `sha256` local | Exigência do mantenedor; o download confere o que um leitor recebe, não só o que a API declara |
-| Apagar as pré-releases antigas | Só depois de todos os anexos conferidos; `gh release delete` sem `--cleanup-tag`, e o script confere que cada tag continua existindo | As tags marcam o commit de cada campanha |
-| Novas campanhas | Subcomando `add` do mesmo script, regra em `docs/benchmark-harness.md` §7.1 e `bench/results/README.md` | Evita que uma campanha nova volte a criar uma pré-release própria |
-| Social preview | SVG versionado em `docs/assets/`, script com `rsvg-convert`, PNG gerado | `docs/assets/` não é publicado no Pages, então o site não muda; cores e marca do site |
-| Índice de `docs/` | `docs/README.md` em inglês, por grupo, com idioma e uma linha por documento | É a porta de entrada para quem chega; o README e o README.pt-BR apontam para ele |
-| Traduções | Arquivo `<nome>.en.md` ao lado do original, que prevalece (CONTRIBUTING, política de idioma) | Convenção explícita nas issues para evitar propostas divergentes |
+| Source of the demonstration | New block in `vm/suite.sh`, after the three lowers, on ext4, with prefix `DEMO| ` and marker `DEMO_PASS` | The suite did not print a readable sequence; the block has assertions, so the README output is also a test and CI (including KASAN, which runs on PRs that touch `vm/`) re-executes it |
+| Mount options in the demonstration | Default (`domain_depth=1`), `QUERY2` on a domain directory; v1 only as a contrast (refused to the user, answered to root) | Reflects the behavior of `main` after phase Q2a |
+| Preparing the domains | `mkdir`/`chown`/`chmod` of the directories on the lower ext4 before mounting | Changing the mode of a domain directory with the layer mounted puts the domain in fallback until the remount (spec-query-v2 §3, Q2a); preparing beforehand avoids this without a remount in the script |
+| User who queries | `query --uid 1001`, as in the rest of the suite | There is no `su` or `setpriv` in the initramfs; the test client switches uid before the call, and the README says so |
+| Excerpt in the README | The `DEMO| ` lines without the prefix and without the serial console `CR`, omitting only the final `GET_INFO` call (command and output entirely) | Short block before the warning; no output line changed; the journal keeps the complete sequence |
+| Experimental warning | Same content in a short list, right after the quickstart; facts dated 2026-10-11 | Maintainer's request; see "Updated facts" |
+| Evidence release | Tag `bench-evidence`, pre-release, `--latest=false`, created as a draft, published only after checking the attachments through the API | Does not appear as "Latest"; the draft tolerates immutable releases at creation time |
+| Evidence manifest | The table in `bench/evidence-release.md` (release text) is also the manifest read by the script | A single source for name, size and SHA-256; the published text and what the script checks do not diverge |
+| Verification after upload | Size and digest through the GitHub API and a new download from the public URL, with local `sha256` | Maintainer's requirement; the download checks what a reader receives, not only what the API declares |
+| Deleting the old pre-releases | Only after all attachments are checked; `gh release delete` without `--cleanup-tag`, and the script checks that each tag still exists | The tags mark the commit of each campaign |
+| New campaigns | `add` subcommand of the same script, rule in `docs/benchmark-harness.md` §7.1 and `bench/results/README.md` | Prevents a new campaign from going back to creating its own pre-release |
+| Social preview | Versioned SVG in `docs/assets/`, script with `rsvg-convert`, generated PNG | `docs/assets/` is not published on Pages, so the site does not change; the site's colors and mark |
+| Index of `docs/` | `docs/README.md` in English, by group, with language and one line per document | It is the entry point for newcomers; the README and README.pt-BR point to it |
+| Translations | File `<name>.en.md` next to the original, which prevails (CONTRIBUTING, language policy) | Explicit convention in the issues to avoid divergent proposals |
 
-## Mudanças
+## Changes
 
-- `vm/suite.sh`: bloco de demonstração (função `demo`, prefixo `DEMO| `, asserções, marcador
-  `DEMO_PASS`). `docs/testing.md`: linha do marcador.
-- `README.md`: frase de abertura, seção "See it run" com a saída real, "Quickstart" com quatro
-  comandos, aviso experimental compacto logo abaixo, badges mantidos (inclusive o do
-  Scorecard), link para o índice de `docs/`. Fora do topo, só o que contradizia `main`: "At a
-  glance" e "How it works" passam a descrever o `QUERY2` por domínio; "Not implemented" e
-  "Limitations" deixam de dizer que não há medição alguma; `DEMO_PASS` na lista de marcadores;
-  duas linhas no mapa da documentação.
-- `README.pt-BR.md`: espelho do topo e das mesmas correções; ganhou também a linha da fase Q2a na
-  tabela de evidências, que faltava.
-- `bench/evidence-release.md` (texto e manifesto da release), `scripts/bench-evidence-release.sh`
-  (SPDX, POSIX `sh`), `bench/results/README.md` (índice das campanhas e regra para novas), e os
-  sete `bench/results/*/README.md` com o link novo para o anexo, o nome da pré-release original
-  e, no `profile-q7`, o SHA-256 que faltava.
-- `docs/benchmark-harness.md` §7.1: onde ficam os artefatos de uma campanha.
-- `docs/README.md` (índice), `docs/assets/social-preview.svg`, `docs/assets/social-preview.png`,
+- `vm/suite.sh`: demonstration block (function `demo`, prefix `DEMO| `, assertions, marker
+  `DEMO_PASS`). `docs/testing.md`: the marker's line.
+- `README.md`: opening sentence, "See it run" section with the real output, "Quickstart" with four
+  commands, compact experimental warning right below, badges kept (including the
+  Scorecard one), link to the index of `docs/`. Outside the top, only what contradicted `main`: "At a
+  glance" and "How it works" now describe the per-domain `QUERY2`; "Not implemented" and
+  "Limitations" no longer say there is no measurement at all; `DEMO_PASS` in the list of markers;
+  two lines in the documentation map.
+- `README.pt-BR.md`: mirror of the top and of the same corrections; it also gained the phase Q2a line in
+  the evidence table, which was missing.
+- `bench/evidence-release.md` (release text and manifest), `scripts/bench-evidence-release.sh`
+  (SPDX, POSIX `sh`), `bench/results/README.md` (index of the campaigns and rule for new ones), and the
+  seven `bench/results/*/README.md` with the new link to the attachment, the name of the original pre-release
+  and, in `profile-q7`, the missing SHA-256.
+- `docs/benchmark-harness.md` §7.1: where a campaign's artifacts go.
+- `docs/README.md` (index), `docs/assets/social-preview.svg`, `docs/assets/social-preview.png`,
   `docs/assets/render-social-preview.sh`.
-- `docs/dx-plan.md` (estado do lote 3), `CHANGELOG.md`, `docs/history/README.md`.
+- `docs/dx-plan.md` (status of batch 3), `CHANGELOG.md`, `docs/history/README.md`.
 
-Os registros 0025, 0027 e 0029 continuam citando as pré-releases pelo nome, de propósito: eram
-o destino na data em que foram escritos, e as tags permanecem.
+Journals 0025, 0027 and 0029 still cite the pre-releases by name, on purpose: they were
+the destination on the date they were written, and the tags remain.
 
-### Fatos atualizados no aviso
+### Updated facts in the warning
 
-| Antes (2026-10-10) | Agora (2026-10-11) | Fonte |
+| Before (2026-10-10) | Now (2026-10-11) | Source |
 | --- | --- | --- |
-| "the UAPI v1 (`QUERY`, `GET_INFO`) may change" | v1 e v2 podem mudar; com domínios ligados (padrão), a v1 é só para administradores | Registro 0035, `docs/spec-query-v2.md` |
-| "no performance numbers have been measured (M4 pending)" | Só medições em nível de piloto numa VM de nuvem; M4 não feito; nenhuma alegação | `bench/results/`, registros 0025 a 0031 |
-| "three kernel-side defects" (0015, 0016) | Defeitos encontrados e corrigidos pelos próprios testes e revisões, citando 0015, 0016 e 0035, sem contagem | O registro 0035 lista um `oops` e um erro de `rename` no código da Q2a antes do merge |
-| README.pt-BR: "Sem versão lançada" | Só a tag de pre-release do fonte `v0.1.0-experimental` | Registro 0026 |
+| "the UAPI v1 (`QUERY`, `GET_INFO`) may change" | v1 and v2 may change; with domains on (default), v1 is for administrators only | Journal 0035, `docs/spec-query-v2.md` |
+| "no performance numbers have been measured (M4 pending)" | Only pilot-level measurements on a cloud VM; M4 not done; no claims | `bench/results/`, journals 0025 to 0031 |
+| "three kernel-side defects" (0015, 0016) | Defects found and fixed by the tests and reviews themselves, citing 0015, 0016 and 0035, without a count | Journal 0035 lists an `oops` and a `rename` error in the Q2a code before the merge |
+| README.pt-BR: "Sem versão lançada" ("No version released") | Only the source pre-release tag `v0.1.0-experimental` | Journal 0026 |
 
-## Demonstração
+## Demonstration
 
-Sequência completa, das linhas `DEMO| ` de `build/vm/console.log` (prefixo e `CR` removidos),
-execução de 2026-10-11 descrita em "Evidências":
+Complete sequence, from the `DEMO| ` lines of `build/vm/console.log` (prefix and `CR` removed),
+run of 2026-10-11 described in "Evidence":
 
 ```text
 # (prepared on the lower ext4: alice/ uid 1001 0700, bob/ uid 1002 0700, team/ 0755)
@@ -111,48 +111,48 @@ domain_depth=1 heterogeneous=1 fallback_domains=0
 lower=ext4 caps=0x8 flags=0x10 budget=134217728 used=1050 entries=4 inodes=4
 ```
 
-Leitura: `team/salary.md` (0600, dono 1002, num domínio 0755 de root) não satisfaz a regra de
-homogeneidade e fica fora da partição; por isso a Alice não o vê, e o Bob também não o veria
-pelo `QUERY2` (falha segura da Q2a). O `GET_INFO` ainda informa `uapi=1`: o campo de versão não
-mudou na Q2a.
+Reading: `team/salary.md` (0600, owner 1002, in a root 0755 domain) does not satisfy the
+homogeneity rule and stays out of the partition; that is why Alice does not see it, and Bob would not see it either
+through `QUERY2` (Q2a fail-safe). `GET_INFO` still reports `uapi=1`: the version field did not
+change in Q2a.
 
-## Releases de benchmark
+## Benchmark releases
 
-Inventário em 2026-10-11 (`gh release list`, `gh release view --json assets`): **sete**
-pré-releases `bench-2026-10-11-*`, não oito como dizia o pedido, mais a `v0.1.0-experimental`.
-Nenhuma é rascunho; nenhuma é imutável. Os sete anexos têm nomes distintos, então cabem numa só
-release. Tamanhos de 1,09 MB a 129,4 MB, 162,4 MB no total; os SHA-256 publicados pelo GitHub
-(`digest`) coincidem com os citados nos `bench/results/*/README.md` (o do `profile-q7` não
-estava citado e foi acrescentado).
+Inventory on 2026-10-11 (`gh release list`, `gh release view --json assets`): **seven**
+`bench-2026-10-11-*` pre-releases, not eight as the request said, plus `v0.1.0-experimental`.
+None is a draft; none is immutable. The seven attachments have distinct names, so they fit in a single
+release. Sizes from 1.09 MB to 129.4 MB, 162.4 MB in total; the SHA-256 published by GitHub
+(`digest`) match the ones cited in `bench/results/*/README.md` (the one for `profile-q7` was not
+cited and was added).
 
-`scripts/bench-evidence-release.sh` (padrão `--dry-run`):
+`scripts/bench-evidence-release.sh` (default `--dry-run`):
 
-- `migrate`: baixa cada anexo da pré-release original para `build/bench-evidence/download/` e
-  confere tamanho e SHA-256 com a tabela; cria `bench-evidence` como rascunho se não existir;
-  envia o que falta (um anexo já presente só é aceito se for idêntico; nunca usa `--clobber`);
-  confere tamanho e digest pela API; publica; baixa de novo pela URL pública e confere; só então
-  apaga as sete pré-releases e confere que cada tag continua no remoto.
-- `add ARQUIVO...`: para campanhas novas; exige uma linha na tabela, confere o arquivo local,
-  envia, confere pela API e pela URL pública e atualiza o texto da release a partir do arquivo.
+- `migrate`: downloads each attachment from the original pre-release into `build/bench-evidence/download/` and
+  checks size and SHA-256 against the table; creates `bench-evidence` as a draft if it does not exist;
+  uploads what is missing (an attachment already present is only accepted if identical; never uses `--clobber`);
+  checks size and digest through the API; publishes; downloads again from the public URL and checks; only then
+  deletes the seven pre-releases and checks that each tag is still on the remote.
+- `add FILE...`: for new campaigns; requires a line in the table, checks the local file,
+  uploads, checks through the API and the public URL, and updates the release text from the file.
 
 ## Social preview
 
-`docs/assets/social-preview.svg` → `social-preview.png` (1280×640, 86 684 bytes) com
-`rsvg-convert` 2.62.3 (Homebrew). Conteúdo: marca do site, "MoobFS", "Linux filesystem layer for
-LLM-agent memory", uma frase sobre o que a camada faz e a faixa "Experimental research project ·
-GPL-2.0 · no FUSE · run it in a disposable VM". Nenhuma afirmação de desempenho. Conferida
-reduzida a 400×200: título, subtítulo e faixa legíveis. A fonte vem do sistema (Arial ou
-Helvetica, com DejaVu Sans como alternativa), então outro computador pode gerar um PNG
-ligeiramente diferente.
+`docs/assets/social-preview.svg` → `social-preview.png` (1280×640, 86 684 bytes) with
+`rsvg-convert` 2.62.3 (Homebrew). Content: the site's mark, "MoobFS", "Linux filesystem layer for
+LLM-agent memory", one sentence about what the layer does, and the band "Experimental research project ·
+GPL-2.0 · no FUSE · run it in a disposable VM". No performance claim. Checked
+scaled down to 400×200: title, subtitle and band legible. The font comes from the system (Arial or
+Helvetica, with DejaVu Sans as an alternative), so another computer may generate a slightly
+different PNG.
 
-## Índice de `docs/` e traduções
+## Index of `docs/` and translations
 
-`docs/README.md` lista os 31 documentos da raiz de `docs/` (conferido por script: nenhum
-ausente) e aponta `decisions/`, `history/`, `bench/results/` e `assets/`. Documentos de entrada só em português, escolhidos para issues de tradução: a
-especificação do `QUERY2` (interface padrão desde a Q2a), a especificação do M2, as ADRs 0007 e
-0009, o roadmap de segurança (citado pela issue #16), o harness de benchmark e o
-`ai-workflow.md`. Comandos para o mantenedor (rótulos como em `docs/labels.md`: `good first
-issue` junto de `difficulty/good-first-issue`):
+`docs/README.md` lists the 31 documents at the root of `docs/` (checked by script: none
+missing) and points to `decisions/`, `history/`, `bench/results/` and `assets/`. Entry documents only in Portuguese, chosen for translation issues: the
+`QUERY2` specification (default interface since Q2a), the M2 specification, ADRs 0007 and
+0009, the security roadmap (cited by issue #16), the benchmark harness and
+`ai-workflow.md`. Commands for the maintainer (labels as in `docs/labels.md`: `good first
+issue` together with `difficulty/good-first-issue`):
 
 ```sh
 mk() {
@@ -228,93 +228,93 @@ A short first contribution. Sign off your commit (DCO).
 EOF
 ```
 
-## Evidências
+## Evidence
 
-Comandos executados nesta sessão (host macOS, Apple Silicon, Docker 29.8.2):
+Commands executed in this session (macOS host, Apple Silicon, Docker 29.8.2):
 
-- `make vm-test`: código de saída 0 em 6 min 21 s, com a imagem Docker construída do zero.
-  Guest Debian 6.12.111+deb13-amd64 em QEMU 10.0.13 (TCG). Marcadores: `MOOBFS_VM_PASS`,
-  `QUERY2_PASS`, `ISOLATION_PASS`, `BENCH_LAYER_PASS` e `LAYER_LOWER_PASS` para ext4, btrfs e
+- `make vm-test`: exit code 0 in 6 min 21 s, with the Docker image built from scratch.
+  Guest Debian 6.12.111+deb13-amd64 in QEMU 10.0.13 (TCG). Markers: `MOOBFS_VM_PASS`,
+  `QUERY2_PASS`, `ISOLATION_PASS`, `BENCH_LAYER_PASS` and `LAYER_LOWER_PASS` for ext4, btrfs and
   xfs, `DEMO_PASS`, `ACCEPTANCE_CLIENTS_PASS`, `POWER_LOSS_REPLAY_PASS`,
-  `IO_ERROR_INJECTION_PASS`, `MOOBFS_ACCEPTANCE_PASS` e `MOOBFS_LAYER_PASS`. A saída da
-  demonstração está acima.
-- `docker run koalaman/shellcheck:v0.10.0 --shell=sh --severity=warning vm/suite.sh` e, na
-  severidade padrão, `scripts/bench-evidence-release.sh`: código 0.
-- `scripts/bench-evidence-release.sh` (simulação): baixou os sete anexos (20 s), conferiu
-  tamanho e SHA-256 de cada um contra a tabela e listou as escritas que faria (criar o rascunho,
-  sete envios, sete exclusões). `add` com um arquivo fora da tabela: recusado; com um anexo
-  baixado: conferido e envio listado; com uma cópia de um byte a mais: recusada pelo tamanho;
-  argumento desconhecido: recusado.
-- `docs/assets/render-social-preview.sh`: PNG 1280×640 (`magick identify`), conferido
-  visualmente em tamanho real e reduzido.
-- O bloco de comandos `gh issue create` acima, executado com `gh` substituído por uma função
-  que imprime os argumentos: seis chamadas, cinco rótulos cada, títulos e corpos completos.
-- Outros resultados (lint, SPDX, CI) estão nas notas abaixo.
+  `IO_ERROR_INJECTION_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS`. The
+  demonstration output is above.
+- `docker run koalaman/shellcheck:v0.10.0 --shell=sh --severity=warning vm/suite.sh` and, at the
+  default severity, `scripts/bench-evidence-release.sh`: code 0.
+- `scripts/bench-evidence-release.sh` (simulation): downloaded the seven attachments (20 s), checked
+  size and SHA-256 of each against the table and listed the writes it would make (create the draft,
+  seven uploads, seven deletions). `add` with a file not in the table: refused; with a downloaded
+  attachment: checked and upload listed; with a copy one byte larger: refused by size;
+  unknown argument: refused.
+- `docs/assets/render-social-preview.sh`: PNG 1280×640 (`magick identify`), checked
+  visually at full size and scaled down.
+- The block of `gh issue create` commands above, executed with `gh` replaced by a function
+  that prints the arguments: six calls, five labels each, complete titles and bodies.
+- Other results (lint, SPDX, CI) are in the notes below.
 
-## Limitações
+## Limitations
 
-- **O `--apply` não foi executado**, porque escritas no GitHub estão negadas nesta sessão. Só o
-  caminho de simulação e os downloads foram testados; a criação do rascunho, os envios, a
-  verificação pela API e pela URL pública e as exclusões rodam pela primeira vez com o
-  mantenedor. O script supõe que `gh release view <tag>` encontra a release ainda em rascunho; isso
-  não foi exercitado aqui.
-- Até o `--apply`, os links novos em `bench/results/*/README.md`, `bench/results/README.md` e
-  nos READMEs respondem 404. Por isso o `--apply` deve rodar antes do merge deste PR (a partir
-  da branch, porque o script lê `bench/evidence-release.md` localmente).
-- A release `bench-evidence` é recente e aparecerá acima da `v0.1.0-experimental` na lista de
-  releases; marcada como pré-release e `--latest=false`, não vira "Latest". A lista passa de
-  oito entradas para duas.
-- A demonstração usa o cliente de teste `query`, não uma ferramenta para usuários; o README
-  diz isso. Ela não mede tempo nem mostra nada além dos quatro arquivos.
-- A imagem de social preview depende das fontes do sistema que a gera.
+- **`--apply` was not executed**, because writes on GitHub are denied in this session. Only the
+  simulation path and the downloads were tested; creating the draft, the uploads, the
+  verification through the API and the public URL, and the deletions run for the first time with the
+  maintainer. The script assumes that `gh release view <tag>` finds the release while still a draft; this
+  was not exercised here.
+- Until `--apply`, the new links in `bench/results/*/README.md`, `bench/results/README.md` and
+  in the READMEs respond 404. That is why `--apply` must run before the merge of this PR (from
+  the branch, because the script reads `bench/evidence-release.md` locally).
+- The `bench-evidence` release is recent and will appear above `v0.1.0-experimental` in the list of
+  releases; marked as pre-release and `--latest=false`, it does not become "Latest". The list goes from
+  eight entries to two.
+- The demonstration uses the test client `query`, not a tool for users; the README
+  says so. It does not measure time or show anything beyond the four files.
+- The social preview image depends on the system fonts of the machine that generates it.
 
-## Ações do mantenedor
+## Maintainer actions
 
-1. Releases (antes do merge, a partir da branch `community/dx-batch3`):
+1. Releases (before the merge, from the branch `community/dx-batch3`):
 
    ```sh
-   scripts/bench-evidence-release.sh            # simulação: confere downloads e lista escritas
-   scripts/bench-evidence-release.sh --apply    # cria, envia, confere e só então apaga as sete pré-releases
+   scripts/bench-evidence-release.sh            # simulation: checks downloads and lists writes
+   scripts/bench-evidence-release.sh --apply    # creates, uploads, checks and only then deletes the seven pre-releases
    ```
 
-   Opcional: `--target <sha>` fixa o commit da tag `bench-evidence` (padrão: `main`).
+   Optional: `--target <sha>` pins the commit of the `bench-evidence` tag (default: `main`).
 2. Social preview: Settings → General → Social preview → Edit → Upload an image →
    `docs/assets/social-preview.png`.
-3. Issues de tradução: rodar os comandos `gh issue create` da seção anterior.
+3. Translation issues: run the `gh issue create` commands from the previous section.
 
-Nota de 2026-10-11 (revisão da sessão coordenadora): o parágrafo que apresenta a demonstração
-dizia que a Alice recebe em `team/` "só o arquivo que pode ler", sugerindo um filtro por
-chamador. Pela regra de homogeneidade (`docs/spec-query-v2.md` §3), o `salary.md` fica fora da
-partição de `team/` para qualquer chamador; o `QUERY2` não verifica permissão por resultado. Os
-dois READMEs passaram a explicar isso. Saída da demonstração e testes inalterados.
+Note from 2026-10-11 (review by the coordinating session): the paragraph introducing the demonstration
+said that Alice receives in `team/` "só o arquivo que pode ler" ("only the file they can read"), suggesting a per-caller
+filter. By the homogeneity rule (`docs/spec-query-v2.md` §3), `salary.md` stays out of the
+partition of `team/` for any caller; `QUERY2` does not check permission per result. The
+two READMEs now explain this. Demonstration output and tests unchanged.
 
-Nota de 2026-10-12: as três ações do mantenedor foram feitas e conferidas pela sessão
-coordenadora.
+Note from 2026-10-12: the three maintainer actions were done and checked by the coordinating
+session.
 
-- Releases: antes do merge do PR #33, a sessão rodou a simulação de
-  `scripts/bench-evidence-release.sh` num worktree da branch. Os sete arquivos foram baixados e
-  conferidos contra o manifesto, e as escritas listadas. Depois o mantenedor rodou `--apply`.
-  Conferido com `gh release list` e `gh release view bench-evidence`:
-  - restam duas releases, `bench-evidence` (pré-release, publicada) e `v0.1.0-experimental`;
-  - os sete anexos têm nome, tamanho e SHA-256 iguais aos de `bench/evidence-release.md`
-    (comparação por `diff`);
-  - as sete tags `bench-2026-10-11-*` continuam existindo.
+- Releases: before the merge of PR #33, the session ran the simulation of
+  `scripts/bench-evidence-release.sh` in a worktree of the branch. The seven files were downloaded and
+  checked against the manifest, and the writes listed. Then the maintainer ran `--apply`.
+  Checked with `gh release list` and `gh release view bench-evidence`:
+  - two releases remain, `bench-evidence` (pre-release, published) and `v0.1.0-experimental`;
+  - the seven attachments have name, size and SHA-256 equal to those in `bench/evidence-release.md`
+    (comparison by `diff`);
+  - the seven `bench-2026-10-11-*` tags still exist.
 
-  Os sete links `releases/download/bench-evidence/...` do repositório respondem 200, e nenhum
-  link aponta para as releases antigas. A `bench-evidence` aparece acima da
-  `v0.1.0-experimental` por ser mais recente; nenhuma das duas é "Latest".
-- Issues de tradução: criadas como #35 a #40 a partir dos comandos da seção acima, cada uma com
-  `good first issue`, `help wanted`, `area/docs`, `difficulty/good-first-issue` e `priority/p2`.
-- Social preview: imagem enviada pelo mantenedor. A API mostra
-  `usesCustomOpenGraphImage: true`, e a imagem publicada pelo GitHub tem o mesmo SHA-256 de
+  The seven `releases/download/bench-evidence/...` links in the repository respond 200, and no
+  link points to the old releases. `bench-evidence` appears above
+  `v0.1.0-experimental` because it is more recent; neither of the two is "Latest".
+- Translation issues: created as #35 to #40 from the commands in the section above, each with
+  `good first issue`, `help wanted`, `area/docs`, `difficulty/good-first-issue` and `priority/p2`.
+- Social preview: image uploaded by the maintainer. The API shows
+  `usesCustomOpenGraphImage: true`, and the image published by GitHub has the same SHA-256 as
   `docs/assets/social-preview.png`.
 
-Nota de 2026-10-12: o site passa a usar a mesma imagem em `og:image` e `twitter:card`
-(`summary_large_image`) nas quatro páginas; a imagem foi copiada para
-`site/social-preview.png`, porque o Pages publica só `site/`. `python3 scripts/check-site.py`:
-"Site links valid: 4 HTML pages". O plano foi encerrado na seção 4 de `docs/dx-plan.md`.
+Note from 2026-10-12: the site now uses the same image in `og:image` and `twitter:card`
+(`summary_large_image`) on the four pages; the image was copied to
+`site/social-preview.png`, because Pages publishes only `site/`. `python3 scripts/check-site.py`:
+"Site links valid: 4 HTML pages". The plan was closed in section 4 of `docs/dx-plan.md`.
 
-## Próximo passo
+## Next step
 
-Nenhum dentro do lote 3. Pendências restantes do plano (Codespaces, assinatura de releases) e os
-repasses à sessão da Q2 estão na seção 4 de `docs/dx-plan.md`.
+None within batch 3. Remaining items of the plan (Codespaces, release signing) and the
+hand-offs to the Q2 session are in section 4 of `docs/dx-plan.md`.

@@ -1,220 +1,220 @@
-# Especificação: `QUERY` por domínio (UAPI v2)
+# Specification: per-domain `QUERY` (UAPI v2)
 
-Estado: **especificação aceita**, 2026-10-11, decorrente da ADR-0009 (alternativa E, aceita). Os quatro
-pontos marcados **[decisão aceita]** foram aceitos pelo mantenedor no mesmo dia, nas formas recomendadas:
-domínios por `domain_depth`, ACLs estendidas fora da partição nesta versão, v1 restrita a
-`CAP_SYS_ADMIN`, e `EXDEV` para diretórios renomeados entre domínios. Implementação por fases (§8).
+Status: **accepted specification**, 2026-10-11, following from ADR-0009 (alternative E, accepted). The four
+points marked **[accepted decision]** were accepted by the maintainer on the same day, in the recommended forms:
+domains by `domain_depth`, extended ACLs outside the partition in this version, v1 restricted to
+`CAP_SYS_ADMIN`, and `EXDEV` for directories renamed across domains. Implementation in phases (§8).
 
-## 1. Objetivo
+## 1. Goal
 
-Responder consultas por atributo dentro de um domínio de permissão sem percorrer entradas de
-outros domínios, sem verificar o caminho de cada resultado e sem motor de banco de dados. Fecha o
-canal de tempo do registro 0030, remove o custo por resultado do registro 0028 e limita o custo
-por candidato ao tamanho do domínio (registro 0029).
+Answer attribute queries within a permission domain without traversing entries of other
+domains, without checking the path of each result and without a database engine. Closes the
+timing channel of journal 0030, removes the per-result cost of journal 0028 and bounds the cost
+per candidate by the size of the domain (journal 0029).
 
-## 2. Domínios
+## 2. Domains
 
-- **Definição.** Um domínio é um diretório numa profundidade fixa abaixo da raiz da montagem,
-  dada pela opção de montagem `domain_depth=N` (padrão 1: cada diretório de primeiro nível é um
-  domínio; 0 desliga os domínios e mantém só o comportamento da v1). **[decisão aceita]** Alternativa
-  considerada: marcar domínios com um atributo reservado; descartada porque qualquer dono de
-  diretório poderia criar ou desfazer domínios sem o administrador.
-- **Partição.** O índice em RAM passa a ter uma partição por domínio (árvore de nomes de atributo
-  e, por nome, árvore de entradas ordenadas por tipo, valor e inode), mais uma partição para o que
-  estiver fora de qualquer domínio (acima da profundidade N). O mapa de inode para registro
-  continua global e guarda o domínio de cada inode.
-- **Orçamento.** O `index_budget` continua sendo da montagem inteira; o `GET_INFO` passa a
-  informar o número de domínios.
+- **Definition.** A domain is a directory at a fixed depth below the root of the mount,
+  given by the mount option `domain_depth=N` (default 1: each first-level directory is a
+  domain; 0 turns domains off and keeps only the v1 behavior). **[accepted decision]** Alternative
+  considered: marking domains with a reserved attribute; discarded because any directory owner
+  could create or undo domains without the administrator.
+- **Partition.** The in-RAM index now has one partition per domain (tree of attribute names
+  and, per name, tree of entries ordered by type, value and inode), plus one partition for what
+  lies outside any domain (above depth N). The inode-to-record map
+  stays global and stores the domain of each inode.
+- **Budget.** The `index_budget` still applies to the whole mount; `GET_INFO` now
+  reports the number of domains.
 
-## 3. Regra de homogeneidade
+## 3. Homogeneity rule
 
-Um arquivo só entra na partição do seu domínio se todo processo capaz de atravessar o diretório
-do domínio também puder lê-lo. Como o kernel não enumera processos, a regra é verificada por
-condições suficientes, avaliadas sobre o inode do arquivo `f` e o do diretório do domínio `D`:
+A file only enters the partition of its domain if every process able to traverse the domain
+directory can also read it. Since the kernel does not enumerate processes, the rule is checked by
+sufficient conditions, evaluated over the inode of the file `f` and that of the domain directory `D`:
 
-1. `f` concede leitura a "outros" (`o+r`) e não tem ACL de acesso; **ou**
-2. `f` e `D` têm o mesmo dono e o mesmo grupo, nenhum dos dois tem ACL de acesso além da mínima,
-   e, para cada classe (dono, grupo, outros), se `D` concede execução àquela classe, `f` concede
-   leitura a ela.
+1. `f` grants read to "others" (`o+r`) and has no access ACL; **or**
+2. `f` and `D` have the same owner and the same group, neither has an access ACL beyond the minimal one,
+   and, for each class (owner, group, others), if `D` grants execute to that class, `f` grants
+   read to it.
 
-Arquivos com ACL de acesso estendida ficam fora da partição nesta versão, salvo pela condição 1.
-**[decisão aceita]** Tratar ACLs exigiria comparar entradas nomeadas; fica para uma revisão com teste
-próprio.
+Files with an extended access ACL stay outside the partition in this version, except through condition 1.
+**[accepted decision]** Handling ACLs would require comparing named entries; it is left for a revision with its own
+test.
 
-Um arquivo que não satisfaz a regra é **heterogêneo**: não aparece em consultas v2, é contado em
-`GET_INFO` (`heterogeneous`) e listado pelo `moobfs-check`. A regra é reavaliada na mesma chamada
-que muda o que ela usa: `setattr` (modo, dono, grupo), `set_acl` e criação, sob o lock de escrita
-do índice. Mudança de modo, dono, grupo ou ACL do próprio `D` marca a partição como "a
-reavaliar"; a consulta seguinte a essa partição reavalia todas as entradas antes de responder
-(custo linear no tamanho do domínio, pago uma vez por mudança).
+A file that does not satisfy the rule is **heterogeneous**: it does not appear in v2 queries, is counted in
+`GET_INFO` (`heterogeneous`) and listed by `moobfs-check`. The rule is re-evaluated in the same call
+that changes what it uses: `setattr` (mode, owner, group), `set_acl` and creation, under the write lock
+of the index. A change of mode, owner, group or ACL of `D` itself marks the partition as "to
+re-evaluate"; the next query to that partition re-evaluates all entries before answering
+(cost linear in the size of the domain, paid once per change).
 
-**Implementação Q2a (2026-10-11, registro 0035), diferenças em relação ao texto acima.** A
-proposta continua registrada como acima; o comportamento implementado é este:
+**Q2a implementation (2026-10-11, journal 0035), differences from the text above.** The
+proposal remains recorded as above; the implemented behavior is this:
 
-- Mudança de modo, dono, grupo ou ACL de um **diretório** na profundidade do domínio ou abaixo
-  dela (o próprio `D` ou um intermediário) não reavalia a partição: o domínio passa a responder
-  com verificação de permissão por resultado (como a v1) até a próxima montagem, e `GET_INFO`
-  conta esses domínios em `fallback_domains`. Motivo: reavaliar exigiria percorrer a subárvore
-  sob o lock de escrita do índice; o modo de contingência é correto, mais simples e raro em uso
-  normal (diretórios de agentes não mudam de permissão a cada escrita).
-- Diretórios intermediários entre `D` e o arquivo entram na regra pelo bit de execução: cada um
-  deve deixar atravessar todo processo que atravessa `D` (condição 1 com `o+x`, ou condição 2
-  com execução no lugar de leitura).
-- Arquivo regular com mais de um nome (`nlink > 1`) é heterogêneo, porque outro nome pode estar
-  em outro domínio. Ao voltar a um nome, ele pode continuar heterogêneo até a próxima mudança de
-  modo, dono, grupo, ACL ou renomeação, ou até a próxima montagem (falha segura: fica de fora,
-  nunca aparece a mais).
-- Com `domain_depth=0` a v1 mantém a semântica anterior e continua aberta a todos; a restrição
-  a `CAP_SYS_ADMIN` (§4.5) vale quando os domínios estão ligados.
-- `MOOB_IOC_QUERY2` com o índice desligado (`noindex`) devolve `ENOSYS`, como a v1. (Revisão de 2026-10-12, registro 0050: as duas versões passaram a devolver `EOPNOTSUPP`.) Campos de
-  `order_by`, `order`, `cursor`, `flags`, preenchimento, reservados e a marca `MISSING_OK` devem
-  ser zero nesta fase (`EINVAL`); entram nas fases Q2b e Q2d.
+- A change of mode, owner, group or ACL of a **directory** at the domain depth or below
+  it (`D` itself or an intermediate one) does not re-evaluate the partition: the domain starts answering
+  with per-result permission checking (like v1) until the next mount, and `GET_INFO`
+  counts these domains in `fallback_domains`. Reason: re-evaluating would require traversing the subtree
+  under the index write lock; the fallback mode is correct, simpler and rare in normal
+  use (agent directories do not change permission on every write).
+- Intermediate directories between `D` and the file enter the rule through the execute bit: each one
+  must let through every process that traverses `D` (condition 1 with `o+x`, or condition 2
+  with execute in place of read).
+- A regular file with more than one name (`nlink > 1`) is heterogeneous, because another name may be
+  in another domain. When it goes back to one name, it may stay heterogeneous until the next change of
+  mode, owner, group, ACL or rename, or until the next mount (fail-safe: it stays out,
+  never appears in excess).
+- With `domain_depth=0`, v1 keeps the previous semantics and remains open to everyone; the restriction
+  to `CAP_SYS_ADMIN` (§4.5) applies when domains are on.
+- `MOOB_IOC_QUERY2` with the index off (`noindex`) returns `ENOSYS`, like v1. (Revision of 2026-10-12, journal 0050: both versions now return `EOPNOTSUPP`.) The fields
+  `order_by`, `order`, `cursor`, `flags`, padding, reserved fields and the `MISSING_OK` flag must
+  be zero in this phase (`EINVAL`); they come in phases Q2b and Q2d.
 
 ## 4. Interface (UAPI v2)
 
 ### 4.1 `MOOB_IOC_QUERY2`
 
-Emitido sobre um descritor aberto do **diretório do domínio** (não da raiz). Outro descritor
-devolve `ENOTTY`; domínios desligados (`domain_depth=0`), `EOPNOTSUPP`.
+Issued on an open descriptor of the **domain directory** (not the root). Any other descriptor
+returns `ENOTTY`; domains off (`domain_depth=0`), `EOPNOTSUPP`.
 
-Campos novos em relação à v1:
+New fields relative to v1:
 
 - `version = 2`.
-- Até 4 termos com os operadores da v1, mais a marca por termo `MOOB_TERM_MISSING_OK`: o termo
-  também casa entradas que não têm o atributo (validade e expiração do tipo "ausente ou maior
-  que"). Ao menos um termo deve ser sem essa marca, salvo quando há `order_by`.
-- `order_by` opcional: nome de um atributo do tipo `int64`, `time`, `double` ou `string`, e
-  `order` (`ASC` ou `DESC`). Sem `order_by`, a ordem é a da varredura (não especificada).
-- `limit` de 1 a 4096 e `cursor` opaco de 128 bytes: a resposta devolve no `cursor` a posição
-  seguinte quando `truncated = 1`; reenviar a mesma consulta com esse `cursor` continua dali. Um
-  cursor de outra consulta, de outra montagem ou após reavaliação da partição devolve `ESTALE`.
-- Resultados: `ino`, `flags` e caminho **relativo ao diretório do domínio**.
+- Up to 4 terms with the v1 operators, plus the per-term flag `MOOB_TERM_MISSING_OK`: the term
+  also matches entries that do not have the attribute (validity and expiry of the "missing or greater
+  than" kind). At least one term must be without that flag, except when there is `order_by`.
+- Optional `order_by`: name of an attribute of type `int64`, `time`, `double` or `string`, and
+  `order` (`ASC` or `DESC`). Without `order_by`, the order is that of the scan (unspecified).
+- `limit` from 1 to 4096 and an opaque 128-byte `cursor`: the response returns in `cursor` the next
+  position when `truncated = 1`; resending the same query with that `cursor` continues from there. A
+  cursor from another query, from another mount or after re-evaluation of the partition returns `ESTALE`.
+- Results: `ino`, `flags` and path **relative to the domain directory**.
 
-**Implementação Q2b (2026-10-11, registro 0036), complementos ao texto acima.**
+**Q2b implementation (2026-10-11, journal 0036), additions to the text above.**
 
-- O tipo de ordenação é explícito: campo `order_type` (`string`, `int64`, `double` ou `time`),
-  tirado do preenchimento da estrutura, sem mudar o tamanho. Um atributo pode ter entradas de
-  tipos diferentes; só as do tipo pedido entram na ordem. Isso torna "tipo errado" um erro de
-  entrada verificável (`EINVAL`), enquanto `order_by` com um nome válido que nenhum arquivo do
-  domínio tem devolve resposta vazia, e não erro: a ausência de um atributo não é um pedido
-  malformado.
-- Empates no valor são desfeitos pelo número do inode, no mesmo sentido da ordem.
-- O cursor é a chave (tipo, valor, inode) do último resultado entregue, mais um resumo da
-  consulta (domínio, estado de fallback, ordenação e termos; o `limit` pode mudar entre
-  páginas) e um código de autenticação, ambos com uma chave aleatória da montagem. Corrompido,
-  de outra consulta, de outra montagem ou emitido antes de o domínio entrar em fallback:
-  `ESTALE`. Valores de até 96 bytes vão no cursor; os maiores são recuperados da entrada atual
-  do inode, que precisa ainda ter o mesmo tipo, tamanho e prefixo, senão `ESTALE`.
-- A paginação é por chave, como em bancos de dados: entradas criadas, removidas ou com valor
-  alterado entre páginas podem aparecer duas vezes ou não aparecer; as que não mudaram aparecem
-  exatamente uma vez.
-- Sem `order_by`, o cursor também funciona, sobre a ordem de varredura do primeiro termo.
+- The ordering type is explicit: field `order_type` (`string`, `int64`, `double` or `time`),
+  taken from the structure's padding, without changing its size. An attribute may have entries of
+  different types; only those of the requested type enter the ordering. This makes "wrong type" a
+  verifiable input error (`EINVAL`), while `order_by` with a valid name that no file in the
+  domain has returns an empty response, not an error: the absence of an attribute is not a
+  malformed request.
+- Ties in value are broken by inode number, in the same direction as the order.
+- The cursor is the key (type, value, inode) of the last delivered result, plus a digest of the
+  query (domain, fallback state, ordering and terms; the `limit` may change between
+  pages) and an authentication code, both with a random per-mount key. Corrupted,
+  from another query, from another mount or issued before the domain went into fallback:
+  `ESTALE`. Values of up to 96 bytes go in the cursor; larger ones are recovered from the current
+  entry of the inode, which must still have the same type, size and prefix, otherwise `ESTALE`.
+- Pagination is keyset-based, as in databases: entries created, removed or with a changed value
+  between pages may appear twice or not appear; those that did not change appear
+  exactly once.
+- Without `order_by`, the cursor also works, over the scan order of the first term.
 
-### 4.2 Autorização
+### 4.2 Authorization
 
-Ao receber a chamada, o kernel verifica `MAY_EXEC | MAY_READ` no diretório do domínio com as
-credenciais do chamador (os ancestrais foram verificados quando o descritor foi aberto). Se
-passar, os resultados vêm da partição sem verificação por resultado: a regra de homogeneidade
-garante que quem atravessa o domínio pode ler cada arquivo indexado nele. Contrato de tempo
-(TOCTOU): igual ao da v1; uma mudança concorrente de permissão vale a partir da chamada seguinte.
+On receiving the call, the kernel checks `MAY_EXEC | MAY_READ` on the domain directory with the
+caller's credentials (the ancestors were checked when the descriptor was opened). If
+it passes, the results come from the partition without per-result checking: the homogeneity rule
+guarantees that whoever traverses the domain can read each file indexed in it. Timing contract
+(TOCTOU): the same as v1; a concurrent permission change takes effect from the next call.
 
 ### 4.3 `MOOB_IOC_QUERY2_BATCH`
 
-Até 8 consultas v2 sobre o mesmo domínio numa chamada, com resultados concatenados e uma contagem
-por consulta. União e remoção de duplicatas ficam com o cliente. Cobre o "ou" entre valores
-(tags, tipos) com uma chamada.
+Up to 8 v2 queries over the same domain in one call, with concatenated results and one count
+per query. Union and duplicate removal are left to the client. Covers "or" across values
+(tags, types) with one call.
 
-**Implementação Q2d (2026-10-11, registro 0038), diferenças e complementos.**
+**Q2d implementation (2026-10-11, journal 0038), differences and additions.**
 
-- O lote leva um vetor de pedidos `moob_query2` completos, cada um com seu vetor de
-  resultados, `limit`, `count`, `truncated` e `cursor`, em vez de um vetor único de resultados
-  concatenados. O cliente que quiser os resultados contíguos aponta os pedidos para fatias de
-  um mesmo vetor. Motivo: cada pedido continua paginável pelo próprio cursor, sem uma regra de
-  divisão do limite entre pedidos.
-- Todos os pedidos são validados antes de qualquer execução; um pedido inválido recusa o lote
-  inteiro com `EINVAL` e nada é escrito de volta. Os pedidos rodam em ordem, cada um sob a sua
-  própria aquisição do lock do índice: o lote não é uma fotografia única.
-- `MOOB_TERM_MISSING_OK` fica no byte de marcas do termo (antes `reserved[0]`, renomeado
-  `flags`). A v1 recusa qualquer marca (`EINVAL`). `EXISTS` com a marca é recusado ("existe ou
-  ausente" casaria tudo). Um atributo presente com outro tipo, inválido ou bruto (`raw`) conta
-  como presente ou ausente conforme o índice: tipo diferente é presente e não casa; inválido e
-  bruto não são indexados e contam como ausentes.
-- Na varredura simples, o kernel conduz pelo primeiro termo sem a marca (numa cópia dos termos;
-  o resumo do cursor usa a ordem do pedido). A interseção usa só termos `EQ` sem a marca.
+- The batch carries a vector of complete `moob_query2` requests, each with its own results
+  vector, `limit`, `count`, `truncated` and `cursor`, instead of a single vector of concatenated
+  results. A client that wants contiguous results points the requests at slices of
+  one same vector. Reason: each request stays pageable by its own cursor, without a rule for
+  splitting the limit among requests.
+- All requests are validated before any execution; an invalid request refuses the whole
+  batch with `EINVAL` and nothing is written back. The requests run in order, each under its
+  own acquisition of the index lock: the batch is not a single snapshot.
+- `MOOB_TERM_MISSING_OK` lives in the term's flags byte (formerly `reserved[0]`, renamed
+  `flags`). v1 refuses any flag (`EINVAL`). `EXISTS` with the flag is refused ("exists or
+  missing" would match everything). An attribute present with another type, invalid or raw (`raw`) counts
+  as present or missing according to the index: a different type is present and does not match; invalid and
+  raw are not indexed and count as missing.
+- In the simple scan, the kernel drives by the first term without the flag (on a copy of the terms;
+  the cursor digest uses the request order). The intersection uses only `EQ` terms without the flag.
 
-### 4.4 Plano de execução no kernel, sem planejador
+### 4.4 Execution plan in the kernel, without a planner
 
-- Com `order_by`: percorre a árvore do atributo de ordenação na partição, na ordem pedida, e
-  testa os termos em cada entrada até completar o `limit`.
-- Sem `order_by` e com dois ou mais termos de igualdade sem `MISSING_OK`: interseção por avanço
-  alternado (leapfrog) sobre as sequências desses termos, que já estão ordenadas por inode dentro
-  de cada valor; os demais termos são testados em cada inode da interseção.
-- Nos outros casos: varredura do primeiro termo sem `MISSING_OK`, como na v1 corrigida.
+- With `order_by`: walks the tree of the ordering attribute in the partition, in the requested order, and
+  tests the terms on each entry until the `limit` is filled.
+- Without `order_by` and with two or more equality terms without `MISSING_OK`: intersection by
+  leapfrog over the runs of those terms, which are already ordered by inode within
+  each value; the remaining terms are tested on each inode of the intersection.
+- In the other cases: scan of the first term without `MISSING_OK`, as in the corrected v1.
 
-**Implementação Q2c (2026-10-11, registro 0037).** A interseção vale para o `QUERY2` sem
-`order_by` com dois ou mais termos `EQ`; a v1 continua com a varredura do primeiro termo, para
-servir de base de comparação. O primeiro termo `EQ`, na ordem do pedido, conduz: os resultados
-saem em ordem de inode e o cursor guarda o valor desse termo com o último inode. Cada passo é
-uma busca logarítmica na árvore de cada termo, até todos chegarem ao mesmo inode; os demais
-termos (inclusive os `EQ`, por simplicidade) são testados só nos inodes da interseção.
+**Q2c implementation (2026-10-11, journal 0037).** The intersection applies to `QUERY2` without
+`order_by` with two or more `EQ` terms; v1 keeps the scan of the first term, to
+serve as a comparison baseline. The first `EQ` term, in request order, drives: the results
+come out in inode order and the cursor stores the value of that term with the last inode. Each step is
+a logarithmic search in the tree of each term, until all reach the same inode; the remaining
+terms (including the `EQ` ones, for simplicity) are tested only on the inodes of the intersection.
 
-**Revisão do plano de igualdade (2026-10-12, registro 0044).** Medido no host do registro 0042,
-o avanço alternado só ganhou quando a sequência do primeiro termo era longa e foi 2,7 a 3,6 vezes
-mais lento que a varredura simples quando ela era curta. O plano passou a ser: medir as
-sequências dos termos `EQ` em paralelo até a primeira terminar e varrer só essa, testando todos
-os termos. A retomada desse plano usa só o inode. A proposta original de §4.4 fica registrada
-acima.
+**Revision of the equality plan (2026-10-12, journal 0044).** Measured on the host of journal 0042,
+the leapfrog only won when the run of the first term was long and was 2.7 to 3.6 times
+slower than the simple scan when it was short. The plan became: measure the
+runs of the `EQ` terms in parallel until the first one ends and scan only that one, testing all
+the terms. Resuming this plan uses only the inode. The original proposal of §4.4 remains recorded
+above.
 
-### 4.5 A v1
+### 4.5 v1
 
-**[decisão aceita]** Proposta: `MOOB_IOC_QUERY` (v1) sobre a raiz continua existindo, com a semântica
-atual, mas só para quem tem `CAP_SYS_ADMIN` no namespace de usuário inicial (ferramentas de
-administração e comparação com o oráculo). Para os demais devolve `EPERM`, porque percorre todos
-os domínios e mantém o canal de tempo. Alternativa: manter a v1 aberta e documentar o canal.
+**[accepted decision]** Proposal: `MOOB_IOC_QUERY` (v1) on the root continues to exist, with the current
+semantics, but only for those with `CAP_SYS_ADMIN` in the initial user namespace (administration
+tools and comparison with the oracle). For everyone else it returns `EPERM`, because it traverses all
+domains and keeps the timing channel. Alternative: keep v1 open and document the channel.
 
-## 5. Renomeação entre domínios
+## 5. Rename across domains
 
-Arquivo renomeado para outro domínio: suas entradas mudam de partição na mesma chamada, e a regra
-de homogeneidade é reavaliada no destino. **Diretório** renomeado para outro domínio: devolve
-`EXDEV`, como entre filesystems; `mv` passa a copiar e apagar. **[decisão aceita]** Evita mover
-subárvores inteiras de partição dentro de um `rename`.
+A file renamed into another domain: its entries change partition in the same call, and the homogeneity
+rule is re-evaluated at the destination. A **directory** renamed into another domain: returns
+`EXDEV`, as across filesystems; `mv` then copies and deletes. **[accepted decision]** Avoids moving
+whole subtrees between partitions inside a `rename`.
 
-## 6. Ferramentas
+## 6. Tools
 
-- `moobfs-index --domain DIR`: oráculo que avalia a mesma regra de homogeneidade e responde só
-  sobre o domínio, para comparação.
-- `moobfs-check`: lista arquivos heterogêneos por domínio.
-- `bench`: forma W3 por domínio e o experimento do canal de tempo do registro 0030 como teste.
+- `moobfs-index --domain DIR`: oracle that evaluates the same homogeneity rule and answers only
+  about the domain, for comparison.
+- `moobfs-check`: lists heterogeneous files per domain.
+- `bench`: W3 shape per domain and the timing-channel experiment of journal 0030 as a test.
 
-## 7. Testes exigidos
+## 7. Required tests
 
-1. Entradas inválidas: versão, termos, marca `MISSING_OK` sozinha sem `order_by`, `order_by` em
-   atributo inexistente ou de tipo errado, `cursor` corrompido, de outra consulta e após
-   reavaliação (`ESTALE`), descritor que não é domínio (`ENOTTY`), `domain_depth=0`
-   (`EOPNOTSUPP`), lote com mais de 8 consultas.
-2. Equivalência com o oráculo por domínio, em todas as formas do W3, nos três inferiores.
-3. Homogeneidade: `chmod` que torna um arquivo mais restrito o tira dos resultados na chamada
-   seguinte; reverter o devolve; ACL estendida o exclui salvo se legível por todos; mudança no
-   modo do diretório do domínio dispara reavaliação.
-4. Canal de tempo: latência de uma consulta num domínio com 10 arquivos não varia (dentro do ruído)
-   quando outro domínio vai de 0 a 20 000 arquivos que casam com o predicado.
-5. Isolamento: usuário sem acesso ao diretório do domínio não consegue abri-lo nem consultar.
-6. Renomeação: arquivo entre domínios muda de partição; diretório entre domínios devolve `EXDEV`.
-7. Ordenação e cursor: "N mais recentes" igual ao oráculo ordenado; paginação completa por cursor
-   devolve o mesmo conjunto que a consulta sem limite.
-8. Concorrência: o teste de corrida do registro 0020 aplicado à v2, incluindo `chmod` no diretório
-   do domínio durante consultas.
-9. KASAN e lockdep sem diagnóstico; v1 restrita conforme 4.5.
+1. Invalid inputs: version, terms, `MISSING_OK` flag alone without `order_by`, `order_by` on a
+   nonexistent attribute or of the wrong type, `cursor` corrupted, from another query and after
+   re-evaluation (`ESTALE`), descriptor that is not a domain (`ENOTTY`), `domain_depth=0`
+   (`EOPNOTSUPP`), batch with more than 8 queries.
+2. Equivalence with the per-domain oracle, in all W3 shapes, on the three lower filesystems.
+3. Homogeneity: a `chmod` that makes a file more restricted removes it from the results on the next
+   call; reverting brings it back; an extended ACL excludes it unless readable by everyone; a change in the
+   mode of the domain directory triggers re-evaluation.
+4. Timing channel: the latency of a query in a domain with 10 files does not vary (within noise)
+   when another domain goes from 0 to 20 000 files that match the predicate.
+5. Isolation: a user without access to the domain directory cannot open it or query.
+6. Rename: a file across domains changes partition; a directory across domains returns `EXDEV`.
+7. Ordering and cursor: "N most recent" equal to the ordered oracle; full pagination by cursor
+   returns the same set as the query without a limit.
+8. Concurrency: the race test of journal 0020 applied to v2, including `chmod` on the domain
+   directory during queries.
+9. KASAN and lockdep without diagnostics; v1 restricted as in 4.5.
 
-## 8. Fases
+## 8. Phases
 
-| Fase | Conteúdo | Critério de pronto |
+| Phase | Content | Done-when criterion |
 | --- | --- | --- |
-| Q2a | Partições por domínio, regra de homogeneidade, `MOOB_IOC_QUERY2` sem `order_by`, restrição da v1 | Testes 1, 2, 3, 4, 5, 9 |
-| Q2b | `order_by`, `cursor` | Teste 7 |
-| Q2c | Interseção por leapfrog | Equivalência e medição contra Q2a na forma `namespace AND agent` |
-| Q2d | Lote e `MISSING_OK` | Testes 1 e 2 para os novos campos |
-| Q2e | Renomeação entre domínios | Teste 6 e 8 |
+| Q2a | Per-domain partitions, homogeneity rule, `MOOB_IOC_QUERY2` without `order_by`, v1 restriction | Tests 1, 2, 3, 4, 5, 9 |
+| Q2b | `order_by`, `cursor` | Test 7 |
+| Q2c | Leapfrog intersection | Equivalence and measurement against Q2a in the `namespace AND agent` shape |
+| Q2d | Batch and `MISSING_OK` | Tests 1 and 2 for the new fields |
+| Q2e | Rename across domains | Test 6 and 8 |
 
-Cada fase entra por pull request próprio, com registro em `docs/history/`, a suíte da VM e o
-KASAN, e medição no host da Azure comparada ao registro 0029.
+Each phase comes in through its own pull request, with a journal in `docs/history/`, the VM suite and
+KASAN, and a measurement on the Azure host compared with journal 0029.

@@ -1,25 +1,25 @@
-# Continuidade do projeto
+# Project continuity
 
-Leia `README.md`, `docs/history/README.md`, o registro de sessão mais recente e as ADRs relevantes antes de alterar o projeto.
+Read `README.md`, `docs/history/README.md`, the most recent session journal and the relevant ADRs before changing the project.
 
-## Histórico obrigatório
+## Mandatory history
 
-- Registre pedidos e resultados em `docs/history/`, como sínteses técnicas factuais: objetivo, decisões, alternativas, justificativas resumidas, mudanças, evidências, limitações e próximos passos.
-- Registre decisões, inclusive as que nascem de perguntas do usuário, mas não as perguntas em si nem as respostas de esclarecimento. Erros encontrados com sua correção, hipóteses descartadas e experimentos que falharam continuam sendo registrados. Uma investigação em andamento tem registro próprio, marcado como em andamento e atualizado a cada rodada.
-- Documente decisões arquiteturais em `docs/decisions/` com IDs sequenciais. Preserve decisões antigas; uma mudança deve apontar para a decisão que substitui.
-- Preserve especificações anteriores. Identifique claramente proposta, implementação e comportamento efetivamente testado.
-- Atualize `CHANGELOG.md` para alterações relevantes. Guarde comandos reproduzíveis e resumos de resultados; nunca apresente teste não executado como aprovado.
-- Faça commits locais pequenos e legíveis quando houver uma unidade concluída. Não reescreva história compartilhada, não faça force-push e não apague registros para esconder tentativas ou limitações. Exceção única e registrada: em 2026-10-10 a história foi reescrita, com autorização explícita do usuário, para remover perguntas registradas por engano e dados pessoais (registro 0018).
-- Não armazene credenciais, tokens, dumps de ambiente ou dados pessoais desnecessários. Históricos registram justificativas técnicas resumidas, não raciocínio interno privado do assistente.
-- Antes de terminar uma tarefa, deixe claro o estado atual, os testes, as limitações e o próximo passo. Corrija registros factualmente errados com uma nota datada.
+- Record requests and results in `docs/history/`, as factual technical summaries: goal, decisions, alternatives, brief justifications, changes, evidence, limitations and next steps.
+- Record decisions, including those that arise from user questions, but not the questions themselves nor the clarifying answers. Errors found together with their fix, discarded hypotheses and failed experiments continue to be recorded. An investigation in progress has its own journal, marked as in progress and updated at each round.
+- Document architectural decisions in `docs/decisions/` with sequential IDs. Preserve old decisions; a change must point to the decision it replaces.
+- Preserve previous specifications. Clearly identify proposal, implementation and actually tested behavior.
+- Update `CHANGELOG.md` for relevant changes. Keep reproducible commands and summaries of results; never present an unexecuted test as passed.
+- Make small, readable local commits when a unit is complete. Do not rewrite shared history, do not force-push and do not delete records to hide attempts or limitations. Single, recorded exception: on 2026-10-10 the history was rewritten, with the user's explicit authorization, to remove questions recorded by mistake and personal data (journal 0018).
+- Do not store credentials, tokens, environment dumps or unnecessary personal data. Histories record brief technical justifications, not the assistant's private internal reasoning.
+- Before finishing a task, make clear the current state, the tests, the limitations and the next step. Correct factually wrong records with a dated note.
 
-## Documentação técnica
+## Technical documentation
 
-Use `npx ctx7@latest library <nome> "<consulta>"` e depois `npx ctx7@latest docs <id> "<consulta>"` para bibliotecas, APIs, frameworks e CLIs. Máximo de três comandos por pergunta. Consulte o código/headers do kernel exato usado no build. Não exponha segredos em consultas. Em erro de quota, informe e sugira `npx ctx7@latest login` ou `CONTEXT7_API_KEY`.
+Use `npx ctx7@latest library <name> "<query>"` and then `npx ctx7@latest docs <id> "<query>"` for libraries, APIs, frameworks and CLIs. Maximum of three commands per question. Consult the code/headers of the exact kernel used in the build. Do not expose secrets in queries. On a quota error, report it and suggest `npx ctx7@latest login` or `CONTEXT7_API_KEY`.
 
-## Escopo e validação
+## Scope and validation
 
-- O projeto é um filesystem nativo montável no Linux. Não substituir por FUSE ou uma API em espaço de usuário.
-- Teste módulos em VM dedicada. As ferramentas de criação devem evitar sobrescrever arquivos/dispositivos existentes por padrão.
-- Mudanças no formato exigem especificação, testes de entradas inválidas e decisão explícita de compatibilidade.
-- GitHub é uma réplica remota do histórico Git; sua criação e publicação devem seguir as instruções do usuário na sessão.
+- The project is a native filesystem mountable on Linux. Do not replace it with FUSE or a user-space API.
+- Test modules in a dedicated VM. Creation tools must avoid overwriting existing files/devices by default.
+- Format changes require a specification, tests of invalid inputs and an explicit compatibility decision.
+- GitHub is a remote replica of the Git history; its creation and publication must follow the user's instructions in the session.

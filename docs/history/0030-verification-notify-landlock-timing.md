@@ -1,91 +1,92 @@
-# 0030 — Verificações: fluxo de mudanças, Landlock e canal de tempo do `QUERY`
+# 0030 — Verifications: change stream, Landlock and `QUERY` timing channel
 
-Data: 2026-10-11. Estado: concluído (experimentos no host da Azure).
+Date: 2026-10-11. Status: completed (experiments on the Azure host).
 
-## Objetivo
+## Goal
 
-Verificar na prática três pontos que a pesquisa (`docs/research-metadata-search.md`) deixou
-como não verificados ou inferidos, todos relevantes para a ADR-0009: se um índice externo pode
-ser alimentado por notificações do kernel para mudanças feitas pela camada; se processos
-confinados pelo Landlock veem resultados que não podem abrir; e se o tempo de resposta do
-`QUERY` revela entradas que o chamador não pode ver.
+Verify in practice three points that the research (`docs/research-metadata-search.md`) left as
+not verified or inferred, all relevant to ADR-0009: whether an external index can be fed by
+kernel notifications for changes made through the layer; whether processes confined by Landlock
+see results they cannot open; and whether the response time of `QUERY` reveals entries the
+caller cannot see.
 
-## Ferramentas
+## Tools
 
-`tests/notify.c` (observador `fanotify` com marca de filesystem e `FAN_REPORT_DFID_NAME`, e
-`inotify` por diretório) e `tests/landlock_run.c` (executa um comando com Landlock: listagem
-permitida sob uma raiz, leitura de arquivos só sob uma pasta e a pasta do executável). Host da
-Azure, kernel `6.12.112-moobfs-bench`, LSMs ativos
-`lockdown,capability,landlock,yama,apparmor,ima,evm`, camada sobre ext4. Binários estáticos
-em `/opt/moob-test` para poderem rodar como uid 1001.
+`tests/notify.c` (`fanotify` watcher with a filesystem mark and `FAN_REPORT_DFID_NAME`, and
+per-directory `inotify`) and `tests/landlock_run.c` (runs a command under Landlock: listing
+allowed under a root, reading files only under one folder and the executable's folder). Azure
+host, kernel `6.12.112-moobfs-bench`, active LSMs
+`lockdown,capability,landlock,yama,apparmor,ima,evm`, layer over ext4. Static binaries in
+`/opt/moob-test` so they can run as uid 1001.
 
-## 1. Fluxo de mudanças
+## 1. Change stream
 
-Operações pela camada: criar `f1`, gravar dois atributos, renomear para `f2`, criar pasta
-`d1`, remover `f2`.
+Operations through the layer: create `f1`, write two attributes, rename to `f2`, create folder
+`d1`, remove `f2`.
 
-| Observador | Resultado |
+| Watcher | Result |
 | --- | --- |
-| `fanotify`, marca de filesystem na camada | recusado: `Operation not supported` |
-| `fanotify`, marca de filesystem no ext4 inferior | 7 eventos: CREATE f1, ATTRIB f1 (2), MOVED_FROM f1, MOVED_TO f2, CREATE d1, DELETE f2 |
-| `inotify` na pasta da camada | os mesmos 7 |
-| `inotify` na pasta correspondente do inferior | os mesmos 7 |
+| `fanotify`, filesystem mark on the layer | refused: `Operation not supported` |
+| `fanotify`, filesystem mark on the lower ext4 | 7 events: CREATE f1, ATTRIB f1 (2), MOVED_FROM f1, MOVED_TO f2, CREATE d1, DELETE f2 |
+| `inotify` on the layer folder | the same 7 |
+| `inotify` on the corresponding folder of the lower | the same 7 |
 
-Conclusão: o fluxo de mudanças de que a ADR-0009 precisa já existe sem código novo no kernel,
-observando o filesystem inferior com `fanotify` (uma marca, exige `CAP_SYS_ADMIN`) ou cada pasta
-da camada com `inotify`. A camada recusa o `fanotify` com identificadores de arquivo porque não
-implementa as operações de exportação (`encode_fh`); o overlayfs implementou essas operações para
-permitir isso, e seria uma mudança contida se for necessária.
+Conclusion: the change stream ADR-0009 needs already exists without new kernel code, by watching
+the lower filesystem with `fanotify` (one mark, requires `CAP_SYS_ADMIN`) or each layer folder
+with `inotify`. The layer refuses `fanotify` with file identifiers because it does not implement
+the export operations (`encode_fh`); overlayfs implemented those operations to allow this, and it
+would be a contained change if needed.
 
 ## 2. Landlock
 
-Seis memórias com `kind = lt`, três em `lt/allowed` e três em `lt/denied`, legíveis por todos.
-Como uid 1001:
+Six memories with `kind = lt`, three in `lt/allowed` and three in `lt/denied`, readable by
+everyone. As uid 1001:
 
-- sem Landlock: `QUERY` devolve as 6, e todas abrem;
-- com Landlock (listagem sob a raiz da montagem, leitura de arquivos só em `lt/allowed`): o
-  `QUERY` devolve as mesmas 6; `open` de `lt/allowed/m1.md` funciona e `open` de
-  `lt/denied/m1.md` falha com `EACCES` (código 3 do cliente);
-- com o mesmo Landlock, `moobfs-attr get` (`getxattr`) do atributo `kind` de um arquivo negado
-  funciona.
+- without Landlock: `QUERY` returns the 6, and all of them open;
+- with Landlock (listing under the mount root, reading files only in `lt/allowed`): `QUERY`
+  returns the same 6; `open` of `lt/allowed/m1.md` works and `open` of `lt/denied/m1.md` fails
+  with `EACCES` (client code 3);
+- with the same Landlock, `moobfs-attr get` (`getxattr`) of the `kind` attribute of a denied file
+  works.
 
-Conclusão: a lacuna existe (resultados que o processo não pode abrir), mas é estreita. O Landlock
-(ABI 6) não controla leitura de atributos estendidos, e usar o `QUERY` exige poder listar a raiz
-da montagem, o que no Landlock vale para toda a árvore abaixo dela. O `QUERY` revela, portanto,
-nomes e valores de atributos que esse processo já obteria listando pastas e lendo atributos; o
-conteúdo continua protegido. AppArmor, que pode negar subpastas por caminho, não foi testado.
+Conclusion: the gap exists (results the process cannot open), but it is narrow. Landlock
+(ABI 6) does not control reading of extended attributes, and using `QUERY` requires being able to
+list the mount root, which in Landlock applies to the whole tree below it. `QUERY` therefore
+reveals names and attribute values that this process would already obtain by listing folders and
+reading attributes; the content stays protected. AppArmor, which can deny subfolders by path, was
+not tested.
 
-## 3. Canal de tempo
+## 3. Timing channel
 
-Uid 1001 tem 10 memórias `kind = tc` numa pasta sua; uid 1002 tem N memórias `kind = tc` numa
-pasta 0700. Uid 1001 executa `kind eq string tc` 400 vezes (`bench-load --uid 1001`).
+Uid 1001 has 10 memories `kind = tc` in a folder of its own; uid 1002 has N memories `kind = tc`
+in a 0700 folder. Uid 1001 runs `kind eq string tc` 400 times (`bench-load --uid 1001`).
 
-| N (privadas do uid 1002) | Resultados vistos pelo uid 1001 | p50 | p10 | p90 |
+| N (private to uid 1002) | Results seen by uid 1001 | p50 | p10 | p90 |
 | --- | --- | --- | --- | --- |
-| 0 | 10 | 18,2 µs | 18,1 | 18,3 |
-| 1 000 | 10 | 1,15 ms | 1,14 | 1,17 |
-| 5 000 | 10 | 5,88 ms | 5,75 | 6,13 |
-| 20 000 | 10 | 28,4 ms | 28,2 | 28,6 |
+| 0 | 10 | 18.2 µs | 18.1 | 18.3 |
+| 1 000 | 10 | 1.15 ms | 1.14 | 1.17 |
+| 5 000 | 10 | 5.88 ms | 5.75 | 6.13 |
+| 20 000 | 10 | 28.4 ms | 28.2 | 28.6 |
 
-Conclusão: o tempo cresce cerca de 1,15 µs por candidato invisível, com dispersão abaixo de 3%.
-Um agente estima quantas memórias de outros donos casam com um predicado e testa a existência de
-um valor em qualquer lugar da montagem. A promessa da fase 3b de não revelar nada "nem em
-contagens" vale para os resultados e contagens devolvidos, não para o tempo. Documentos
-corrigidos: `docs/spec-m3.md` §3.1, `docs/faq.md`, `docs/architecture-overview.md`,
-`docs/testing.md`; nota no S1 de `docs/security-roadmap.md`.
+Conclusion: the time grows about 1.15 µs per invisible candidate, with dispersion below 3%.
+An agent can estimate how many memories of other owners match a predicate and test the existence
+of a value anywhere in the mount. The phase 3b promise of revealing nothing "nem em contagens"
+("not even in counts") holds for the returned results and counts, not for the time. Documents
+corrected: `docs/spec-m3.md` §3.1, `docs/faq.md`, `docs/architecture-overview.md`,
+`docs/testing.md`; note in S1 of `docs/security-roadmap.md`.
 
-## Implicações
+## Implications
 
-- Fluxo de mudanças para um índice externo: disponível hoje (`fanotify` no inferior ou
-  `inotify` na camada); não justifica cursor próprio agora.
-- O canal de tempo só se fecha estruturalmente quando a consulta não percorre entradas de outros
-  domínios de permissão: índice particionado por domínio, no kernel ou fora dele (modelo GUFI da
-  ADR-0009). Atenuações (reaproveitar a autorização por diretório, ADR-0008) reduzem o custo por
-  candidato, mas não o eliminam.
-- Preenchimento de tempo constante foi descartado como mitigação: custaria o pior caso em toda
-  consulta.
+- Change stream for an external index: available today (`fanotify` on the lower or `inotify` on
+  the layer); it does not justify a cursor of our own now.
+- The timing channel only closes structurally when the query does not walk entries of other
+  permission domains: an index partitioned by domain, in the kernel or outside it (the GUFI model
+  of ADR-0009). Mitigations (reusing per-directory authorization, ADR-0008) reduce the
+  per-candidate cost, but do not eliminate it.
+- Constant-time padding was discarded as a mitigation: it would cost the worst case on every
+  query.
 
-## Limitações
+## Limitations
 
-Um host, ext4, uma execução de cada experimento; AppArmor não testado; o Landlock testado na ABI
-6 do kernel 6.12.
+One host, ext4, one run of each experiment; AppArmor not tested; Landlock tested at ABI 6 of
+kernel 6.12.

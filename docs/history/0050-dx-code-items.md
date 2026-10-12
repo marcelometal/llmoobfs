@@ -1,50 +1,50 @@
-# 0050 — Pendências de código recebidas do lote de experiência do desenvolvedor
+# 0050 — Pending code items received from the developer experience batch
 
-Data: 2026-10-12. Estado: implementadas nas branches da série Q2; checkpatch zerado e obrigatório.
+Date: 2026-10-12. Status: implemented on the branches of the Q2 series; checkpatch at zero and mandatory.
 
-## Contexto
+## Context
 
-Ao encerrar o plano de experiência do desenvolvedor (`docs/dx-plan.md`, registros 0039 a 0046),
-a outra sessão passou quatro pendências que mexem em código ou no harness da Q2. Foram encaixadas
-nas branches que já mexem nos mesmos arquivos, para não abrir um pull request concorrente com a
-fila Q2 (cada atualização da main força uma nova execução do KASAN).
+When closing the developer experience plan (`docs/dx-plan.md`, journals 0039 to 0046),
+the other session handed over four pending items that touch code or the Q2 harness. They were fitted
+into the branches that already touch the same files, so as not to open a pull request competing with the
+Q2 queue (each update of main forces a new KASAN run).
 
-## Mudanças
+## Changes
 
-1. **`qsort(NULL, 0, ...)` no oráculo** (`tools/moobfs-index.c`, branch da Q2d): só ordena quando
-   há resultados. Reproduzido antes com `make bench-smoke` sob ASan e UBSan com
+1. **`qsort(NULL, 0, ...)` in the oracle** (`tools/moobfs-index.c`, Q2d branch): only sorts when
+   there are results. Reproduced beforehand with `make bench-smoke` under ASan and UBSan with
    `-fno-sanitize-recover=all`.
-2. **Falso aprovado no `bench-smoke`** (achado ao reproduzir o item 1): `bench/equiv.sh`
-   encadeava o oráculo em `cut` e `sort`, e o status verificado era o do `sort`; com o oráculo
-   abortado pelo sanitizador, a resposta vazia coincidia com a esperada e o teste imprimia
-   `BENCH_SMOKE_PASS`. O status do oráculo passou a ser verificado à parte. Comprovado: com o
-   oráculo antigo o `bench-smoke` sob sanitizadores falha (código 2); com o corrigido, passa sem
-   nenhum relatório.
-3. **`bench-smoke` sob ASan e UBSan no CI** (job "Tools and sanitizers", branch da Q2d): compila
-   com `-fsanitize=address,undefined -fno-sanitize-recover=all` e falha pelo status e por
-   qualquer relatório de sanitizador na saída.
-4. **`kasan.yml`**: as duas negações (`! grep ...`) que não eram o último comando de um passo
-   `bash -e`, e portanto não o reprovavam (SC2251), viraram `if grep ...; then exit 1; fi`.
-5. **checkpatch** (branch `m3/query-v2-recent`, onde `layer/index.c` está na forma final): eram
-   30 avisos nessa branch (14 na main mais os do código da Q2). Corrigidos 28: linhas em branco
-   em `kernel/main.c`; permissões em octal em `reach_ok`; comentários de bloco no estilo do
-   kernel; a varredura da montagem e a cópia de um resultado extraídas em funções
-   (`scan_child`, `scan_push_dir`, `scan_file`, `put_result`) para tirar a indentação profunda.
-   Sem mudança de comportamento: `make vm-test` passou (`MOOBFS_VM_PASS`, blocos `QUERY2_*`,
+2. **False pass in `bench-smoke`** (found while reproducing item 1): `bench/equiv.sh`
+   piped the oracle into `cut` and `sort`, and the status checked was that of `sort`; with the oracle
+   aborted by the sanitizer, the empty response coincided with the expected one and the test printed
+   `BENCH_SMOKE_PASS`. The oracle's status is now checked separately. Confirmed: with the
+   old oracle, `bench-smoke` under sanitizers fails (code 2); with the fixed one, it passes with
+   no report.
+3. **`bench-smoke` under ASan and UBSan in CI** (job "Tools and sanitizers", Q2d branch): compiles
+   with `-fsanitize=address,undefined -fno-sanitize-recover=all` and fails on the status and on
+   any sanitizer report in the output.
+4. **`kasan.yml`**: the two negations (`! grep ...`) that were not the last command of a
+   `bash -e` step, and therefore did not fail it (SC2251), became `if grep ...; then exit 1; fi`.
+5. **checkpatch** (branch `m3/query-v2-recent`, where `layer/index.c` is in its final form): there were
+   30 warnings on that branch (14 on main plus those of the Q2 code). 28 fixed: blank lines
+   in `kernel/main.c`; octal permissions in `reach_ok`; block comments in kernel
+   style; the mount scan and the copy of a result extracted into functions
+   (`scan_child`, `scan_push_dir`, `scan_file`, `put_result`) to remove the deep indentation.
+   No behavior change: `make vm-test` passed (`MOOBFS_VM_PASS`, `QUERY2_*` blocks,
    `DEMO_PASS`, `MOOBFS_LAYER_PASS`).
 
-## Decisão: `EOPNOTSUPP` no lugar de `ENOSYS`
+## Decision: `EOPNOTSUPP` instead of `ENOSYS`
 
-Com `noindex`, a v1 e a v2 devolviam `ENOSYS`; para o checkpatch, `ENOSYS` só significa "chamada
-de sistema inexistente". O mantenedor escolheu trocar por `EOPNOTSUPP` (alternativa: manter e
-excluir só essa regra no `scripts/checkpatch.sh`). Decisão de compatibilidade: a UAPI é
-declarada experimental e nenhum teste dependia do código antigo, mas um cliente que testasse
-`ENOSYS` precisa passar a testar `EOPNOTSUPP`. Com domínios desligados, a v2 já devolvia
-`EOPNOTSUPP`; para distinguir os dois casos, o cliente lê `GET_INFO` (`MOOB_FLAG_INDEX_OFF`,
-`MOOB_FLAG_DOMAINS`). A suíte passou a verificar o código: a v1 com `noindex` falha com
-"Operation not supported" e a v2 devolve 95 (`EOPNOTSUPP`).
+With `noindex`, v1 and v2 returned `ENOSYS`; for checkpatch, `ENOSYS` only means "nonexistent system
+call". The maintainer chose to switch to `EOPNOTSUPP` (alternative: keep it and
+exclude only that rule in `scripts/checkpatch.sh`). Compatibility decision: the UAPI is
+declared experimental and no test depended on the old code, but a client that tested for
+`ENOSYS` needs to test for `EOPNOTSUPP` instead. With domains off, v2 already returned
+`EOPNOTSUPP`; to distinguish the two cases, the client reads `GET_INFO` (`MOOB_FLAG_INDEX_OFF`,
+`MOOB_FLAG_DOMAINS`). The suite now checks the code: v1 with `noindex` fails with
+"Operation not supported" and v2 returns 95 (`EOPNOTSUPP`).
 
-Com isso o checkpatch ficou com 0 erros e 0 avisos nessa branch; `scripts/checkpatch.sh` sai com
-1 em qualquer aviso (conferido nas duas direções), e o passo deixou de ter `continue-on-error`
-no job `Lint` (item S5 de `docs/security-roadmap.md`). As especificações antigas recebem nota
-datada em vez de reescrita.
+With this, checkpatch is at 0 errors and 0 warnings on that branch; `scripts/checkpatch.sh` exits with
+1 on any warning (checked in both directions), and the step no longer has `continue-on-error`
+in the `Lint` job (item S5 of `docs/security-roadmap.md`). The old specifications receive a dated
+note instead of a rewrite.

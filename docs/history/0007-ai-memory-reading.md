@@ -1,45 +1,45 @@
-# 0007 — Leitura técnica do ai-memory e posição relativa
+# 0007 — Technical reading of ai-memory and relative position
 
-Data: 2026-10-10, America/Sao_Paulo.
+Date: 2026-10-10, America/Sao_Paulo.
 
-## Pedido
+## Request
 
-Entender o que `akitaonrails/ai-memory` pode contribuir e se o MoobFS seria uma opção de
-armazenamento para ele; leitura completa, inclusive do código, incluindo a posição relativa
-dos dois projetos e o momento adequado para um contato com o mantenedor.
+Understand what `akitaonrails/ai-memory` can contribute and whether MoobFS would be a storage
+option for it; a complete reading, including the code, covering the relative position
+of the two projects and the right moment for contacting the maintainer.
 
-## Método
+## Method
 
-Clone raso em diretório de rascunho, leitura direta de README, ARCHITECTURE, design-decisions,
-vector-backend-policy, temporal, backup, wiki-migrations e comparison; três leituras de código
-em paralelo (store + core, wiki + git + watcher, hooks + consolidate + llm + mcp). Nada foi
-compilado nem executado. Métricas do repositório lidas da API do GitHub na data.
+Shallow clone in a scratch directory, direct reading of README, ARCHITECTURE, design-decisions,
+vector-backend-policy, temporal, backup, wiki-migrations and comparison; three code readings
+in parallel (store + core, wiki + git + watcher, hooks + consolidate + llm + mcp). Nothing was
+compiled or executed. Repository metrics read from the GitHub API on that date.
 
-## Conclusões
+## Conclusions
 
-- O ai-memory é aplicação: ocupa o papel de "cliente" da ADR-0005. Fonte de verdade é um
-  diretório `wiki/` de markdown em git; SQLite é índice derivado. Não há abstração de backend.
-- O MoobFS cabe embaixo de `wiki/`, mas hoje não pode hospedá-lo: o ai-memory precisa de
-  escrita POSIX, `.git` gravável e SQLite com WAL. Isso impõe ao M2 escrita POSIX, não só
-  ioctl. Registrado como requisito a levar para a especificação do M2.
-- Git já deduplica blobs idênticos no commit e já versiona. O ganho do MoobFS precisa ser
-  demonstrado: dedup entre caminhos sem commit, revisões nativas, atributos indexados.
-- Caminho de integração sem alterar o núcleo deles: webhooks de admissão espelhando cada
-  página via `PUT` em MoobFS.
-- Contato com o mantenedor faz sentido só após M2 funcional, com números. Três divergências
-  doc/código encontradas podem servir de primeiro contato verificável.
+- ai-memory is an application: it occupies the "client" role of ADR-0005. The source of truth is a
+  `wiki/` directory of markdown in git; SQLite is a derived index. There is no backend abstraction.
+- MoobFS fits underneath `wiki/`, but today it cannot host it: ai-memory needs
+  POSIX writes, a writable `.git` and SQLite with WAL. This imposes POSIX writes on M2, not only
+  ioctl. Recorded as a requirement to carry into the M2 specification.
+- Git already deduplicates identical blobs at commit and already versions. MoobFS's gain needs to be
+  demonstrated: dedup across paths without a commit, native revisions, indexed attributes.
+- Integration path without changing their core: admission webhooks mirroring each
+  page via `PUT` into MoobFS.
+- Contacting the maintainer makes sense only after a working M2, with numbers. Three doc/code
+  divergences found can serve as a verifiable first contact.
 
-## Mudanças
+## Changes
 
-- `docs/research-ai-memory.md` (novo), linha em `docs/ecosystem.md`, índice do histórico,
+- `docs/research-ai-memory.md` (new), a line in `docs/ecosystem.md`, history index,
   `CHANGELOG.md`.
 
-## Limitações
+## Limitations
 
-Leitura de código sem execução; contagens de linhas e proporções de teste são estimativas por
-posição de `mod tests`. Versão lida: v2.6.3; o projeto muda rápido.
+Code reading without execution; line counts and test proportions are estimates by
+position of `mod tests`. Version read: v2.6.3; the project changes fast.
 
-## Próximo passo
+## Next step
 
-Especificação do M2 incorporando o requisito de escrita POSIX e o caso de uso "hospedar
-`wiki/` do ai-memory", antes de código.
+M2 specification incorporating the POSIX write requirement and the use case "host
+ai-memory's `wiki/`", before code.

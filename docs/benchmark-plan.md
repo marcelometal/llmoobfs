@@ -1,121 +1,121 @@
-# Plano de benchmark do M4
+# M4 benchmark plan
 
-Estado: proposta (2026-10-10). Nenhum número aqui foi medido. O M4 só existe para produzir
-números; até lá toda afirmação de desempenho do projeto é hipótese.
+Status: proposal (2026-10-10). No number here was measured. M4 exists only to produce
+numbers; until then every performance claim of the project is a hypothesis.
 
-## O que o benchmark deve responder
+## What the benchmark must answer
 
-1. O `QUERY` da camada responde consultas por atributo mais rápido, ou mais barato, do que um
-   índice equivalente mantido pela aplicação sobre um filesystem comum?
-2. O que custa a camada: latência adicional por operação POSIX, tempo de montagem com a
-   varredura do índice, memória do índice, e a partir de quantos inodes o orçamento padrão
-   (128 MiB) deixa de bastar?
-3. O compartilhamento físico delegado (reflink e dedup em btrfs e XFS) reduz espaço em cargas
-   reais de memória de agentes, e quanto?
-4. Um cliente real de memória de agentes roda inalterado sobre a camada com custo aceitável?
+1. Does the layer's `QUERY` answer attribute queries faster, or more cheaply, than an
+   equivalent index maintained by the application over an ordinary filesystem?
+2. What does the layer cost: additional latency per POSIX operation, mount time with the
+   index scan, index memory, and from how many inodes does the default budget
+   (128 MiB) stop being enough?
+3. Does delegated physical sharing (reflink and dedup on btrfs and XFS) reduce space in real
+   agent memory loads, and by how much?
+4. Does a real agent memory client run unchanged over the layer at an acceptable cost?
 
-Busca semântica não entra nestas perguntas: embeddings, ranking e síntese ficam no cliente
-(ADR-0005). Comparar `QUERY` com busca vetorial seria comparar operações diferentes.
+Semantic search is not part of these questions: embeddings, ranking and synthesis stay in the client
+(ADR-0005). Comparing `QUERY` with vector search would be comparing different operations.
 
-## Sistemas comparados
+## Systems compared
 
-Baselines de armazenamento, funcionalmente equivalentes ao que a camada faz:
+Storage baselines, functionally equivalent to what the layer does:
 
-| Rótulo | Configuração | Papel |
+| Label | Configuration | Role |
 | --- | --- | --- |
-| A | ext4, arquivos com xattr, índice de atributos em SQLite mantido pela aplicação | baseline sem camada, sem reflink |
-| B | btrfs, idem | baseline sem camada, com reflink e dedup do próprio FS |
-| C | MoobFS sobre ext4, btrfs e XFS, `QUERY` nativo | o objeto do experimento |
+| A | ext4, files with xattrs, attribute index in SQLite maintained by the application | baseline without the layer, without reflink |
+| B | btrfs, same | baseline without the layer, with the FS's own reflink and dedup |
+| C | MoobFS over ext4, btrfs and XFS, native `QUERY` | the object of the experiment |
 
-Clientes reais, usados como geradores de carga e como teste de compatibilidade, não como
-concorrentes do `QUERY`:
+Real clients, used as load generators and as a compatibility test, not as
+competitors of `QUERY`:
 
-| Cliente | Por que entra | Como entra |
+| Client | Why it is included | How it is included |
 | --- | --- | --- |
-| [ai-memory](https://github.com/akitaonrails/ai-memory) | Fonte de verdade em arquivos com front matter; já tem harness de benchmark (LongMemEval) e teto de escrita medido (~700 observações/s); o mais próximo do nosso modelo | `data_dir` sobre A, B e C; mesma sessão capturada; comparar latência de escrita de páginas, `reindex`, espaço |
-| [mem0](https://github.com/mem0ai/mem0) | Backend de armazenamento plugável | backend de arquivos sobre A, B e C |
-| [Letta](https://github.com/letta-ai/letta) e [letta-code](https://github.com/letta-ai/letta-code) (memória em arquivos, integração com git) | Forma realista de memória de agente como arquivos versionados | diretório de memória sobre A, B e C; git intacto |
-| [Graphiti](https://github.com/getzep/graphiti), [cognee](https://github.com/topoteretes/cognee) | Fatos com validade temporal e grafos; referência para o modelo de atributos do M3 | referência de modelo de dados; carga só se houver backend de arquivos |
-| [Agent VFS](https://github.com/johannesmichalke/agent-vfs) | Filesystem virtual em espaço de usuário com persistência em banco | referência de interface; não é concorrente de módulo de kernel |
-| [Microsoft GraphRAG](https://github.com/microsoft/graphrag) | Pipeline de conhecimento; produz entidades e relações | fonte de dataset de atributos (entidades, relações) para cargas de `QUERY`; não é armazenamento |
+| [ai-memory](https://github.com/akitaonrails/ai-memory) | Source of truth in files with front matter; already has a benchmark harness (LongMemEval) and a measured write ceiling (~700 observations/s); the closest to our model | `data_dir` over A, B and C; same captured session; compare page write latency, `reindex`, space |
+| [mem0](https://github.com/mem0ai/mem0) | Pluggable storage backend | file backend over A, B and C |
+| [Letta](https://github.com/letta-ai/letta) and [letta-code](https://github.com/letta-ai/letta-code) (memory in files, git integration) | Realistic form of agent memory as versioned files | memory directory over A, B and C; git intact |
+| [Graphiti](https://github.com/getzep/graphiti), [cognee](https://github.com/topoteretes/cognee) | Facts with temporal validity and graphs; reference for the M3 attribute model | data model reference; load only if there is a file backend |
+| [Agent VFS](https://github.com/johannesmichalke/agent-vfs) | User-space virtual filesystem with database persistence | interface reference; not a competitor of a kernel module |
+| [Microsoft GraphRAG](https://github.com/microsoft/graphrag) | Knowledge pipeline; produces entities and relations | source of an attribute dataset (entities, relations) for `QUERY` loads; not storage |
 
-PostgreSQL com pgvector fica fora da comparação do `QUERY`. Entra, se entrar, apenas no
-cenário "cliente semântico inteiro" sobre A, B e C, onde o banco é parte do cliente.
+PostgreSQL with pgvector is out of the `QUERY` comparison. It comes in, if at all, only in the
+"whole semantic client" scenario over A, B and C, where the database is part of the client.
 
-## Cargas
+## Loads
 
-Cada carga é um programa determinístico com semente fixa, versionado no repositório, que
-grava os mesmos bytes e os mesmos atributos em A, B e C, e cujos resultados de consulta são
-validados contra o oráculo (`tools/moobfs-index`) antes de qualquer medição de tempo. Uma
-consulta truncada não conta como completa.
+Each load is a deterministic program with a fixed seed, versioned in the repository, that
+writes the same bytes and the same attributes to A, B and C, and whose query results are
+validated against the oracle (`tools/moobfs-index`) before any time measurement. A
+truncated query does not count as complete.
 
-| ID | Operação | O que mede |
+| ID | Operation | What it measures |
 | --- | --- | --- |
-| W1 | criação: tmp + atributos + fsync + rename + fsync do diretório | latência de criação, amplificação de escrita |
-| W2 | leitura por caminho conhecido | custo da passagem |
-| W3 | consulta estruturada por 1 a 4 atributos (`QUERY` em C; SQL com índices equivalentes em A e B) | pergunta 1; base para decidir `QUERY_BATCH` |
-| W4 | atualização e remoção de atributos | validação e índice |
-| W5 | renomeação e remoção concorrentes com consultas | locks e consistência do índice |
-| W6 | montagem com índice frio (caches de página descartados) | tempo de varredura |
-| W7 | remontagem e reconstrução do índice com cache quente | idem, separando I/O de CPU |
-| W8 | cargas mistas concorrentes (1, 10, 100 processos) | contenção |
-| W9 | fsync, durabilidade e recuperação (`dm-log-writes`, marcas, replay) | integridade; sem métrica de tempo |
+| W1 | creation: tmp + attributes + fsync + rename + fsync of the directory | creation latency, write amplification |
+| W2 | read by known path | passthrough cost |
+| W3 | structured query by 1 to 4 attributes (`QUERY` in C; SQL with equivalent indexes in A and B) | question 1; basis for deciding `QUERY_BATCH` |
+| W4 | update and removal of attributes | validation and index |
+| W5 | concurrent rename and removal with queries | locks and index consistency |
+| W6 | mount with a cold index (page caches dropped) | scan time |
+| W7 | remount and index rebuild with a warm cache | same, separating I/O from CPU |
+| W8 | concurrent mixed loads (1, 10, 100 processes) | contention |
+| W9 | fsync, durability and recovery (`dm-log-writes`, marks, replay) | integrity; no time metric |
 
-Cliente real: a mesma sessão do ai-memory capturada e reproduzida sobre A, B e C.
+Real client: the same ai-memory session captured and replayed over A, B and C.
 
-## Escalas e perfis
+## Scales and profiles
 
-S1 1.000, S2 5.000, S3 10.000, S4 25.000, S5 40.000, S6 50.000 a 65.000 inodes, conforme a
-capacidade observada; perfis de 3, 8 e 16 atributos tipados por inode, com cardinalidade,
-tamanho e distribuição dos valores registrados. Esses números acompanham o orçamento atual do
-índice (128 MiB) e não são limites definitivos.
+S1 1,000, S2 5,000, S3 10,000, S4 25,000, S5 40,000, S6 50 000 to 65 000 inodes, according to the
+observed capacity; profiles of 3, 8 and 16 typed attributes per inode, with cardinality,
+size and distribution of the values recorded. These numbers follow the current index budget
+(128 MiB) and are not definitive limits.
 
-Saturação do índice: usando `GET_INFO` (`index_budget`, `index_used`, `index_entries`,
-`index_inodes`, flags), medir `U = index_used / index_budget` em 50%, 70%, 85%, 95% e 100%,
-registrando inodes reais, atributos, RAM, tempo de montagem e de reconstrução, p99 de W3,
-e o comportamento quando a montagem é recusada por orçamento ou o índice fica incompleto.
-Nenhuma persistência de índice é implementada antes de esses números existirem.
+Index saturation: using `GET_INFO` (`index_budget`, `index_used`, `index_entries`,
+`index_inodes`, flags), measure `U = index_used / index_budget` at 50%, 70%, 85%, 95% and 100%,
+recording real inodes, attributes, RAM, mount and rebuild time, p99 of W3,
+and the behavior when the mount is refused for budget or the index becomes incomplete.
+No index persistence is implemented before these numbers exist.
 
-## Métricas
+## Metrics
 
-Por operação: latência p50, p95 e p99 e vazão. Por sistema: CPU, memória residente (incluindo
-`index_used` do `GET_INFO`), espaço em disco antes e depois de dedup, amplificação de escrita
-(bytes gravados no dispositivo por byte útil, via `dm-log-writes` ou `/proc/diskstats`), tempo
-de montagem, tempo até o índice responder, integridade após queda.
+Per operation: p50, p95 and p99 latency and throughput. Per system: CPU, resident memory (including
+`index_used` from `GET_INFO`), disk space before and after dedup, write amplification
+(bytes written to the device per useful byte, via `dm-log-writes` or `/proc/diskstats`), mount
+time, time until the index answers, integrity after a crash.
 
-## Método
+## Method
 
-- Hardware, kernel, versões de ferramentas e imagens registrados em `environment.txt`.
-- Dataset determinístico; aquecimento de 60 s; medição de 180 s; no mínimo 7 repetições;
-  ordem dos baselines alternada entre repetições; resultados brutos preservados; mediana e
-  dispersão (p5–p95 entre repetições) reportadas; dispersão acima de 20% marca o resultado
-  como inconclusivo. Durações e repetições são ajustadas pela estabilidade observada.
-- Latências separadas por tipo de operação; nunca uma distribuição única misturando
-  leitura, escrita e consulta.
-- Amplificação de escrita: `WA_logical = bytes gravados no dispositivo / bytes úteis
-  alterados` e `WA_relative = bytes gravados com a camada / bytes gravados no baseline
-  equivalente`, com journal, writeback, cache e flushes controlados e sem outros processos
-  gravando; qualquer diferença entre C e seu baseline é investigada na origem, já que a
-  persistência é delegada ao inferior.
-- Montagem e reconstrução medidas em cache frio e quente, com as condições explícitas.
-- VM dedicada com KVM; emulação (TCG) serve para correção, não para números.
-- Nenhum número estimado é publicado como medido; cada tabela cita o commit, o comando e o
-  arquivo de evidência.
+- Hardware, kernel, tool versions and images recorded in `environment.txt`.
+- Deterministic dataset; 60 s warm-up; 180 s measurement; at least 7 repetitions;
+  order of the baselines alternated between repetitions; raw results preserved; median and
+  dispersion (p5–p95 across repetitions) reported; dispersion above 20% marks the result
+  as inconclusive. Durations and repetitions are adjusted to the observed stability.
+- Latencies separated by operation type; never a single distribution mixing
+  read, write and query.
+- Write amplification: `WA_logical = bytes gravados no dispositivo / bytes úteis
+  alterados` and `WA_relative = bytes gravados com a camada / bytes gravados no baseline
+  equivalente`, with journal, writeback, cache and flushes controlled and no other processes
+  writing; any difference between C and its baseline is investigated at the source, since
+  persistence is delegated to the lower filesystem.
+- Mount and rebuild measured with a cold and a warm cache, with the conditions made explicit.
+- Dedicated VM with KVM; emulation (TCG) is for correctness, not for numbers.
+- No estimated number is published as measured; each table cites the commit, the command and the
+  evidence file.
 
-## Ferramentas
+## Tools
 
-Desenho detalhado dos programas, do dataset, do esquema SQLite dos baselines e dos testes do
-próprio harness: [benchmark-harness.md](benchmark-harness.md).
+Detailed design of the programs, the dataset, the SQLite schema of the baselines and the tests of the
+harness itself: [benchmark-harness.md](benchmark-harness.md).
 
-- Harness próprio em C para as cargas (determinístico, sem dependências), reutilizando
-  `tests/query.c` e `tools/moobfs-index`.
-- `fio` apenas para calibrar o dispositivo da VM antes das cargas.
-- `dm-log-writes` para amplificação de escrita e recuperação; `duperemove` para dedup.
-- `perf` e `/proc/lock_stat` (kernel com `LOCK_STAT`) para localizar gargalos.
-- O harness de benchmark do ai-memory (`evals/`) para o cenário de cliente real.
+- Our own harness in C for the loads (deterministic, no dependencies), reusing
+  `tests/query.c` and `tools/moobfs-index`.
+- `fio` only to calibrate the VM device before the loads.
+- `dm-log-writes` for write amplification and recovery; `duperemove` for dedup.
+- `perf` and `/proc/lock_stat` (kernel with `LOCK_STAT`) to locate bottlenecks.
+- The ai-memory benchmark harness (`evals/`) for the real-client scenario.
 
-## Critério de saída do M4
+## M4 exit criterion
 
-Relatório em `docs/history/` com as quatro perguntas respondidas por números, incluindo os
-casos em que a camada perde. Se a camada não mostrar vantagem mensurável em nenhuma das
-quatro, isso é um resultado válido e muda o rumo do projeto, conforme ADR-0007.
+A report in `docs/history/` with the four questions answered by numbers, including the
+cases in which the layer loses. If the layer shows no measurable advantage in any of the
+four, that is a valid result and changes the course of the project, as per ADR-0007.

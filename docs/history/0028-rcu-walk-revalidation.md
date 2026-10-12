@@ -1,82 +1,80 @@
-# 0028 — Perfil do `QUERY` e revalidação de dentry compatível com RCU-walk
+# 0028 — `QUERY` profile and dentry revalidation compatible with RCU-walk
 
-Data: 2026-10-11. Branch: `m3/rcu-revalidate`. Estado: implementado, validado na VM e medido no
-host da Azure (piloto 4).
+Date: 2026-10-11. Branch: `m3/rcu-revalidate`. Status: implemented, validated in the VM and
+measured on the Azure host (pilot 4).
 
-## Pergunta
+## Question
 
-Depois do registro 0027, o custo restante do `QUERY` era de cerca de 2 µs por resultado. A
-pergunta foi se o Linux já oferece um mecanismo para reduzir esse custo sem enfraquecer a
-autorização, em vez de inventarmos um cache próprio.
+After journal 0027, the remaining cost of `QUERY` was about 2 µs per result. The question was
+whether Linux already offers a mechanism to reduce that cost without weakening the
+authorization, instead of us inventing a cache of our own.
 
-## Medição
+## Measurement
 
-No host da Azure (kernel de benchmark com `function_graph`, kprobes, `perf` e `bpftrace`),
-amostragem com `perf` de 3000 execuções da forma Q7 (513 resultados), evidências em
-`bench/results/2026-10-11-azure-profile-q7/`. Divisão do tempo dentro de `do_query`:
-resolução do caminho com `vfs_path_lookup` 56%; a própria `do_query` (varredura, filtros,
-montagem do caminho) 12%; cópia para o usuário 7%; `getname_kernel` (cópia do caminho como
-texto, com limpeza de 4 KB) 5%; verificação final de permissão, `kstrdup`, `kfree` e
-`path_put`, o restante.
+On the Azure host (benchmark kernel with `function_graph`, kprobes, `perf` and `bpftrace`),
+`perf` sampling of 3000 runs of shape Q7 (513 results), evidence in
+`bench/results/2026-10-11-azure-profile-q7/`. Breakdown of the time inside `do_query`:
+path resolution with `vfs_path_lookup` 56%; `do_query` itself (scan, filters, path assembly)
+12%; copy to the user 7%; `getname_kernel` (copy of the path as text, with a 4 KB clear) 5%;
+final permission check, `kstrdup`, `kfree` and `path_put`, the rest.
 
-Dentro da resolução de caminho aparecem `__d_lookup`, `try_to_unlazy_next`, `dput` e
-`step_into`, que são do modo de referência (ref-walk) do VFS, e quase nada de
-`__d_lookup_rcu` (0,4% contra 2,9%). A causa está em `moobl_d_revalidate`, que devolvia
-`-ECHILD` sempre que chamada com `LOOKUP_RCU`. Com isso, toda resolução de caminho que passa
-pela camada abandona o modo sem lock (RCU-walk) logo no primeiro componente. O mesmo vale para
-qualquer `open` pela camada, o que explica parte do acréscimo medido em W2.
+Inside path resolution appear `__d_lookup`, `try_to_unlazy_next`, `dput` and `step_into`, which
+belong to the VFS reference mode (ref-walk), and almost nothing of `__d_lookup_rcu` (0.4%
+against 2.9%). The cause is in `moobl_d_revalidate`, which returned `-ECHILD` whenever called
+with `LOOKUP_RCU`. Because of that, every path resolution that goes through the layer abandons
+the lockless mode (RCU-walk) right at the first component. The same holds for any `open`
+through the layer, which explains part of the overhead measured in W2.
 
-## Alternativas consideradas
+## Alternatives considered
 
-- Cache de autorização por diretório, dentro de uma consulta: reduziria o número de caminhadas,
-  mas é mecanismo próprio e mexe no contrato de autorização da fase 3b. Descartado enquanto o
-  mecanismo do próprio VFS não estiver em uso.
-- `open_by_handle_at`: exige `CAP_DAC_READ_SEARCH` e não verifica os diretórios do caminho.
-  Não serve para autorizar um chamador comum.
-- Landlock e AppArmor: são políticas de acesso, não aceleram a verificação.
+- Per-directory authorization cache, within a query: it would reduce the number of walks, but
+  it is a mechanism of our own and touches the phase 3b authorization contract. Discarded while
+  the VFS's own mechanism is not in use.
+- `open_by_handle_at`: requires `CAP_DAC_READ_SEARCH` and does not check the directories of the
+  path. Not suitable for authorizing an ordinary caller.
+- Landlock and AppArmor: they are access policies, they do not speed up the check.
 
-## Decisão
+## Decision
 
-Usar o RCU-walk do próprio VFS. `moobl_d_revalidate_rcu` responde "válido" sem locks, sem
-referências e sem dormir, só no caso simples: o inferior não tem revalidação própria (ext4,
-btrfs e XFS locais não têm), o dentry inferior continua no hash, e o dentry superior concorda
-com ele (positivo e mapeado para o mesmo inode inferior com link, ou ambos negativos). Em
-qualquer outro caso devolve `-ECHILD` e o VFS refaz em ref-walk, que roda a verificação
-completa de antes. A troca do dentry inferior em `moobl_instantiate` (correção do registro
-0015) passa a publicar o ponteiro com `WRITE_ONCE`; o leitor usa `READ_ONCE`. A segurança vem
-de `moobl_dentry` ser liberado com `call_rcu` e de os dentries inferiores só serem liberados
-depois de um período de graça. Os atributos não são copiados no modo RCU; `getattr` e as
-operações de nome já os atualizam. O contrato de autorização não muda: as mesmas permissões são
-verificadas, sem locks.
+Use the VFS's own RCU-walk. `moobl_d_revalidate_rcu` answers "valid" without locks, without
+references and without sleeping, only in the simple case: the lower has no revalidation of its
+own (local ext4, btrfs and XFS do not), the lower dentry is still hashed, and the upper dentry
+agrees with it (positive and mapped to the same linked lower inode, or both negative). In any
+other case it returns `-ECHILD` and the VFS redoes it in ref-walk, which runs the full check as
+before. The lower dentry swap in `moobl_instantiate` (fix from journal 0015) now publishes the
+pointer with `WRITE_ONCE`; the reader uses `READ_ONCE`. Safety comes from `moobl_dentry` being
+freed with `call_rcu` and from the lower dentries only being freed after a grace period. The
+attributes are not copied in RCU mode; `getattr` and the name operations already update them.
+The authorization contract does not change: the same permissions are checked, without locks.
 
-## Lacuna de segurança registrada (fora do escopo desta mudança)
+## Security gap recorded (out of the scope of this change)
 
-A verificação por resultado do `QUERY` usa `vfs_path_lookup` e `inode_permission`. Isso cobre
-DAC, ACLs e módulos de segurança baseados em inode, mas não os que decidem pelo caminho na
-abertura (AppArmor, Landlock). Um processo confinado por eles poderia ver nos resultados um
-arquivo que não conseguiria abrir. Vai para o roteiro de segurança.
+The per-result check of `QUERY` uses `vfs_path_lookup` and `inode_permission`. This covers DAC,
+ACLs and inode-based security modules, but not those that decide by path at open time
+(AppArmor, Landlock). A process confined by them could see in the results a file it would not be
+able to open. It goes to the security roadmap.
 
-## Testes
+## Tests
 
-`make vm-test` (Debian 6.12.111): `ISOLATION_PASS` e `BENCH_LAYER_PASS` nos três inferiores,
-`MOOBFS_ACCEPTANCE_PASS` (inclusive o caso SQLite WAL com remoção e recriação, que é o cenário
-da troca de dentry) e `MOOBFS_LAYER_PASS`; teste de concorrência com cerca de 600 consultas por
-inferior, todas bem formadas. KASAN e lockdep: pelo workflow do pull request.
+`make vm-test` (Debian 6.12.111): `ISOLATION_PASS` and `BENCH_LAYER_PASS` on the three lowers,
+`MOOBFS_ACCEPTANCE_PASS` (including the SQLite WAL case with removal and recreation, which is
+the dentry swap scenario) and `MOOBFS_LAYER_PASS`; concurrency test with about 600 queries per
+lower, all well formed. KASAN and lockdep: through the pull request workflow.
 
-## Medição no host da Azure (piloto 4 e perfil repetido)
+## Measurement on the Azure host (pilot 4 and repeated profile)
 
-Módulo do commit `28f6efa` (árvore do piloto 3 mais esta mudança). Perfil repetido da forma Q7
-(`bench/results/2026-10-11-azure-profile-q7/perf-children-rcu.txt`): `__d_lookup_rcu` passou de
-0,4% para 3,3% das amostras, `__d_lookup` e `try_to_unlazy_next` sumiram, e a resolução de
-caminho caiu de 56% para 43% do tempo de `do_query`. O laço de 3000 consultas Q7 levou 4,81 s,
-estável em três rodadas.
+Module from commit `28f6efa` (pilot 3 tree plus this change). Repeated profile of shape Q7
+(`bench/results/2026-10-11-azure-profile-q7/perf-children-rcu.txt`): `__d_lookup_rcu` went from
+0.4% to 3.3% of the samples, `__d_lookup` and `try_to_unlazy_next` disappeared, and path
+resolution fell from 56% to 43% of the time of `do_query`. The loop of 3000 Q7 queries took
+4.81 s, stable over three rounds.
 
-Piloto 4 (`bench/results/2026-10-11-azure-pilot4-s1/`), 30 equivalências aprovadas. Medianas no
-ext4, como root, contra o piloto 3:
+Pilot 4 (`bench/results/2026-10-11-azure-pilot4-s1/`), 30 equivalences passed. Medians on
+ext4, as root, against pilot 3:
 
-| Forma | Resultados | SQLite | Piloto 3 | Piloto 4 |
+| Shape | Results | SQLite | Pilot 3 | Pilot 4 |
 | --- | --- | --- | --- | --- |
-| Q8 | 0 | 19 µs | 4,9 µs | 4,9 µs |
+| Q8 | 0 | 19 µs | 4.9 µs | 4.9 µs |
 | Q3 | 3 | 16 µs | 34 µs | 33 µs |
 | Q4 | 23 | 26 µs | 73 µs | 66 µs |
 | Q5 | 70 | 43 µs | 144 µs | 126 µs |
@@ -86,19 +84,19 @@ ext4, como root, contra o piloto 3:
 | Q1 | 390 | 90 µs | 744 µs | 636 µs |
 | Q7 | 513 | 224 µs | 1049 µs | 914 µs |
 
-btrfs e XFS seguem o mesmo padrão (Q7 976 e 915 µs; Q3 33 µs; Q8 4,9 µs). W2 no ext4 foi de
-12,9 para 12,5 µs (9,3 µs sem camada); W4 sem mudança relevante.
+btrfs and XFS follow the same pattern (Q7 976 and 915 µs; Q3 33 µs; Q8 4.9 µs). W2 on ext4 went
+from 12.9 to 12.5 µs (9.3 µs without the layer); W4 without relevant change.
 
-Leitura: ganho real, mas modesto. O custo por resultado caiu de cerca de 2,0 para 1,7 µs, contra
-0,2 a 0,4 µs do SQLite. O que resta da resolução de caminho é trabalho que o RCU-walk não
-elimina: montar o caminho como texto, copiá-lo de novo em `getname_kernel`, percorrer quatro
-componentes, chamar `moobl_permission`, que repete `inode_permission` no inode inferior, em cada
-componente, e a verificação final no arquivo. Para consultas que devolvem centenas de resultados,
-o `QUERY` continua de 4 a 7 vezes mais lento que o SQLite com índice composto.
+Reading: a real gain, but a modest one. The per-result cost fell from about 2.0 to 1.7 µs,
+against 0.2 to 0.4 µs for SQLite. What remains of path resolution is work that RCU-walk does
+not eliminate: assembling the path as text, copying it again in `getname_kernel`, walking four
+components, calling `moobl_permission`, which repeats `inode_permission` on the lower inode, at
+each component, and the final check on the file. For queries that return hundreds of results,
+`QUERY` remains 4 to 7 times slower than SQLite with a composite index.
 
-## Próximo passo
+## Next step
 
-Decidir, por ADR, se a autorização por resultado pode reaproveitar a decisão de cada diretório
-dentro de uma mesma consulta, em vez de resolver o caminho completo de cada resultado. Isso
-reduziria o trabalho por resultado a uma verificação no arquivo, mas muda a forma como o
-contrato da fase 3b é cumprido e precisa de testes de isolamento e concorrência próprios.
+Decide, by ADR, whether per-result authorization may reuse the decision for each directory
+within a single query, instead of resolving the full path of each result. This would reduce the
+per-result work to a check on the file, but it changes how the phase 3b contract is fulfilled
+and needs isolation and concurrency tests of its own.

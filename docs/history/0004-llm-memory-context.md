@@ -1,45 +1,45 @@
-# 0004 — Memória e contexto de LLMs como objetivo explícito
+# 0004 — LLM memory and context as an explicit goal
 
-Data: 2026-10-10, America/Sao_Paulo.
+Date: 2026-10-10, America/Sao_Paulo.
 
-## Pedido
+## Request
 
-O usuário observou que a apresentação enfatizava deduplicação e compartilhamento,
-sem deixar suficientemente claro o foco em memória/contexto para LLMs. Pediu
-ajustar README e site, distinguir objetivo de implementação, registrar e publicar.
+The user observed that the presentation emphasized deduplication and sharing,
+without making the focus on memory/context for LLMs sufficiently clear. They asked to
+adjust the README and the site, distinguish goal from implementation, record and publish.
 
-## Decisão editorial e justificativa
+## Editorial decision and justification
 
-Apresentar MoobFS primeiro como filesystem nativo experimental voltado à memória
-persistente e ao contexto consumidos por agentes baseados em LLMs. O compartilhamento
-de bytes continua como fundamento técnico demonstrado pelo M1. Manter a explicação
-anterior como abertura preservaria a ambiguidade de um filesystem genérico; por isso
-a intenção do projeto agora aparece antes do mecanismo.
+Present MoobFS first as an experimental native filesystem aimed at the persistent
+memory and context consumed by LLM-based agents. Byte sharing
+remains as the technical foundation demonstrated by M1. Keeping the previous explanation
+as the opening would preserve the ambiguity of a generic filesystem; therefore
+the project's intention now appears before the mechanism.
 
-Explicitar responsabilidades: o filesystem armazena e expõe arquivos; a aplicação
-do agente seleciona material e monta o contexto. Recuperação semântica e integração
-com agentes continuam como trabalho futuro. Nenhuma mudança no formato, na arquitetura
-adotada ou no código nativo; ADRs 0003 e 0004 continuam válidas. Não são prometidos
-recursos novos, ampliação da janela de contexto nem ganhos de desempenho.
+Make responsibilities explicit: the filesystem stores and exposes files; the agent's
+application selects material and assembles the context. Semantic retrieval and integration
+with agents remain future work. No change to the format, the adopted architecture
+or the native code; ADRs 0003 and 0004 remain valid. No new features,
+context window enlargement or performance gains are promised.
 
-## Mudanças
+## Changes
 
-- `README.md` e `README.pt-BR.md`: objetivo na abertura e seção separada para M1.
-- `site/index.html`: título, metadados e hero voltados a memória/contexto de LLMs;
-  objetivo, responsabilidades e status implementado separados explicitamente.
-- `site/guide.html`: situa a reprodução como teste da base de armazenamento,
-  sem confundi-la com demonstração de consumo de memórias por uma LLM.
-- `PRODUCT.md`: mantém esse posicionamento nas instruções de continuidade do site.
-- `CHANGELOG.md` e índice do histórico atualizados.
+- `README.md` and `README.pt-BR.md`: goal in the opening and a separate section for M1.
+- `site/index.html`: title, metadata and hero focused on LLM memory/context;
+  goal, responsibilities and implemented status explicitly separated.
+- `site/guide.html`: places the reproduction as a test of the storage base,
+  without confusing it with a demonstration of memory consumption by an LLM.
+- `PRODUCT.md`: keeps this positioning in the site's continuity instructions.
+- `CHANGELOG.md` and the history index updated.
 
-## Validação e publicação
+## Validation and publication
 
-`python3 scripts/check-site.py` passou para as duas páginas; `git diff --check`
-passou. Prévia inspecionada no navegador em desktop e tela estreita: título legível,
-navegação para o guia funcionando e sem overflow horizontal medido nas duas páginas.
-O código nativo não mudou; testes locais de kernel não foram repetidos para esta
-alteração editorial. O CI obrigatório do PR e o workflow Pages registram suas
-execuções no GitHub, vinculadas aos commits publicados.
+`python3 scripts/check-site.py` passed for both pages; `git diff --check`
+passed. Preview inspected in the browser on desktop and narrow screen: readable title,
+navigation to the guide working and no horizontal overflow measured on both pages.
+The native code did not change; local kernel tests were not repeated for this
+editorial change. The PR's required CI and the Pages workflow record their
+runs on GitHub, linked to the published commits.
 
-A publicação foi explicitamente autorizada no pedido. A entrega usa PR para `main`
-e o workflow existente de GitHub Pages; o histórico anterior permanece preservado.
+Publication was explicitly authorized in the request. The delivery uses a PR to `main`
+and the existing GitHub Pages workflow; the previous history remains preserved.

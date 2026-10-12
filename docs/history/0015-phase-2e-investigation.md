@@ -1,112 +1,113 @@
-# 0015 — Fase 2e: aceitação com clientes reais e investigação de perda de linhas no SQLite
+# 0015 — Phase 2e: acceptance with real clients and investigation of lost rows in SQLite
 
-Data: 2026-10-10, America/Sao_Paulo. Estado: **concluído e validado na VM de teste** após a
-sequência de rodadas descrita abaixo; mantido na íntegra como registro da investigação.
+Date: 2026-10-10, America/Sao_Paulo. Status: **completed and validated in the test VM** after
+the sequence of rounds described below; kept in full as a record of the investigation.
 
-## Decisões desta etapa
+## Decisions in this stage
 
-- Nenhum projeto externo de memória entra no critério do M2; todos entram no M4 como objetos
-  de benchmark. Especificação e ADR-0007 anotadas (ver registro 0014).
-- Aceitação com git, SQLite em WAL e um cliente de memória próprio (convenção tmp + atributos
-  + fsync + rename + fsync do diretório), mais `dm-log-writes` e `dm-flakey`. O SQLite não faz
-  parte da arquitetura; é o cliente mais exigente disponível para um filesystem e verifica o
-  próprio conteúdo.
-- O diagrama de fluxo do dado vai para o site junto com o plano.
-- O histórico registra decisões, erros e hipóteses descartadas; perguntas e respostas de
-  esclarecimento não (regra ajustada em `AGENTS.md` em 2026-10-10).
+- No external memory project enters the M2 criterion; all of them enter M4 as benchmark
+  objects. Specification and ADR-0007 annotated (see journal 0014).
+- Acceptance with git, SQLite in WAL and an in-house memory client (tmp + attributes + fsync +
+  rename + directory fsync convention), plus `dm-log-writes` and `dm-flakey`. SQLite is not
+  part of the architecture; it is the most demanding client available for a filesystem and it
+  verifies its own content.
+- The data flow diagram goes to the site together with the plan.
+- The history records decisions, errors and discarded hypotheses; clarification questions and
+  answers do not (rule adjusted in `AGENTS.md` on 2026-10-10).
 
-## Harness da fase 2e
+## Phase 2e harness
 
-- `tests/third_party/log-writes/`: `replay-log` do xfstests vendorizado (commit `9b56b94`,
-  2019-10-24, GPL-2.0) para reproduzir o log do `dm-log-writes` até uma marca.
-- `vm/Dockerfile`: `git`, `sqlite3`, `dmsetup`. `vm/in-container.sh`: função `stage_bin`
-  copia binários dinâmicos e suas bibliotecas (`ldd`) para o initramfs; `git`, `sqlite3`,
-  `dmsetup`, `mke2fs`, `e2fsck` passam a existir na VM; dois discos virtio a mais (scratch e
-  log de 64 MiB); módulos `dm-mod`, `dm-log-writes`, `dm-flakey` na cadeia.
-- `vm/init`: seção de aceitação com git (init, três commits de memórias, `fsck --strict`,
-  `cat-file`), QUERY sobre o repositório, experimento do SQLite (abaixo), replay de queda de
-  energia em cinco marcas e injeção de erro com `dm-flakey`. `tests/ipc.c`: primitivas entre
-  processos (locks `fcntl` conflitantes, `F_GETLK`, `F_SETLKW`, mapeamento compartilhado nos
-  dois sentidos, truncate e remapeamento).
+- `tests/third_party/log-writes/`: xfstests `replay-log` vendored (commit `9b56b94`,
+  2019-10-24, GPL-2.0) to replay the `dm-log-writes` log up to a mark.
+- `vm/Dockerfile`: `git`, `sqlite3`, `dmsetup`. `vm/in-container.sh`: the `stage_bin` function
+  copies dynamic binaries and their libraries (`ldd`) into the initramfs; `git`, `sqlite3`,
+  `dmsetup`, `mke2fs`, `e2fsck` now exist in the VM; two more virtio disks (scratch and a
+  64 MiB log); modules `dm-mod`, `dm-log-writes`, `dm-flakey` in the chain.
+- `vm/init`: acceptance section with git (init, three memory commits, `fsck --strict`,
+  `cat-file`), QUERY over the repository, the SQLite experiment (below), power-loss replay at
+  five marks and error injection with `dm-flakey`. `tests/ipc.c`: inter-process primitives
+  (conflicting `fcntl` locks, `F_GETLK`, `F_SETLKW`, shared mapping in both directions,
+  truncate and remapping).
 
-## Resultados até agora (kernel Debian 6.12.111, VM QEMU)
+## Results so far (Debian kernel 6.12.111, QEMU VM)
 
-| Teste | Resultado |
+| Test | Result |
 | --- | --- |
-| git sobre a camada: init, 3 commits, `fsck --strict`, conteúdo via `cat-file` | passou |
-| `QUERY` sobre o repositório git | passou |
-| `tests/ipc.c` no ext4 direto e na camada | passou nos dois |
-| SQLite WAL, escritor + leitor concorrentes, ext4 direto (controle) | 200/200 |
-| SQLite WAL, só escritor, camada | 200/200 |
-| SQLite WAL, escritor + leitor concorrentes, camada | 184 a 188 de 200, repetível |
-| SQLite rollback (`journal_mode=DELETE`), escritor + leitor, camada | 200/200 |
-| `integrity_check` em todos os casos | ok |
+| git over the layer: init, 3 commits, `fsck --strict`, content via `cat-file` | passed |
+| `QUERY` over the git repository | passed |
+| `tests/ipc.c` on ext4 directly and on the layer | passed on both |
+| SQLite WAL, concurrent writer + reader, ext4 directly (control) | 200/200 |
+| SQLite WAL, writer only, layer | 200/200 |
+| SQLite WAL, concurrent writer + reader, layer | 184 to 188 of 200, repeatable |
+| SQLite rollback (`journal_mode=DELETE`), writer + reader, layer | 200/200 |
+| `integrity_check` in all cases | ok |
 
-Linhas perdidas numa rodada: 13, 27, 42, 45, 49, 58, 73, 80, 87, 130, 141, 145, 181, 188,
-193. Isoladas e espalhadas; o escritor recebeu sucesso em todas as inserções; nenhum erro de
-lock impresso (a CLI do SQLite retorna 1 em erro, verificado no container).
+Rows lost in one round: 13, 27, 42, 45, 49, 58, 73, 80, 87, 130, 141, 145, 181, 188,
+193. Isolated and scattered; the writer received success on every insert; no lock error
+printed (the SQLite CLI returns 1 on error, verified in the container).
 
-## Erros encontrados no caminho e correções
+## Errors found along the way and fixes
 
-1. Primeira rodada: "database is locked" porque a CLI do SQLite não tem `busy_timeout`;
-   corrigido com `.timeout 10000`. O erro em si provou que os locks `fcntl` atravessam a
-   camada.
-2. `alias` dentro do script do initramfs não é expandido pelo shell do busybox; trocado por
-   função.
-3. Variantes "cruzadas" (escritor pela camada, leitor direto no inferior) são inválidas por
-   desenho: cada caminho tem seu próprio domínio de locks POSIX (inode da camada versus inode
-   inferior). Descartadas; registradas para não repetir.
+1. First round: "database is locked" because the SQLite CLI has no `busy_timeout`;
+   fixed with `.timeout 10000`. The error itself proved that `fcntl` locks cross the
+   layer.
+2. `alias` inside the initramfs script is not expanded by the busybox shell; replaced by a
+   function.
+3. "Crossed" variants (writer through the layer, reader directly on the lower) are invalid by
+   design: each path has its own POSIX lock domain (layer inode versus lower inode).
+   Discarded; recorded so as not to repeat them.
 
-## Hipóteses, descartes e causa-raiz
+## Hypotheses, discards and root cause
 
-- Descartado: locks `fcntl` básicos (ipc passa; rollback passa). Descartado: mapeamento
-  compartilhado básico (ipc passa). Descartado: perda por erro silencioso do cliente.
-- Variante `unix-excl` (wal-index em heap, locking exclusivo) deu 200/200, mas isso só
-  remove a concorrência; não prova nada sobre `mmap`. Variante `unix-dotfile` não suporta WAL
-  (sem métodos de shm) e foi descartada como experimento inválido.
-- **Causa-raiz (defeito 1, perda de dados):** quando um nome é removido e recriado pela camada
-  sem que ninguém o tenha aberto, o dentry superior fica negativo mas o seu `d_fsdata`
-  continua apontando para o dentry inferior antigo (mantido vivo pela referência da camada,
-  com `nlink` 0). O `create` seguinte criava o arquivo novo no inferior, mas `open` passava a
-  abrir o inferior antigo, já apagado. Dois processos podiam usar arquivos `-shm`/`-wal`
-  diferentes para o mesmo nome; um checkpoint apagava quadros do outro. O WAL do SQLite apaga
-  e recria `-wal` e `-shm` constantemente, por isso só ele expôs o problema; o modo rollback
-  também abria o journal antigo, mas isso não altera leituras. Correção em
-  `moobl_instantiate`: ao instanciar um dentry negativo, trocar o dentry inferior em
-  `d_fsdata` pelo recém-criado. Teste de regressão em `tests/layer.c` (unlink + recreate com e
-  sem descritor antigo aberto; o mesmo para diretórios). Resultado após a correção: as seis
-  variantes do SQLite com 200/200.
-- **Defeito 2 (aviso de kernel, só no CI x86):** `WARNING at fs/inode.c:294 __destroy_inode`,
-  descasamento de `s_remove_count`, causado por chamadas concorrentes a `set_nlink` na mesma
-  inode superior via `fsstack_copy_attr_all` em caminhos sem lock (`getattr`, `d_revalidate`,
-  pós-escrita). Reproduzido no runner do GitHub (2 CPUs, sem emulação), não na VM local sob
-  TCG. Correção: `moobl_copy_attr` copia modo, dono, tempos e tamanho mas não `nlink`;
-  `nlink` muda só nas operações de nome, que o VFS serializa pelo lock do diretório pai.
-  Padrão herdado do ecryptfs, que faz a mesma cópia; vale investigar se o problema existe lá.
+- Discarded: basic `fcntl` locks (ipc passes; rollback passes). Discarded: basic shared
+  mapping (ipc passes). Discarded: loss through a silent client error.
+- The `unix-excl` variant (wal-index on heap, exclusive locking) gave 200/200, but that only
+  removes the concurrency; it proves nothing about `mmap`. The `unix-dotfile` variant does not
+  support WAL (no shm methods) and was discarded as an invalid experiment.
+- **Root cause (defect 1, data loss):** when a name is removed and recreated through the layer
+  without anyone having opened it, the upper dentry becomes negative but its `d_fsdata`
+  keeps pointing to the old lower dentry (kept alive by the layer's reference, with `nlink`
+  0). The following `create` created the new file in the lower, but `open` then opened the
+  old, already deleted lower. Two processes could use different `-shm`/`-wal` files for the
+  same name; a checkpoint erased the other's frames. SQLite's WAL deletes and recreates
+  `-wal` and `-shm` constantly, which is why only it exposed the problem; rollback mode also
+  opened the old journal, but that does not alter reads. Fix in `moobl_instantiate`: when
+  instantiating a negative dentry, replace the lower dentry in `d_fsdata` with the newly
+  created one. Regression test in `tests/layer.c` (unlink + recreate with and without an old
+  descriptor open; the same for directories). Result after the fix: the six SQLite variants
+  at 200/200.
+- **Defect 2 (kernel warning, only on x86 CI):** `WARNING at fs/inode.c:294 __destroy_inode`,
+  `s_remove_count` mismatch, caused by concurrent calls to `set_nlink` on the same upper
+  inode via `fsstack_copy_attr_all` in unlocked paths (`getattr`, `d_revalidate`,
+  post-write). Reproduced on the GitHub runner (2 CPUs, no emulation), not in the local VM
+  under TCG. Fix: `moobl_copy_attr` copies mode, owner, times and size but not `nlink`;
+  `nlink` changes only in name operations, which the VFS serializes by the parent directory
+  lock. Pattern inherited from ecryptfs, which does the same copy; worth investigating whether
+  the problem exists there.
 
-## Erros de harness na fase (além dos anteriores)
+## Harness errors in the phase (in addition to the previous ones)
 
-4. `$5` dentro de uma função de shell é o argumento da função, não do chamador; o VFS do
-   SQLite chegou vazio. 5. `busybox --install -s /bin` sobrescreveu o `mke2fs` real com o
-   applet do busybox; binários reais passaram a viver em `/tools`, à frente do `PATH`.
+4. `$5` inside a shell function is the function's argument, not the caller's; the SQLite VFS
+   arrived empty. 5. `busybox --install -s /bin` overwrote the real `mke2fs` with the busybox
+   applet; real binaries now live in `/tools`, ahead in `PATH`.
 
-## Erros de harness na fase (continuação)
+## Harness errors in the phase (continued)
 
-6. O ash do busybox Debian é compilado com `PREFER_APPLETS`: um comando cujo nome coincide com
-   um applet (`mke2fs`) executa o applet mesmo com `/tools` à frente do `PATH`; binários reais
-   passaram a ser chamados por caminho absoluto. 7. Um `sed` que não casou a linha fez a suíte
-   não rodar e o log analisado ser o da execução anterior; detectado pelos timestamps iguais.
-8. `dmsetup suspend` em um dispositivo que está devolvendo erro falha ao descarregar; a troca
-   de tabela de volta para `linear` usa `--noflush --nolockfs`.
+6. Debian's busybox ash is compiled with `PREFER_APPLETS`: a command whose name matches an
+   applet (`mke2fs`) runs the applet even with `/tools` ahead in `PATH`; real binaries are now
+   called by absolute path. 7. A `sed` that did not match the line made the suite not run and
+   the analyzed log be the one from the previous run; detected by the identical timestamps.
+8. `dmsetup suspend` on a device that is returning errors fails to flush; switching the table
+   back to `linear` uses `--noflush --nolockfs`.
 
-## Achado de durabilidade (não é defeito da camada)
+## Durability finding (not a layer defect)
 
-Na primeira replay do `dm-log-writes` o arquivo renomeado não existia na marca gravada logo
-após o `rename`. É a regra POSIX: `rename` só é durável após `fsync` do diretório pai ou o
-commit do journal. A convenção do cliente na especificação (§6) passou a incluir o `fsync` do
-diretório; o cliente de teste sincroniza após o `rename`.
+On the first `dm-log-writes` replay the renamed file did not exist at the mark recorded right
+after the `rename`. This is the POSIX rule: `rename` is only durable after `fsync` of the
+parent directory or the journal commit. The client convention in the specification (§6) now
+includes the directory `fsync`; the test client syncs after the `rename`.
 
-## Resultado final (kernel Debian 6.12.111, QEMU TCG)
+## Final result (Debian kernel 6.12.111, QEMU TCG)
 
 ```text
 LAYER_LOWER_PASS: ext4 reflink=no
@@ -120,28 +121,28 @@ MOOBFS_ACCEPTANCE_PASS: git, sqlite wal, memory client, dm-log-writes replay, dm
 MOOBFS_LAYER_PASS: … index and QUERY equal to the oracle …
 ```
 
-- git: repositório na camada, três commits, `fsck --strict` limpo, conteúdo correto.
-- SQLite WAL: 200/200 em todas as variantes, inclusive escritor e leitor concorrentes na
-  camada; `integrity_check` ok.
-- `dm-log-writes`: replay em disco zerado até `mkfs`, `m1`, `m2`, `m4` e `end`; em cada marca,
-  `e2fsck -fn` limpo após recuperação do journal, memórias até a marca inteiras (conteúdo e
-  atributos), posteriores ausentes, `QUERY` com a contagem certa.
-- `dm-flakey` com `error_writes`: erros do ext4 no `dmesg` como esperado, sem `BUG`/`Oops`/
-  `WARNING`; após a troca de tabela e `e2fsck`, remontagem limpa, conteúdo anterior intacto,
-  `moobfs-check` limpo.
-- Nenhum aviso de kernel na VM local com as duas correções. CI do commit `9a37b88` (run
-  38070138824, runner x86 com 2 CPUs, onde a corrida do `nlink` aparecia): ferramentas,
-  sanitizers, fuzzing e VM nativa com sucesso, zero ocorrências de `WARNING:` no log.
+- git: repository on the layer, three commits, `fsck --strict` clean, correct content.
+- SQLite WAL: 200/200 in all variants, including concurrent writer and reader on the
+  layer; `integrity_check` ok.
+- `dm-log-writes`: replay onto a zeroed disk up to `mkfs`, `m1`, `m2`, `m4` and `end`; at each
+  mark, `e2fsck -fn` clean after journal recovery, memories up to the mark intact (content and
+  attributes), later ones absent, `QUERY` with the right count.
+- `dm-flakey` with `error_writes`: ext4 errors in `dmesg` as expected, no `BUG`/`Oops`/
+  `WARNING`; after the table switch and `e2fsck`, clean remount, earlier content intact,
+  `moobfs-check` clean.
+- No kernel warning in the local VM with the two fixes. CI of commit `9a37b88` (run
+  38070138824, x86 runner with 2 CPUs, where the `nlink` race appeared): tools,
+  sanitizers, fuzzing and native VM successful, zero occurrences of `WARNING:` in the log.
 
-## O que a fase 2e provou
+## What phase 2e proved
 
-Clientes que não sabem que o MoobFS existe, inclusive o mais exigente deles, rodam inalterados
-sobre a camada, sobre ext4, btrfs e XFS, e sobrevivem a queda de energia e a erros de disco com
-o comportamento do inferior. Dois defeitos reais foram encontrados e corrigidos por esses
-testes; nenhum dos testes anteriores os teria pego.
+Clients that do not know MoobFS exists, including the most demanding of them, run unchanged
+over the layer, over ext4, btrfs and XFS, and survive power loss and disk errors with the
+lower's behavior. Two real defects were found and fixed by these tests; none of the earlier
+tests would have caught them.
 
-## Limitações
+## Limitations
 
-Carga do SQLite pequena (200 inserções) e um único padrão de concorrência; sem xfstests
-completo; sem KASAN/lockdep; `dm-flakey` só no modo "erros de escrita" sobre ext4; o teste de
-I/O com erros não verifica o comportamento sobre btrfs e XFS.
+Small SQLite load (200 inserts) and a single concurrency pattern; no full xfstests;
+no KASAN/lockdep; `dm-flakey` only in "write errors" mode over ext4; the I/O-with-errors test
+does not check the behavior over btrfs and XFS.

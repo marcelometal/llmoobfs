@@ -1,58 +1,57 @@
-# 0016 — Harness com KASAN e lockdep em kernel próprio; diagrama de fluxo no site
+# 0016 — Harness with KASAN and lockdep on our own kernel; data flow diagram on the site
 
-Data: 2026-10-10, America/Sao_Paulo. Estado: **em andamento**; fechado quando o primeiro run
-do workflow concluir.
+Date: 2026-10-10, America/Sao_Paulo. Status: **in progress**; closed when the first workflow
+run completes.
 
-## Pedido
+## Request
 
-"Seguir" após o fechamento da fase 2e. Itens escolhidos: a pendência pequena do site (diagrama
-do fluxo do dado) e a pendência mais pesada do M2, validação com KASAN e lockdep.
+"Seguir" ("Continue") after phase 2e closed. Items chosen: the small site pending item (data
+flow diagram) and the heaviest M2 pending item, validation with KASAN and lockdep.
 
-## Mudanças
+## Changes
 
-- `site/plan.html`: diagrama SVG do caminho de uma memória (escrita à esquerda, consulta e
-  leitura à direita), com descrição acessível; validado por `scripts/check-site.py`.
-- `vm/suite.sh` (novo): a suíte da camada extraída de `vm/init`, parametrizada por diretório
-  de binários, diretório de ferramentas, módulos opcionais e cinco dispositivos de bloco.
-  `vm/init` passa a defini-los e a incluir a suíte; o harness Debian foi reexecutado após a
-  refatoração e passou inteiro (`MOOBFS_VM_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`).
-- `vm/kasan.config`: fragmento com KASAN genérico inline, UBSAN, `PROVE_LOCKING`,
-  `DEBUG_ATOMIC_SLEEP`, `DEBUG_LIST`, `DEBUG_VM`, ext4/btrfs/XFS embutidos, device mapper
-  com `dm-log-writes` e `dm-flakey`, virtio-blk.
-- `vm/kasan-guest.sh`: executa a suíte dentro do guest do virtme-ng (raiz = checkout do host,
-  ferramentas do próprio Ubuntu do runner por symlink) e falha em qualquer diagnóstico de
-  kernel no `dmesg`.
-- `.github/workflows/kasan.yml`: `workflow_dispatch` e semanal; kernel `linux-6.12.112` do
-  kernel.org com SHA-256 fixado (`164dc9d1…ed03`), `virtme-ng 1.41` fixado, timeout de 150
-  minutos, artefatos com console, `dmesg` e `.config`.
+- `site/plan.html`: SVG diagram of a memory's path (write on the left, query and read on the
+  right), with an accessible description; validated by `scripts/check-site.py`.
+- `vm/suite.sh` (new): the layer suite extracted from `vm/init`, parameterized by binaries
+  directory, tools directory, optional modules and five block devices. `vm/init` now defines
+  them and includes the suite; the Debian harness was rerun after the refactoring and passed in
+  full (`MOOBFS_VM_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`).
+- `vm/kasan.config`: fragment with inline generic KASAN, UBSAN, `PROVE_LOCKING`,
+  `DEBUG_ATOMIC_SLEEP`, `DEBUG_LIST`, `DEBUG_VM`, ext4/btrfs/XFS built in, device mapper
+  with `dm-log-writes` and `dm-flakey`, virtio-blk.
+- `vm/kasan-guest.sh`: runs the suite inside the virtme-ng guest (root = host checkout, tools
+  from the runner's own Ubuntu via symlink) and fails on any kernel diagnostic in `dmesg`.
+- `.github/workflows/kasan.yml`: `workflow_dispatch` and weekly; kernel `linux-6.12.112` from
+  kernel.org with pinned SHA-256 (`164dc9d1…ed03`), pinned `virtme-ng 1.41`, 150-minute
+  timeout, artifacts with console, `dmesg` and `.config`.
 
-## Decisões
+## Decisions
 
-- Kernel próprio só neste workflow; o harness Debian continua sendo a referência de
-  reprodutibilidade e roda a cada push. O workflow KASAN é mais pesado e não bloqueia pushes.
-- O kernel upstream 6.12.112 difere do Debian 6.12.111 (que traz backports, como a assinatura
-  de `backing_file_open`); o módulo é compilado contra os cabeçalhos de cada kernel, então
-  ambos são alvos de teste legítimos. Divergências de API entre os dois serão registradas.
+- Our own kernel only in this workflow; the Debian harness remains the reproducibility
+  reference and runs on every push. The KASAN workflow is heavier and does not block pushes.
+- The upstream 6.12.112 kernel differs from Debian 6.12.111 (which carries backports, such as
+  the `backing_file_open` signature); the module is compiled against each kernel's headers, so
+  both are legitimate test targets. API divergences between the two will be recorded.
 
-## Evidências e correções
+## Evidence and fixes
 
-- Run 38071014790: kernel 6.12.112 com KASAN compilou em cerca de dez minutos no runner,
-  iniciou, os cinco discos virtio apareceram e o módulo carregou. Falha de harness: a raiz do
-  guest do virtme-ng é somente leitura e a suíte criava `/lower` e `/mnt/layer`. Correção:
-  pontos de montagem parametrizados (`LOWER`, `LAYER`), em tmpfs no guest.
-- Run 38072014663: KASAN e lockdep ativos (35 linhas em `/proc/lockdep_stats`). **Defeito
-  real encontrado**: `DEBUG_RWSEMS_WARN_ON(sem->magic != sem)` em `up_write`, vindo de
-  `moobl_index_destroy` chamado por `moobl_kill_sb` em montagens que falharam antes de
-  `moobl_index_init` (sem `lower=`, diretório inexistente, empilhar sobre a própria camada).
-  O rwsem e o xarray eram destruídos sem terem sido inicializados; o kernel Debian, sem
-  `DEBUG_RWSEMS`, não acusava. Correção: inicializar o índice logo após alocar o superbloco,
-  antes de qualquer caminho de erro, e `moobl_index_destroy` só agir se inicializado.
-  Segunda falha, de harness: a parametrização não cobria opções com vírgula
-  (`lower=/lower,noindex`), corrigido.
-- Próximo run anexado abaixo.
+- Run 38071014790: the 6.12.112 kernel with KASAN compiled in about ten minutes on the runner,
+  booted, the five virtio disks appeared and the module loaded. Harness failure: the virtme-ng
+  guest root is read-only and the suite created `/lower` and `/mnt/layer`. Fix:
+  parameterized mount points (`LOWER`, `LAYER`), on tmpfs in the guest.
+- Run 38072014663: KASAN and lockdep active (35 lines in `/proc/lockdep_stats`). **Real defect
+  found**: `DEBUG_RWSEMS_WARN_ON(sem->magic != sem)` in `up_write`, coming from
+  `moobl_index_destroy` called by `moobl_kill_sb` on mounts that failed before
+  `moobl_index_init` (no `lower=`, nonexistent directory, stacking over the layer itself).
+  The rwsem and the xarray were destroyed without having been initialized; the Debian kernel,
+  without `DEBUG_RWSEMS`, did not flag it. Fix: initialize the index right after allocating
+  the superblock, before any error path, and have `moobl_index_destroy` act only if
+  initialized. Second failure, harness: the parameterization did not cover options with a comma
+  (`lower=/lower,noindex`), fixed.
+- Next run attached below.
 
-Nota de 2026-10-10: depois da reescrita da história (registro 0018), o workflow "KASAN and
-lockdep" foi executado de novo sobre `main` (execução 38074631812, kernel 6.12.112-virtme):
-`MOOBFS_KASAN_PASS`, com `LAYER_LOWER_PASS` em ext4, btrfs e xfs, `MOOBFS_ACCEPTANCE_PASS`
-(git, SQLite WAL, cliente de memória, replay `dm-log-writes`, `dm-flakey`) e nenhum
-diagnóstico de kernel. O CI comum (execução 38074616460) também passou.
+Note of 2026-10-10: after the history rewrite (journal 0018), the "KASAN and lockdep" workflow
+was run again on `main` (run 38074631812, kernel 6.12.112-virtme): `MOOBFS_KASAN_PASS`, with
+`LAYER_LOWER_PASS` on ext4, btrfs and xfs, `MOOBFS_ACCEPTANCE_PASS` (git, SQLite WAL, memory
+client, `dm-log-writes` replay, `dm-flakey`) and no kernel diagnostic. The regular CI (run
+38074616460) also passed.

@@ -1,37 +1,37 @@
-# 0005 — Modelo de memória e o Be File System como referência
+# 0005 — Memory model and the Be File System as reference
 
-Data: 2026-10-10, America/Sao_Paulo.
+Date: 2026-10-10, America/Sao_Paulo.
 
-## Pedido
+## Request
 
-Retomar o projeto distinguindo o objetivo (memória/contexto para LLMs) do M1 implementado.
-Na retomada foi apontada a lacuna: nenhum documento ligava o objetivo ao mecanismo. O Be File
-System foi adotado como referência de desenho para uma ADR, com avaliação explícita de reuso
-de código do BFS.
+Resume the project distinguishing the goal (memory/context for LLMs) from the implemented M1.
+On resuming, the gap was pointed out: no document linked the goal to the mechanism. The Be File
+System was adopted as the design reference for an ADR, with an explicit evaluation of reusing
+BFS code.
 
-## Decisão
+## Decision
 
-ADR-0005 registra o modelo: memória como arquivo, revisões com atributos tipados expostos via
-xattr, índices por atributo mantidos pelo módulo, consulta estruturada por ioctl e recuperação
-semântica em espaço de usuário. O journaling de metadados do BFS vira referência para M2.
+ADR-0005 records the model: memory as a file, revisions with typed attributes exposed via
+xattr, per-attribute indexes maintained by the module, structured query through ioctl and semantic
+retrieval in user space. BFS metadata journaling becomes the reference for M2.
 
-Sobre reuso: o driver `fs/befs` do Linux é somente leitura e não implementa atributos nem
-índices (confirmado no Kconfig upstream); o BFS do Haiku é completo mas preso à API do Haiku.
-Decidiu-se reutilizar o desenho e os casos de teste, não o código.
+On reuse: the Linux `fs/befs` driver is read-only and implements neither attributes nor
+indexes (confirmed in the upstream Kconfig); Haiku's BFS is complete but tied to Haiku's API.
+It was decided to reuse the design and the test cases, not the code.
 
-## Mudanças
+## Changes
 
-- `docs/decisions/0005-memory-model-bfs-reference.md` (nova).
-- `docs/history/README.md`, `CHANGELOG.md` e `ROADMAP.md` atualizados.
+- `docs/decisions/0005-memory-model-bfs-reference.md` (new).
+- `docs/history/README.md`, `CHANGELOG.md` and `ROADMAP.md` updated.
 
-## Evidências
+## Evidence
 
-Consultas feitas nesta sessão: artigo da Wikipedia, `Documentation/filesystems/befs.rst`,
-`fs/befs/Kconfig` e a entrada `BEFS FILE SYSTEM` em `MAINTAINERS` do Linux upstream.
-Nenhum código mudou; nenhum teste foi executado nem é afirmado como executado.
+Sources consulted in this session: the Wikipedia article, `Documentation/filesystems/befs.rst`,
+`fs/befs/Kconfig` and the `BEFS FILE SYSTEM` entry in upstream Linux `MAINTAINERS`.
+No code changed; no test was executed nor is claimed as executed.
 
-## Limitações e próximo passo
+## Limitations and next step
 
-A ADR é desenho, não implementação. Próximo passo: especificar o formato M2 (atributos,
-índice, UAPI de `QUERY`, journaling) em documento próprio, com casos de entradas inválidas,
-antes de qualquer código de escrita. O hardening do M1 segue independente.
+The ADR is design, not implementation. Next step: specify the M2 format (attributes,
+index, `QUERY` UAPI, journaling) in its own document, with invalid-input cases,
+before any write code. M1 hardening proceeds independently.

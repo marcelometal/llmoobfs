@@ -1,325 +1,325 @@
-# Plano para receber contribuições externas
+# Plan for receiving external contributions
 
-Estado: **proposta** (2026-10-10). Nada neste documento está implementado; é um plano. Ele não
-cria compromisso de compatibilidade, de prazo ou de suporte. Origem: inventário do repositório
-na branch `m3/3b-query-authz`. Onde a informação não foi verificada, o texto diz "a confirmar".
+Status: **proposal** (2026-10-10). Nothing in this document is implemented; it is a plan. It does
+not create any compatibility, deadline or support commitment. Origin: inventory of the repository
+on the branch `m3/3b-query-authz`. Where the information was not verified, the text says "to be confirmed".
 
-Objetivo: preparar o MoobFS, camada nativa empilhada e experimental para memória de agentes de
-LLM, para receber contribuições de desenvolvedores de Linux, filesystems, segurança e
-desempenho, sem exagerar a maturidade e sem alegar vantagens não provadas. Restrições do projeto
-que valem para tudo abaixo: todo trabalho é registrado em `docs/history/`, decisões
-arquiteturais em `docs/decisions/`, e o projeto não é substituído por FUSE nem por API em espaço
-de usuário (ADR-0001, `AGENTS.md`).
+Goal: prepare MoobFS, an experimental native stacked layer for LLM agent memory,
+to receive contributions from Linux, filesystem, security and
+performance developers, without overstating its maturity and without claiming unproven advantages. Project
+constraints that apply to everything below: all work is recorded in `docs/history/`, architectural
+decisions in `docs/decisions/`, and the project is not replaced by FUSE or by a user-space
+API (ADR-0001, `AGENTS.md`).
 
-## 0. Estado atual
+## 0. Current status
 
-O inventário mostrou que **vários arquivos esperados já existem**. O plano foca nas lacunas e em
-alinhar o que existe, não em recriar.
+The inventory showed that **several expected files already exist**. The plan focuses on the gaps and on
+aligning what exists, not on recreating it.
 
-| Item | Existe? | Onde | Lacuna |
+| Item | Exists? | Where | Gap |
 | --- | --- | --- | --- |
-| Licença | Sim | `LICENSE` (GPL v2); `SPDX GPL-2.0-only` nos fontes (ex.: `layer/main.c`) | Confirmar que todo arquivo novo (scripts, testes) tem SPDX; nenhuma verificação automática |
-| README | Sim, EN e PT-BR | `README.md`, `README.pt-BR.md` | Sem banner de estágio experimental no topo; descreve M1 primeiro e a camada (M2/3b) depois; sem seção "como contribuir por área" |
-| ROADMAP | Sim, 17 linhas | `ROADMAP.md` | Tabela única de marcos; sem separar "concluído com evidência" de "dependente de validação"; sem links por item para diário/spec |
-| AGENTS/CLAUDE | Sim | `AGENTS.md`, `CLAUDE.md` (importa AGENTS) | Escritos para agentes; contribuidor humano precisa de resumo (está em `CONTRIBUTING.md`) |
-| CHANGELOG | Sim | `CHANGELOG.md`, seção "Unreleased" | Sem política de formato por entrada |
-| CONTRIBUTING | Sim, 49 linhas | `CONTRIBUTING.md` | Diz que **não há DCO nem CLA**; não pede VM para mudança em `layer/` de forma explícita, não pede KASAN, não define revisão dupla nem política de squash; inglês e português aceitos |
-| CODE_OF_CONDUCT | Sim, 23 linhas | `CODE_OF_CONDUCT.md` | Texto próprio, **não** é o Contributor Covenant (declara isso); contato `claudio@studiomoob.com`; sem prazo de resposta |
-| SECURITY | Sim, 24 linhas | `SECURITY.md` | Já cita GitHub private vulnerability reporting (habilitado, segundo o texto; a confirmar na configuração) e e-mail; faltam escopo, metas de resposta, CVE, embargo, crédito |
-| GOVERNANCE | Sim | `GOVERNANCE.md` | Mantenedor único; descreve proteção do `main`; sem plano de segundo mantenedor |
-| Templates de issue | Parcial | `.github/ISSUE_TEMPLATE/bug_report.yml`, `proposal.yml`, `config.yml` | Falta template de falha de teste e de pedido de revisão; bug não pede kernel, FS inferior nem `dmesg` (a confirmar o conteúdo dos campos); sem labels definidos |
-| Template de PR | Sim | `.github/pull_request_template.md` | Sem itens de KASAN, UAPI/formato, VM, evidência de números |
-| CI | Sim | `.github/workflows/ci.yml` | Ver abaixo |
-| KASAN/lockdep | Sim, sob demanda e semanal | `.github/workflows/kasan.yml` | Não roda por PR; não é check obrigatório |
-| Pages | Sim | `.github/workflows/pages.yml`, `site/` (index, guide, plan) | Sem fluxo de contribuição na página; `plan.html` sem auditoria de acessibilidade registrada |
-| Makefile | Sim | `Makefile` | Alvos: `all tools attr-tools test fuzz module layer vm-test`; sem `help`, sem `lint`, sem alvo para um teste só |
-| Harness de VM | Sim | `vm/Dockerfile`, `in-container.sh`, `run.sh`, `init`, `suite.sh` (381 linhas), `kasan.config`, `kasan-guest.sh` | Sem como rodar um teste isolado nem como adicionar um inferior |
-| Testes | Sim | `tests/` (`attr_test.c`, `layer.c`, `query.c`, `ipc.c`, `mounted.c`, `idmap.c`, `test_images.py`, `fuzz_attr.c`, `fuzz-corpus/attr`, `third_party`) | Corpus de fuzz pequeno; sem cobertura medida |
-| Guia de testes | Sim | `docs/testing.md` (138 linhas) | Narrativa por fase, não referência; sem tempos esperados; sem tabela de marcadores |
-| Roadmap de segurança | Sim | `docs/security-roadmap.md` (S1 a S11) | Tudo "a fazer" exceto a tabela de estado; S1 (ADR) ainda não escrita |
-| Diário e ADRs | Sim | `docs/history/` (0001 a 0021 + README), `docs/decisions/` (0001 a 0007) | ADRs 0001-0007 só; modelo de ameaça sem ADR |
-| Estratégia de distribuição | Sim | `docs/distribution-strategy.md`, §8 (três etapas) | Proposta, nada implementado |
-| Originalidade | Sim | `docs/research-originality.md`, §7 (frases a evitar) | Não é referenciada por `CONTRIBUTING.md` |
-| Avaliação de valor | Sim | `docs/value-assessment.md` (669 linhas, commit 01e76f7), §9 | Não é referenciada por `CONTRIBUTING.md` |
-| Harness M4 | Só especificação | `docs/benchmark-harness.md`; `bench/` **não existe** | Nada implementado |
+| License | Yes | `LICENSE` (GPL v2); `SPDX GPL-2.0-only` in the sources (e.g. `layer/main.c`) | Confirm that every new file (scripts, tests) has SPDX; no automatic check |
+| README | Yes, EN and PT-BR | `README.md`, `README.pt-BR.md` | No experimental-stage banner at the top; describes M1 first and the layer (M2/3b) afterwards; no "how to contribute by area" section |
+| ROADMAP | Yes, 17 lines | `ROADMAP.md` | Single milestone table; does not separate "done with evidence" from "dependent on validation"; no per-item links to journal/spec |
+| AGENTS/CLAUDE | Yes | `AGENTS.md`, `CLAUDE.md` (imports AGENTS) | Written for agents; a human contributor needs a summary (it is in `CONTRIBUTING.md`) |
+| CHANGELOG | Yes | `CHANGELOG.md`, "Unreleased" section | No per-entry format policy |
+| CONTRIBUTING | Yes, 49 lines | `CONTRIBUTING.md` | Says there is **no DCO and no CLA**; does not explicitly require a VM for changes in `layer/`, does not require KASAN, does not define double review or a squash policy; English and Portuguese accepted |
+| CODE_OF_CONDUCT | Yes, 23 lines | `CODE_OF_CONDUCT.md` | Own text, **not** the Contributor Covenant (it says so); contact `claudio@studiomoob.com`; no response time |
+| SECURITY | Yes, 24 lines | `SECURITY.md` | Already mentions GitHub private vulnerability reporting (enabled, according to the text; to be confirmed in the settings) and email; missing scope, response targets, CVE, embargo, credit |
+| GOVERNANCE | Yes | `GOVERNANCE.md` | Single maintainer; describes protection of `main`; no plan for a second maintainer |
+| Issue templates | Partial | `.github/ISSUE_TEMPLATE/bug_report.yml`, `proposal.yml`, `config.yml` | Missing a test-failure template and a review-request template; bug does not ask for kernel, lower FS or `dmesg` (field contents to be confirmed); no labels defined |
+| PR template | Yes | `.github/pull_request_template.md` | No items for KASAN, UAPI/format, VM, evidence for numbers |
+| CI | Yes | `.github/workflows/ci.yml` | See below |
+| KASAN/lockdep | Yes, on demand and weekly | `.github/workflows/kasan.yml` | Does not run per PR; not a required check |
+| Pages | Yes | `.github/workflows/pages.yml`, `site/` (index, guide, plan) | No contribution flow on the page; `plan.html` without a recorded accessibility audit |
+| Makefile | Yes | `Makefile` | Targets: `all tools attr-tools test fuzz module layer vm-test`; no `help`, no `lint`, no target for a single test |
+| VM harness | Yes | `vm/Dockerfile`, `in-container.sh`, `run.sh`, `init`, `suite.sh` (381 lines), `kasan.config`, `kasan-guest.sh` | No way to run an isolated test nor how to add a lower |
+| Tests | Yes | `tests/` (`attr_test.c`, `layer.c`, `query.c`, `ipc.c`, `mounted.c`, `idmap.c`, `test_images.py`, `fuzz_attr.c`, `fuzz-corpus/attr`, `third_party`) | Small fuzz corpus; no measured coverage |
+| Testing guide | Yes | `docs/testing.md` (138 lines) | Narrative by phase, not a reference; no expected times; no marker table |
+| Security roadmap | Yes | `docs/security-roadmap.md` (S1 to S11) | Everything "to do" except the status table; S1 (ADR) not yet written |
+| Journal and ADRs | Yes | `docs/history/` (0001 to 0021 + README), `docs/decisions/` (0001 to 0007) | ADRs 0001-0007 only; threat model without an ADR |
+| Distribution strategy | Yes | `docs/distribution-strategy.md`, §8 (three stages) | Proposal, nothing implemented |
+| Originality | Yes | `docs/research-originality.md`, §7 (phrases to avoid) | Not referenced by `CONTRIBUTING.md` |
+| Value assessment | Yes | `docs/value-assessment.md` (669 lines, commit 01e76f7), §9 | Not referenced by `CONTRIBUTING.md` |
+| M4 harness | Specification only | `docs/benchmark-harness.md`; `bench/` **does not exist** | Nothing implemented |
 
-Fatos de CI (`ci.yml`): job `Tools and sanitizers` (`make test`, ASan/UBSan com clang, `make
-fuzz FUZZ_TIME=30`, `scripts/check-site.py`, 10 min) e job `Native Linux VM` (`make vm-test`, 35
-min, evidência anexada por 30 dias). `kasan.yml`: kernel 6.12.112 com SHA-256 verificado,
-virtme-ng 1.41, 150 min, segunda-feira e manual.
+CI facts (`ci.yml`): job `Tools and sanitizers` (`make test`, ASan/UBSan with clang, `make
+fuzz FUZZ_TIME=30`, `scripts/check-site.py`, 10 min) and job `Native Linux VM` (`make vm-test`, 35
+min, evidence attached for 30 days). `kasan.yml`: kernel 6.12.112 with verified SHA-256,
+virtme-ng 1.41, 150 min, Monday and manual.
 
-Proteção do `main` (segundo `GOVERNANCE.md`; **a confirmar** em Settings > Branches): PR
-obrigatório, checks `Tools and sanitizers` e `Native Linux VM`, branch atualizada, conversas
-resolvidas, sem force-push, sem deleção, sem número mínimo de aprovações, administradores com
-bypass. A história foi reescrita uma única vez (diário 0018), com autorização do usuário. Há 57
-commits em todas as refs; `main` e `origin/main` existem.
+Protection of `main` (according to `GOVERNANCE.md`; **to be confirmed** in Settings > Branches): PR
+required, checks `Tools and sanitizers` and `Native Linux VM`, branch up to date, conversations
+resolved, no force-push, no deletion, no minimum number of approvals, administrators with
+bypass. History was rewritten only once (journal 0018), with the user's authorization. There are 57
+commits across all refs; `main` and `origin/main` exist.
 
-Maturidade (fatos de `README.md`, `docs/research-originality.md` §0/§7 e
-`docs/value-assessment.md` §9): um kernel testado (Debian 6.12.111, KASAN em 6.12.112), três
-inferiores (ext4, btrfs,
-XFS), índice só em RAM, sem números medidos, UAPI v1 sujeita a mudança, três defeitos de kernel
-achados pelos próprios testes, um autor, nenhum usuário externo.
+Maturity (facts from `README.md`, `docs/research-originality.md` §0/§7 and
+`docs/value-assessment.md` §9): one tested kernel (Debian 6.12.111, KASAN on 6.12.112), three
+lowers (ext4, btrfs,
+XFS), index in RAM only, no measured numbers, UAPI v1 subject to change, three kernel defects
+found by our own tests, one author, no external users.
 
-## 1. Ambiente de desenvolvimento reproduzível
+## 1. Reproducible development environment
 
-**O que existe.** `make vm-test` (`vm/run.sh`) constrói a imagem Docker (base Debian trixie fixada por digest, kernel 6.12.111+deb13 fixado), compila módulos e boota QEMU x86-64 TCG com
-timeout de 180 s, sem contêiner privilegiado e sem KVM. KASAN/UBSAN/lockdep usam o tarball
-upstream `linux-6.12.112` com hash verificado e virtme-ng (`vm/kasan.config`,
+**What exists.** `make vm-test` (`vm/run.sh`) builds the Docker image (Debian trixie base pinned by digest, kernel 6.12.111+deb13 pinned), compiles modules and boots QEMU x86-64 TCG with
+a 180 s timeout, without a privileged container and without KVM. KASAN/UBSAN/lockdep use the
+upstream tarball `linux-6.12.112` with a verified hash and virtme-ng (`vm/kasan.config`,
 `vm/kasan-guest.sh`).
-O mesmo `vm/suite.sh` roda nos dois ambientes.
+The same `vm/suite.sh` runs in both environments.
 
-**O que falta**, em ordem de valor para um novo contribuidor:
+**What is missing**, in order of value for a new contributor:
 
-1. Um documento de bootstrap de um comando (`docs/development.md`) com: requisitos do host
-   (Docker; macOS Apple Silicon usa emulação e é lento; Linux x86-64 com `/dev/kvm` pode
-   acelerar o
-   KASAN, a confirmar se o alvo `vm-test` aproveita KVM, pois o texto atual diz TCG), espaço em disco, memória e rede para o primeiro download.
-2. Tempos esperados medidos em pelo menos duas máquinas (Mac ARM, Linux x86). **A confirmar:**
-   nenhum tempo está registrado fora do timeout de CI; o plano é medir e registrar, não estimar.
-3. Como rodar um teste só. Hoje `vm/suite.sh` é sequencial. Proposta: variável de ambiente
-   `MOOB_ONLY=<etapa>` ou funções nomeadas, via mudança pequena revisada (ver §5, item 5).
-4. Como adicionar um teste: onde colocar o binário (`tests/*.c`), como `in-container.sh` o
-   compila e copia, onde `suite.sh` o chama, qual marcador `*_PASS` imprime e como falha.
-5. `make help` listando alvos; `make lint` (shellcheck, ver §4); `make check-spdx`.
-6. Opcional, só com voluntário mantenedor: `.devcontainer/` reaproveitando `vm/Dockerfile`, ou
-   `flake.nix`. Decisão do mantenedor.
-7. Repetir no topo do guia a diretriz de `AGENTS.md`: nunca carregar o módulo no host; sempre VM
-   descartável.
+1. A one-command bootstrap document (`docs/development.md`) with: host requirements
+   (Docker; macOS Apple Silicon uses emulation and is slow; Linux x86-64 with `/dev/kvm` can
+   speed up
+   KASAN, to be confirmed whether the `vm-test` target takes advantage of KVM, since the current text says TCG), disk space, memory and network for the first download.
+2. Expected times measured on at least two machines (ARM Mac, x86 Linux). **To be confirmed:**
+   no time is recorded apart from the CI timeout; the plan is to measure and record, not estimate.
+3. How to run a single test. Today `vm/suite.sh` is sequential. Proposal: environment variable
+   `MOOB_ONLY=<step>` or named functions, via a small reviewed change (see §5, item 5).
+4. How to add a test: where to put the binary (`tests/*.c`), how `in-container.sh`
+   compiles and copies it, where `suite.sh` calls it, which `*_PASS` marker it prints and how it fails.
+5. `make help` listing targets; `make lint` (shellcheck, see §4); `make check-spdx`.
+6. Optional, only with a volunteer maintainer: `.devcontainer/` reusing `vm/Dockerfile`, or
+   `flake.nix`. Maintainer's decision.
+7. Repeat at the top of the guide the `AGENTS.md` guideline: never load the module on the host; always a disposable
+   VM.
 
-## 2. CONTRIBUTING, CODE_OF_CONDUCT e SECURITY
+## 2. CONTRIBUTING, CODE_OF_CONDUCT and SECURITY
 
-Os três arquivos existem. A proposta é **revisar**, não criar.
+All three files exist. The proposal is to **revise**, not create.
 
-### 2.1 CONTRIBUTING.md (revisão)
+### 2.1 CONTRIBUTING.md (revision)
 
-Manter o que há e acrescentar, nesta ordem:
-- Estágio experimental e o que não esperar (link para o banner, §9).
-- Como começar (links para `docs/development.md`, `docs/testing.md`, a lista de issues
-  `good-first-issue`).
-- Estilo: C no estilo do kernel (tabulações, 80 colunas como guia, `checkpatch.pl` quando S5
-  existir), limites e endianness explícitos, SPDX `GPL-2.0-only` em todo arquivo novo, nenhuma
-  verificação desabilitada para passar o build.
-- Testes: mudança em `layer/`, `include/moobfs_ioctl.h`, `common/` ou formato exige `make
-  vm-test` verde e teste novo na VM; mudança em `layer/` pede também o workflow KASAN (`gh
+Keep what is there and add, in this order:
+- Experimental stage and what not to expect (link to the banner, §9).
+- How to get started (links to `docs/development.md`, `docs/testing.md`, the list of
+  `good-first-issue` issues).
+- Style: C in kernel style (tabs, 80 columns as a guide, `checkpatch.pl` once S5
+  exists), explicit limits and endianness, SPDX `GPL-2.0-only` in every new file, no
+  check disabled to make the build pass.
+- Tests: a change in `layer/`, `include/moobfs_ioctl.h`, `common/` or the format requires a green `make
+  vm-test` and a new test in the VM; a change in `layer/` also requires the KASAN workflow (`gh
   workflow
-  run kasan.yml` na branch) com link da execução no PR.
-- **Sem números de desempenho sem arquivo de evidência** em `build/bench/<data>/` ou anexo ao
-  diário, com comando, kernel, hardware e repetições (M4, `docs/benchmark-plan.md`).
-- Registro obrigatório: entrada em `docs/history/` e `CHANGELOG.md`; ADR para decisão
-  arquitetural, sem editar ADRs antigas (apontar a substituta).
-- Sem force-push em `main`; em branches de PR, rebase permitido antes da revisão e merge sem
-  reescrever história depois que houver revisão.
-- Linguagem (ver §4, item 12): decisão pendente.
-- **DCO:** hoje o texto diz que não há DCO nem CLA. Proposta: adotar DCO (`Signed-off-by`, `git
-  commit -s`) a partir de uma data, sem CLA, e verificar com uma GitHub Action. Justificativa:
-  prática do kernel Linux e licença GPL-2.0-only. **Decisão do mantenedor**; a mudança não é retroativa e deve respeitar contribuições existentes (`GOVERNANCE.md`).
-- Contribuições assistidas por IA: manter a seção atual.
+  run kasan.yml` on the branch) with a link to the run in the PR.
+- **No performance numbers without an evidence file** in `build/bench/<date>/` or attached to the
+  journal, with command, kernel, hardware and repetitions (M4, `docs/benchmark-plan.md`).
+- Mandatory record: entry in `docs/history/` and `CHANGELOG.md`; ADR for an architectural
+  decision, without editing old ADRs (point to the replacement).
+- No force-push on `main`; on PR branches, rebase allowed before review and merge without
+  rewriting history once there has been a review.
+- Language (see §4, item 12): decision pending.
+- **DCO:** today the text says there is no DCO and no CLA. Proposal: adopt DCO (`Signed-off-by`, `git
+  commit -s`) from a given date, without a CLA, and check it with a GitHub Action. Rationale:
+  Linux kernel practice and the GPL-2.0-only license. **Maintainer's decision**; the change is not retroactive and must respect existing contributions (`GOVERNANCE.md`).
+- AI-assisted contributions: keep the current section.
 
 ### 2.2 CODE_OF_CONDUCT.md
 
-Hoje é um texto próprio de 23 linhas, que declara não ser um covenant de terceiros. Proposta:
-adotar **Contributor Covenant 2.1** (declarar versão e atribuição CC BY 4.0), porque é
-reconhecido por contribuidores externos, mantendo o contato de denúncia. Pontos a decidir: (a)
-contato de aplicação, hoje `claudio@studiomoob.com`, enquanto o e-mail do mantenedor no
-ambiente é outro; **a confirmar** qual endereço publicar; (b) alternativa a um mantenedor único
-(o texto atual remete a denúncia à plataforma GitHub quando o alvo é o mantenedor); (c) prazo
-de resposta. Registrar a troca em diário e `CHANGELOG.md`.
+Today it is an own text of 23 lines, which states that it is not a third-party covenant. Proposal:
+adopt **Contributor Covenant 2.1** (state the version and the CC BY 4.0 attribution), because it is
+recognized by external contributors, keeping the reporting contact. Points to decide: (a)
+enforcement contact, today `claudio@studiomoob.com`, while the maintainer's email in the
+environment is a different one; **to be confirmed** which address to publish; (b) an alternative to a single maintainer
+(the current text refers the report to the GitHub platform when the target is the maintainer); (c) response
+time. Record the change in the journal and `CHANGELOG.md`.
 
 ### 2.3 SECURITY.md
 
-Estrutura proposta: escopo; canais (GitHub Security Advisories primeiro, e-mail como
-alternativa); o que enviar; metas de resposta; embargo; CVE; crédito; limites atuais. Detalhes
-em §7.
-Manter a seção "Current boundaries" existente e ampliá-la com o modelo de ameaça quando S1 existir.
+Proposed structure: scope; channels (GitHub Security Advisories first, email as an
+alternative); what to send; response targets; embargo; CVE; credit; current limits. Details
+in §7.
+Keep the existing "Current boundaries" section and expand it with the threat model once S1 exists.
 
-## 3. Organização de issues
+## 3. Issue organization
 
-**Labels** (criar via `gh label create`, listar em `docs/labels.md` ou em `CONTRIBUTING.md`):
+**Labels** (create via `gh label create`, list in `docs/labels.md` or in `CONTRIBUTING.md`):
 
-| Grupo | Labels |
+| Group | Labels |
 | --- | --- |
-| Área | `kernel-layer`, `index-query`, `tools`, `tests-vm`, `kasan`, `docs`, `site`, `bench-m4`, `security` |
-| Dificuldade | `good-first-issue`, `intermediate`, `kernel-expert` |
-| Prioridade | `p0` (perda de dados, crash, vazamento), `p1`, `p2` |
-| Estado | `needs-evidence`, `blocked-on-m4`, `needs-adr`, `needs-triage` |
+| Area | `kernel-layer`, `index-query`, `tools`, `tests-vm`, `kasan`, `docs`, `site`, `bench-m4`, `security` |
+| Difficulty | `good-first-issue`, `intermediate`, `kernel-expert` |
+| Priority | `p0` (data loss, crash, leak), `p1`, `p2` |
+| Status | `needs-evidence`, `blocked-on-m4`, `needs-adr`, `needs-triage` |
 
-Regras: toda issue de desempenho nasce com `needs-evidence` e `bench-m4`; `blocked-on-m4` marca
-decisões que `docs/distribution-strategy.md` §8 e `docs/value-assessment.md` §9 condicionam ao
-M4. Existe hoje o label `bug` (aplicado por `bug_report.yml`).
+Rules: every performance issue is born with `needs-evidence` and `bench-m4`; `blocked-on-m4` marks
+decisions that `docs/distribution-strategy.md` §8 and `docs/value-assessment.md` §9 make conditional on
+M4. Today the `bug` label exists (applied by `bug_report.yml`).
 
-**Templates** (em `.github/ISSUE_TEMPLATE/`):
-- `bug_report.yml` (revisar): commit; versão do kernel (`uname -r`); host ou VM; **sistema de
-  arquivos inferior** e opções de montagem (`lower=`, `nolinks`, `index_budget=`); `dmesg` com
-  BUG/WARNING/KASAN; passos mínimos; se rodou no harness (`make vm-test`) ou fora.
-- `test_failure.yml` (novo): qual alvo, marcador esperado e obtido, trecho de
-  `build/vm/console.log`, se reproduz em segundo run, host e Docker.
-- `proposal.yml` (existe): acrescentar campo "ADR relacionada" (link ou "nova ADR necessária") e
-  "impacto em UAPI ou formato".
-- `review_request.yml` (novo, para os pedidos de §8, uso de mantenedor).
-- Segurança: **sem template público**. `config.yml` já aponta `mailto:`; trocar/ampliar para o
-  link de Security Advisories (`/security/advisories/new`) e deixar `blank_issues_enabled:
+**Templates** (in `.github/ISSUE_TEMPLATE/`):
+- `bug_report.yml` (revise): commit; kernel version (`uname -r`); host or VM; **lower
+  filesystem** and mount options (`lower=`, `nolinks`, `index_budget=`); `dmesg` with
+  BUG/WARNING/KASAN; minimal steps; whether it ran in the harness (`make vm-test`) or outside.
+- `test_failure.yml` (new): which target, expected and obtained marker, excerpt of
+  `build/vm/console.log`, whether it reproduces on a second run, host and Docker.
+- `proposal.yml` (exists): add a field "Related ADR" (link or "new ADR needed") and
+  "impact on UAPI or format".
+- `review_request.yml` (new, for the requests in §8, maintainer use).
+- Security: **no public template**. `config.yml` already points to `mailto:`; replace/extend it with the
+  Security Advisories link (`/security/advisories/new`) and leave `blank_issues_enabled:
   false`.
 
-## 4. Contribuições iniciais sem kernel
+## 4. Initial contributions without a kernel
 
-Candidatos concretos, todos verificáveis no host ou em CI comum. Cada um vira issue com label de
-área, critério de pronto e arquivos tocados. Nenhum exige carregar módulo.
+Concrete candidates, all verifiable on the host or in ordinary CI. Each becomes an issue with an
+area label, a done-when criterion and the files touched. None requires loading a module.
 
-1. **Lacunas de `docs/testing.md`**: tabela de marcadores `*_PASS`, tempos, como ler
+1. **Gaps in `docs/testing.md`**: table of `*_PASS` markers, times, how to read
    `build/vm/*.log` (§5). `docs`, `good-first-issue`.
-2. **`moobfs-attr` e `moobfs-check`**: mensagens de erro e códigos de saída documentados,
-   `--help` consistente. Arquivos `tools/moobfs-attr.c`, `tools/moobfs-check.c`. `tools`.
-3. **Saída JSON** opcional em `moobfs-check` e `moobfs-index` (hoje `fsck.moobfs` já emite
-   JSON), com esquema documentado e teste em `tests/`. `tools`, `intermediate`.
-4. **Páginas de manual** (`man/moobfs-attr.1`, `moobfs-check.1`, `moobfs-index.1`,
-   `mkfs.moobfs.8`), verificadas com `mandoc -Tlint`. `docs`, `good-first-issue`.
-5. **Corpus de fuzz** para `tests/fuzz_attr.c`: hoje `tests/fuzz-corpus/attr` tem poucos
-   arquivos; gerar sementes por tipo de atributo e limites (comprimento 0, máximo, UTF-8
-   inválido),
-   minimizar com `-merge=1`. `tests-vm`/`tools`, `intermediate`.
-6. **Peças do harness `bench/`** conforme `docs/benchmark-harness.md`: `bench/gen` (dataset
-   determinístico a partir de semente) e `bench/report` (p50/p95/p99, CSV/JSON) em C ou Python;
-   ambos
-   rodam no host sem módulo. `bench-m4`, `intermediate`. **Nenhum número publicado** até haver execução em VM com evidência.
-7. **`bench/equiv`** (comparar `QUERY`, SQLite e oráculo): contra o oráculo, que já existe;
-   parte depende de VM. `bench-m4`, `intermediate`.
-8. **`site/plan.html` e demais páginas**: auditoria de acessibilidade (contraste, foco, `lang`,
-   landmarks, texto alternativo do diagrama), `scripts/check-site.py` estendido. `site`,
+2. **`moobfs-attr` and `moobfs-check`**: documented error messages and exit codes,
+   consistent `--help`. Files `tools/moobfs-attr.c`, `tools/moobfs-check.c`. `tools`.
+3. Optional **JSON output** in `moobfs-check` and `moobfs-index` (today `fsck.moobfs` already emits
+   JSON), with a documented schema and a test in `tests/`. `tools`, `intermediate`.
+4. **Manual pages** (`man/moobfs-attr.1`, `moobfs-check.1`, `moobfs-index.1`,
+   `mkfs.moobfs.8`), checked with `mandoc -Tlint`. `docs`, `good-first-issue`.
+5. **Fuzz corpus** for `tests/fuzz_attr.c`: today `tests/fuzz-corpus/attr` has few
+   files; generate seeds per attribute type and limits (length 0, maximum, invalid
+   UTF-8),
+   minimize with `-merge=1`. `tests-vm`/`tools`, `intermediate`.
+6. **Pieces of the `bench/` harness** per `docs/benchmark-harness.md`: `bench/gen` (deterministic
+   dataset from a seed) and `bench/report` (p50/p95/p99, CSV/JSON) in C or Python;
+   both
+   run on the host without the module. `bench-m4`, `intermediate`. **No published numbers** until there is a VM run with evidence.
+7. **`bench/equiv`** (compare `QUERY`, SQLite and the oracle): against the oracle, which already exists;
+   part depends on the VM. `bench-m4`, `intermediate`.
+8. **`site/plan.html` and other pages**: accessibility audit (contrast, focus, `lang`,
+   landmarks, alt text for the diagram), extended `scripts/check-site.py`. `site`,
    `good-first-issue`.
-9. **`moobfs-index` (oráculo)**: mensagens de erro, tratamento de árvores grandes, testes de
-   predicados limite. É a referência de corretude do `QUERY`; qualquer mudança exige comparação
-   com
-   o kernel na VM (então `intermediate`).
-10. **Matriz de avisos de compilador no CI**: gcc e clang, versões distintas, `-Wall -Wextra
-    -Wconversion -Wshadow -Werror` já usados em `Makefile` para ferramentas. `tools`,
+9. **`moobfs-index` (oracle)**: error messages, handling of large trees, tests of
+   boundary predicates. It is the correctness reference for `QUERY`; any change requires comparison
+   with
+   the kernel in the VM (hence `intermediate`).
+10. **Compiler warning matrix in CI**: gcc and clang, different versions, `-Wall -Wextra
+    -Wconversion -Wshadow -Werror` already used in the `Makefile` for tools. `tools`,
     `good-first-issue`.
-11. **`shellcheck`** em `vm/*.sh`, `vm/init`, `scripts/`: corrigir ou suprimir com
-    justificativa; novo passo no job `Tools and sanitizers`. `tests-vm`, `good-first-issue`.
-12. **Reprodutibilidade dos hashes de kernel**: script que verifica o digest da imagem Debian, o
-    pacote 6.12.111 e o SHA-256 do `linux-6.12.112` (hoje em `kasan.yml`); documentar como
-    atualizar em conjunto (como `docs/testing.md` já manda). `docs`/`tests-vm`.
-13. **Verificação de SPDX** (`scripts/check-spdx.py`) em fontes `.c/.h/.py/.sh`. `tools`,
+11. **`shellcheck`** on `vm/*.sh`, `vm/init`, `scripts/`: fix or suppress with a
+    justification; new step in the `Tools and sanitizers` job. `tests-vm`, `good-first-issue`.
+12. **Reproducibility of the kernel hashes**: a script that checks the Debian image digest, the
+    6.12.111 package and the SHA-256 of `linux-6.12.112` (today in `kasan.yml`); document how to
+    update them together (as `docs/testing.md` already requires). `docs`/`tests-vm`.
+13. **SPDX check** (`scripts/check-spdx.py`) on `.c/.h/.py/.sh` sources. `tools`,
     `good-first-issue`.
-14. **Tradução e política de idioma.** O README tem EN e PT-BR e o site está em inglês, mas
-    `docs/` (specs, ADRs, diário, roadmap de segurança) está em português, e o público-alvo é
-    internacional. Propor: (a) seção "At a glance" em inglês no README, com estágio, limites e como validar; (b) política: código, commits, issues e PRs em inglês ou português; documentos
-    normativos novos (ADRs, specs) em inglês ou bilíngues a partir de uma data; diário permanece no idioma do autor; (c) traduções de `docs/testing.md`, `security-roadmap.md` e `spec-m3.md`
-    primeiro, sinalizando "tradução de cortesia, o original prevalece". **Decisão do mantenedor.**
+14. **Translation and language policy.** The README has EN and PT-BR and the site is in English, but
+    `docs/` (specs, ADRs, journal, security roadmap) is in Portuguese, and the target audience is
+    international. Propose: (a) an "At a glance" section in English in the README, with stage, limits and how to validate; (b) policy: code, commits, issues and PRs in English or Portuguese; new normative
+    documents (ADRs, specs) in English or bilingual from a given date; the journal stays in the author's language; (c) translations of `docs/testing.md`, `security-roadmap.md` and `spec-m3.md`
+    first, marked "courtesy translation, the original prevails". **Maintainer's decision.**
 
-## 5. Documentar a execução dos testes em VM
+## 5. Documenting how to run the VM tests
 
-Reestruturar `docs/testing.md` (preservando o conteúdo atual, movido) em:
+Restructure `docs/testing.md` (preserving the current content, moved) into:
 
-1. **Pré-requisitos**: Docker, plataforma, espaço, rede; aviso para nunca usar `insmod` no host.
-2. **Alvos do Makefile**: tabela `make test` / `make fuzz` / `make attr-tools` / `make module` /
-   `make layer` / `make vm-test`, o que cada um compila e roda, onde escreve (`build/`), tempo
-   observado (a medir).
-3. **Marcadores e significado**: `MOOBFS_VM_PASS`, `SHARED:`, `MOUNTED_READ_TESTS_PASS`,
+1. **Prerequisites**: Docker, platform, space, network; warning never to use `insmod` on the host.
+2. **Makefile targets**: table `make test` / `make fuzz` / `make attr-tools` / `make module` /
+   `make layer` / `make vm-test`, what each compiles and runs, where it writes (`build/`), observed
+   time (to be measured).
+3. **Markers and meaning**: `MOOBFS_VM_PASS`, `SHARED:`, `MOUNTED_READ_TESTS_PASS`,
    `WRITABLE_MOUNT_REJECTED`, `LAYER_LOWER_PASS: <fs>`, `ISOLATION_PASS: <fs>` (`suite.sh`),
-   `ACCEPTANCE_CLIENTS_PASS`, `POWER_LOSS_REPLAY_PASS`, `IO_ERROR_INJECTION_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`, `MOOBFS_KASAN_PASS`; e `MOOBFS_VM_FAIL:`. Para cada um: o
-   que prova e o que **não** prova.
-4. **Ler os logs**: `build/vm/console.log`, `environment.txt`, `kernel.config`,
-   `image-report.json`; em KASAN, `build/vng/dmesg.txt` e o padrão que reprova (`BUG: KASAN`,
+   `ACCEPTANCE_CLIENTS_PASS`, `POWER_LOSS_REPLAY_PASS`, `IO_ERROR_INJECTION_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`, `MOOBFS_KASAN_PASS`; and `MOOBFS_VM_FAIL:`. For each one: what
+   it proves and what it does **not** prove.
+4. **Reading the logs**: `build/vm/console.log`, `environment.txt`, `kernel.config`,
+   `image-report.json`; under KASAN, `build/vng/dmesg.txt` and the pattern that fails the run (`BUG: KASAN`,
    `WARNING:`,
-   lockdep, UBSAN). Como distinguir uma rejeição **esperada** (imagem malformada, escrita em M1) de uma falha.
-5. **Rodar um teste isolado**: ver §1, item 3.
-6. **KASAN localmente**: replicar os passos de `kasan.yml` com `vng` (virtme-ng 1.41), comando
-   por comando, com espaço e tempo esperados, e como baixar o artefato do workflow no lugar de
-   rodar local.
-7. **Adicionar um inferior** (por exemplo F2FS): `vm/Dockerfile` (pacotes), `in-container.sh`
-   (módulos e imagem), `suite.sh` (`run_lower <fs> <dev> <reflink>`), `kasan.config`,
-   `kasan-guest.sh` (disco extra) e `kasan.yml`; avisar que cada inferior novo exige registro e não amplia o escopo sem ADR.
-8. **O que não é coberto**: xfstests completo, syzkaller, outros kernels (S2, S3, §0).
+   lockdep, UBSAN). How to distinguish an **expected** rejection (malformed image, write on M1) from a failure.
+5. **Running an isolated test**: see §1, item 3.
+6. **KASAN locally**: replicate the steps of `kasan.yml` with `vng` (virtme-ng 1.41), command
+   by command, with expected space and time, and how to download the workflow artifact instead of
+   running locally.
+7. **Adding a lower** (for example F2FS): `vm/Dockerfile` (packages), `in-container.sh`
+   (modules and image), `suite.sh` (`run_lower <fs> <dev> <reflink>`), `kasan.config`,
+   `kasan-guest.sh` (extra disk) and `kasan.yml`; warn that each new lower requires a record and does not widen the scope without an ADR.
+8. **What is not covered**: full xfstests, syzkaller, other kernels (S2, S3, §0).
 
-## 6. Critérios de revisão e aceitação de PRs
+## 6. PR review and acceptance criteria
 
-Checklist a anexar ao template de PR e a `CONTRIBUTING.md`:
+Checklist to attach to the PR template and to `CONTRIBUTING.md`:
 
-- [ ] O escopo corresponde a uma ADR aceita ou a uma issue discutida; formato ou UAPI sem issue
-  prévia não é aceito.
-- [ ] Testes adicionados na VM (`vm/suite.sh` ou `tests/`) para mudança de comportamento;
-  entradas inválidas incluídas quando há parser ou ioctl.
-- [ ] CI verde, incluindo `Tools and sanitizers` e `Native Linux VM`.
-- [ ] Para `layer/`: execução do workflow KASAN na branch, com link, sem `BUG`, `WARNING`,
-  lockdep ou UBSAN.
-- [ ] Entrada em `docs/history/` (objetivo, decisões, testes realmente executados, limitações,
-  próximo passo) e linha em `CHANGELOG.md`.
-- [ ] Nenhuma alegação sem evidência: nada de desempenho, segurança, "testado no Linux" ou
-  "pronto para produção"; conferir `docs/research-originality.md` §7.
-- [ ] Mudança de UAPI (`include/moobfs_ioctl.h`): especificação, incremento de versão, testes de
-  entradas inválidas e decisão explícita de compatibilidade.
-- [ ] Mudança de formato (M1 em `docs/format-m1.md` ou atributos): decisão de compatibilidade (ADR).
-- [ ] SPDX; sem credenciais, sem memórias reais; declaração de DCO (se adotado).
-- [ ] Declaração de assistência de IA e o que foi revisado por humano.
+- [ ] The scope corresponds to an accepted ADR or a discussed issue; format or UAPI changes without a prior
+  issue are not accepted.
+- [ ] Tests added in the VM (`vm/suite.sh` or `tests/`) for behavior changes;
+  invalid inputs included when there is a parser or ioctl.
+- [ ] Green CI, including `Tools and sanitizers` and `Native Linux VM`.
+- [ ] For `layer/`: a run of the KASAN workflow on the branch, with a link, without `BUG`, `WARNING`,
+  lockdep or UBSAN.
+- [ ] Entry in `docs/history/` (goal, decisions, tests actually run, limitations,
+  next step) and a line in `CHANGELOG.md`.
+- [ ] No claim without evidence: nothing about performance, security, "tested on Linux" or
+  "production ready"; check `docs/research-originality.md` §7.
+- [ ] UAPI change (`include/moobfs_ioctl.h`): specification, version increment, invalid-input
+  tests and an explicit compatibility decision.
+- [ ] Format change (M1 in `docs/format-m1.md` or attributes): compatibility decision (ADR).
+- [ ] SPDX; no credentials, no real memories; DCO sign-off (if adopted).
+- [ ] Statement of AI assistance and what was reviewed by a human.
 
-Política de revisão:
-- **Duas revisões** para `layer/`, `include/` e `common/` enquanto houver mantenedor único? Isso
-  é impossível hoje (um mantenedor e administrador com bypass). Proposta honesta: exigir uma
-  aprovação do mantenedor mais **uma revisão externa registrada** (comentário no PR, com nome) para mudanças em `layer/`; ativar a regra de duas aprovações quando existir um segundo
-  mantenedor. Decisão pendente.
-- **Squash**: merge por squash com mensagem final escrita pelo mantenedor, para manter `main`
-  legível; commits intermediários continuam no PR. Alternativa: merge com histórico quando a
-  série
-  for bisectável. A definir.
-- **Mensagem de commit**: assunto imperativo curto com prefixo de área (`layer:`, `tests:`,
-  `docs:`, `tools:`, `vm:`, `ci:`), linha em branco, o porquê, `Signed-off-by` se DCO,
-  referência a
-  issue/ADR/diário.
-- Reverter é preferível a reescrever; sem force-push em `main` (única exceção histórica: 0018).
+Review policy:
+- **Two reviews** for `layer/`, `include/` and `common/` while there is a single maintainer? That
+  is impossible today (one maintainer and administrator with bypass). Honest proposal: require one
+  maintainer approval plus **one recorded external review** (comment on the PR, with a name) for changes in `layer/`; enable the two-approval rule when a second
+  maintainer exists. Decision pending.
+- **Squash**: squash merge with a final message written by the maintainer, to keep `main`
+  readable; intermediate commits remain in the PR. Alternative: merge with history when the
+  series
+  is bisectable. To be defined.
+- **Commit message**: short imperative subject with an area prefix (`layer:`, `tests:`,
+  `docs:`, `tools:`, `vm:`, `ci:`), blank line, the why, `Signed-off-by` if DCO,
+  reference to
+  issue/ADR/journal.
+- Reverting is preferable to rewriting; no force-push on `main` (only historical exception: 0018).
 
-## 7. Comunicação responsável de vulnerabilidades
+## 7. Responsible vulnerability disclosure
 
-Conteúdo proposto de `SECURITY.md`:
+Proposed content of `SECURITY.md`:
 
-- **Canal:** GitHub Security Advisories (`security/advisories/new`) como principal; e-mail como
-  alternativa (endereço **a confirmar**); nunca issue pública.
-- **Escopo dentro:** módulo `layer/moobfs_layer.ko` e `kernel/moobfs.ko`, UAPI (`QUERY`,
-  `GET_INFO`), `common/` (parser de atributos), ferramentas em `tools/`, scripts do harness em
+- **Channel:** GitHub Security Advisories (`security/advisories/new`) as the primary one; email as an
+  alternative (address **to be confirmed**); never a public issue.
+- **In scope:** module `layer/moobfs_layer.ko` and `kernel/moobfs.ko`, UAPI (`QUERY`,
+  `GET_INFO`), `common/` (attribute parser), tools in `tools/`, harness scripts in
   `vm/`
-  quando o defeito afeta quem executa o harness (por exemplo, escrita fora de `build/`).
-- **Escopo fora:** defeitos nos sistemas de arquivos inferiores (ext4, btrfs, XFS), no kernel
-  Debian ou no QEMU sem relação com a camada; reporte aos respectivos projetos. Ataques que
-  exigem
-  `CAP_SYS_ADMIN` para montar não são escalada (a montagem já exige isso; S1).
-- **Contam como vulnerabilidade:** crash, travamento ou corrupção disparável por usuário sem
-  privilégio (negação de serviço inclusive, conforme `security-roadmap.md`), vazamento entre
-  usuários via `QUERY`, escrita fora dos limites, uso após liberação, perda silenciosa de dados.
-- **Metas de resposta** (metas, não garantias, dado um mantenedor): confirmação em 7 dias,
-  triagem em 14, correção ou plano em 90, divulgação coordenada ao final, ou antes se o relator
-  concordar. **Valores a confirmar** pelo mantenedor; o texto atual diz não prometer prazo.
-- **CVE:** solicitar via GitHub (CNA do GitHub) quando houver impacto em quem roda o módulo; sem
-  expectativa de CVE para código só de teste. Em achados no próprio kernel, acionar a lista de
-  segurança do kernel conforme `Documentation/process/security-bugs`.
-- **Embargo:** privado até a correção estar em `main`; relator e mantenedor combinam a data.
-- **Crédito:** no advisory, no diário e em `CHANGELOG.md`, com consentimento.
-- **Sem recompensa financeira (bug bounty).**
-- Aviso: não é um release suportado; correções só em `main`.
+  when the defect affects whoever runs the harness (for example, writing outside `build/`).
+- **Out of scope:** defects in the lower filesystems (ext4, btrfs, XFS), in the Debian
+  kernel or in QEMU unrelated to the layer; report them to the respective projects. Attacks that
+  require
+  `CAP_SYS_ADMIN` to mount are not escalation (mounting already requires it; S1).
+- **Count as a vulnerability:** crash, hang or corruption triggerable by an unprivileged
+  user (denial of service included, per `security-roadmap.md`), leak between
+  users via `QUERY`, out-of-bounds write, use after free, silent data loss.
+- **Response targets** (targets, not guarantees, given one maintainer): acknowledgment within 7 days,
+  triage within 14, fix or plan within 90, coordinated disclosure at the end, or earlier if the reporter
+  agrees. **Values to be confirmed** by the maintainer; the current text says it promises no deadline.
+- **CVE:** request via GitHub (GitHub's CNA) when there is impact on those who run the module; no
+  expectation of a CVE for test-only code. For findings in the kernel itself, contact the kernel
+  security list per `Documentation/process/security-bugs`.
+- **Embargo:** private until the fix is on `main`; reporter and maintainer agree on the date.
+- **Credit:** in the advisory, the journal and `CHANGELOG.md`, with consent.
+- **No financial reward (bug bounty).**
+- Notice: this is not a supported release; fixes only on `main`.
 
-## 8. Incentivar revisões independentes
+## 8. Encouraging independent reviews
 
-Abrir issues de "pedido de revisão" (label `security` ou `kernel-expert`), cada uma com um
-pacote para o revisor e uma pergunta delimitada. Nenhuma sugere que a camada foi auditada.
+Open "review request" issues (label `security` or `kernel-expert`), each with a
+package for the reviewer and a bounded question. None suggests that the layer has been audited.
 
-| Pedido | Pergunta | Artefatos |
+| Request | Question | Artifacts |
 | --- | --- | --- |
-| Modelo de ameaça (S1) | O modelo cobre o adversário certo? `FS_USERNS_MOUNT` desligado, `override_creds`, `nop_mnt_idmap`, autorização no `QUERY` | `docs/security-roadmap.md`, diário 0020, `layer/main.c`, `layer/index.c`, `tests/idmap.c` |
-| Concorrência | `rwsem` do índice, chunking do `QUERY`, `rename` e `paths_stale`, corrida com chmod/rename/unlink (commit `c933a74`) | `layer/index.c`, `tests/query.c`, logs KASAN do workflow |
-| Integridade | Cenários do `dm-log-writes` e do `dm-flakey`: o que falta (barreiras, rename, fsync de diretório) | `vm/suite.sh`, diário 0015 |
-| UAPI | Struct, flags, reservados, `copy_to_user`, `open_by_handle_at` devolvido pelo `QUERY` (S11) | `include/moobfs_ioctl.h`, `docs/spec-m3.md` |
-| Parser de atributos | Limites, UTF-8, alfabeto de nomes | `common/attr.c`, `tests/fuzz_attr.c` |
+| Threat model (S1) | Does the model cover the right adversary? `FS_USERNS_MOUNT` off, `override_creds`, `nop_mnt_idmap`, authorization in `QUERY` | `docs/security-roadmap.md`, journal 0020, `layer/main.c`, `layer/index.c`, `tests/idmap.c` |
+| Concurrency | Index `rwsem`, `QUERY` chunking, `rename` and `paths_stale`, race with chmod/rename/unlink (commit `c933a74`) | `layer/index.c`, `tests/query.c`, KASAN logs from the workflow |
+| Integrity | `dm-log-writes` and `dm-flakey` scenarios: what is missing (barriers, rename, directory fsync) | `vm/suite.sh`, journal 0015 |
+| UAPI | Struct, flags, reserved fields, `copy_to_user`, `open_by_handle_at` returned by `QUERY` (S11) | `include/moobfs_ioctl.h`, `docs/spec-m3.md` |
+| Attribute parser | Limits, UTF-8, name alphabet | `common/attr.c`, `tests/fuzz_attr.c` |
 
-O revisor recebe: a seção da especificação, o comando para reproduzir, os logs do `make
-vm-test`, o artefato do workflow KASAN da revisão exata (commit) e a lista de limitações
-conhecidas
-(TOCTOU, falso negativo após rename de diretório, segundo `research-originality.md` §7).
-Registro de achados: issue (ou advisory, se for vulnerabilidade) mais entrada de diário; se o
-achado
-muda o desenho, ADR nova que aponta para a anterior; crédito ao revisor. Não registrar
-"revisado" como aprovação: um comentário não prova segurança.
+The reviewer receives: the specification section, the command to reproduce, the `make
+vm-test` logs, the KASAN workflow artifact for the exact revision (commit) and the list of known
+limitations
+(TOCTOU, false negative after a directory rename, according to `research-originality.md` §7).
+Recording findings: issue (or advisory, if it is a vulnerability) plus a journal entry; if the
+finding
+changes the design, a new ADR that points to the previous one; credit to the reviewer. Do not record
+"reviewed" as approval: a comment does not prove security.
 
-## 9. Estágio experimental e limitações
+## 9. Experimental stage and limitations
 
-Texto proposto para o topo de `README.md` (e equivalente em PT-BR e no `site/index.html`):
+Proposed text for the top of `README.md` (and equivalent in PT-BR and in `site/index.html`):
 
 > **Experimental research project. Not for production use.** MoobFS is a native Linux stacked
 > filesystem layer (kernel module over ext4, btrfs or XFS) for storing and querying LLM-agent memory
@@ -332,93 +332,93 @@ Texto proposto para o topo de `README.md` (e equivalente em PT-BR e no `site/ind
 > - our own tests found **three kernel bugs** during development; there has been **no external audit**;
 > - reflink, deduplication and durability come from the lower filesystem, not from MoobFS.
 
-A página `site/index.html` mostra o mesmo bloco acima da dobra. Verificar cada linha contra
-`README.md`, `docs/research-originality.md` §0 e §7 e `docs/value-assessment.md` §9 antes de
-publicar; "três defeitos" vem de §9.1 e **a confirmar** contra os diários 0011 a 0015.
+The `site/index.html` page shows the same block above the fold. Check each line against
+`README.md`, `docs/research-originality.md` §0 and §7 and `docs/value-assessment.md` §9 before
+publishing; "three defects" comes from §9.1 and is **to be confirmed** against journals 0011 to 0015.
 
-## 10. Roadmap público
+## 10. Public roadmap
 
-Reestruturar `ROADMAP.md` em três estados, cada item com link para diário ou especificação:
+Restructure `ROADMAP.md` into three states, each item with a link to a journal or specification:
 
-- **Concluído com evidência:** M0 (0001-0003); M1 somente leitura (0002, `docs/format-m1.md`);
-  M2 fases 2a-2e (0011-0015, `docs/spec-m2.md`); harness KASAN (0016); fase 3b parcial (0020:
-  autorização no `QUERY`, idmap e userns rejeitados, corrida com chmod/rename/unlink). Cada linha cita o que **foi** testado e o que não foi.
-- **Planejado:** restante do M3 (`docs/spec-m3.md`); ADR de ameaça S1; S5 lint; S6
-  (`SECURITY.md` revisado); fstests (S2); S4 (inferior hostil). Sem datas.
-- **Dependente de validação (M4 ou segurança):** `QUERY_BATCH`, `READ_BATCH` e persistência do
-  índice (condicionados ao M4); benchmark (M4, `docs/benchmark-plan.md` e
-  `benchmark-harness.md`); DKMS, `.deb` e etapa 3 pública (`distribution-strategy.md` §8); syzkaller (S3); fuzzing contínuo (S7); hardening (S8); limites (S9); assinatura (S10).
+- **Done with evidence:** M0 (0001-0003); M1 read-only (0002, `docs/format-m1.md`);
+  M2 phases 2a-2e (0011-0015, `docs/spec-m2.md`); KASAN harness (0016); partial phase 3b (0020:
+  authorization in `QUERY`, idmap and userns rejected, race with chmod/rename/unlink). Each line cites what **was** tested and what was not.
+- **Planned:** rest of M3 (`docs/spec-m3.md`); threat ADR S1; S5 lint; S6
+  (revised `SECURITY.md`); fstests (S2); S4 (hostile lower). No dates.
+- **Dependent on validation (M4 or security):** `QUERY_BATCH`, `READ_BATCH` and index
+  persistence (conditional on M4); benchmark (M4, `docs/benchmark-plan.md` and
+  `benchmark-harness.md`); DKMS, `.deb` and public stage 3 (`distribution-strategy.md` §8); syzkaller (S3); continuous fuzzing (S7); hardening (S8); limits (S9); signing (S10).
 
-Mapa de fases para itens de segurança: M2 fecha com S-itens parciais da tabela de estado; M3
-depende de S1 e S11; M4 não depende de S-itens, mas a versão pública depende de S1-S6 e S8-S10.
-Cada item recebe um rótulo "proposta", "implementado", "testado (kernel, inferior)", como
-`AGENTS.md` pede.
+Phase map for security items: M2 closes with partial S-items from the status table; M3
+depends on S1 and S11; M4 does not depend on S-items, but the public version depends on S1-S6 and S8-S10.
+Each item gets a label "proposal", "implemented", "tested (kernel, lower)", as
+`AGENTS.md` requires.
 
-## 11. Sequência priorizada de ações
+## 11. Prioritized sequence of actions
 
-Esforço: S (horas), M (1 a 3 dias), L (semana ou mais). "Decisão" marca o que depende do mantenedor.
+Effort: S (hours), M (1 to 3 days), L (a week or more). "Decision" marks what depends on the maintainer.
 
-| # | Ação | Esforço | Depende de | Decisão |
+| # | Action | Effort | Depends on | Decision |
 | --- | --- | --- | --- | --- |
-| 1 | Revisar e commitar este plano, com diário e `CHANGELOG.md` | S | revisão do mantenedor | não |
-| 2 | Confirmar contatos (conduta e segurança) e se o Security Advisories está ativo | S | 0 | **sim** (e-mail) |
-| 3 | Confirmar a licença: `LICENSE` GPL v2, SPDX `GPL-2.0-only`; avaliar "or later" fora de escopo | S | 0 | **sim** (confirmar) |
-| 4 | Banner de estágio experimental no README, PT-BR e site (§9) | S | 1 | não |
-| 5 | Criar labels e `docs/labels.md` | S | 0 | não |
-| 6 | Revisar `SECURITY.md` (§7), metas de resposta | S | 2 | **sim** (prazos) |
-| 7 | Decidir DCO vs sem DCO; atualizar `CONTRIBUTING.md` e template de PR | S | 0 | **sim** |
-| 8 | Decidir Contributor Covenant 2.1 e contato de aplicação | S | 2 | **sim** |
-| 9 | Política de idioma e seção "At a glance" em inglês | M | 0 | **sim** |
-| 10 | Templates de issue novos (§3) | S | 5 | não |
-| 11 | `docs/development.md` e reestruturar `docs/testing.md` (§1, §5); medir tempos | M | 0 | não |
-| 12 | `ROADMAP.md` em três estados (§10) | S | 1 | não |
-| 13 | Abrir 10 a 15 issues iniciais (§4) com labels | M | 5, 10 | não |
-| 14 | `shellcheck` e `check-spdx` no CI | S | 13 | não |
-| 15 | Abrir pedidos de revisão (§8) após ADR S1 | M | S1 | não |
-| 16 | ADR de modelo de ameaça (S1) | M | 0020 | **sim** (ADR) |
-| 17 | `MOOB_ONLY` ou execução isolada em `vm/suite.sh` (altera código; exige VM e KASAN) | M | 11 | não |
-| 18 | KASAN como check obrigatório ou por PR de `layer/` | M | custo de CI (150 min) | **sim** |
+| 1 | Review and commit this plan, with journal and `CHANGELOG.md` | S | maintainer review | no |
+| 2 | Confirm contacts (conduct and security) and whether Security Advisories is active | S | 0 | **yes** (email) |
+| 3 | Confirm the license: `LICENSE` GPL v2, SPDX `GPL-2.0-only`; evaluating "or later" out of scope | S | 0 | **yes** (confirm) |
+| 4 | Experimental-stage banner in the README, PT-BR and site (§9) | S | 1 | no |
+| 5 | Create labels and `docs/labels.md` | S | 0 | no |
+| 6 | Revise `SECURITY.md` (§7), response targets | S | 2 | **yes** (deadlines) |
+| 7 | Decide DCO vs no DCO; update `CONTRIBUTING.md` and the PR template | S | 0 | **yes** |
+| 8 | Decide on Contributor Covenant 2.1 and the enforcement contact | S | 2 | **yes** |
+| 9 | Language policy and an "At a glance" section in English | M | 0 | **yes** |
+| 10 | New issue templates (§3) | S | 5 | no |
+| 11 | `docs/development.md` and restructure `docs/testing.md` (§1, §5); measure times | M | 0 | no |
+| 12 | `ROADMAP.md` in three states (§10) | S | 1 | no |
+| 13 | Open 10 to 15 initial issues (§4) with labels | M | 5, 10 | no |
+| 14 | `shellcheck` and `check-spdx` in CI | S | 13 | no |
+| 15 | Open review requests (§8) after ADR S1 | M | S1 | no |
+| 16 | Threat model ADR (S1) | M | 0020 | **yes** (ADR) |
+| 17 | `MOOB_ONLY` or isolated execution in `vm/suite.sh` (changes code; requires VM and KASAN) | M | 11 | no |
+| 18 | KASAN as a required check or per `layer/` PR | M | CI cost (150 min) | **yes** |
 
-As ações 1 a 14 não tocam código do kernel. A 17 e a 18 tocam harness e CI e seguem as regras de §6.
+Actions 1 to 14 do not touch kernel code. Actions 17 and 18 touch the harness and CI and follow the rules of §6.
 
-## 12. Arquivos a criar ou modificar
+## 12. Files to create or modify
 
-Este documento cria apenas `docs/community-plan.md`. Se o plano for aprovado, os arquivos abaixo
-seriam alterados em PRs separados, cada um com diário e `CHANGELOG.md`.
+This document creates only `docs/community-plan.md`. If the plan is approved, the files below
+would be changed in separate PRs, each with a journal entry and `CHANGELOG.md`.
 
-| Arquivo | Ação |
+| File | Action |
 | --- | --- |
-| `README.md`, `README.pt-BR.md`, `site/index.html` | banner experimental; seção "At a glance" em inglês |
-| `ROADMAP.md` | três estados com links |
-| `CONTRIBUTING.md`, `.github/pull_request_template.md` | checklist de §6, DCO (se aprovado), KASAN, evidência |
-| `CODE_OF_CONDUCT.md` | Contributor Covenant 2.1 (se aprovado) |
-| `SECURITY.md` | escopo, metas, CVE, embargo, crédito |
-| `.github/ISSUE_TEMPLATE/bug_report.yml`, `proposal.yml`, `config.yml` | campos de kernel/inferior/dmesg; ADR; link de advisory |
-| `.github/ISSUE_TEMPLATE/test_failure.yml`, `review_request.yml` | novos |
-| `.github/CODEOWNERS` | novo (quando houver mais de um mantenedor) |
-| `.github/workflows/ci.yml` | `shellcheck`, `check-spdx`, matriz de avisos, DCO (se aprovado) |
-| `docs/development.md` (novo), `docs/testing.md` | bootstrap, estrutura de §5 |
-| `docs/labels.md` (novo) | labels e uso |
-| `docs/decisions/0008-*.md` (novo, ID a confirmar) | modelo de ameaça (S1) |
-| `docs/history/NNNN-*.md`, `docs/history/README.md`, `CHANGELOG.md` | registros de cada etapa |
-| `vm/suite.sh`, `Makefile` | execução isolada, `help`, `lint` (código; exige VM) |
-| `scripts/check-spdx.py` (novo), `man/*` (novos) | tarefas iniciais |
-| `.devcontainer/` ou `flake.nix` | opcional, a decidir |
+| `README.md`, `README.pt-BR.md`, `site/index.html` | experimental banner; "At a glance" section in English |
+| `ROADMAP.md` | three states with links |
+| `CONTRIBUTING.md`, `.github/pull_request_template.md` | checklist from §6, DCO (if approved), KASAN, evidence |
+| `CODE_OF_CONDUCT.md` | Contributor Covenant 2.1 (if approved) |
+| `SECURITY.md` | scope, targets, CVE, embargo, credit |
+| `.github/ISSUE_TEMPLATE/bug_report.yml`, `proposal.yml`, `config.yml` | kernel/lower/dmesg fields; ADR; advisory link |
+| `.github/ISSUE_TEMPLATE/test_failure.yml`, `review_request.yml` | new |
+| `.github/CODEOWNERS` | new (when there is more than one maintainer) |
+| `.github/workflows/ci.yml` | `shellcheck`, `check-spdx`, warning matrix, DCO (if approved) |
+| `docs/development.md` (new), `docs/testing.md` | bootstrap, structure from §5 |
+| `docs/labels.md` (new) | labels and usage |
+| `docs/decisions/0008-*.md` (new, ID to be confirmed) | threat model (S1) |
+| `docs/history/NNNN-*.md`, `docs/history/README.md`, `CHANGELOG.md` | records of each step |
+| `vm/suite.sh`, `Makefile` | isolated execution, `help`, `lint` (code; requires VM) |
+| `scripts/check-spdx.py` (new), `man/*` (new) | initial tasks |
+| `.devcontainer/` or `flake.nix` | optional, to be decided |
 
-Limitações: o conteúdo de campos dos templates, a configuração real do GitHub (labels, proteção
-do `main`, advisories, Pages) e tempos de execução não foram verificados; todos estão marcados
-"a confirmar".
+Limitations: the contents of the template fields, the actual GitHub configuration (labels, protection
+of `main`, advisories, Pages) and execution times were not verified; all are marked
+"to be confirmed".
 
-## 13. Decisões do mantenedor (2026-10-10)
+## 13. Maintainer decisions (2026-10-10)
 
-| Tema | Decisão |
+| Topic | Decision |
 | --- | --- |
-| Contato de segurança e conduta | `claudio@studiomoob.com`, mais o canal privado do GitHub Security Advisories |
-| DCO | Adotado: `Signed-off-by` obrigatório em cada commit, verificado no CI |
-| Código de conduta | Contributor Covenant 2.1, com a fonte citada |
-| Idioma | Inglês em código, commits, issues, PRs e README; documentação em `docs/` aceita em português ou inglês; ADRs e especificações traduzidos sob demanda externa |
-| Prazos em `SECURITY.md` | Confirmação em 7 dias, avaliação em 30 dias, atualização ao relator a cada 30 dias; correção sem prazo fixo |
-| KASAN | Obrigatório em pull requests que alterem `layer/` ou `vm/`; semanal e sob demanda para o resto |
-| Licença | Confirmada GPL-2.0-only |
-| Revisão de `layer/` | Um mantenedor mais uma revisão externa registrada, até haver segundo mantenedor |
-| Execução | Ações 1 a 14 aprovadas; 15 a 18 após o merge da fase 3b |
+| Security and conduct contact | `claudio@studiomoob.com`, plus the private GitHub Security Advisories channel |
+| DCO | Adopted: `Signed-off-by` required on every commit, checked in CI |
+| Code of conduct | Contributor Covenant 2.1, with the source cited |
+| Language | English in code, commits, issues, PRs and README; documentation in `docs/` accepted in Portuguese or English; ADRs and specifications translated on external demand |
+| Deadlines in `SECURITY.md` | Acknowledgment within 7 days, assessment within 30 days, update to the reporter every 30 days; fix with no fixed deadline |
+| KASAN | Required on pull requests that change `layer/` or `vm/`; weekly and on demand for the rest |
+| License | Confirmed GPL-2.0-only |
+| Review of `layer/` | One maintainer plus one recorded external review, until there is a second maintainer |
+| Execution | Actions 1 to 14 approved; 15 to 18 after the merge of phase 3b |
