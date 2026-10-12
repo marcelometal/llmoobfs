@@ -250,10 +250,14 @@ Todos os documentos de `docs/`, com o idioma de cada um, estão no [índice da d
 
 O MoobFS se apoia em precedentes que reconhece: o Semantic File System (1991) e o Be File
 System (1997) para consultas por atributos, overlayfs e ecryptfs para o modelo empilhado, e o
-YoloFS (2026), que já demonstra um módulo de kernel empilhado voltado a agentes. O projeto não
-reivindica nenhuma dessas ideias como inédita; o que explora é a combinação delas com
-autorização POSIX por resultado numa consulta do kernel, e se isso tem valor mensurável
-([research-originality.md](docs/research-originality.md) §4, §5, §9).
+YoloFS (2026), que já demonstra um módulo de kernel empilhado voltado a agentes. O `QUERY2` por
+domínio segue a pesquisa sobre busca com controle de acesso: particionar o índice pelo conjunto de
+leitores (Singh et al. 2007; GUFI, SC22) fecha os vazamentos que filtrar depois da busca deixa
+abertos (Büttcher e Clarke, FAST 2005; Wang et al., S&P 2017). O projeto não reivindica nenhuma
+dessas ideias como inédita; o que explora é a combinação delas numa camada empilhada no kernel, e
+se isso tem valor mensurável ([research-originality.md](docs/research-originality.md) §4, §5, §9).
+Cada obra, projeto e ferramenta usada está listada com fontes conferidas em
+[references.md](docs/references.md).
 
 ## Contribuição e segurança
 

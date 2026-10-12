@@ -401,6 +401,48 @@ run_lower() {
     q2ord leap-fallback 5 --limit 2 --pages ns eq string n1 kind eq string note -- $LOWER/da ns eq string n1 kind eq string note
     set -f; q2batchcmp fallback; set +f
     echo "QUERY2_LEAPFROG_PASS: $fs"
+    # QUERY2 under concurrency (phase Q2e, spec test 8): mode changes, renames, unlink and
+    # recreate, files moving to another domain and back, and chmod of the domain directory
+    # itself (which switches the domain to fallback and closes it for a moment), racing for
+    # 5 s with paged QUERY2 as uid 1001 over the plain, equality and ordered plans. Answers
+    # must stay well formed and every result openable unless changed after the answer; the
+    # final answer must equal the oracle, paged or not.
+    mkdir -p $LAYER/dr $LAYER/dr2 && chmod 0755 $LAYER/dr $LAYER/dr2 || fail "q2e-mkdir-$fs"
+    q2e_new() {   # $1: file index
+        f=$LAYER/dr/r$1.md
+        echo "r$1" > $f && $BIN/moobfs-attr set $f kind string note >/dev/null &&
+            $BIN/moobfs-attr set $f ns string r >/dev/null &&
+            $BIN/moobfs-attr set $f created time $(( $1 * 1000 )) >/dev/null && chmod 0644 $f
+    }
+    for i in $(seq 1 40); do q2e_new $i || fail "q2e-attr-$fs"; done
+    umount $LAYER && mount -t moobfs_layer -o lower=$LOWER none $LAYER || fail "q2e-remount-$fs"
+    $BIN/query $LAYER info | grep -q 'fallback_domains=0' || fail "q2e-fallback-start-$fs"
+    : > /tmp/q2e.go
+    ( n=0; while [ -e /tmp/q2e.go ]; do
+          i=$(( n % 40 + 1 )); n=$(( n + 1 ))
+          chmod 0600 $LAYER/dr/r$i.md 2>/dev/null; chmod 0644 $LAYER/dr/r$i.md 2>/dev/null
+          mv $LAYER/dr/r$i.md $LAYER/dr/t$i.md 2>/dev/null && mv $LAYER/dr/t$i.md $LAYER/dr/r$i.md 2>/dev/null
+          rm -f $LAYER/dr/r$i.md; q2e_new $i 2>/dev/null
+          [ $(( n % 5 )) -eq 0 ] && { mv $LAYER/dr/r$i.md $LAYER/dr2/r$i.md 2>/dev/null; mv $LAYER/dr2/r$i.md $LAYER/dr/r$i.md 2>/dev/null; }
+          [ $(( n % 7 )) -eq 0 ] && { chmod 0711 $LAYER/dr; chmod 0755 $LAYER/dr; }
+      done ) &
+    racer=$!
+    $BIN/query --uid 1001 $LAYER/dr race2 5 | tee /tmp/q2e.txt || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
+    rm -f /tmp/q2e.go; wait $racer
+    grep -q '^race2: [1-9]' /tmp/q2e.txt || fail "q2e-no-iterations-$fs"
+    # a rename or move cut by the end of the race may leave t<i>.md behind or r<i>.md in dr2
+    chmod 0755 $LAYER/dr && rm -f $LAYER/dr/t*.md $LAYER/dr2/*.md || fail "q2e-tidy-$fs"
+    for i in $(seq 1 40); do [ -e $LAYER/dr/r$i.md ] || q2e_new $i || fail "q2e-restore-$fs"; done
+    chmod 0644 $LAYER/dr/*.md || fail "q2e-final-mode-$fs"
+    $BIN/query $LAYER info | grep -q 'fallback_domains=0' && fail "q2e-no-fallback-$fs"   # the race must have switched it
+    $BIN/query --uid 1001 $LAYER/dr q2 kind eq string note > /tmp/k.txt || fail "q2e-final-query-$fs"
+    $BIN/moobfs-index --domain $LOWER/dr kind eq string note > /tmp/o.txt || fail "q2e-final-oracle-$fs"
+    cmp -s /tmp/k.txt /tmp/o.txt || { diff /tmp/k.txt /tmp/o.txt; fail "q2e-final-mismatch-$fs"; }
+    [ "$(wc -l < /tmp/k.txt)" -eq 40 ] || fail "q2e-final-count-$fs"
+    $BIN/query --uid 1001 $LAYER/dr q2 --limit 3 --pages kind eq string note > /tmp/k2.txt || fail "q2e-final-pages-$fs"
+    cmp -s /tmp/k.txt /tmp/k2.txt || fail "q2e-final-pages-mismatch-$fs"
+    rm -rf $LAYER/dr $LAYER/dr2 || fail "q2e-cleanup-$fs"
+    echo "QUERY2_RACE_PASS: $fs"
     echo "kind eq string note" > /tmp/q2q.txt
     $BIN/bench-load --workload W3 --target $LAYER/da --root $LAYER/da --query2 1 --uid 1001 --queries /tmp/q2q.txt --repeat 3 --out /tmp/q2w3 || fail "q2-bench-w3-$fs"
     rm -rf $LAYER/da $LAYER/db $LAYER/dshared || fail "q2-cleanup-$fs"
