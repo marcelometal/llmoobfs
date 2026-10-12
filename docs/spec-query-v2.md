@@ -66,7 +66,7 @@ proposta continua registrada como acima; o comportamento implementado é este:
   nunca aparece a mais).
 - Com `domain_depth=0` a v1 mantém a semântica anterior e continua aberta a todos; a restrição
   a `CAP_SYS_ADMIN` (§4.5) vale quando os domínios estão ligados.
-- `MOOB_IOC_QUERY2` com o índice desligado (`noindex`) devolve `ENOSYS`, como a v1. Campos de
+- `MOOB_IOC_QUERY2` com o índice desligado (`noindex`) devolve `ENOSYS`, como a v1. (Revisão de 2026-10-12, registro 0050: as duas versões passaram a devolver `EOPNOTSUPP`.) Campos de
   `order_by`, `order`, `cursor`, `flags`, preenchimento, reservados e a marca `MISSING_OK` devem
   ser zero nesta fase (`EINVAL`); entram nas fases Q2b e Q2d.
 

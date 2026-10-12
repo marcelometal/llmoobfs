@@ -114,7 +114,7 @@ ir além de S6. Isto deve ser decidido antes de executar o M4.
 
 - **Montagem**: se a varredura estoura o orçamento, `index_put` devolve `-ENOMEM`, a varredura
   para e `moobl_index_build` falha com aviso (`mount with noindex to skip it`): montagem
-  recusada, ou `noindex` (QUERY responde `ENOSYS`). Testado com `index_budget=1M` em árvore
+  recusada, ou `noindex` (QUERY responde `EOPNOTSUPP`; `ENOSYS` até o registro 0050). Testado com `index_budget=1M` em árvore
   minúscula (registro 0014); com carga grande, não.
 - **Em execução**: falha de memória ao atualizar o índice depois de uma escrita já feita no
   inferior **não desfaz a escrita**: marca `incomplete` e o `GET_INFO` expõe

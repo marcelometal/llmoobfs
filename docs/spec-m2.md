@@ -97,6 +97,9 @@ Montagem `ro`: nenhuma escrita chega ao inferior; o índice é construído norma
 - Modificar o inferior **enquanto montado** é indefinido, como no overlayfs; `moobfs-check`
   detecta divergência entre índice e inferior por varredura comparativa.
 
+> Nota (2026-10-12, registro 0050): com o índice desligado, `QUERY` passou a devolver
+> `EOPNOTSUPP` em vez de `ENOSYS`; `ENOSYS` fica reservado a chamada de sistema inexistente.
+
 ## 6. Consistência e durabilidade
 
 - Tudo que o inferior garante, a camada herda; nada além disso. `fsync` bem-sucedido significa

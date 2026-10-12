@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **UAPI change:** with `noindex`, `MOOB_IOC_QUERY` and `MOOB_IOC_QUERY2` return `EOPNOTSUPP`
+  instead of `ENOSYS` (journal 0050). checkpatch is now clean and required in CI; the oracle no
+  longer calls `qsort` on an empty answer; `bench/equiv.sh` checks the oracle's own status;
+  `bench-smoke` runs under ASan and UBSan in CI; `kasan.yml` fails explicitly on failure
+  markers.
 - QUERY2 "N most recent" (journal 0048): without per-result checks a scan chunk gathers only the
   results still missing plus one, instead of 256 candidates; attributes are matched by name node
   inside a domain. On the Mac mini the top-20 shapes got 7 to 17 times faster and now beat the

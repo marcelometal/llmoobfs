@@ -1,7 +1,6 @@
 # 0050 — Pendências de código recebidas do lote de experiência do desenvolvedor
 
-Data: 2026-10-12. Estado: implementadas nas branches da série Q2; uma decisão pendente
-(`ENOSYS`).
+Data: 2026-10-12. Estado: implementadas nas branches da série Q2; checkpatch zerado e obrigatório.
 
 ## Contexto
 
@@ -34,10 +33,18 @@ fila Q2 (cada atualização da main força uma nova execução do KASAN).
    Sem mudança de comportamento: `make vm-test` passou (`MOOBFS_VM_PASS`, blocos `QUERY2_*`,
    `DEMO_PASS`, `MOOBFS_LAYER_PASS`).
 
-## Pendente: os dois `ENOSYS`
+## Decisão: `EOPNOTSUPP` no lugar de `ENOSYS`
 
-Com `noindex`, a v1 e a v2 devolvem `ENOSYS`; para o checkpatch, `ENOSYS` só significa "chamada
-de sistema inexistente". Trocar o código de erro é decisão de compatibilidade da UAPI, levada ao
-mantenedor com duas opções: trocar por `EOPNOTSUPP` (recomendado) ou manter e excluir só essa
-regra no `scripts/checkpatch.sh`. Enquanto isso, o passo do checkpatch continua consultivo
-(`continue-on-error`).
+Com `noindex`, a v1 e a v2 devolviam `ENOSYS`; para o checkpatch, `ENOSYS` só significa "chamada
+de sistema inexistente". O mantenedor escolheu trocar por `EOPNOTSUPP` (alternativa: manter e
+excluir só essa regra no `scripts/checkpatch.sh`). Decisão de compatibilidade: a UAPI é
+declarada experimental e nenhum teste dependia do código antigo, mas um cliente que testasse
+`ENOSYS` precisa passar a testar `EOPNOTSUPP`. Com domínios desligados, a v2 já devolvia
+`EOPNOTSUPP`; para distinguir os dois casos, o cliente lê `GET_INFO` (`MOOB_FLAG_INDEX_OFF`,
+`MOOB_FLAG_DOMAINS`). A suíte passou a verificar o código: a v1 com `noindex` falha com
+"Operation not supported" e a v2 devolve 95 (`EOPNOTSUPP`).
+
+Com isso o checkpatch ficou com 0 erros e 0 avisos nessa branch; `scripts/checkpatch.sh` sai com
+1 em qualquer aviso (conferido nas duas direções), e o passo deixou de ter `continue-on-error`
+no job `Lint` (item S5 de `docs/security-roadmap.md`). As especificações antigas recebem nota
+datada em vez de reescrita.
