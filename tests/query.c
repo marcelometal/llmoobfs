@@ -21,6 +21,12 @@
  *   query <domain-dir> q2invalid                     malformed QUERY2 requests are refused
  *   query [--uid N] <dir> q2errno [opts] <terms...>  prints the errno of QUERY2 (0 on success)
  *   query [--uid N] <x> rename <old> <new>           prints the errno of rename(2) (0 on success)
+ *   query [--uid N] <domain-dir> race2 <seconds>     QUERY2 under churn (spec test 8): cycles the
+ *                                                    plain, equality and ordered plans with small
+ *                                                    pages; results must be well formed and openable
+ *                                                    unless changed after the answer; ESTALE (fallback
+ *                                                    switched) restarts paging, EACCES (domain closed
+ *                                                    by chmod) is counted
  *   query [--uid N] <mount> race <seconds>           repeats QUERY kind eq note while another
  *                                                    process changes modes, names and inodes;
  *                                                    every result must be well formed and
@@ -300,6 +306,84 @@ int main(int argc, char **argv)
 		       info.lower_fs, info.caps, info.flags, (uint64_t)info.index_budget,
 		       (uint64_t)info.index_used, info.index_entries, info.index_inodes);
 		return 0;
+	}
+	if (argc >= 4 && !strcmp(argv[2], "race2")) {
+		struct timespec t0, t1;
+		unsigned long iters = 0, pages = 0, hits = 0, gone = 0, denied = 0, replaced = 0;
+		unsigned long stale = 0, closed = 0, closed_tries = 0;
+		int was_closed = 0;
+		double secs = atof(argv[3]);
+
+		clock_gettime(CLOCK_MONOTONIC, &t0);
+		for (;;) {
+			struct moob_query2 q2;
+			int plan = (int)(iters % 3), r;
+
+			memset(&q2, 0, sizeof q2);
+			q2.version = MOOB_QUERY2_VERSION;
+			q2.nterms = 1;
+			strcpy(q2.terms[0].name, "kind"); q2.terms[0].op = MOOB_OP_EQ;
+			q2.terms[0].type = MOOB_T_STRING; q2.terms[0].len = 4; memcpy(q2.terms[0].value, "note", 4);
+			if (plan == 1) {	/* equality plan: two EQ terms */
+				q2.nterms = 2;
+				strcpy(q2.terms[1].name, "ns"); q2.terms[1].op = MOOB_OP_EQ;
+				q2.terms[1].type = MOOB_T_STRING; q2.terms[1].len = 1; q2.terms[1].value[0] = 'r';
+			} else if (plan == 2) {	/* ordered plan */
+				strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_DESC; q2.order_type = MOOB_T_TIME;
+			}
+			q2.limit = 7;
+			q2.results = (__u64)(uintptr_t)res;
+			for (;;) {	/* one full pagination */
+				__u32 i;
+
+				r = ioctl(fd, MOOB_IOC_QUERY2, &q2);
+				if (r && errno == ESTALE) {	/* the domain switched fallback mode: start over */
+					stale++;
+					memset(q2.cursor, 0, sizeof q2.cursor);
+					continue;
+				}
+				if (r && errno == EACCES) {	/* domain directory closed by chmod: count episodes */
+					closed_tries++;
+					if (!was_closed) closed++;
+					was_closed = 1;
+					break;
+				}
+				was_closed = 0;
+				if (r) { perror("MOOB_IOC_QUERY2"); return 1; }
+				pages++;
+				CHECK(q2.count <= q2.limit);
+				for (i = 0; i < q2.count; i++) {
+					struct stat st;
+					int rfd;
+
+					CHECK(memchr(res[i].path, 0, sizeof res[i].path) != NULL);
+					if (res[i].flags & MOOB_RES_PATH_UNKNOWN) continue;
+					CHECK(res[i].ino != 0 && res[i].path[0] && res[i].path[0] != '/' && !strstr(res[i].path, ".."));
+					CHECK(strlen(res[i].path) == res[i].path_len);
+					rfd = openat(fd, res[i].path, O_RDONLY);
+					if (rfd >= 0) {
+						CHECK(!fstat(rfd, &st));
+						if ((__u64)st.st_ino == res[i].ino) hits++;
+						else replaced++;	/* name recreated after the answer */
+						close(rfd);
+						continue;
+					}
+					if (errno == ENOENT) { gone++; continue; }
+					if (errno == EACCES) { denied++; continue; }
+					fprintf(stderr, "race2: open %s: %s\n", res[i].path, strerror(errno));
+					return 1;
+				}
+				if (!q2.truncated) {
+					iters++;	/* a complete pagination */
+					break;
+				}
+			}
+			clock_gettime(CLOCK_MONOTONIC, &t1);
+			if ((t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9 >= secs) break;
+		}
+		printf("race2: %lu complete paginations, %lu pages, %lu openable, %lu replaced, %lu vanished, %lu denied, %lu stale restarts, %lu domain-closed episodes (%lu refused calls)\n",
+		       iters, pages, hits, replaced, gone, denied, stale, closed, closed_tries);
+		return pages ? 0 : 1;
 	}
 	if (argc >= 4 && !strcmp(argv[2], "race")) {
 		struct timespec t0, t1;

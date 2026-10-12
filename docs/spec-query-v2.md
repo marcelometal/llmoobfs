@@ -218,3 +218,10 @@ whole subtrees between partitions inside a `rename`.
 
 Each phase comes in through its own pull request, with a journal in `docs/history/`, the VM suite and
 KASAN, and a measurement on the Azure host compared with journal 0029.
+
+**Status note (2026-10-12, journal 0052).** Test 6 (renames across domains: `EXDEV` for directories,
+repartition for files) landed with Q2a. Q2e therefore adds test 8: the `QUERY2_RACE_PASS` block of the
+suite races mode changes, renames, unlink and recreate, files moving to another domain and back,
+and `chmod` of the domain directory against paged `QUERY2` over the plain, equality and ordered
+plans. Q2c and Q2d went in one combined pull request by the maintainer's decision, and the
+measurements moved from the Azure host to the Mac mini host (journal 0042).
