@@ -92,3 +92,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0063 — Real-client test, stage 2: design from ai-memory's code](0063-client-stage2-design.md)
 - [0064 — Real-client test, stage 2: tools and first small run](0064-client-stage2-first-run.md)
 - [0065 — Real-client test, stage 2: latency tool and first numbers](0065-client-stage2-latency.md)
+- [0067 — Adoption risks written down with an answer for each](0067-adoption-risks.md)

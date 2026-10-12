@@ -16,6 +16,7 @@ accepted but may be only partly implemented, and only the journals and
 | --- | --- | --- |
 | [architecture-overview.md](architecture-overview.md) | EN | How the stacked layer is built, with a source citation for each claim |
 | [when-not-to-use.md](when-not-to-use.md) | EN | Comparison with plain files, SQLite, FUSE and memory frameworks; when not to use MoobFS |
+| [adoption-risks.md](adoption-risks.md) | EN | Proposal: fourteen adoption risks, the evidence for each and the fix, work or deployment rule that answers it |
 | [faq.md](faq.md) | EN | Short sourced answers to common questions |
 | [development.md](development.md) | EN | Environment setup, `make` targets, devcontainer, lint and checkpatch |
 | [testing.md](testing.md) | EN | What each test runs, its success markers, and what they do not prove |
