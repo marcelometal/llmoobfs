@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Phase Q2e (journal 0052): `QUERY2_RACE_PASS` races mode changes, renames, unlink and
+  recreate, moves across domains and `chmod` of the domain directory against paged `QUERY2` over
+  the plain, equality and ordered plans; test client `query race2`.
 - Everything in the repository is in English (ADR-0010, journal 0051): 82 documents, ADRs and
   journals written in Portuguese were translated in place; `README.pt-BR.md` stays as a mirror.
 - **UAPI change:** with `noindex`, `MOOB_IOC_QUERY` and `MOOB_IOC_QUERY2` return `EOPNOTSUPP`
