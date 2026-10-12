@@ -6,6 +6,17 @@
   `order_type`, ties by inode) and pages with an authenticated 128-byte cursor (`ESTALE` for
   a cursor from another query or mount, corrupt, or issued before a fallback). Oracle
   `--order`/`--limit`, test client paging, `bench-load --order/--limit`.
+- KASAN workflow: `virtme-ng` 1.41 and its dependencies are installed from
+  `vm/kasan-requirements.txt` with `pip --require-hashes` instead of a version-only pin
+  (journal 0046; OpenSSF Scorecard Pinned-Dependencies).
+- CodeQL triage (journal 0045): every one of the 30 open alerts has a decision. Fixed in
+  `bench/`: manifest fields are copied with `memcpy` of the length already checked against the
+  destination (the three `cpp/unbounded-write` alerts were false positives), and record files
+  and the `bench-gen` manifest are created with mode 0644 through `bench_create_out()` instead
+  of `fopen`'s 0666 (unchanged under umask 022); W6 opens `drop_caches` without `O_CREAT`.
+  The 20 `cpp/path-injection` alerts and the `cpp/sql-injection` alert describe the intended
+  use of command-line tools and of the benchmark harness; dismissal commands for the
+  maintainer are in the journal.
 - Contributor experience, batch 3 (plan `docs/dx-plan.md`, journal 0041): `README.md` and
   `README.pt-BR.md` open with one sentence, a real demonstration (domain-scoped `QUERY2` as a
   regular user, results filtered by permission, v1 refused) captured from `make vm-test`, and a

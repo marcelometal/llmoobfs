@@ -12,6 +12,7 @@ project exploring storage for LLM-agent memory.
 [![CI](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml/badge.svg)](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml)
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/studiomoob/llmoobfs/badge)](https://scorecard.dev/viewer/?uri=github.com/studiomoob/llmoobfs)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
 
 ## See it run
 

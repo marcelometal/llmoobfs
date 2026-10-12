@@ -177,7 +177,7 @@ on a Linux x86-64 host (Ubuntu 24.04 is what CI uses):
 sudo apt-get install -y build-essential flex bison libelf-dev libssl-dev bc cpio kmod \
   qemu-system-x86 qemu-utils python3-pip python3-venv udev \
   e2fsprogs btrfs-progs xfsprogs sqlite3 git dmsetup acl
-python3 -m pip install --user "virtme-ng==1.41"
+python3 -m pip install --user --require-hashes -r vm/kasan-requirements.txt   # virtme-ng 1.41
 export PATH="$HOME/.local/bin:$PATH"
 
 # 2. Kernel source, pinned and verified (values from kasan.yml)

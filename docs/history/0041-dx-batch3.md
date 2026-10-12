@@ -288,8 +288,33 @@ chamador. Pela regra de homogeneidade (`docs/spec-query-v2.md` §3), o `salary.m
 partição de `team/` para qualquer chamador; o `QUERY2` não verifica permissão por resultado. Os
 dois READMEs passaram a explicar isso. Saída da demonstração e testes inalterados.
 
+Nota de 2026-10-12: as três ações do mantenedor foram feitas e conferidas pela sessão
+coordenadora.
+
+- Releases: antes do merge do PR #33, a sessão rodou a simulação de
+  `scripts/bench-evidence-release.sh` num worktree da branch. Os sete arquivos foram baixados e
+  conferidos contra o manifesto, e as escritas listadas. Depois o mantenedor rodou `--apply`.
+  Conferido com `gh release list` e `gh release view bench-evidence`:
+  - restam duas releases, `bench-evidence` (pré-release, publicada) e `v0.1.0-experimental`;
+  - os sete anexos têm nome, tamanho e SHA-256 iguais aos de `bench/evidence-release.md`
+    (comparação por `diff`);
+  - as sete tags `bench-2026-10-11-*` continuam existindo.
+
+  Os sete links `releases/download/bench-evidence/...` do repositório respondem 200, e nenhum
+  link aponta para as releases antigas. A `bench-evidence` aparece acima da
+  `v0.1.0-experimental` por ser mais recente; nenhuma das duas é "Latest".
+- Issues de tradução: criadas como #35 a #40 a partir dos comandos da seção acima, cada uma com
+  `good first issue`, `help wanted`, `area/docs`, `difficulty/good-first-issue` e `priority/p2`.
+- Social preview: imagem enviada pelo mantenedor. A API mostra
+  `usesCustomOpenGraphImage: true`, e a imagem publicada pelo GitHub tem o mesmo SHA-256 de
+  `docs/assets/social-preview.png`.
+
+Nota de 2026-10-12: o site passa a usar a mesma imagem em `og:image` e `twitter:card`
+(`summary_large_image`) nas quatro páginas; a imagem foi copiada para
+`site/social-preview.png`, porque o Pages publica só `site/`. `python3 scripts/check-site.py`:
+"Site links valid: 4 HTML pages". O plano foi encerrado na seção 4 de `docs/dx-plan.md`.
+
 ## Próximo passo
 
-Depois do `--apply`, conferir os links do README e de `bench/results/` e registrar uma nota
-aqui. Avaliar `og:image` no site com a mesma imagem (exigiria copiá-la para `site/`). Lote 2
-continua com a medição em Codespaces pendente.
+Nenhum dentro do lote 3. Pendências restantes do plano (Codespaces, assinatura de releases) e os
+repasses à sessão da Q2 estão na seção 4 de `docs/dx-plan.md`.

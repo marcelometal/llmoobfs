@@ -160,6 +160,24 @@ Nota de 2026-10-11: renumerado de 0035 para 0039 ao trazer `main` para a branch.
 0035 (fase Q2a) entrou em `main` pelo PR #31, e as branches `m3/query-v2-q2b` a
 `m3/query-v2-q2d` já usam 0036 a 0038.
 
+Nota de 2026-10-12: o mantenedor aplicou o comando de permissões do `GITHUB_TOKEN`. Conferido com
+`gh api repos/studiomoob/llmoobfs/actions/permissions/workflow`:
+`default_workflow_permissions: read` e `can_approve_pull_request_reviews: false`. Seguem
+pendentes a medição em Codespaces e a inscrição no OpenSSF Best Practices.
+
+Nota de 2026-10-12: inscrição no OpenSSF Best Practices feita pelo mantenedor (projeto 15408,
+<https://www.bestpractices.dev/projects/15408>), sem conceder ao aplicativo OAuth acesso às
+organizações. A sessão coordenadora preparou as justificativas a partir do repositório e
+preencheu o formulário no navegador do mantenedor, com as respostas pessoais
+(`know_secure_design`, `know_common_errors`) dadas por ele. Resultado, conferido em
+`https://www.bestpractices.dev/projects/15408.json`: `badge_level: passing`, 100%, obtido em
+2026-10-12T12:03Z. São 60 critérios Met, 5 N/A (sem chaves, senhas, protocolo de rede ou
+aleatoriedade criptográfica) e 2 Unmet, ambos só sugeridos: `test_most` (cobertura não medida)
+e `crypto_call` (SHA-256 implementado em `common/hash.c`). O `static_analysis_fixed` foi
+respondido depois da triagem do CodeQL (registro 0045, PR #42): 14 alertas fechados como
+`fixed` na análise de `main` (`b19780b`) e 21 dispensados com justificativa; nenhum alerta do
+CodeQL aberto. Badge acrescentado ao `README.md`. Segue pendente a medição em Codespaces.
+
 ## Próximo passo
 
 Medir `make vm-test` num Codespace e decidir o botão. Zerar os 14 avisos do `checkpatch.pl` e

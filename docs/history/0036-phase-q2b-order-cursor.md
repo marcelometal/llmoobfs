@@ -77,3 +77,8 @@ e `bench/load.c`. Os dois casos já eram precedidos de verificação de tamanho 
 positivos), mas foram trocados por `memcpy` com o tamanho verificado contra o destino, o que
 torna o limite explícito; o mesmo padrão em `tests/query.c`, que o CodeQL não compila, também
 foi trocado.
+
+Atualização posterior (2026-10-12): a exceção acima não chegou a ser usada. Antes do merge, a main
+recebeu também o PR 42 (triagem do CodeQL, com mudanças em `bench/`) e os PRs 43 a 48 do lado DX;
+como a mudança deixou de ser só documentação, a branch foi atualizada com a main final, o
+changelog resolvido mantendo as duas entradas, e o merge espera uma nova execução do KASAN.

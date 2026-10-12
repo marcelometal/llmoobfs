@@ -431,9 +431,13 @@ static int w6_mount(void)
 		umount(target);	/* ignore ENOENT/EINVAL when nothing is mounted */
 		if (workload == 6) {
 			FILE *dc;
+			int dcfd;
 
 			sync();
-			dc = fopen("/proc/sys/vm/drop_caches", "w");
+			dcfd = open("/proc/sys/vm/drop_caches", O_WRONLY | O_CLOEXEC);
+			dc = dcfd < 0 ? NULL : fdopen(dcfd, "w");
+			if (dcfd >= 0 && !dc)
+				close(dcfd);
 			if (!dc || fputs("3\n", dc) == EOF) { perror("drop_caches"); rc = 1; }
 			if (dc) fclose(dc);
 		}
@@ -466,7 +470,7 @@ static int run_proc(void)
 	uint64_t rng = 0x5eed0000ULL + proc_id;
 
 	snprintf(recname, sizeof recname, "%s.%u.rec", out, proc_id);
-	if (!recf && !(recf = fopen(recname, "wb"))) { perror(recname); return 1; }
+	if (!recf && !(recf = bench_create_out(recname))) { perror(recname); return 1; }
 	if (workload == 3 || workload == 6 || workload == 7) {
 		int r = workload == 3 ? w3_queries() : w6_mount();
 		fclose(recf);
@@ -559,7 +563,7 @@ int main(int argc, char **argv)
 		if (workload != 3 || nprocs != 1) { fprintf(stderr, "load: --uid is for W3 with one process\n"); return 64; }
 		if (w8_load_queries() || !w8nq) { fprintf(stderr, "load: W3 needs query lines\n"); return 1; }
 		snprintf(recname, sizeof recname, "%s.0.rec", out);
-		if (!(recf = fopen(recname, "wb"))) { perror(recname); return 1; }
+		if (!(recf = bench_create_out(recname))) { perror(recname); return 1; }
 		if (setgroups(0, NULL) || setgid((gid_t)run_uid) || setuid((uid_t)run_uid)) { perror("setuid"); return 1; }
 	}
 	if (nprocs == 1 || workload == 6 || workload == 7) { proc_id = 0; return run_proc(); }
@@ -574,7 +578,7 @@ int main(int argc, char **argv)
 		}
 		proc_id = 0;
 		snprintf(recname, sizeof recname, "%s.0.rec", out);
-		recf = fopen(recname, "wb");
+		recf = bench_create_out(recname);
 		if (!recf) { perror(recname); return 1; }
 		rc = w5_reader(kids, nprocs - 1);
 		fclose(recf);

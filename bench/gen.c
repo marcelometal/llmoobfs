@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: gen --seed N --inodes N --profile 6|8|16 [--namespaces N] [--agents N] [--out FILE]\n");
 		return 64;
 	}
-	if (out && !(f = fopen(out, "w"))) { perror(out); return 1; }
+	if (out && !(f = bench_create_out(out))) { perror(out); return 1; }
 	sizes = calloc(inodes, sizeof *sizes);
 	if (!sizes) { perror("calloc"); return 1; }
 	s = seed;

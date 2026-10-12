@@ -78,6 +78,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 | [seo-geo-plan.md](seo-geo-plan.md) | PT | Discoverability audit and plan for the README, site and docs |
 | [dx-plan.md](dx-plan.md) | PT | Contributor-experience plan for GitHub, in three batches |
 | [ai-workflow.md](ai-workflow.md) | PT | How AI-assisted development is governed (`AGENTS.md`, `CLAUDE.md`, Cursor rules) |
+| [ai-workflow.en.md](ai-workflow.en.md) | EN | English translation of ai-workflow.md (AI-assisted development governance) |
 
 ## Assets
 
