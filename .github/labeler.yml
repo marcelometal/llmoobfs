@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Path-to-label rules for actions/labeler (.github/workflows/labeler.yml). Labels are the
+# area/* labels of docs/labels.md; a pull request may receive several. Labels are only
+# added, never removed (sync-labels is off), so a maintainer's manual choice is kept.
+
+area/kernel-layer:
+  - changed-files:
+      - any-glob-to-any-file: ['layer/**', 'kernel/**']
+
+area/index-query:
+  - changed-files:
+      - any-glob-to-any-file:
+          - layer/index.c
+          - include/moobfs_ioctl.h
+          - tools/moobfs-index.c
+          - tools/query-common.h
+          - tests/query.c
+
+area/tools:
+  - changed-files:
+      - any-glob-to-any-file: ['tools/**', 'common/**']
+
+area/tests-vm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - tests/**
+          - vm/**
+          - Makefile
+          - scripts/check-spdx.sh
+          - scripts/checkpatch.sh
+          - .devcontainer/**
+          - .github/workflows/ci.yml
+
+area/kasan:
+  - changed-files:
+      - any-glob-to-any-file:
+          - vm/kasan.config
+          - vm/kasan-guest.sh
+          - .github/workflows/kasan.yml
+
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '*.md', 'CITATION.cff']
+
+area/site:
+  - changed-files:
+      - any-glob-to-any-file: ['site/**', 'scripts/check-site.py', '.github/workflows/pages.yml']
+
+area/bench-m4:
+  - changed-files:
+      - any-glob-to-any-file: ['bench/**', 'docs/bench*.md']
+
+area/security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - SECURITY.md
+          - docs/security-roadmap.md
+          - .github/workflows/codeql.yml
+          - .github/workflows/scorecard.yml

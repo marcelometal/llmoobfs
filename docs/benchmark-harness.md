@@ -155,6 +155,26 @@ acima de 20% marca "inconclusivo". `report` emite `results.csv` (uma linha por s
 carga, operação, métrica) e `results.json` com os metadados. Nenhum número é escrito em
 documento do projeto sem o caminho do `results.csv` que o originou.
 
+### 7.1 Onde ficam os artefatos de uma campanha
+
+Acrescentado em 2026-10-11 (registro 0041). Os arquivos de texto da campanha (relatório,
+`results.csv`, `results.json`, ambiente, equivalências, manifesto de hashes) são versionados em
+`bench/results/<data>-<host>-<campanha>/`, com um `README.md` que descreve a execução. O
+pacote bruto (registros `*.rec`, bancos SQLite, manifestos, `perf.data`) não entra no Git: vai
+como anexo da release única `bench-evidence`, nunca numa pré-release nova. Passos:
+
+1. Empacotar os brutos como `<data>-<host>-<campanha>-raw.tgz` e calcular tamanho e SHA-256.
+2. Acrescentar uma linha à tabela de `bench/evidence-release.md` (coluna "Original tag" com
+   `—`) e citar no `README.md` da campanha o link
+   `https://github.com/studiomoob/llmoobfs/releases/download/bench-evidence/<arquivo>` e o
+   SHA-256.
+3. Rodar `scripts/bench-evidence-release.sh add <arquivo>` (simulação) e depois com `--apply`:
+   o script confere o arquivo contra a tabela, envia, confere tamanho e digest pela API e pelo
+   download público, e atualiza o texto da release a partir de `bench/evidence-release.md`.
+
+Se o repositório passar a usar releases imutáveis, anexos não poderão mais ser acrescentados a
+uma release publicada; nesse caso esta regra precisa ser revista.
+
 ## 8. Execução
 
 Ambiente alvo: VM Linux com KVM, 4 vCPU, 4 GiB, três discos virtio dedicados (um por

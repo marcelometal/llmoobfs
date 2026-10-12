@@ -20,7 +20,6 @@ concurrency:
 env:
   KERNEL_VERSION: 6.12.112
   KERNEL_SHA256: 164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03
-  VIRTME_NG_VERSION: '1.41'
 jobs:
   kasan:
     name: Layer suite under KASAN/lockdep
@@ -37,7 +36,7 @@ jobs:
             build-essential flex bison libelf-dev libssl-dev bc cpio kmod \
             qemu-system-x86 qemu-utils python3-pip python3-venv udev \
             e2fsprogs btrfs-progs xfsprogs sqlite3 libsqlite3-dev git dmsetup acl
-          python3 -m pip install --user "virtme-ng==${VIRTME_NG_VERSION}"
+          python3 -m pip install --user --require-hashes -r vm/kasan-requirements.txt   # virtme-ng 1.41 and deps, by hash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           ls -la /dev/kvm || echo "no KVM: QEMU will use TCG"
       - name: Fetch and verify the kernel source
