@@ -1,0 +1,13 @@
+SELECT ino, path FROM memories WHERE kind = 'note' ORDER BY ino;
+SELECT ino, path FROM memories WHERE kind = 'decision' AND score > 500 ORDER BY ino;
+SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' ORDER BY ino;
+SELECT ino, path FROM memories WHERE namespace = 'ns1' AND kind = 'fact' AND created >= 1760000300000000000 ORDER BY ino;
+SELECT ino, path FROM memories WHERE pinned = 1 AND score < 500 ORDER BY ino;
+SELECT ino, path FROM memories WHERE kind >= 'de' AND kind < 'df' ORDER BY ino;
+SELECT ino, path FROM memories WHERE score >= 250 AND score <= 750 ORDER BY ino;
+SELECT ino, path FROM memories WHERE tag1 = 'v00' AND kind = 'note' AND pinned = 0 AND score > 100 ORDER BY ino;
+SELECT ino, path FROM memories WHERE weight IS NOT NULL ORDER BY ino;
+SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' AND kind = 'note' ORDER BY ino;
+SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' ORDER BY ino;
+SELECT ino, path FROM memories WHERE namespace = 'ns3' AND kind = 'note' ORDER BY created DESC LIMIT 20;
+SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' ORDER BY created DESC LIMIT 20;

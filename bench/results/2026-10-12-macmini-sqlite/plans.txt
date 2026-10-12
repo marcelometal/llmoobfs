@@ -1,0 +1,47 @@
+== SELECT ino, path FROM memories WHERE kind = 'note' ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_kind_score (kind=?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE kind = 'decision' AND score > 500 ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_kind_score (kind=? AND score>?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' ORDER BY ino;
+QUERY PLAN
+`--SEARCH memories USING INDEX ix_ns_agent (namespace=? AND agent=?)
+== SELECT ino, path FROM memories WHERE namespace = 'ns1' AND kind = 'fact' AND created >= 1760000300000000000 ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_ns_kind_created (namespace=? AND kind=? AND created>?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE pinned = 1 AND score < 500 ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_pinned_score (pinned=? AND score<?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE kind >= 'de' AND kind < 'df' ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_kind_score (kind>? AND kind<?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE score >= 250 AND score <= 750 ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_score (score>? AND score<?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE tag1 = 'v00' AND kind = 'note' AND pinned = 0 AND score > 100 ORDER BY ino;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_tag1_kind_pinned_score (tag1=? AND kind=? AND pinned=? AND score>?)
+`--USE TEMP B-TREE FOR ORDER BY
+== SELECT ino, path FROM memories WHERE weight IS NOT NULL ORDER BY ino;
+QUERY PLAN
+`--SCAN memories
+== SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' AND kind = 'note' ORDER BY ino;
+QUERY PLAN
+`--SEARCH memories USING INDEX ix_ns_agent (namespace=? AND agent=?)
+== SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' ORDER BY ino;
+QUERY PLAN
+`--SEARCH memories USING INDEX ix_ns_agent (namespace=? AND agent=?)
+== SELECT ino, path FROM memories WHERE namespace = 'ns3' AND kind = 'note' ORDER BY created DESC LIMIT 20;
+QUERY PLAN
+`--SEARCH memories USING INDEX ix_ns_kind_created (namespace=? AND kind=?)
+== SELECT ino, path FROM memories WHERE namespace = 'ns3' AND agent = 'a07' ORDER BY created DESC LIMIT 20;
+QUERY PLAN
+|--SEARCH memories USING INDEX ix_ns_agent (namespace=? AND agent=?)
+`--USE TEMP B-TREE FOR ORDER BY
