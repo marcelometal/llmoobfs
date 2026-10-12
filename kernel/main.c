@@ -14,10 +14,12 @@ static int moob_read_at(void *opaque, m_u64 offset, void *out, size_t len)
 {
 	struct super_block *sb = opaque;
 	u8 *p = out;
+
 	while (len) {
 		struct buffer_head *bh;
 		size_t within = offset & (MOOB_BLOCK - 1);
 		size_t take = min_t(size_t, len, MOOB_BLOCK - within);
+
 		bh = sb_bread(sb, offset / MOOB_BLOCK);
 		if (!bh)
 			return -EIO;
@@ -34,6 +36,7 @@ static int moob_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
 		unsigned int flags, struct iomap *map, struct iomap *srcmap)
 {
 	const struct moob_object *o = inode->i_private;
+
 	if (flags & IOMAP_WRITE)
 		return -EROFS;
 	if (pos < 0 || pos >= moob_align(o->size ? o->size : 1))
@@ -86,6 +89,7 @@ static struct inode *moob_file_inode(struct super_block *sb, unsigned int index)
 	struct moob_file *f = &im->files[index];
 	struct moob_object *o = &im->objects[f->object_index];
 	struct inode *inode = iget_locked(sb, f->ino);
+
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 	if (!(inode->i_state & I_NEW))
@@ -112,6 +116,7 @@ static struct dentry *moob_lookup(struct inode *dir, struct dentry *dentry,
 {
 	struct moob_image *im = dir->i_sb->s_fs_info;
 	unsigned int i;
+
 	for (i = 0; i < im->file_count; i++) {
 		if (dentry->d_name.len == strlen(im->files[i].name) &&
 		    !memcmp(dentry->d_name.name, im->files[i].name, dentry->d_name.len))
@@ -124,10 +129,12 @@ static struct dentry *moob_lookup(struct inode *dir, struct dentry *dentry,
 static int moob_iterate(struct file *file, struct dir_context *ctx)
 {
 	struct moob_image *im = file_inode(file)->i_sb->s_fs_info;
+
 	if (!dir_emit_dots(file, ctx))
 		return 0;
 	while (ctx->pos >= 2 && ctx->pos - 2 < im->file_count) {
 		struct moob_file *f = &im->files[ctx->pos - 2];
+
 		if (!dir_emit(ctx, f->name, strlen(f->name), f->ino, DT_REG))
 			break;
 		ctx->pos++;
@@ -146,6 +153,7 @@ static const struct file_operations moob_dir_ops = {
 static int moob_statfs(struct dentry *dentry, struct kstatfs *st)
 {
 	struct moob_image *im = dentry->d_sb->s_fs_info;
+
 	st->f_type = MOOB_STAT_MAGIC;
 	st->f_bsize = MOOB_BLOCK;
 	st->f_blocks = im->image_size / MOOB_BLOCK;
@@ -181,6 +189,7 @@ static int moob_fill_super(struct super_block *sb, struct fs_context *fc)
 	u8 *scratch;
 	const char *why;
 	int ret;
+
 	if (!sb_set_blocksize(sb, MOOB_BLOCK))
 		return -EINVAL;
 	im = kzalloc(sizeof(*im), GFP_KERNEL);

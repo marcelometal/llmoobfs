@@ -457,8 +457,9 @@ static bool ext_acl(struct inode *inode)
  */
 static bool reach_ok(struct inode *in, struct inode *dom, bool want_read)
 {
-	umode_t u = want_read ? S_IRUSR : S_IXUSR, g = want_read ? S_IRGRP : S_IXGRP;
-	umode_t o = want_read ? S_IROTH : S_IXOTH;
+	/* octal class bits: read 0444 or search 0111, split per owner, group, other */
+	umode_t u = want_read ? 0400 : 0100, g = want_read ? 0040 : 0010;
+	umode_t o = want_read ? 0004 : 0001;
 	bool acl = ext_acl(in);
 
 	if (!acl && (in->i_mode & o))
@@ -467,11 +468,11 @@ static bool reach_ok(struct inode *in, struct inode *dom, bool want_read)
 		return false;
 	if (!uid_eq(in->i_uid, dom->i_uid) || !gid_eq(in->i_gid, dom->i_gid))
 		return false;
-	if ((dom->i_mode & S_IXUSR) && !(in->i_mode & u))
+	if ((dom->i_mode & 0100) && !(in->i_mode & u))
 		return false;
-	if ((dom->i_mode & S_IXGRP) && !(in->i_mode & g))
+	if ((dom->i_mode & 0010) && !(in->i_mode & g))
 		return false;
-	if ((dom->i_mode & S_IXOTH) && !(in->i_mode & o))
+	if ((dom->i_mode & 0001) && !(in->i_mode & o))
 		return false;
 	return true;
 }
@@ -654,6 +655,79 @@ static int scan_attrs(struct super_block *sb, struct dentry *lower, u64 ino, con
 	return err;
 }
 
+/* A child directory of the scan: its record goes on the stack and takes cpath. */
+static int scan_push_dir(struct moobl_index *ix, struct scan_dir *cur, struct dentry *child,
+			 char *cpath, struct list_head *stack)
+{
+	struct scan_dir *nd = kzalloc(sizeof(*nd), GFP_KERNEL);
+	unsigned int dn = ix->domain_depth;
+
+	if (!nd) {
+		kfree(cpath);
+		return -ENOMEM;
+	}
+	nd->dentry = dget(child);
+	nd->path = cpath;
+	nd->depth = cur->depth + 1;
+	if (dn && nd->depth == dn) {
+		nd->inner = d_inode(child)->i_ino;
+		nd->inner_ok = true;
+		nd->dom = dget(child);
+	} else if (dn && nd->depth > dn) {
+		struct inode *dom = d_inode(cur->dom);
+
+		nd->dom = dget(cur->dom);
+		nd->inner = cur->inner;
+		nd->self.domain = cur->inner;
+		nd->self.hetero = !(cur->inner_ok && target_ok(d_inode(child), dom));
+		nd->inner_ok = cur->inner_ok && reach_ok(d_inode(child), dom, false);
+	}
+	list_add(&nd->list, stack);
+	return 0;
+}
+
+/* A child regular file of the scan: its attributes go into the index; frees cpath. */
+static int scan_file(struct super_block *sb, struct scan_dir *cur, struct dentry *child,
+		     char *cpath, char *list, u8 *value)
+{
+	struct moobl_place fpl = { .domain = cur->inner };
+	int err;
+
+	if (cur->inner)
+		fpl.hetero = !(cur->inner_ok && target_ok(d_inode(child), d_inode(cur->dom)));
+	err = scan_attrs(sb, child, d_inode(child)->i_ino, cpath, &fpl, list, XATTR_LIST_MAX,
+			 value);
+	kfree(cpath);
+	return err;
+}
+
+/* One name read from a scanned directory: a directory is queued, a regular file indexed. */
+static int scan_child(struct super_block *sb, struct scan_dir *cur, struct scan_name *sn,
+		      struct list_head *stack, char *list, u8 *value)
+{
+	struct dentry *child = lookup_one_len_unlocked(sn->name, cur->dentry, sn->len);
+	char *cpath;
+	int err = 0;
+
+	if (IS_ERR(child))
+		return PTR_ERR(child);
+	if (d_really_is_negative(child) || !(d_is_dir(child) || d_is_reg(child)))
+		goto out;
+	cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path, cur->path[0] ? "/" : "", sn->len,
+			  sn->name);
+	if (!cpath) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (d_is_dir(child))
+		err = scan_push_dir(IX(sb), cur, child, cpath, stack);
+	else
+		err = scan_file(sb, cur, child, cpath, list, value);
+out:
+	dput(child);
+	return err;
+}
+
 int moobl_index_build(struct super_block *sb)
 {
 	struct moobl_sb *sbi = MOOBL_SB(sb);
@@ -712,64 +786,8 @@ int moobl_index_build(struct super_block *sb)
 		if (!err)
 			err = sc.err;
 		list_for_each_entry_safe(sn, tmp, &sc.names, list) {
-			struct dentry *child;
-
-			if (!err) {
-				child = lookup_one_len_unlocked(sn->name, cur->dentry, sn->len);
-				if (IS_ERR(child)) {
-					err = PTR_ERR(child);
-				} else if (d_really_is_positive(child) &&
-					   (d_is_dir(child) || d_is_reg(child))) {
-					char *cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path,
-								cur->path[0] ? "/" : "", sn->len, sn->name);
-
-					if (!cpath) {
-						err = -ENOMEM;
-					} else if (d_is_dir(child)) {
-						struct scan_dir *nd = kzalloc(sizeof(*nd), GFP_KERNEL);
-
-						if (!nd) {
-							err = -ENOMEM;
-							kfree(cpath);
-						} else {
-							unsigned int dn = ix->domain_depth;
-
-							nd->dentry = dget(child);
-							nd->path = cpath;
-							nd->depth = cur->depth + 1;
-							if (dn && nd->depth == dn) {
-								nd->inner = d_inode(child)->i_ino;
-								nd->inner_ok = true;
-								nd->dom = dget(child);
-							} else if (dn && nd->depth > dn) {
-								struct inode *dom = d_inode(cur->dom);
-
-								nd->dom = dget(cur->dom);
-								nd->inner = cur->inner;
-								nd->self.domain = cur->inner;
-								nd->self.hetero = !(cur->inner_ok &&
-										    target_ok(d_inode(child), dom));
-								nd->inner_ok = cur->inner_ok &&
-									       reach_ok(d_inode(child), dom, false);
-							}
-							list_add(&nd->list, &stack);
-						}
-					} else {
-						struct moobl_place fpl = { .domain = cur->inner };
-
-						if (cur->inner)
-							fpl.hetero = !(cur->inner_ok &&
-								       target_ok(d_inode(child), d_inode(cur->dom)));
-						err = scan_attrs(sb, child, d_inode(child)->i_ino, cpath, &fpl,
-								 list, XATTR_LIST_MAX, value);
-						kfree(cpath);
-					}
-					if (!IS_ERR(child))
-						dput(child);
-				} else {
-					dput(child);
-				}
-			}
+			if (!err)
+				err = scan_child(sb, cur, sn, &stack, list, value);
 			list_del(&sn->list);
 			kfree(sn);
 		}
@@ -1502,6 +1520,30 @@ static int leap_collect(struct moobl_index *ix, const struct moobl_qscope *sc,
 	return 0;
 }
 
+/* Copies one candidate to the caller as a result; last gets its scan key (cursor). */
+static int put_result(struct moob_query_result __user *dst, struct moob_query_result *one,
+		      const struct moobl_candidate *c, struct moobl_resume *last)
+{
+	memset(one, 0, sizeof(*one));
+	one->ino = c->ino;
+	if (c->path) {
+		one->path_len = (u32)strlen(c->path);
+		memcpy(one->path, c->path, one->path_len + 1);
+	} else {
+		one->flags = MOOB_RES_PATH_UNKNOWN;
+	}
+	if (copy_to_user(dst, one, sizeof(*one)))
+		return -EFAULT;
+	if (last) {
+		last->valid = true;
+		last->type = c->type;
+		last->len = c->len;
+		last->ino = c->ino;
+		memcpy(last->value, c->value, c->len);
+	}
+	return 0;
+}
+
 /*
  * Runs one query. start (may be NULL) resumes strictly after (or, descending, before) a
  * scan key; last (may be NULL) receives the key of the last result returned.
@@ -1523,8 +1565,10 @@ static long query_run(struct super_block *sb, struct file *file,
 	bool exhausted = false;
 	long err = 0;
 
-	/* one result at a time is copied to the caller's array, so the kernel never allocates
-	 * (or zeroes) a limit-sized buffer: the cost is per result, not per requested limit */
+	/*
+	 * one result at a time is copied to the caller's array, so the kernel never allocates
+	 * (or zeroes) a limit-sized buffer: the cost is per result, not per requested limit
+	 */
 	one = kmalloc(sizeof(*one), GFP_KERNEL);
 	cand = kcalloc(MOOBL_QUERY_CHUNK, sizeof(*cand), GFP_KERNEL);
 	resume = kzalloc(sizeof(*resume), GFP_KERNEL);
@@ -1559,8 +1603,10 @@ static long query_run(struct super_block *sb, struct file *file,
 					   last != NULL, &more);
 			goto chunk_done;
 		}
-		/* QUERY2: candidates all sit in the domain's homogeneous partition, so each term's
-		 * attribute is one name node and entries are matched by pointer, not by strcmp */
+		/*
+		 * QUERY2: candidates all sit in the domain's homogeneous partition, so each term's
+		 * attribute is one name node and entries are matched by pointer, not by strcmp
+		 */
 		if (!sc->all)
 			for (i = 0; i < nterms; i++)
 				tn[i] = name_find(ix, terms[i].name, sc->domain, false);
@@ -1628,32 +1674,13 @@ chunk_done:
 			bool ok = !err && (!sc->check ||
 					   caller_may_read(file, sb, cand[i].path, cand[i].ino));
 
-			if (ok) {
-				if (count == limit) {
-					truncated = 1;
-					exhausted = true;
-				} else {
-					memset(one, 0, sizeof(*one));
-					one->ino = cand[i].ino;
-					if (cand[i].path) {
-						one->path_len = (u32)strlen(cand[i].path);
-						memcpy(one->path, cand[i].path, one->path_len + 1);
-					} else {
-						one->flags = MOOB_RES_PATH_UNKNOWN;
-					}
-					if (copy_to_user(&uout[count], one, sizeof(*one))) {
-						err = -EFAULT;
-					} else {
-						count++;
-						if (last) {
-							last->valid = true;
-							last->type = cand[i].type;
-							last->len = cand[i].len;
-							last->ino = cand[i].ino;
-							memcpy(last->value, cand[i].value, cand[i].len);
-						}
-					}
-				}
+			if (ok && count == limit) {
+				truncated = 1;
+				exhausted = true;
+			} else if (ok) {
+				err = put_result(&uout[count], one, &cand[i], last);
+				if (!err)
+					count++;
 			}
 			kfree(cand[i].path);
 			cand[i].path = NULL;
