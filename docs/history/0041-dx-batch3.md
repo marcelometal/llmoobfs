@@ -309,7 +309,12 @@ coordenadora.
   `usesCustomOpenGraphImage: true`, e a imagem publicada pelo GitHub tem o mesmo SHA-256 de
   `docs/assets/social-preview.png`.
 
+Nota de 2026-10-12: o site passa a usar a mesma imagem em `og:image` e `twitter:card`
+(`summary_large_image`) nas quatro páginas; a imagem foi copiada para
+`site/social-preview.png`, porque o Pages publica só `site/`. `python3 scripts/check-site.py`:
+"Site links valid: 4 HTML pages". O plano foi encerrado na seção 4 de `docs/dx-plan.md`.
+
 ## Próximo passo
 
-Avaliar `og:image` no site com a mesma imagem (exigiria copiá-la para `site/`). Lote 2
-continua com a medição em Codespaces pendente.
+Nenhum dentro do lote 3. Pendências restantes do plano (Codespaces, assinatura de releases) e os
+repasses à sessão da Q2 estão na seção 4 de `docs/dx-plan.md`.
