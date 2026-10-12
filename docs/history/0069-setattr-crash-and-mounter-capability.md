@@ -1,7 +1,7 @@
 # 0069 — Two review findings fixed: the set-user-ID crash and the mounter's capability
 
-Date: 2026-10-12. Status: implemented; `make vm-test` passes and both new tests fail without their
-fix; local KASAN **not run yet**. Local series.
+Date: 2026-10-12. Status: implemented; `make vm-test` passes, both new tests fail without their
+fix, and the local KASAN job passes. Local series.
 
 ## Goal
 
@@ -72,10 +72,13 @@ No mapped inode space is proposed.
 
 The three runs used the Debian 6.12.111 kernel in QEMU, in a container on the development machine.
 
+- Local KASAN (`vm/kasan-local.sh` on the benchmark host, tree at 733d25a, upstream 6.12.112 with
+  KASAN, UBSAN and lockdep): `MOOBFS_KASAN_PASS` on the first attempt in about 20 minutes, with
+  `LAYER_RESERVE_PASS` and no kernel diagnostic in the console.
+
 ## Limitations
 
-- KASAN and lockdep (`vm/kasan-local.sh`) have not run on this change; the benchmark host was busy
-  with the stage 2 scale. Required before the series is published.
+- The CI KASAN check runs when the series is published.
 - The reserve test covers ext4 with a non-root reserve owner only. The quota case is argued from
   the source, not tested: the VM image has no quota tools.
 - The default-`resuid` reserve case is open (F4).
@@ -84,5 +87,4 @@ The three runs used the Debian 6.12.111 kernel in QEMU, in a container on the de
 
 ## Next step
 
-Local KASAN on this tree once the benchmark host is free; then S4 and S2, which exercise promises 1
-and 2 systematically.
+S4 and S2, which exercise promises 1 and 2 systematically.
