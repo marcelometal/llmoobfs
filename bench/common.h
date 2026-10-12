@@ -2,14 +2,17 @@
 /*
  * Shared pieces of the M4 benchmark harness (docs/benchmark-harness.md):
  * deterministic PRNG, manifest line format and the fixed-size latency record.
- * Pure helpers, no I/O.
+ * Pure helpers; the only I/O is bench_create_out(), which opens an output file.
  */
 #ifndef MOOBFS_BENCH_COMMON_H
 #define MOOBFS_BENCH_COMMON_H
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 /* splitmix64: deterministic across platforms, good enough for workload shaping. */
 static inline uint64_t bench_next(uint64_t *s)
@@ -80,6 +83,7 @@ static inline int bench_parse_line(char *line, struct bench_line *out)
 {
 	char *save = NULL, *tok, *attrs;
 	int field = 0;
+	size_t n;
 
 	memset(out, 0, sizeof *out);
 	out->dup_of = -1;
@@ -89,8 +93,9 @@ static inline int bench_parse_line(char *line, struct bench_line *out)
 	while (tok && field < 4) {
 		switch (field) {
 		case 0:
-			if (strlen(tok) >= BENCH_PATH_MAX) return -1;
-			strcpy(out->path, tok); break;
+			n = strlen(tok);
+			if (n >= sizeof out->path) return -1;
+			memcpy(out->path, tok, n + 1); break;
 		case 1: out->size = strtoull(tok, NULL, 10); break;
 		case 2: out->seed = strtoull(tok, NULL, 10); break;
 		case 3: out->dup_of = strcmp(tok, "-") ? strtoll(tok, NULL, 10) : -1; break;
@@ -109,15 +114,34 @@ static inline int bench_parse_line(char *line, struct bench_line *out)
 		if (!eq || out->nattrs == BENCH_MAX_ATTRS) return -1;
 		a = &out->attrs[out->nattrs];
 		*eq = 0;
-		if (strlen(tok) > 64 || strlen(eq + 1) < 2 || eq[2] != ':') return -1;
-		strcpy(a->name, tok);
+		n = strlen(tok);
+		if (n >= sizeof a->name || strlen(eq + 1) < 2 || eq[2] != ':') return -1;
+		memcpy(a->name, tok, n + 1);
 		a->type = eq[1];
 		colon = eq + 3;
-		if (strlen(colon) >= sizeof a->value) return -1;
-		strcpy(a->value, colon);
+		n = strlen(colon);
+		if (n >= sizeof a->value) return -1;
+		memcpy(a->value, colon, n + 1);
 		out->nattrs++;
 	}
 	return 0;
+}
+
+/*
+ * Creates or truncates an output file (records, manifest) with mode 0644 before the umask,
+ * instead of the 0666 that fopen(path, "w") would request. Returns NULL with errno set.
+ */
+static inline FILE *bench_create_out(const char *path)
+{
+	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+	FILE *f;
+
+	if (fd < 0)
+		return NULL;
+	f = fdopen(fd, "wb");
+	if (!f)
+		close(fd);
+	return f;
 }
 
 /* Latency record: 32 bytes, native endianness, one per call. */

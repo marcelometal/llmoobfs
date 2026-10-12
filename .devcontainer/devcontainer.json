@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Development container for GitHub Codespaces and local Dev Containers.
+// Same Ubuntu release as the CI runners (24.04), so `make test` and `make lint` use the
+// same compiler and shellcheck versions as CI. `make vm-test` runs the disposable QEMU VM
+// through docker-in-docker; the container itself is never used to load the module.
+// No hostRequirements yet: the minimum machine is pending a measured `make vm-test`
+// run in a real Codespace (docs/dx-plan.md, lote 2).
+{
+  "name": "MoobFS",
+  "image": "mcr.microsoft.com/devcontainers/base:3.0.10-ubuntu24.04@sha256:21e9e3275736cb3bc33a2904b279a2ab292c51fedd53c2963463627d4586c3e6",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
+      "moby": true,
+      "dockerDashComposeVersion": "none"
+    }
+  },
+  "postCreateCommand": "sh .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "timonwong.shellcheck",
+        "EditorConfig.EditorConfig"
+      ]
+    }
+  }
+}

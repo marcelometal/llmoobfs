@@ -17,6 +17,37 @@
   `order_type`, ties by inode) and pages with an authenticated 128-byte cursor (`ESTALE` for
   a cursor from another query or mount, corrupt, or issued before a fallback). Oracle
   `--order`/`--limit`, test client paging, `bench-load --order/--limit`.
+- KASAN workflow: `virtme-ng` 1.41 and its dependencies are installed from
+  `vm/kasan-requirements.txt` with `pip --require-hashes` instead of a version-only pin
+  (journal 0046; OpenSSF Scorecard Pinned-Dependencies).
+- CodeQL triage (journal 0045): every one of the 30 open alerts has a decision. Fixed in
+  `bench/`: manifest fields are copied with `memcpy` of the length already checked against the
+  destination (the three `cpp/unbounded-write` alerts were false positives), and record files
+  and the `bench-gen` manifest are created with mode 0644 through `bench_create_out()` instead
+  of `fopen`'s 0666 (unchanged under umask 022); W6 opens `drop_caches` without `O_CREAT`.
+  The 20 `cpp/path-injection` alerts and the `cpp/sql-injection` alert describe the intended
+  use of command-line tools and of the benchmark harness; dismissal commands for the
+  maintainer are in the journal.
+- Contributor experience, batch 3 (plan `docs/dx-plan.md`, journal 0041): `README.md` and
+  `README.pt-BR.md` open with one sentence, a real demonstration (domain-scoped `QUERY2` as a
+  regular user, results filtered by permission, v1 refused) captured from `make vm-test`, and a
+  four-command quickstart, followed by the experimental notice, now compact and dated
+  2026-10-11 (UAPI v2, pilot-grade measurements only); the demonstration is a new `vm/suite.sh`
+  block with assertions and the `DEMO_PASS` marker. `docs/README.md` indexes every document
+  with its language. `docs/assets/social-preview.svg`/`.png` for the GitHub social preview.
+  Benchmark raw archives move to one release, `bench-evidence`: `bench/evidence-release.md`
+  (release text and manifest), `scripts/bench-evidence-release.sh` (dry run by default;
+  `--apply` uploads, verifies size and SHA-256 through the API and the public URL, then deletes
+  the per-campaign pre-releases and keeps their tags; `add` for new campaigns),
+  `bench/results/README.md`, links in `bench/results/*/README.md` and
+  `docs/benchmark-harness.md` §7.1. The release move itself is pending for the maintainer.
+- Contributor tooling, batch 2 (plan `docs/dx-plan.md`, journal 0039): `.devcontainer/`
+  (Ubuntu 24.04, docker-in-docker, host tools; not yet advertised, the Codespaces measurement
+  of `make vm-test` is pending); OpenSSF Scorecard workflow and README badge; CodeQL for the
+  user-space C (`tools/`, `common/`, `bench/`); `make checkpatch` (`checkpatch.pl --no-tree`
+  on `layer/` and `kernel/`, script pinned to `v6.12.112` and verified by SHA-256), advisory
+  in the CI `Lint` job; `area/*` labels on pull requests by path (`.github/labeler.yml`) and a
+  greeting on a person's first issue and first pull request; Dependabot for the devcontainer.
 - Phase Q2a of the domain-scoped QUERY (`docs/spec-query-v2.md`, journal 0035): mount option
   `domain_depth` (default 1, 0 keeps the previous behaviour); the RAM index is partitioned by
   domain and by the homogeneity rule; `MOOB_IOC_QUERY2` on a domain directory answers from its

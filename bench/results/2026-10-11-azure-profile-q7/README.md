@@ -12,5 +12,6 @@ Dataset: 1000 memories, profile 8, seed 1, written with `bench-load` W1 under
   direct children (depth 2). Absolute durations are inflated by the tracer itself, which hooks
   every function inside the path walk; use it for the call structure, not for times.
 
-Raw `perf.data` and the full trace: `2026-10-11-azure-profile-q7.tgz` on the GitHub
-pre-release `bench-2026-10-11-azure-profile-q7`. Interpretation: journal 0028.
+Raw `perf.data` and the full trace: [`2026-10-11-azure-profile-q7.tgz`](https://github.com/studiomoob/llmoobfs/releases/download/bench-evidence/2026-10-11-azure-profile-q7.tgz) in the GitHub release
+`bench-evidence`
+(SHA-256 `6357fa1c96d344b2bebe29b4397fcc08e7d893541fb637d331ceb16cd2d3f805`). Originally attached to the pre-release `bench-2026-10-11-azure-profile-q7`; that tag remains. Interpretation: journal 0028.
