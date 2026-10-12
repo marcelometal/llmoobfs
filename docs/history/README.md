@@ -79,4 +79,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0049 — `QUERY2`, v1 and SQLite on btrfs and XFS](0049-q2-btrfs-xfs.md)
 - [0050 — Pending code items received from the developer experience batch](0050-dx-code-items.md)
 - [0051 — The repository moves to English (ADR-0010)](0051-english-everywhere.md)
+- [0052 — Phase Q2e: QUERY2 under concurrency (spec test 8)](0052-phase-q2e-concurrency.md)
 - [0057 — Bug: renaming a file over a just-deleted name failed with EINVAL](0057-rename-over-deleted-name.md)
