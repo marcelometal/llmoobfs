@@ -28,8 +28,11 @@ grep -v '^#' "$queries" | while read -r line; do
     esac
     # shellcheck disable=SC2086
     sh "$SQLBASE" query "$db" $line | cut -d'|' -f1 | sort -n > "$tmp/sql" || { echo "EQUIV_FAIL $n sqlite"; continue; }
+    # the oracle's own status: in a pipeline only the last command's counts, and a killed oracle
+    # would leave an empty answer that looks valid (found with the sanitizer smoke test)
     # shellcheck disable=SC2086
-    "$BIN/moobfs-index" "$lower" $line | cut -f1 | sort -n > "$tmp/oracle" || { echo "EQUIV_FAIL $n oracle"; continue; }
+    "$BIN/moobfs-index" "$lower" $line > "$tmp/oracle.raw" || { echo "EQUIV_FAIL $n oracle"; continue; }
+    cut -f1 "$tmp/oracle.raw" | sort -n > "$tmp/oracle"
     if ! cmp -s "$tmp/sql" "$tmp/oracle"; then
         echo "equiv: query $n ($line): SQLite and oracle differ"; diff "$tmp/sql" "$tmp/oracle" | head -5; echo "EQUIV_FAIL $n"; continue
     fi
