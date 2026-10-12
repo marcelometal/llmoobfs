@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- First real-client test (journal 0054, `docs/client-test-plan.md`): ai-memory v2.6.3 unchanged on
+  the layer. Stage 1a, its own test suites: 1 147 pass on plain ext4 and on the layer once the
+  rename fix (journal 0057) is in. Stage 1b, LongMemEval-S retrieval (50 questions): identical
+  results per question; `memory_query` p50 14 vs 15 ms in one run.
+- Measurement gaps closed (journal 0055): cold cache, mount time at 60 000 files and write cost,
+  `bench/q2-gaps.sh`.
 - `docs/references.md` (journal 0053): verified list of the papers, projects and tools MoobFS builds
   on, includes, compares against or used to decide; five citation and license errors corrected in
   the research documents, the fsx notice and `docs/ecosystem.md`.
