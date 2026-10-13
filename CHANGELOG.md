@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Security fix** (journal 0074, ADR-0011 F5; found with fstests): `copy_file_range` and a clone
+  through the layer left set-user-ID, set-group-ID and file capabilities on the target, so an
+  ordinary user with write access to such a file could change its content and keep them. Also
+  fixed: ordinary writes to a file with capabilities failed with `EIO`.
 - S4 (journal 0073): adversarial lower trees (`tests/hostile.c`) in the VM suite on the three lower
   filesystems, under KASAN, and through the tools under sanitizers in CI (`make hostile-test`).
   **Fix:** an empty or over-long `user.moob.format` marker on the lower root was accepted as "no

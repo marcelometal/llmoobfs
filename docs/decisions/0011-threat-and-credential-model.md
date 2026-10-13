@@ -127,6 +127,15 @@ Added on 2026-10-12, from the review of journal 0066 (`docs/research-stacked-fs-
   with the default `resuid` an ordinary user writing through the layer still spends that reserve.
   Promise 2 does not hold for it; the README lists the workaround (another `resuid`).
 
+- **F5 — copy and clone kept set-user-ID, set-group-ID and file capabilities** (found on
+  2026-10-13 with fstests, journal 0074). `copy_file_range` and a clone ran on the lower with the
+  mounter's credentials without first dropping the target's privileges with the caller's, so an
+  ordinary user with write access to a set-user-ID file could change its content and keep the bit,
+  against promise 2. **Fixed** in journal 0074, with the related failure of ordinary writes to
+  files that carry capabilities. The general lesson is recorded there: every operation delegated
+  with the mounter's credentials must be checked for decisions the lower takes from the caller's
+  capabilities.
+
 Added on 2026-10-13, with the tests of promise 5 (security roadmap S4, journal 0073). The
 behaviour on input the layer did not write is now stated in full and tested:
 

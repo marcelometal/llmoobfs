@@ -724,10 +724,22 @@ static int moobl_xattr_set(const struct xattr_handler *handler, struct mnt_idmap
 		if (err)
 			return err;
 	}
-	if (value)
+	if (value) {
 		err = vfs_setxattr(&nop_mnt_idmap, lower, full, value, size, flags);
-	else
+	} else if (!strcmp(full, XATTR_NAME_CAPS)) {
+		/*
+		 * File capabilities are removed by the kernel when an ordinary user changes
+		 * the file (cap_inode_killpriv), a caller the lower would refuse. A removal
+		 * asked by a user was authorized on this inode before the handler ran
+		 * (cap_inode_removexattr), so the mounter's credentials are safe here.
+		 */
+		const struct cred *old = override_creds(MOOBL_SB(inode->i_sb)->creds);
+
 		err = vfs_removexattr(&nop_mnt_idmap, lower, full);
+		revert_creds(old);
+	} else {
+		err = vfs_removexattr(&nop_mnt_idmap, lower, full);
+	}
 	if (err)
 		return err;
 	moobl_copy_attr(inode, d_inode(lower));
@@ -1015,6 +1027,19 @@ static loff_t moobl_remap_file_range(struct file *in, loff_t pos_in, struct file
 
 	if (file_inode(in)->i_sb != inode_out->i_sb)
 		return -EXDEV;
+	if (!(flags & REMAP_FILE_DEDUP)) {
+		/*
+		 * A clone changes the content. The lower call runs with the mounter's
+		 * credentials, which keep set-user-ID, set-group-ID and file capabilities,
+		 * so they are dropped here with the caller's, as for a write. A dedupe
+		 * leaves the content as it was. The lock is held across the lower call, as
+		 * for a write.
+		 */
+		inode_lock(inode_out);
+		ret = file_remove_privs(out);
+		if (ret)
+			goto unlock;
+	}
 	old = override_creds(MOOBL_SB(inode_out->i_sb)->creds);
 	if (flags & REMAP_FILE_DEDUP)
 		ret = vfs_dedupe_file_range_one(in->private_data, pos_in, out->private_data,
@@ -1024,6 +1049,9 @@ static loff_t moobl_remap_file_range(struct file *in, loff_t pos_in, struct file
 					   pos_out, len, flags);
 	revert_creds(old);
 	moobl_file_modified(out);
+unlock:
+	if (!(flags & REMAP_FILE_DEDUP))
+		inode_unlock(inode_out);
 	return ret;
 }
 
@@ -1035,11 +1063,18 @@ static ssize_t moobl_copy_file_range(struct file *in, loff_t pos_in, struct file
 
 	if (file_inode(in)->i_sb != file_inode(out)->i_sb)
 		return -EXDEV;
+	/* as for a clone: drop the privileges of the target with the caller's credentials */
+	inode_lock(file_inode(out));
+	ret = file_remove_privs(out);
+	if (ret)
+		goto unlock;
 	old = override_creds(MOOBL_SB(file_inode(out)->i_sb)->creds);
 	ret = vfs_copy_file_range(in->private_data, pos_in, out->private_data, pos_out,
 				  len, flags);
 	revert_creds(old);
 	moobl_file_modified(out);
+unlock:
+	inode_unlock(file_inode(out));
 	return ret;
 }
 
