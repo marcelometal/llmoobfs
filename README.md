@@ -314,6 +314,7 @@ Every document under `docs/`, with its language, is listed in the [docs index](d
 | How is AI-assisted development governed? | [ai-workflow.md](docs/ai-workflow.md) (shared through `AGENTS.md`, `CLAUDE.md` and Cursor rules) | EN |
 | Prior art, what may and may not be claimed | [research-originality.md](docs/research-originality.md) | EN |
 | Which kernels are supported, and what may change between versions? | [compatibility.md](docs/compatibility.md) | EN |
+| How can I help? | [help-wanted.md](docs/help-wanted.md) | EN |
 | Changes, governance, conduct, security | [CHANGELOG.md](CHANGELOG.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) | EN |
 
 Git records exact changes; journals record concise rationale, experiments and results. Future
