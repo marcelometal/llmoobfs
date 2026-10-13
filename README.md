@@ -200,6 +200,8 @@ measurements (only pilot-grade campaigns exist, in [bench/results/](bench/result
   On ext4 with the default reserve owner (uid 0), ordinary users writing through the layer can
   still use the blocks reserved for root; mount the lower with another `resuid`, or set the
   reserve to zero, if that matters.
+- `noatime`, `relatime` and `strictatime` on the layer's mount have no effect; access times
+  follow the mount options of the lower filesystem.
 
 ## Compared with plain files, SQLite and memory frameworks
 

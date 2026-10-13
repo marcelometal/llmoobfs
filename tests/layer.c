@@ -104,6 +104,24 @@ static int as_user(int fd, int how)
 		}
 		if (how == 4) _exit(ioctl(fd, FICLONE, src_fd) ? 7 : 0);
 		if (how == 5) _exit(fallocate(fd, 0, 0, 65536) ? 8 : 0);
+		if (how == 6) {
+			/* dedupe into a descriptor this user could not open for writing */
+			struct file_dedupe_range *dr = calloc(1, sizeof(*dr) + sizeof(struct file_dedupe_range_info));
+
+			if (!dr) _exit(9);
+			dr->src_length = 8192; dr->dest_count = 1; dr->info[0].dest_fd = fd;
+			if (ioctl(src_fd, FIDEDUPERANGE, dr)) _exit(9);
+			_exit(dr->info[0].status == -EPERM ? 0 : 10);
+		}
+		if (how == 7) {
+			/* toggling append-only needs CAP_LINUX_IMMUTABLE, and any flag the ownership */
+			int f;
+
+			if (ioctl(fd, FS_IOC_GETFLAGS, &f)) _exit(11);
+			f ^= FS_APPEND_FL;
+			errno = 0;
+			_exit(ioctl(fd, FS_IOC_SETFLAGS, &f) == -1 && errno == EPERM ? 0 : 12);
+		}
 		while (write(fd, block, sizeof block) > 0)
 			;
 		_exit(errno == ENOSPC ? 0 : 5);
@@ -368,6 +386,17 @@ int main(int argc, char **argv)
 			}
 			CHECK(!fsync(twin) && !fsync(src));
 			CHECK(shared_extent(up("twin")) == 0);
+			{
+				/* the lower call runs as the mounter, who may dedupe into anything; the
+				 * caller's right to change the target is checked before it */
+				int ro = open(up("twin"), O_RDONLY);
+
+				CHECK(ro >= 0);
+				src_fd = src;
+				CHECK(as_user(ro, 6) == 0);
+				close(ro);
+				CHECK(shared_extent(up("twin")) == 0);
+			}
 			dr->src_offset = 0; dr->src_length = 8192; dr->dest_count = 1;
 			dr->info[0].dest_fd = twin; dr->info[0].dest_offset = 0;
 			CHECK(!ioctl(src, FIDEDUPERANGE, dr));
@@ -456,6 +485,50 @@ int main(int argc, char **argv)
 			}
 		}
 		CHECK(!unlink(up("acl")));
+	}
+
+	/* file flags (lsattr, chattr) are the lower's, read and changed through the layer */
+	{
+		struct fsxattr fsx;
+		int flags = -1, lflags = -2, lfd, w;
+
+		fd = open(up("flags"), O_RDWR | O_CREAT | O_EXCL, 0666); CHECK(fd >= 0);
+		CHECK(!fchmod(fd, 0666) && write(fd, "abc", 3) == 3);
+		lfd = open(lo("flags"), O_RDONLY); CHECK(lfd >= 0);
+		CHECK(!ioctl(fd, FS_IOC_GETFLAGS, &flags) && !ioctl(lfd, FS_IOC_GETFLAGS, &lflags));
+		CHECK(flags == lflags);
+		CHECK(!ioctl(fd, FS_IOC_FSGETXATTR, &fsx));
+		CHECK(as_user(fd, 7) == 0);		/* not the owner */
+		CHECK(!fchown(fd, 1001, 1001));
+		CHECK(as_user(fd, 7) == 0);		/* the owner, without the capability */
+		CHECK(!ioctl(lfd, FS_IOC_GETFLAGS, &lflags) && !(lflags & FS_APPEND_FL));
+		flags |= FS_APPEND_FL;
+		CHECK(!ioctl(fd, FS_IOC_SETFLAGS, &flags));
+		CHECK(!ioctl(lfd, FS_IOC_GETFLAGS, &lflags) && (lflags & FS_APPEND_FL));
+		{
+			struct statx sx;
+
+			CHECK(!statx(AT_FDCWD, up("flags"), 0, STATX_BASIC_STATS, &sx));
+			CHECK((sx.stx_attributes_mask & STATX_ATTR_APPEND) && (sx.stx_attributes & STATX_ATTR_APPEND));
+			CHECK(!(sx.stx_attributes & STATX_ATTR_IMMUTABLE));
+		}
+		/* append-only is enforced on the layer's inode from then on */
+		errno = 0; CHECK(open(up("flags"), O_WRONLY) == -1 && errno == EPERM);
+		errno = 0; CHECK(truncate(up("flags"), 0) == -1 && errno == EPERM);
+		errno = 0; CHECK(unlink(up("flags")) == -1 && errno == EPERM);
+		w = open(up("flags"), O_WRONLY | O_APPEND); CHECK(w >= 0);
+		CHECK(write(w, "d", 1) == 1);
+		close(w);
+		CHECK(as_user(fd, 7) == 0);		/* the owner cannot clear it either */
+		flags = (flags & ~FS_APPEND_FL) | FS_IMMUTABLE_FL;
+		CHECK(!ioctl(fd, FS_IOC_SETFLAGS, &flags));
+		errno = 0; CHECK(open(up("flags"), O_WRONLY | O_APPEND) == -1 && errno == EPERM);
+		flags &= ~FS_IMMUTABLE_FL;
+		CHECK(!ioctl(fd, FS_IOC_SETFLAGS, &flags));
+		CHECK(!ioctl(lfd, FS_IOC_GETFLAGS, &lflags) && !(lflags & (FS_APPEND_FL | FS_IMMUTABLE_FL)));
+		CHECK(!fstat(fd, &st) && st.st_size == 4);
+		close(lfd); close(fd);
+		CHECK(!unlink(up("flags")));
 	}
 
 	/* unlink removes from lower; open descriptor keeps reading */

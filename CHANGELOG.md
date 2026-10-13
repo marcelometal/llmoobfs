@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- File flags (journal 0079): `lsattr`, `chattr`, `FS_IOC_FSGETXATTR` and `FS_IOC_FSSETXATTR` work
+  through the layer, with the caller's credentials; `statx` reports the lower's attributes and
+  creation time. fstests `generic/169` and `generic/420` pass. Changing a directory's casefold
+  flag through the layer is refused.
+- Review of every place where the layer uses the mounter's credentials (journal 0079): no new
+  defect. The layer's inodes now carry only the four lower inode flags the VFS enforces.
+- Decision (journal 0079): the layer's `atime` mount options stay without effect; documented
+  as a limitation.
 - **Fix** (journal 0078; found with fstests `generic/674` over btrfs): `syncfs` on the layer, and
   the sync of its unmount, returned success without syncing the lower filesystem. `fsync` and
   `sync` were not affected. The layer now delegates `sync_fs` to the lower, as overlayfs does.

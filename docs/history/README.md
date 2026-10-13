@@ -106,3 +106,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0076 — Fix: an ACL read through the layer could be the one before the last change](0076-stale-acl-read.md)
 - [0077 — S2: fstests over btrfs and XFS (group `quick`)](0077-s2-fstests-btrfs-xfs.md)
 - [0078 — Fix: `syncfs` on the layer did not sync the lower filesystem](0078-syncfs-reaches-the-lower.md)
+- [0079 — Review of the mounter-credential sites; file flags passed through](0079-credential-review-file-flags.md)
