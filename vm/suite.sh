@@ -741,6 +741,10 @@ for i in 1 2 3 4; do
     remember $LAYER "mem/m$i.md" decision $i || fail "lw-remember-$i"
     $TOOLS/dmsetup message lw 0 mark "m$i" || fail "lw-mark-$i"
 done
+# syncfs on the layer, with no fsync of the file, must make it durable in the lower filesystem
+mkdir -p $LAYER/mem && printf 'kept by syncfs\n' > $LAYER/mem/syncfs.md || fail lw-syncfs-write
+$BIN/layer syncfs $LAYER || fail lw-syncfs
+$TOOLS/dmsetup message lw 0 mark sf || fail lw-mark-sf
 umount $LAYER || fail lw-layer-umount
 umount $LOWER || fail lw-lower-umount
 $TOOLS/dmsetup message lw 0 mark end || fail lw-mark-end
@@ -761,6 +765,7 @@ check_mark() {   # replay up to a mark; memories 1..$2 must be whole, later ones
             [ ! -e "$LAYER/mem/m$i.md" ] || return 1
         fi
     done
+    if [ "${3:-}" = syncfs ]; then grep -q 'kept by syncfs' "$LAYER/mem/syncfs.md" || return 1; fi
     $BIN/query $LAYER kind eq string decision > /tmp/k.txt || return 1
     [ "$(wc -l < /tmp/k.txt)" -eq "$2" ] || return 1
     for leftover in "$LOWER"/.tmp.*; do [ -e "$leftover" ] && echo "note: a temporary file survived the crash at $1 (allowed)"; break; done
@@ -770,8 +775,9 @@ check_mark mkfs 0 || fail lw-check-mkfs
 check_mark m1 1 || fail lw-check-m1
 check_mark m2 2 || fail lw-check-m2
 check_mark m4 4 || fail lw-check-m4
-check_mark end 4 || fail lw-check-end
-echo "POWER_LOSS_REPLAY_PASS: marks mkfs m1 m2 m4 end"
+check_mark sf 4 syncfs || fail lw-check-syncfs
+check_mark end 4 syncfs || fail lw-check-end
+echo "POWER_LOSS_REPLAY_PASS: marks mkfs m1 m2 m4 sf end"
 # I/O errors: the lower device starts erroring every write; errors must reach the caller,
 # nothing may crash, and the tree must come back clean once the device is healthy again.
 dd if=/dev/zero of=$SCRATCH bs=1M count=64 2>/dev/null || fail fl-zero

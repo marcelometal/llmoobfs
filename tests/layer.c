@@ -3,6 +3,7 @@
  * Phase 2a/2b acceptance test for the MoobFS memory layer: exercises the
  * pass-through operations on a mounted layer and checks that the lower
  * directory reflects every change. Usage: layer <mount> <lower> <reflink: yes|no> <links|nolinks>
+ *   layer syncfs <path>             syncfs(2) on the filesystem that holds <path>
  *   layer reserve <mount> <lower>   an ordinary user fills the layer; the blocks the lower
  *                                   reserves for its administrator must stay free
  */
@@ -120,6 +121,12 @@ int main(int argc, char **argv)
 	ssize_t n;
 
 	int reflink, links;
+	if (argc == 3 && !strcmp(argv[1], "syncfs")) {
+		fd = open(argv[2], O_RDONLY); CHECK(fd >= 0);
+		CHECK(!syncfs(fd));
+		close(fd);
+		return 0;
+	}
 	if (argc == 4 && !strcmp(argv[1], "reserve")) {
 		/* the lower is mounted with a reserve owner that is not the mounter, so only
 		 * CAP_SYS_RESOURCE in the mounter credentials could spend the reserve */

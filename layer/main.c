@@ -193,11 +193,32 @@ static int moobl_show_options(struct seq_file *m, struct dentry *root)
 	return 0;
 }
 
+/*
+ * syncfs(2) on the layer has to reach the lower filesystem, which holds every page and all
+ * metadata. sync(2) visits the lower superblock by itself, so the layer is skipped there
+ * (SB_I_SKIP_SYNC) and this runs for syncfs, and for the final sync of an unmount.
+ */
+static int moobl_sync_fs(struct super_block *sb, int wait)
+{
+	struct moobl_sb *sbi = MOOBL_SB(sb);
+	struct super_block *lower_sb;
+	int err;
+
+	if (!wait || !sbi || !sbi->lower.dentry)
+		return 0;
+	lower_sb = sbi->lower.dentry->d_sb;
+	down_read(&lower_sb->s_umount);
+	err = sync_filesystem(lower_sb);
+	up_read(&lower_sb->s_umount);
+	return err;
+}
+
 static const struct super_operations moobl_sops = {
 	.alloc_inode = moobl_alloc_inode,
 	.free_inode = moobl_free_inode,
 	.evict_inode = moobl_evict_inode,
 	.statfs = moobl_statfs,
+	.sync_fs = moobl_sync_fs,
 	.show_options = moobl_show_options,
 };
 
@@ -1284,7 +1305,7 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	sb->s_flags |= SB_NOSEC;	/* lower enforces suid/sgid clearing */
 	if (sbi->lower.dentry->d_sb->s_flags & SB_POSIXACL)
 		sb->s_flags |= SB_POSIXACL;	/* ACL xattrs route to get_acl/set_acl, delegated below */
-	sb->s_iflags |= SB_I_NOEXEC | SB_I_NODEV;
+	sb->s_iflags |= SB_I_NOEXEC | SB_I_NODEV | SB_I_SKIP_SYNC;
 
 	root_inode = moobl_get_inode(sb, d_inode(sbi->lower.dentry));
 	if (IS_ERR(root_inode))
