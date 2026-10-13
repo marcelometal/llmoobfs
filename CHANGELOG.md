@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Decisions (journal 0081): the second real client is the LangGraph store (`BaseStore`), through
+  an adapter; outside review is requested now (community action 15).
 - S6 (journal 0080): `docs/compatibility.md` proposes the policy of supported kernels and of
   compatibility for the attribute encoding, the ioctl interface, mount options and tools.
   Accepted by the maintainer on 2026-10-13.

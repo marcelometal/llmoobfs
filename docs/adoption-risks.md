@@ -329,6 +329,8 @@ many of the other five keep each memory as a file, which the layer requires.
 **Residual.** Until a second client runs, generality is a claim supported by reading code, not by
 a test.
 
+Note of 2026-10-13: the second client is chosen, the LangGraph store (journal 0081). Not run yet.
+
 ## Proposed order
 
 1. Risk 1, item 1 and risk 4: the two fixes from the review (small, both against stated promises).
