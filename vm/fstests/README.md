@@ -33,7 +33,7 @@ Per test: [`results-ext4-quick.txt`](results-ext4-quick.txt).
 | passed | 178 |
 | not run | 451 |
 | failed in the first run | 18 |
-| failed after the fix of journal 0074 | 17 |
+| failed after the fixes of journals 0074 and 0076 | 16 |
 
 ### The failures
 
@@ -46,7 +46,7 @@ Per test: [`results-ext4-quick.txt`](results-ext4-quick.txt).
 | 732 | mounts the same "export" twice and renames between the two mounts | Does not apply: two layers over one lower directory is outside the contract (ADR-0007) |
 | 169, 420 | `FS_IOC_FSGETXATTR` returns `ENOTTY` | **Gap:** the file-attribute calls (`lsattr`, `chattr`, `xfs_io lsattr`) are not passed to the lower |
 | 003, 120 | `noatime`, `relatime`, `strictatime` on the layer's mount have no effect | **Gap:** access times follow the lower's mount options, not the layer's |
-| 318 | ACLs written from inside a user namespace read back with different entries and mask | **Open, not understood.** Possibly identifier mapping of ACL entries; to investigate |
+| 318 | an ACL read back right after it was changed was the earlier one, until a remount | **Defect, fixed** in journal 0076 (the VFS kept a copy the layer never dropped); passes now |
 | 688 | `fallocate` by an ordinary user on a file with capabilities failed with `EPERM` | **Defect, fixed** in journal 0074; passes now |
 
 `generic/215` also printed "No space left on device" for a 2 MiB write in the full run and not

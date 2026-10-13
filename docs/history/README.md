@@ -103,3 +103,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0073 — S4: the lower tree as hostile input](0073-s4-hostile-lower.md)
 - [0074 — Security fix: copy and clone kept set-user-ID, set-group-ID and file capabilities](0074-privileges-kept-on-copy.md)
 - [0075 — S2: fstests over the layer, first run (group `quick`, ext4)](0075-s2-fstests-first-run.md)
+- [0076 — Fix: an ACL read through the layer could be the one before the last change](0076-stale-acl-read.md)

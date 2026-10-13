@@ -422,6 +422,35 @@ int main(int argc, char **argv)
 	close(fd);
 	CHECK(!unlink(up("suid")) && !unlink(up("suidsrc")));
 
+	/* an ACL read through the layer is the one just set, not one remembered from an earlier read */
+	{
+		/* version 2; then tag, permissions and id of each entry, little-endian */
+		unsigned char acl[2][44] = {
+			{ 2, 0, 0, 0,  1, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,  2, 0, 4, 0, 0xe9, 3, 0, 0,
+			  4, 0, 4, 0, 0xff, 0xff, 0xff, 0xff,  0x10, 0, 4, 0, 0xff, 0xff, 0xff, 0xff,
+			  0x20, 0, 4, 0, 0xff, 0xff, 0xff, 0xff },	/* user 1001: r-- */
+			{ 2, 0, 0, 0,  1, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,  2, 0, 6, 0, 0xea, 3, 0, 0,
+			  4, 0, 4, 0, 0xff, 0xff, 0xff, 0xff,  0x10, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+			  0x20, 0, 4, 0, 0xff, 0xff, 0xff, 0xff },	/* user 1002: rw- */
+		};
+		const char *name = "system.posix_acl_access";
+		unsigned char got[64];
+
+		fd = open(up("acl"), O_WRONLY | O_CREAT | O_EXCL, 0644); CHECK(fd >= 0); close(fd);
+		if (getxattr(up("acl"), name, got, sizeof got) < 0 && errno == EOPNOTSUPP) {
+			puts("note: lower mounted without POSIX ACLs, ACL read test skipped");
+		} else {
+			for (i = 0; i < 4; i++) {
+				CHECK(!setxattr(up("acl"), name, acl[i % 2], sizeof acl[0], 0));
+				CHECK(getxattr(up("acl"), name, got, sizeof got) == (ssize_t)sizeof acl[0]);
+				CHECK(!memcmp(got, acl[i % 2], sizeof acl[0]));
+				CHECK(getxattr(lo("acl"), name, got, sizeof got) == (ssize_t)sizeof acl[0]);
+				CHECK(!memcmp(got, acl[i % 2], sizeof acl[0]));
+			}
+		}
+		CHECK(!unlink(up("acl")));
+	}
+
 	/* unlink removes from lower; open descriptor keeps reading */
 	fd = open(up("a.txt"), O_RDONLY); CHECK(fd >= 0);
 	CHECK(!unlink(up("a.txt")));

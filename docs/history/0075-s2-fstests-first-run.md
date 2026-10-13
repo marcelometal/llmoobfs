@@ -52,6 +52,10 @@ Of the 451 not run, 159 need reflink or dedupe, which the lower ext4 does not ha
 block device under the filesystem. A smaller set names what the layer does not offer:
 `mknod`/`mkfifo`, `O_TMPFILE`, `O_DIRECT`, the `chattr` flags, idmapped mounts, NFS export.
 
+*Addendum, same day (journal 0076).* `generic/318` is explained and fixed: the VFS remembered in
+the layer's inode the first ACL it read, and the layer never dropped it. 16 of the 18 fail now,
+ten by design, two that do not apply and four gaps.
+
 ## What the run was worth
 
 Two findings neither the project's suite nor the review of journal 0066 had: the privileges kept

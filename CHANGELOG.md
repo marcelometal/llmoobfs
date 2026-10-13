@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Fix** (journal 0076; found with fstests `generic/318`): an ACL read through the layer right
+  after it was changed could be the earlier one, until a remount. Access decisions were not
+  affected; they are made on the lower.
 - S2, first run (journal 0075): fstests v2026.09.22 runs over the layer through a small port
   (`vm/fstests/`, `vm/fstests-local.sh`). Group `quick` over ext4: 647 tests, 178 pass, 451 not
   run, 18 fail, of which 10 by design (no execution, no device nodes), 4 gaps, 1 fixed, 1 open.

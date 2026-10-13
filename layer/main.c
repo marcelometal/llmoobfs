@@ -96,6 +96,14 @@ static int moobl_inode_set(struct inode *inode, void *data)
 	fsstack_copy_attr_all(inode, lower);
 	fsstack_copy_inode_size(inode, lower);
 	inode->i_ino = lower->i_ino;
+#ifdef CONFIG_FS_POSIX_ACL
+	/*
+	 * ACLs are the lower's. The VFS would otherwise remember here the first one it
+	 * read and return it after the lower's changed.
+	 */
+	inode->i_acl = ACL_DONT_CACHE;
+	inode->i_default_acl = ACL_DONT_CACHE;
+#endif
 	inode->i_mapping->a_ops = &moobl_aops;
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &moobl_dir_iops;
