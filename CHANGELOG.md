@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- M3 closed (journal 0072): a batch read of content is dropped and the change cursor stays in the
+  client, both with measurements. `bench/readcost.c` shows that reading the attributes of a
+  query's results costs far more than the query (16 µs per file against 0.9 µs per result);
+  returning chosen values with the results is proposed, not built.
 - Stage 2 closed with a live mirror (journal 0071): a process that only watches files keeps the
   attributes of 2 000 pages equal to the client's database as they are written, without slowing
   its writes or waking its watcher; the scale of 20 000 pages repeated on the module with the

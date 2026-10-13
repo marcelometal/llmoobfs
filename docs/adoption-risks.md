@@ -274,6 +274,11 @@ structure is the suspect) and the 272-byte result record, which dominates long t
 have candidate changes that belong in a UAPI revision. *Accept* and publish the rest: the M4 report
 must list the operations where the layer loses, as the benchmark plan requires.
 
+*Note, 2026-10-13 (journal 0072).* A larger cost than those was measured afterwards: a result is
+a path, so a client that needs fields of the results reads them file by file, 2 µs for one
+attribute and 16 µs for all, against 0.9 µs per result for the query. Returning chosen values with
+the results is proposed there.
+
 **Residual.** Per-file overhead on open and on attribute writes is inherent to stacking.
 
 ## 14. One maintainer, no outside review

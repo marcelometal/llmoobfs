@@ -121,6 +121,13 @@ overflow, reserved fields not zeroed, invalid inner query, partial failure, conc
 and `setxattr`, inaccessible results, compatibility with a v1 client, fuzzing
 of the parsers.
 
+**Phase 3c, 2026-10-13 (journal 0072).** The query batch exists as `MOOB_IOC_QUERY2_BATCH`
+(up to 8 requests; phase Q2d). A batch read of content is dropped: the most it could save is
+4.4 µs per file, of which the lower filesystem's own open, read and close are 4.5 µs. What the
+measurement did show is that reading the *attributes* of results costs 2 µs per file for one and
+16 µs for all, against 0.9 µs per result for the query, while the index already holds the values.
+Returning chosen attribute values with each result is proposed for an ADR; nothing is built.
+
 ## 5. Logical revision and change cursor: decision
 
 Two distinct concepts: **persistent logical revision** (evolution of a memory) and **enumeration
@@ -137,6 +144,11 @@ documented as an alternative and is only reconsidered if M4 shows that the clien
 after a session costs more than acceptable. Questions any implementation would have to
 answer first: identity and scope of the revision, persistence, ordering, concurrency,
 recovery after failure, cursor validity, error codes, integration with git.
+
+**Phase 3c, 2026-10-13 (journal 0072).** Unchanged: revisions and the change cursor stay in the
+client. An attribute the client maintains plus the `QUERY2` cursor answer "updated after T" with
+equal results up to 60 000 files (journal 0068), a file watcher can maintain that attribute
+(journal 0071), and no surveyed system asks its store for changes since a revision.
 
 ## 6. Phases
 

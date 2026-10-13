@@ -40,7 +40,7 @@ $(BUILD)/moobfs-check: tools/moobfs-check.c common/attr.c include/moobfs_attr.h 
 $(BUILD)/moobfs-index: tools/moobfs-index.c tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-index.c common/attr.c $(LDFLAGS) -o $@
 # M4 benchmark harness (docs/benchmark-harness.md). gen is portable; load is Linux-only.
-bench-tools: $(BUILD)/bench-gen $(BUILD)/bench-load $(BUILD)/bench-sqlclient $(BUILD)/bench-aimem-latency
+bench-tools: $(BUILD)/bench-gen $(BUILD)/bench-load $(BUILD)/bench-sqlclient $(BUILD)/bench-aimem-latency $(BUILD)/bench-readcost
 $(BUILD)/bench-gen: bench/gen.c bench/common.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) bench/gen.c -lm $(LDFLAGS) -o $@
 $(BUILD)/bench-load: bench/load.c bench/common.h tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
@@ -49,6 +49,9 @@ $(BUILD)/bench-load: bench/load.c bench/common.h tools/query-common.h common/att
 SQLITE_LIBS ?= -lsqlite3
 $(BUILD)/bench-sqlclient: bench/sqlclient.c bench/common.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) bench/sqlclient.c $(SQLITE_LIBS) -lm $(LDFLAGS) -o $@
+# what a client pays to read a query's results, for the READ_BATCH decision (docs/spec-m3.md §4)
+$(BUILD)/bench-readcost: bench/readcost.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude bench/readcost.c $(LDFLAGS) -o $@
 # stage 2 of the real-client test (docs/client-test-plan.md): SQLite and QUERY2 in one process
 $(BUILD)/bench-aimem-latency: bench/client/aimem-latency.c bench/common.h include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude bench/client/aimem-latency.c $(SQLITE_LIBS) -lm $(LDFLAGS) -o $@
