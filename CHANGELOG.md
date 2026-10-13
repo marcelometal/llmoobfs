@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `docs/client-contract.md` (M3 phase 3a, journal 0070): what any agent-memory system must follow
+  to use the layer, with no client named.
 - **Security fix** (journal 0069; review of journal 0066): any user writing to or truncating a
   set-user-ID or set-group-ID file through the layer, and any `chown` of one, crashed the kernel
   (`BUG()` in `notify_change`). Regression test in `tests/layer.c`.

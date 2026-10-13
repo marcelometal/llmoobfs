@@ -179,7 +179,7 @@ set the attributes, `fsync`, `rename`, `fsync` the directory (`remember()` in `v
 synced before a mark survive and later ones are absent
 ([journal 0015](history/0015-phase-2e-investigation.md)).
 
-## 7. Identity convention (M3 phase 3a, partial)
+## 7. Identity convention (M3 phase 3a)
 
 Identity is a client convention, not a kernel feature: the logical key is the pair of string
 attributes `user.moob.namespace` and `user.moob.memory_id`; `user.moob.agent` records
@@ -188,8 +188,8 @@ authorship and is not part of the key; provenance of a copied memory goes in
 kernel does not generate identifiers and does not interpret these attributes. The only
 implemented check is in `tools/moobfs-check.c`: two distinct inodes with the same
 `(namespace, memory_id)` are reported as a conflict; several paths to the same inode (hard
-links) are not; the same id in another namespace is counted as normal. The rest of phase 3a
-(end-to-end documentation of the convention) is listed as planned in [ROADMAP.md](../ROADMAP.md).
+links) are not; the same id in another namespace is counted as normal. The convention is written
+end to end, for any client, in [client-contract.md](client-contract.md) (journal 0070).
 
 ## 8. Nothing trapped
 

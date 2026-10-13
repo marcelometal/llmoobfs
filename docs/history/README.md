@@ -97,3 +97,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0067 — Adoption risks written down with an answer for each](0067-adoption-risks.md)
 - [0068 — Real-client test, stage 2: scale to 60 000 pages](0068-client-stage2-scale.md)
 - [0069 — Two review findings fixed: the set-user-ID crash and the mounter's capability](0069-setattr-crash-and-mounter-capability.md)
+- [0070 — M3 phase 3a: the client contract](0070-client-contract.md)

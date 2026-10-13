@@ -28,6 +28,7 @@ accepted but may be only partly implemented, and only the journals and
 | --- | --- | --- |
 | [spec-m2.md](spec-m2.md) | EN | M2: the memory layer stacked over a mature filesystem (pass-through, typed attributes, index, `QUERY`) |
 | [spec-m3.md](spec-m3.md) | EN | M3: identity, isolation and provenance, change cursor, batch reads |
+| [client-contract.md](client-contract.md) | EN | What any memory system must follow to use the layer: scope, permissions, attributes, identity, write sequence, queries |
 | [spec-query-v2.md](spec-query-v2.md) | EN | Domain-scoped `QUERY2` (UAPI v2): domains, homogeneity rule, ioctl contract, phases Q2a–Q2e |
 | [format-m1.md](format-m1.md) | EN | The read-only M1 image format, kept as a regression |
 | [kernel-infrastructure.md](kernel-infrastructure.md) | EN | Mature kernel infrastructure the layer reuses, checked against Linux v6.12 |
