@@ -38,4 +38,8 @@ if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|possible (circular|recursive)
     echo "MOOBFS_VM_FAIL: kernel diagnostics under KASAN/lockdep"
     exit 1
 fi
-echo "MOOBFS_KASAN_PASS: layer suite under KASAN, UBSAN and lockdep with no kernel diagnostics"
+if [ -n "${MOOB_ONLY:-}" ]; then
+    echo "MOOBFS_KASAN_ONLY_PASS: steps $MOOB_ONLY under KASAN, UBSAN and lockdep with no kernel diagnostics (not a complete run)"
+else
+    echo "MOOBFS_KASAN_PASS: layer suite under KASAN, UBSAN and lockdep with no kernel diagnostics"
+fi

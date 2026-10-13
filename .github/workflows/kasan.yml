@@ -1,17 +1,14 @@
 name: KASAN and lockdep
 # Builds a pinned upstream 6.12 kernel with KASAN, UBSAN and lockdep using virtme-ng
-# and runs the layer suite (vm/suite.sh) inside it. Heavier than CI, so it runs on
-# pull requests that touch the layer or the harness, weekly, and on demand, rather
-# than on every push.
+# and runs the layer suite (vm/suite.sh) inside it. It is a required check of main, so the
+# job starts on every pull request; the heavy steps run only when the pull request touches
+# what the module is built or tested from, and otherwise the job passes at once. Also weekly
+# and on demand.
 on:
   workflow_dispatch:
   schedule:
     - cron: '17 4 * * 1'
   pull_request:
-    paths:
-      - 'layer/**'
-      - 'vm/**'
-      - '.github/workflows/kasan.yml'
 permissions:
   contents: read
 concurrency:
@@ -29,7 +26,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Decide whether the suite is needed
+        id: need
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git diff --name-only "$BASE_SHA" HEAD |
+             grep -qE '^(layer|vm|include|common|tests)/|^Makefile$|^\.github/workflows/kasan\.yml$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing under layer/, vm/, include/, common/, tests/, the Makefile or this workflow changed: the suite was not run." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Install build and guest dependencies
+        if: steps.need.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -40,6 +53,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           ls -la /dev/kvm || echo "no KVM: QEMU will use TCG"
       - name: Fetch and verify the kernel source
+        if: steps.need.outputs.run == 'true'
         run: |
           mkdir -p build
           curl -fsSL -o build/linux.tar.xz "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz"
@@ -47,12 +61,14 @@ jobs:
           mkdir -p build/linux
           tar -xJf build/linux.tar.xz -C build/linux --strip-components=1
       - name: Configure and build the kernel with KASAN and lockdep
+        if: steps.need.outputs.run == 'true'
         run: |
           cd build/linux
           vng --kconfig --config ../../vm/kasan.config
           grep -E '^CONFIG_(KASAN|PROVE_LOCKING|UBSAN|EXT4_FS|BTRFS_FS|XFS_FS|DM_LOG_WRITES|DM_FLAKEY|VIRTIO_BLK)=' .config
           vng --build --verbose
       - name: Build the layer module and the test binaries against that kernel
+        if: steps.need.outputs.run == 'true'
         run: |
           make layer KDIR="$PWD/build/linux"
           make attr-tools BUILD=build/vng CFLAGS="-O2 -g -static"
@@ -70,6 +86,7 @@ jobs:
           truncate -s 300M build/vng/lower-xfs.img && mkfs.xfs -q -f -L moob-lower build/vng/lower-xfs.img
           truncate -s 64M build/vng/scratch.img build/vng/log.img
       - name: Run the layer suite inside the KASAN kernel
+        if: steps.need.outputs.run == 'true'
         run: |
           cd build/linux
           R="$GITHUB_WORKSPACE"
@@ -90,7 +107,7 @@ jobs:
           if grep -q '^MOOBFS_VM_FAIL:' "$R/build/vng/console.log"; then exit 1; fi
           if grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log"; then exit 1; fi
       - name: Preserve evidence
-        if: always()
+        if: always() && steps.need.outputs.run == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: kasan-evidence

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- Harness (journal 0084): `MOOB_ONLY="btrfs reserve" make vm-test` runs only the named suite
+  steps (101 s against 261 s) and ends in `MOOBFS_ONLY_PASS`, which no check accepts as a
+  complete run. The KASAN workflow now starts on every pull request and skips its heavy steps
+  when nothing the module is built or tested from changed, so it can be a required check.
+- **Fixes** (journal 0083; from an outside read-only inspection of `layer/index.c`):
+  - a rename over a file with typed attributes left the replaced file in the index until
+    unmount;
+  - a result whose name is 256 bytes or longer was dropped when results are checked one by one,
+    and `MOOB_RES_PATH_TRUNCATED` was never set; it is now returned cut and marked;
+  - a typed attribute overwritten by a raw one kept answering queries with the old value;
+  - a failed allocation while noting a permission change of a directory left the domain
+    answering without per-result checks; it now turns the checks on for every domain;
+  - a dentry reference is no longer dropped with the index lock held.
+- **Behaviour change** (journal 0083): a btrfs subvolume or snapshot inside the lower tree is
+  not entered (`EXDEV`) and not indexed. Its files reuse inode numbers, and two files with one
+  number shared an index record: setting an attribute on one removed the other from answers.
+- **Fix** (journal 0082; found from an outside inspection report): allocations made with the
+  index lock held could recurse into memory reclaim, which evicts inodes and takes the same lock.
+  An ordinary user setting a typed attribute under memory pressure could hang every query and
+  attribute change of the mount. Sections under the lock now run in a no-filesystem-reclaim
+  scope, the mount scan takes the lock per attribute, and lockdep is told about the dependency.
+  Not reproduced as a hang; proved with lockdep. The layer module now has a `MODULE_VERSION`.
 - Decisions (journal 0081): the second real client is the LangGraph store (`BaseStore`), through
   an adapter; outside review is requested now (community action 15).
 - S6 (journal 0080): `docs/compatibility.md` proposes the policy of supported kernels and of

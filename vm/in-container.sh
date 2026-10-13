@@ -123,13 +123,17 @@ timeout 600 qemu-system-x86_64 \
     -drive file=build/vm/scratch.img,format=raw,if=virtio \
     -drive file=build/vm/log.img,format=raw,if=virtio \
     -kernel "/boot/vmlinuz-$KERNEL" -initrd build/vm/initramfs.cpio.gz \
-    -append 'console=ttyS0 rdinit=/init panic=-1 loglevel=4' \
+    -append "console=ttyS0 rdinit=/init panic=-1 loglevel=4${MOOB_ONLY:+ moob_only=$(echo "$MOOB_ONLY" | tr ' ' ',')}" \
     -nographic -no-reboot -nic none > build/vm/console.log 2>&1
 RESULT=$?
 set -e
 cat build/vm/console.log
 test "$RESULT" -eq 0
 grep -q '^MOOBFS_VM_PASS:' build/vm/console.log
-grep -q '^MOOBFS_LAYER_PASS:' build/vm/console.log
-grep -q '^MOOBFS_ACCEPTANCE_PASS:' build/vm/console.log
+if [ -n "${MOOB_ONLY:-}" ]; then
+    grep -q '^MOOBFS_ONLY_PASS:' build/vm/console.log   # a partial run, asked for with MOOB_ONLY
+else
+    grep -q '^MOOBFS_LAYER_PASS:' build/vm/console.log
+    grep -q '^MOOBFS_ACCEPTANCE_PASS:' build/vm/console.log
+fi
 ! grep -q '^MOOBFS_VM_FAIL:' build/vm/console.log
