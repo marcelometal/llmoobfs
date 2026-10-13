@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- S2, first run (journal 0075): fstests v2026.09.22 runs over the layer through a small port
+  (`vm/fstests/`, `vm/fstests-local.sh`). Group `quick` over ext4: 647 tests, 178 pass, 451 not
+  run, 18 fail, of which 10 by design (no execution, no device nodes), 4 gaps, 1 fixed, 1 open.
 - **Security fix** (journal 0074, ADR-0011 F5; found with fstests): `copy_file_range` and a clone
   through the layer left set-user-ID, set-group-ID and file capabilities on the target, so an
   ordinary user with write access to such a file could change its content and keep them. Also

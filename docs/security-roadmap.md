@@ -66,6 +66,10 @@ escrito, revisores não conseguem dizer se o esquema de credenciais é exploráv
 
 ### S2. fstests (xfstests) sobre a camada
 
+*Status, 2026-10-13 (journal 0075; in English).* Started: fstests runs over the layer with a small
+port (`vm/fstests/`), and the `quick` group has one recorded run over ext4. btrfs and XFS, the
+exclusion list and the four gaps it showed are open.
+
 Precedente: a documentação do kernel "Adding New Filesystems" chama fstests de infraestrutura
 padrão e seu uso de fortemente recomendado; bcachefs reportou fstests sob lockdep e KASAN antes
 do merge.
