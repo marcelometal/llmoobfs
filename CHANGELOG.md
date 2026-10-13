@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Fault injection (journal 0096): `tests/failnth.c` and a block in `vm/kasan-guest.sh` fail every
+  allocation made on behalf of the module in turn, with the kernel's `fail-nth`, across 17
+  operations, under KASAN and lockdep. Fixed what it found: an allocation failure in the walk
+  from a file to its domain was taken for a path that is too deep, so a query returned `ENOTTY`
+  and a write could leave a file out of its domain without declaring the index incomplete. The
+  walk no longer allocates.
+- Direction (journal 0095, ADR-0012 proposed): the index stays in the kernel module; its mount
+  and memory costs are to be removed by building each domain's partition on demand and releasing
+  partitions under memory pressure. Not implemented.
+- User-space baseline measured (journal 0094, `bench/userspace/compare.sh`): on 60 000 memories
+  the layer answered five query shapes 2 to 150 times faster than the generic per-attribute
+  SQLite index, writes are a tie for the writer, and the baseline's follower fell behind and
+  resynchronized under the bulk load. Most of the query gap is the generic schema: a SQLite
+  index written for the application's schema (journal 0047) is within 1.1 to 6 times of the layer.
 - User-space baseline (journal 0092): `bench/userspace/` builds the same per-domain index with
   no kernel module (plain `user.*` attributes, one SQLite database per domain directory, an
   inotify follower) and a query tool whose output equals the oracle's on 37 query shapes. The

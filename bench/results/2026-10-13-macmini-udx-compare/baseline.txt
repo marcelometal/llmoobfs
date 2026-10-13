@@ -1,0 +1,3 @@
+settle_after_writes_ms=1011 status=[watcher=absent state=resync synced_ns=1791918138195330254 overflows=1]
+VmHWM:	   22304 kB VmRSS:	   19268 kB 
+index_bytes_on_disk=69030136

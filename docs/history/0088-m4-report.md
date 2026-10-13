@@ -283,6 +283,10 @@ four questions. It does in one, with limits; the other three are costs or neutra
    in user space, protected by the same directory permissions, is being built as a baseline
    (journal 0092). Until it is compared, this report cannot say that the kernel module is the
    right place for the index, only what it costs and gives.
+   Note of 2026-10-13, later the same day: it was built (journal 0092) and measured once
+   (journal 0094). A generic index in user space was 2 to 150 times slower on five query shapes
+   and fell behind under a bulk load; an index that knows the application's schema is close to
+   the layer. See those journals before quoting either number.
 9. **Everything here is pilot-grade.** The plan's method (repetitions with confidence intervals,
    three data-set profiles, 1 to 100 concurrent processes, a budget-saturation series, CPU and
    memory per system) was only partly carried out. Two ways forward, for the maintainer: accept

@@ -1,0 +1,2 @@
+SELECT e.ino, e.path FROM entry e JOIN attr o ON o.eid = e.id AND o.name = 'created' AND o.type = 5 JOIN attr a0 ON a0.eid = e.id AND a0.name = 'kind' AND a0.type = 1 AND a0.v = x'6e6f7465' WHERE e.ok = 1 ORDER BY o.v DESC, e.ino DESC LIMIT 20
+SELECT e.ino, e.path FROM entry e JOIN attr o ON o.eid = e.id AND o.name = 'created' AND o.type = 5 JOIN attr a0 ON a0.eid = e.id AND a0.name = 'agent' AND a0.type = 1 AND a0.v = x'613037' WHERE e.ok = 1 ORDER BY o.v DESC, e.ino DESC LIMIT 20

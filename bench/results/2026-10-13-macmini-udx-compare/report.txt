@@ -1,0 +1,16 @@
+layer W1 create: n=60000 err=0 p50=13427.5us p99=31567.4us
+layer W4 attr_rm: n=60000 err=0 p50=20.5us p99=35.7us
+layer W4 attr_set: n=60000 err=0 p50=16.2us p99=27.6us
+udx W1 create: n=60000 err=0 p50=13169.3us p99=36141.6us
+udx W4 attr_rm: n=60000 err=0 p50=14.1us p99=28.5us
+udx W4 attr_set: n=60000 err=0 p50=10.5us p99=20.6us
+udx-ns3 W3 query:Q1: n=50 err=0 results=253 p50=6556.6us p99=10448.2us INCONCLUSIVE
+udx-ns3 W3 query:Q2: n=50 err=0 results=253 p50=239.6us p99=546.8us INCONCLUSIVE
+udx-ns3 W3 query:Q3: n=50 err=0 results=3030 p50=2220.6us p99=2783.7us INCONCLUSIVE
+udx-recent W3 query:Q1: n=50 err=0 results=20 p50=3996.7us p99=7531.9us
+udx-recent W3 query:Q2: n=50 err=0 results=20 p50=439.3us p99=617.2us
+v2-ns3 W3 query:Q1: n=50 err=0 results=253 p50=119.7us p99=255.5us
+v2-ns3 W3 query:Q2: n=50 err=0 results=253 p50=76.5us p99=118.0us
+v2-ns3 W3 query:Q3: n=50 err=0 results=3030 p50=924.7us p99=1680.8us
+v2-recent W3 query:Q1: n=50 err=0 results=20 p50=26.4us p99=46.5us INCONCLUSIVE
+v2-recent W3 query:Q2: n=50 err=0 results=20 p50=135.8us p99=245.7us

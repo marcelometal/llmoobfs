@@ -1,0 +1,2 @@
+udx-watch: domains=8 watches=265 events=528107 batches=10061 refreshed=146931 max_batch=6293 rows_written=1079739 overflows=1 resyncs=1 cpu_ms=52378
+udx-watch: domains=8 watches=265 events=544505 batches=10068 refreshed=146931 max_batch=6293 rows_written=1079771 overflows=2 resyncs=2 cpu_ms=54892

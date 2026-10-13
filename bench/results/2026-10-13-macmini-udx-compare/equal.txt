@@ -1,0 +1,4 @@
+shape 1: oracle=253 udx=253 layer=253
+shape 2: oracle=253 udx=253 layer=253
+shape 3: oracle=3030 udx=3030 layer=3030
+EQUAL: shapes=3 different=0

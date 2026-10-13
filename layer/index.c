@@ -521,36 +521,39 @@ static bool target_ok(struct inode *in, struct inode *dom)
 }
 
 /*
- * Walks from a layer dentry up to the mount root, keeping a reference on every dentry on
- * the way: chain[0] is the dentry itself (depth *depth), chain[*depth - j] is its ancestor
- * at depth j. Returns false when the path is deeper than MOOBL_MAX_DEPTH (references
- * dropped). Directory renames never change a dentry's depth or domain (EXDEV otherwise),
- * so a concurrent rename cannot move it between partitions behind the caller's back.
+ * Distance of a layer dentry from the mount root, or MOOBL_MAX_DEPTH + 1 when it is deeper.
+ * Directory renames never change a dentry's depth or domain (EXDEV otherwise), so a
+ * concurrent rename cannot move a directory between partitions behind the caller's back.
+ * Nothing here allocates: an allocation failure used to be indistinguishable from a path
+ * that is too deep, which turned memory pressure into ENOTTY on a query and into a file
+ * silently left out of its domain on a write (journal 0096).
  */
-static bool walk_up(struct dentry *dentry, struct dentry **chain, unsigned int *depth)
+static unsigned int depth_of(struct dentry *dentry)
 {
-	struct dentry *d = dget(dentry);
+	struct dentry *d = dget(dentry), *p;
 	unsigned int k = 0;
 
-	while (!IS_ROOT(d)) {
-		if (k == MOOBL_MAX_DEPTH) {
-			dput(d);
-			while (k)
-				dput(chain[--k]);
-			return false;
-		}
-		chain[k++] = d;
-		d = dget_parent(d);
+	while (!IS_ROOT(d) && k <= MOOBL_MAX_DEPTH) {
+		p = dget_parent(d);
+		dput(d);
+		d = p;
+		k++;
 	}
 	dput(d);
-	*depth = k;
-	return true;
+	return k;
 }
 
-static void chain_put(struct dentry **chain, unsigned int k)
+/* The ancestor up levels above a layer dentry, referenced (the root when there are fewer). */
+static struct dentry *ancestor_get(struct dentry *dentry, unsigned int up)
 {
-	while (k)
-		dput(chain[--k]);
+	struct dentry *d = dget(dentry), *p;
+
+	while (up-- && !IS_ROOT(d)) {
+		p = dget_parent(d);
+		dput(d);
+		d = p;
+	}
+	return d;
 }
 
 /*
@@ -560,8 +563,8 @@ static void chain_put(struct dentry **chain, unsigned int k)
 static void place_dentry(struct moobl_index *ix, struct dentry *dentry, struct inode *self,
 			 struct moobl_place *pl)
 {
-	struct dentry **chain;
 	unsigned int n = ix->domain_depth, k, i;
+	struct dentry *domd, *d, *p;
 	struct inode *dom;
 	bool ok = true;
 
@@ -569,43 +572,48 @@ static void place_dentry(struct moobl_index *ix, struct dentry *dentry, struct i
 	pl->hetero = false;
 	if (!n)
 		return;
-	chain = kmalloc_array(MOOBL_MAX_DEPTH, sizeof(*chain), GFP_KERNEL);
-	if (!chain || !walk_up(dentry, chain, &k)) {
+	k = depth_of(dentry);
+	if (k > MOOBL_MAX_DEPTH) {
 		pl->hetero = true;	/* cannot evaluate: keep it out of every domain answer */
-		kfree(chain);
 		return;
 	}
 	if (k > n) {
-		dom = moobl_lower_inode(d_inode(chain[k - n]));
+		domd = ancestor_get(dentry, k - n);
+		dom = moobl_lower_inode(d_inode(domd));
 		pl->domain = dom->i_ino;
-		for (i = k - n - 1; i >= 1 && ok; i--)
-			ok = reach_ok(moobl_lower_inode(d_inode(chain[i])), dom, false);
+		d = dget_parent(dentry);
+		for (i = 1; i < k - n && ok; i++) {	/* the directories between the two */
+			ok = reach_ok(moobl_lower_inode(d_inode(d)), dom, false);
+			p = dget_parent(d);
+			dput(d);
+			d = p;
+		}
+		dput(d);
 		if (ok)
-			ok = target_ok(moobl_lower_inode(self ? self : d_inode(chain[0])), dom);
+			ok = target_ok(moobl_lower_inode(self ? self : d_inode(dentry)), dom);
 		pl->hetero = !ok;
+		dput(domd);
 	}
-	chain_put(chain, k);
-	kfree(chain);
 }
 
 /* Depth of a layer dentry and the lower ino of its ancestor at depth n (0 when none or negative). */
 static bool depth_and_domain(struct moobl_index *ix, struct dentry *dentry, unsigned int *depth,
 			     u64 *domain)
 {
-	struct dentry **chain = kmalloc_array(MOOBL_MAX_DEPTH, sizeof(*chain), GFP_KERNEL);
-	unsigned int n = ix->domain_depth, k;
+	unsigned int n = ix->domain_depth, k = depth_of(dentry);
+	struct dentry *dom;
 
-	if (!chain || !walk_up(dentry, chain, &k)) {
-		kfree(chain);
+	if (k > MOOBL_MAX_DEPTH)
 		return false;
-	}
 	*depth = k;
 	*domain = 0;
 	/* the dentry itself may be negative (a rename target): it then has no domain inode yet */
-	if (n && k >= n && d_really_is_positive(chain[k - n]))
-		*domain = moobl_lower_inode(d_inode(chain[k - n]))->i_ino;
-	chain_put(chain, k);
-	kfree(chain);
+	if (n && k >= n) {
+		dom = ancestor_get(dentry, k - n);
+		if (d_really_is_positive(dom))
+			*domain = moobl_lower_inode(d_inode(dom))->i_ino;
+		dput(dom);
+	}
 	return true;
 }
 

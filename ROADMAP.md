@@ -46,6 +46,7 @@ on the security roadmap, and a negative result may cancel it.
 
 | Item | Condition | Reference |
 | --- | --- | --- |
+| Index built per domain on demand, releasable under memory pressure | Decided in [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md) after the M4 report and the user-space comparison; the maintainer chose on 2026-10-13 to remove the module's mount and memory costs with kernel techniques. Accepted on 2026-10-13; to be implemented after fault injection is in the suite, with tests of a build racing with writes | [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md), journals 0088, 0094 |
 | Index persistence (surviving remount) | M4 must show that rebuild time or memory at the target scale justifies an on-disk structure, and a format and compatibility ADR must exist | [spec-m3](docs/spec-m3.md) §1, [value-assessment](docs/value-assessment.md) §9 |
 | Attribute values with query results | Measured in journal 0072: reading the attributes of results costs 2 to 16 µs per file against 0.9 µs per result for the query. A projection answered from the index needs an ADR (it changes the UAPI) and a check that more than one surveyed system needs it. The batch read of content (`READ_BATCH`) is dropped | [spec-m3](docs/spec-m3.md) §4, journal 0072 |
 | Change cursor ("changes since revision") | Decision deferred; needs a client with a measured benefit and answers to the open questions in spec-m3 §5 | [spec-m3](docs/spec-m3.md) §5 |

@@ -1,0 +1,7 @@
+compare: 19:02:16 baseline: W1 and W4 on the plain directory with udx-watch running
+compare: 19:06:24 layer: W1 and W4 through the mount
+compare: 19:10:27 equal answers on this data set
+compare: 19:10:28 rep 1: queries
+compare: 19:10:28 rep 2: queries
+compare: 19:10:29 rep 3: queries
+compare: 19:10:32 COMPARE_DONE

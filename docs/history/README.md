@@ -121,3 +121,6 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0091 — S2: the `quick` group passes on the three lower filesystems with the exclusion list](0091-s2-fstests-clean-with-exclusions.md)
 - [0092 — A user-space baseline of the index: SQLite per domain kept current with inotify](0092-userspace-index-baseline.md)
 - [0093 — README and landing page open with the problem](0093-readme-and-site-problem-first.md)
+- [0094 — The user-space baseline measured against the layer](0094-userspace-baseline-measured.md)
+- [0095 — Direction after the user-space comparison: keep the module, remove its costs](0095-direction-after-the-baseline.md)
+- [0096 — Systematic allocation-failure injection; the domain walk no longer allocates](0096-fault-injection.md)
