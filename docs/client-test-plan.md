@@ -117,3 +117,7 @@ for 60 000 pages:
 Still open: the scales up to 60 000 pages, the live sidecar and the mirror's cost against what
 ai-memory spends on SQLite.
 
+Update of the same day (journal 0068): the scales are done, 2 000 to 60 000 pages, with equal
+answers at each. Pages above 6 000 are loaded as files and indexed by the client's `reindex`
+(decision 2 said MCP; its cost per write grows with the store). Still open: the live sidecar and
+its cost against the client's own synchronization.

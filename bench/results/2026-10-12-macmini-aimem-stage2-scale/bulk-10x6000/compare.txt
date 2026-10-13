@@ -1,0 +1,1 @@
+COMPARE: projects=10 checks=60 failed=0 results=incremental:25493,pinned:200,recent:200,rules:200,settled:15383,stale:200

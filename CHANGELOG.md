@@ -19,6 +19,11 @@
   warm and cold. At 150 and 1 905 pages every answer is equal; warm, `QUERY2` is 1.6 to 5.8 times
   faster on the filtered shapes, equal on two and slower on the incremental traversal (0.74 to
   0.86). Small scales, one run each.
+- Stage 2 at scale (journal 0068): equal answers up to 60 000 pages in ten projects. Warm,
+  `QUERY2` is 5 to 6.5 times faster on a set of kinds and 1.6 to 3.8 times on a family filter,
+  equal on plain ordered scans, and at 0.51 to 0.71 of SQLite's speed on long ordered traversals.
+  Index memory is 530 bytes per page. The large scales are loaded by `bench/client/aimem-bulk.py`
+  and the client's `reindex`, because its MCP write cost grows with the store on any filesystem.
 - **UAPI change** (journal 0061, ADR-0011 F1): `GET_INFO` fills the index counters only for
   `CAP_SYS_ADMIN`, flagged by the new `MOOB_FLAG_COUNTERS`; other callers get zeros, because the
   counters sum every user's memories.

@@ -94,4 +94,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0065 — Real-client test, stage 2: latency tool and first numbers](0065-client-stage2-latency.md)
 - [0066 — Stacked-filesystem rules from kernel sources, audited against the layer](0066-stacked-fs-kernel-rules-audit.md)
 - [0067 — Adoption risks written down with an answer for each](0067-adoption-risks.md)
+- [0068 — Real-client test, stage 2: scale to 60 000 pages](0068-client-stage2-scale.md)
 - [0069 — Two review findings fixed: the set-user-ID crash and the mounter's capability](0069-setattr-crash-and-mounter-capability.md)
