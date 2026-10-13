@@ -177,6 +177,14 @@ medições do M4 (só existem campanhas em nível de piloto, em [bench/results/]
   negativos após renomear diretório, até remontar ([spec-m3](docs/spec-m3.md) §3.1).
 - Atomicidade arquivo × metadados é convenção do cliente; durabilidade, reflink e dedup são do
   inferior. A aceitação rodou só sobre ext4.
+- Os números de inode são os do inferior. Quando o diretório inferior abrange vários subvolumes
+  btrfs, dois arquivos podem aparecer com o mesmo `st_dev` e `st_ino` pela camada, o que confunde
+  ferramentas que detectam hard links assim (`tar`, `rsync`, `du`, `find -samefile`). Mantenha o
+  inferior em um só subvolume.
+- Os dados são gravados com as credenciais do montador sem `CAP_SYS_RESOURCE`, então os limites de
+  cota valem. No ext4 com o dono padrão da reserva (uid 0), usuários comuns gravando pela camada
+  ainda podem usar os blocos reservados ao root; monte o inferior com outro `resuid`, ou zere a
+  reserva, se isso importar.
 
 ## Comparado com arquivos comuns, SQLite e frameworks de memória
 

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- **Security fix** (journal 0069; review of journal 0066): any user writing to or truncating a
+  set-user-ID or set-group-ID file through the layer, and any `chown` of one, crashed the kernel
+  (`BUG()` in `notify_change`). Regression test in `tests/layer.c`.
+- **Behaviour change** (journal 0069): data operations no longer carry `CAP_SYS_RESOURCE`, so quota
+  limits apply to writes through the layer. ext4's reserve with the default owner (uid 0) is still
+  reachable; see the README's limitations and ADR-0011, finding F4.
+- `docs/research-stacked-fs-kernel-rules.md` (journal 0066): the rules a stacked filesystem must
+  follow, from kernel v6.12 sources, each with whether the layer complies.
+- `docs/adoption-risks.md` (proposal; journal 0067): fifteen risks any agent-memory system takes by
+  adopting the layer, each with its evidence, what exists and an answer (fix, build, contain or
+  accept).
+- Real-client test, stage 2 (journals 0063 to 0065): ai-memory's structured queries against `QUERY2`
+  with projects as domains. Tools in `bench/client/` (workload through its MCP, mirror, comparator)
+  and `bench-aimem-latency`, which runs the six shapes on SQLite and on `QUERY2` in one process,
+  warm and cold. At 150 and 1 905 pages every answer is equal; warm, `QUERY2` is 1.6 to 5.8 times
+  faster on the filtered shapes, equal on two and slower on the incremental traversal (0.74 to
+  0.86). Small scales, one run each.
+- Stage 2 at scale (journal 0068): equal answers up to 60 000 pages in ten projects. Warm,
+  `QUERY2` is 5 to 6.5 times faster on a set of kinds and 1.6 to 3.8 times on a family filter,
+  equal on plain ordered scans, and at 0.51 to 0.71 of SQLite's speed on long ordered traversals.
+  Index memory is 530 bytes per page. The large scales are loaded by `bench/client/aimem-bulk.py`
+  and the client's `reindex`, because its MCP write cost grows with the store on any filesystem.
+- **UAPI change** (journal 0061, ADR-0011 F1): `GET_INFO` fills the index counters only for
+  `CAP_SYS_ADMIN`, flagged by the new `MOOB_FLAG_COUNTERS`; other callers get zeros, because the
+  counters sum every user's memories.
+- ADR-0011 (accepted; journal 0060): threat and credential model of the layer (security roadmap S1),
+  with two findings: `GET_INFO` counters cross users (F1) and one index budget for all users (F2).
+- `ROADMAP.md` brought up to date, planned items in the agreed order (journal 0059).
+
 ## v0.2.0-experimental — 2026-10-12
 
 Second source pre-release: the per-domain `QUERY2` of ADR-0009 (phases Q2a to Q2e) and its

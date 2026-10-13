@@ -131,7 +131,8 @@ run_lower() {
     $BIN/query $LAYER score ge int64 10 > /tmp/noindex.txt 2>&1 && fail "query-noindex-answered-$fs"
     grep -q 'Operation not supported' /tmp/noindex.txt || { cat /tmp/noindex.txt; fail "query-noindex-errno-$fs"; }
     [ "$($BIN/query $LAYER q2errno kind exists x x)" = "q2 95" ] || fail "query2-noindex-errno-$fs"   # EOPNOTSUPP
-    $BIN/query $LAYER info | grep -q 'flags=0x2' || fail "query-noindex-flag-$fs"
+    f=$($BIN/query $LAYER info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
+    [ -n "$f" ] && [ $(( f & 2 )) -ne 0 ] || fail "query-noindex-flag-$fs"   # MOOB_FLAG_INDEX_OFF
     umount $LAYER || fail "q-umount3-$fs"
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0,index_budget=1M none $LAYER || fail "q-budget-mount-$fs"
     same_query score ge int64 10 || fail "query-budget-$fs"
@@ -520,7 +521,10 @@ run_lower() {
     $BIN/bench-load --workload W7 --target $LAYER --lower $LOWER --mount-opts domain_depth=0 --queries /tmp/bench-q.txt --out /tmp/bench-w7 --repeat 2 || fail "bench-w7-$fs"
     [ "$(cat /tmp/bench-w6.0.rec /tmp/bench-w7.0.rec | wc -c)" -eq $(( 4 * 32 )) ] || fail "bench-mount-records-$fs"
     grep -q "moobfs_layer $LAYER\| $LAYER " /proc/mounts || fail "bench-remounted-$fs"
-    $BIN/query $LAYER info | grep -q 'flags=0x0\|flags=0 ' || fail "bench-remount-flags-$fs"
+    # after the remount: index on, paths current, index complete (flag bits 0x2, 0x4 and 0x8 clear;
+    # root also gets MOOB_FLAG_COUNTERS 0x20, ADR-0011)
+    f=$($BIN/query $LAYER info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
+    [ -n "$f" ] && [ $(( f & 0xe )) -eq 0 ] || fail "bench-remount-flags-$fs"
     rm -rf $LAYER/bench /tmp/bench-* || fail "bench-cleanup-$fs"
     # the campaign orchestrator, one repetition at a tiny scale: procedure only, never numbers
     env BIN=$BIN SQLITE=$TOOLS/sqlite3 sh $BIN/bench-run.sh --out /tmp/bench-run --scale 60 --profile 16 --reps 1 --procs 2 --layer "C-$fs=$LAYER:$LOWER" > /tmp/bench-run.log 2>&1 || { tail -20 /tmp/bench-run.log; fail "bench-run-$fs"; }
@@ -585,6 +589,11 @@ demo "query $LAYER kind eq string decision" || fail demo-v1-root
 [ "$(wc -l < /tmp/demo.out)" -eq 4 ] || fail demo-v1-root-count
 demo "query $LAYER info" || fail demo-info
 grep -q 'domain_depth=1 heterogeneous=1 fallback_domains=0' /tmp/demo.out || fail demo-info-counts
+# ADR-0011 F1: the index counters sum every user's memories; root gets them, a user gets zeros
+grep -q 'counters=shown' /tmp/demo.out || fail demo-info-root-counters
+demo "query --uid 1001 $LAYER info" || fail demo-info-user
+grep -q 'domain_depth=1 heterogeneous=0 fallback_domains=0 counters=hidden' /tmp/demo.out || fail demo-info-user-hidden
+grep -q ' used=0 entries=0 inodes=0$' /tmp/demo.out || fail demo-info-user-counters
 umount $LAYER || fail demo-umount
 rm -rf $LOWER/alice $LOWER/bob $LOWER/team /tmp/demo.out || fail demo-cleanup
 umount $LOWER || fail demo-lower-umount
@@ -729,6 +738,15 @@ grep -q 'memory ok.md' $LAYER/ok.md || fail fl-ok-content
 $BIN/moobfs-check $LOWER > /dev/null || fail fl-check
 umount $LAYER && umount $LOWER || fail fl-final-umount
 echo "IO_ERROR_INJECTION_PASS"
+# Reserved space: the mounter credentials carry no CAP_SYS_RESOURCE (as overlayfs), so an ordinary
+# user writing through the layer cannot spend the blocks ext4 reserves. The lower is mounted with a
+# reserve owner other than root: with resuid=0, ext4 itself grants the reserve to the mounter's
+# fsuid, whatever its capabilities (journal 0069).
+$TOOLS/mke2fs -q -F -t ext4 -b 4096 $SCRATCH || fail rs-mkfs
+mount -t ext4 -o resuid=4242 $SCRATCH $LOWER || fail rs-lower-mount
+mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail rs-layer-mount
+$BIN/layer reserve $LAYER $LOWER || fail rs-reserve
+umount $LAYER && umount $LOWER || fail rs-final-umount
 rmmod moobfs_layer || fail layer-unload
 if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
 echo "MOOBFS_ACCEPTANCE_PASS: git, sqlite wal, memory client, dm-log-writes replay, dm-flakey"

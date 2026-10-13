@@ -1,0 +1,3 @@
+600 debian /srv/moob/ext4/aim2/data/wiki/01a1323c-1066-7d83-9b48-b446f546e8de/01a13240-4543-7142-80b3-9cde007930a7/_meta.md
+600 debian /srv/moob/ext4/aim2/data/wiki/01a1323c-1066-7d83-9b48-b446f546e8de/01a13240-4543-7142-80b3-9cde007930a7/_slots/slots-00013.md
+600 debian /srv/moob/ext4/aim2/data/wiki/01a1323c-1066-7d83-9b48-b446f546e8de/01a13240-4543-7142-80b3-9cde007930a7/_slots/slots-00143.md

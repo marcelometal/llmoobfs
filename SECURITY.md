@@ -108,10 +108,12 @@ These are targets for a single volunteer maintainer, not guarantees:
 The parser checks image structure and hashes, but checksums are not
 authentication. The module validates at mount, not continuously against external
 backing-device writes. Neither encryption nor authorization beyond ordinary VFS
-access is provided; `QUERY` filters results by the caller's POSIX permissions on
-the lower tree, as tested in the VM suite, and that is the whole access model.
+access is provided. `QUERY2` answers from the partition of a domain directory the
+caller can traverse and read, holding only files every traverser can read; with
+domains on, the v1 `QUERY` is limited to `CAP_SYS_ADMIN` (`docs/spec-query-v2.md`).
 The VM suite, the KASAN/lockdep workflow and the attribute fuzzer are not a
-security audit; no external audit has taken place. See
-[docs/security-roadmap.md](docs/security-roadmap.md) for the threat model (S1,
-not yet written), fstests, syzkaller, hostile-lower handling and the other open
-items.
+security audit; no external audit has taken place. The threat and credential
+model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
+(accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and two
+known findings. [docs/security-roadmap.md](docs/security-roadmap.md) lists
+fstests, syzkaller, hostile-lower handling and the other open items.

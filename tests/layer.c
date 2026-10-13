@@ -3,6 +3,8 @@
  * Phase 2a/2b acceptance test for the MoobFS memory layer: exercises the
  * pass-through operations on a mounted layer and checks that the lower
  * directory reflects every change. Usage: layer <mount> <lower> <reflink: yes|no> <links|nolinks>
+ *   layer reserve <mount> <lower>   an ordinary user fills the layer; the blocks the lower
+ *                                   reserves for its administrator must stay free
  */
 #define _GNU_SOURCE
 #include <sys/types.h>
@@ -12,10 +14,12 @@
 #include <sys/uio.h>
 #include <sys/ioctl.h>
 #include <sys/xattr.h>
+#include <sys/wait.h>
 #include <linux/fs.h>
 #include <linux/fiemap.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <grp.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +75,32 @@ static int count_entries(const char *dir)
 	closedir(d); return n;
 }
 
+/*
+ * As uid and gid 1001, writes to (how 0), truncates (how 1) or fills until ENOSPC (how 2) a
+ * descriptor that root opened.
+ * Without CAP_FSETID the VFS then clears set-user-ID and set-group-ID through ->setattr, the
+ * path that reached BUG() in notify_change (journal 0069). Returns the child's exit status.
+ */
+static int as_user(int fd, int how)
+{
+	pid_t pid = fork();
+	int status;
+
+	if (pid < 0) return -1;
+	if (!pid) {
+		static char block[1 << 16];
+
+		if (setgroups(0, NULL) || setgid(1001) || setuid(1001)) _exit(2);
+		if (how == 0) _exit(write(fd, "y", 1) == 1 ? 0 : 3);
+		if (how == 1) _exit(ftruncate(fd, 2) ? 4 : 0);
+		while (write(fd, block, sizeof block) > 0)
+			;
+		_exit(errno == ENOSPC ? 0 : 5);
+	}
+	if (waitpid(pid, &status, 0) != pid) return -1;
+	return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+}
+
 int main(int argc, char **argv)
 {
 	struct stat st, lst;
@@ -80,6 +110,25 @@ int main(int argc, char **argv)
 	ssize_t n;
 
 	int reflink, links;
+	if (argc == 4 && !strcmp(argv[1], "reserve")) {
+		/* the lower is mounted with a reserve owner that is not the mounter, so only
+		 * CAP_SYS_RESOURCE in the mounter credentials could spend the reserve */
+		unsigned long long reserve;
+
+		snprintf(mnt, sizeof mnt, "%s", argv[2]);
+		snprintf(low, sizeof low, "%s", argv[3]);
+		CHECK(!statfs(low, &sfs) && sfs.f_bfree > sfs.f_bavail);
+		reserve = sfs.f_bfree - sfs.f_bavail;
+		fd = open(up("fill"), O_WRONLY | O_CREAT | O_EXCL, 0644); CHECK(fd >= 0);
+		CHECK(!fchown(fd, 1001, 1001));
+		CHECK(as_user(fd, 2) == 0);
+		CHECK(!fsync(fd));
+		CHECK(!statfs(low, &sfs) && sfs.f_bfree >= reserve * 3 / 4);
+		close(fd);
+		CHECK(!unlink(up("fill")));
+		puts("LAYER_RESERVE_PASS");
+		return 0;
+	}
 	CHECK(argc == 5);
 	reflink = !strcmp(argv[3], "yes");
 	links = !strcmp(argv[4], "links");
@@ -315,6 +364,23 @@ int main(int argc, char **argv)
 		close(src); close(dst);
 		CHECK(!unlink(up("clone")));
 	}
+
+	/* an unprivileged write and an unprivileged truncate clear set-user-ID and set-group-ID */
+	fd = open(up("suid"), O_RDWR | O_CREAT | O_EXCL, 0755); CHECK(fd >= 0);
+	CHECK(write(fd, "xxxx", 4) == 4);
+	for (i = 0; i < 2; i++) {
+		CHECK(!fchown(fd, 1001, 1001) && !fchmod(fd, 06755));
+		CHECK(!stat(lo("suid"), &lst) && (lst.st_mode & 07777) == 06755);
+		CHECK(as_user(fd, i) == 0);
+		CHECK(!stat(up("suid"), &st) && (st.st_mode & 07777) == 0755);
+		CHECK(!stat(lo("suid"), &lst) && (lst.st_mode & 07777) == 0755);
+	}
+	CHECK(st.st_size == 2);
+	/* chown clears them too, for every caller, through the same ->setattr path */
+	CHECK(!fchmod(fd, 06755) && !fchown(fd, 1001, 1001));
+	CHECK(!stat(lo("suid"), &lst) && (lst.st_mode & 07777) == 0755);
+	close(fd);
+	CHECK(!unlink(up("suid")));
 
 	/* unlink removes from lower; open descriptor keeps reading */
 	fd = open(up("a.txt"), O_RDONLY); CHECK(fd >= 0);

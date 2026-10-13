@@ -1,0 +1,10 @@
+project 0: 74 ms per page
+project 1: 106 ms per page
+project 2: 125 ms per page
+project 3: 144 ms per page
+project 4: 133 ms per page
+project 5: 180 ms per page
+project 6: 190 ms per page
+project 7: 203 ms per page
+project 8: 218 ms per page
+project 9: 233 ms per page

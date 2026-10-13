@@ -78,7 +78,7 @@ The layer does not impose a schema. Naming conventions (for example `kind`, `tie
 | `FICLONE`, `FICLONERANGE`, `FIDEDUPERANGE` | `vfs_clone_file_range` / `vfs_dedupe_file_range_one` on the lower files; `EOPNOTSUPP` if the lower filesystem does not support it; the VFS has already compared bytes in dedup |
 | `FIEMAP` | Passthrough |
 | `QUERY` (ioctl on the mounted root directory) | Predicate of up to 4 terms `(attribute, operator ∈ {=, <, <=, >, >=, prefix}, typed value)` in conjunction, result limit; returns `(layer inode number, file handle)` for `open_by_handle_at`, plus the relative path when available by bounded reverse lookup |
-| `GET_INFO` (ioctl) | UAPI version, encoding version, limits, index budget and usage, capabilities of the lower filesystem (`reflink`, `dedup`, `data_checksums`, `snapshots`, `xattr`), type of the lower filesystem |
+| `GET_INFO` (ioctl) | UAPI version, encoding version, limits, index budget and usage, capabilities of the lower filesystem (`reflink`, `dedup`, `data_checksums`, `snapshots`, `xattr`), type of the lower filesystem (Revision of 2026-10-12, ADR-0011 finding F1, journal 0061: the index usage and counters are filled only for `CAP_SYS_ADMIN`, flagged by `MOOB_FLAG_COUNTERS`, and are zero for everyone else, because they sum every user's memories.) |
 
 `ro` mount: no write reaches the lower filesystem; the index is built normally.
 

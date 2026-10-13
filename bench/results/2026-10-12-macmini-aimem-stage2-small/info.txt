@@ -1,0 +1,3 @@
+uapi=1 format=1 name_max=64 string_max=1024 raw_max=4096 per_file=64
+domain_depth=2 heterogeneous=0 fallback_domains=0
+lower=ext4 caps=0x8 flags=0x10 budget=134217728 used=82381 entries=811 inodes=150

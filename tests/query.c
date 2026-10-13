@@ -300,8 +300,9 @@ int main(int argc, char **argv)
 		printf("uapi=%u format=%u name_max=%u string_max=%u raw_max=%u per_file=%u\n",
 		       info.uapi_version, info.format_version, info.attr_name_max, info.attr_string_max,
 		       info.attr_raw_max, info.attr_max_per_file);
-		printf("domain_depth=%u heterogeneous=%u fallback_domains=%u\n", info.domain_depth,
-		       info.heterogeneous, info.fallback_domains);
+		printf("domain_depth=%u heterogeneous=%u fallback_domains=%u counters=%s\n", info.domain_depth,
+		       info.heterogeneous, info.fallback_domains,
+		       (info.flags & MOOB_FLAG_COUNTERS) ? "shown" : "hidden");
 		printf("lower=%s caps=%#x flags=%#x budget=%" PRIu64 " used=%" PRIu64 " entries=%u inodes=%u\n",
 		       info.lower_fs, info.caps, info.flags, (uint64_t)info.index_budget,
 		       (uint64_t)info.index_used, info.index_entries, info.index_inodes);

@@ -1,0 +1,2 @@
+W-AIM-BULK: projects=10 pages=20000 written=20000
+REINDEX: seconds=58

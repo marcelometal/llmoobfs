@@ -16,6 +16,7 @@ accepted but may be only partly implemented, and only the journals and
 | --- | --- | --- |
 | [architecture-overview.md](architecture-overview.md) | EN | How the stacked layer is built, with a source citation for each claim |
 | [when-not-to-use.md](when-not-to-use.md) | EN | Comparison with plain files, SQLite, FUSE and memory frameworks; when not to use MoobFS |
+| [adoption-risks.md](adoption-risks.md) | EN | Proposal: fifteen adoption risks, the evidence for each and the fix, work or deployment rule that answers it |
 | [faq.md](faq.md) | EN | Short sourced answers to common questions |
 | [development.md](development.md) | EN | Environment setup, `make` targets, devcontainer, lint and checkpatch |
 | [testing.md](testing.md) | EN | What each test runs, its success markers, and what they do not prove |
@@ -37,12 +38,13 @@ accepted but may be only partly implemented, and only the journals and
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0010, with alternatives and reasons |
+| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0011, with alternatives and reasons |
 | [history/](history/README.md) | EN | Technical journal: one entry per piece of work, with evidence and limitations |
 
 Key decisions for newcomers: [ADR-0007](decisions/0007-stacked-memory-layer.md) (a stacked layer
 over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-space-index.md)
-(the in-kernel index partitioned by permission domain).
+(the in-kernel index partitioned by permission domain); for security,
+[ADR-0011](decisions/0011-threat-and-credential-model.md) (threat and credential model).
 
 ## Benchmarks (M4)
 
@@ -74,6 +76,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 | Document | Lang | What it covers |
 | --- | --- | --- |
 | [security-roadmap.md](security-roadmap.md) | PT (English translation in review) | Security and robustness items S1–S11 (threat model, syzkaller, fuzzing, hardening) |
+| [research-stacked-fs-kernel-rules.md](research-stacked-fs-kernel-rules.md) | EN | Stacked-FS rules from kernel v6.12 primary sources (credentials, locking, lifetime, ioctl/UAPI, xattrs, hostile lower, memory), each with source and MoobFS compliance status |
 | [distribution-strategy.md](distribution-strategy.md) | EN | Proposed deployment model, DKMS packaging, kernel matrix and release stages |
 | [community-plan.md](community-plan.md) | EN | Plan for external contributions (policies, templates, CI); largely executed |
 | [seo-geo-plan.md](seo-geo-plan.md) | EN | Discoverability audit and plan for the README, site and docs |

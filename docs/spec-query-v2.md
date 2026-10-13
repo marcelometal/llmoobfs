@@ -24,7 +24,8 @@ per candidate by the size of the domain (journal 0029).
   lies outside any domain (above depth N). The inode-to-record map
   stays global and stores the domain of each inode.
 - **Budget.** The `index_budget` still applies to the whole mount; `GET_INFO` now
-  reports the number of domains.
+  reports the number of domains. (Revision of 2026-10-12, journal 0061: the counters of `GET_INFO`, `heterogeneous` and
+  `fallback_domains` included, are filled only for `CAP_SYS_ADMIN`; ADR-0011 finding F1.)
 
 ## 3. Homogeneity rule
 
