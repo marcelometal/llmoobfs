@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- S2 (journal 0077): fstests group `quick` over btrfs (271 pass, 360 not run, 16 fail) and XFS
+  (298 pass, 333 not run, 16 fail), no kernel diagnostic. The reflink and dedupe tests run and
+  pass. The same 15 tests fail on the three lowers (10 by design, 1 not applicable, 4 gaps);
+  `generic/674` on btrfs exposed that `syncfs` on the layer did not reach the lower.
 - **Fix** (journal 0076; found with fstests `generic/318`): an ACL read through the layer right
   after it was changed could be the earlier one, until a remount. Access decisions were not
   affected; they are made on the lower.

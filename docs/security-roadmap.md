@@ -70,6 +70,10 @@ escrito, revisores não conseguem dizer se o esquema de credenciais é exploráv
 port (`vm/fstests/`), and the `quick` group has one recorded run over ext4. btrfs and XFS, the
 exclusion list and the four gaps it showed are open.
 
+*Status, 2026-10-13 (journal 0077; in English).* The `quick` group is recorded over btrfs and XFS
+too; the same 15 tests fail on the three lowers. Open: the exclusion list, the four gaps, the
+`auto` group.
+
 Precedente: a documentação do kernel "Adding New Filesystems" chama fstests de infraestrutura
 padrão e seu uso de fortemente recomendado; bcachefs reportou fstests sob lockdep e KASAN antes
 do merge.
