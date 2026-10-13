@@ -50,6 +50,13 @@ The arrangement that always satisfies the rule, and the one to deploy:
   private domain, directories `0700` and files `0600` (a process `umask` of `077`);
 - no access ACLs on files, no hard links (a file with two names is left out).
 
+To see which files are being left out and why, run
+`moobfs-check --domain-depth N <lower directory>`: its `left_out` list names each one with the
+reason (a directory more private than the domain, another owner, an ACL, a hard link, a file
+above every domain). *Tool; tested in `vm/suite.sh`.* A common way to get there by accident:
+a library call that creates nested directories gives the requested mode to the last one only
+(`os.makedirs` in Python, journal 0089).
+
 Changing the mode, owner or ACL of a directory at or below the domain depth is allowed, but that
 domain then answers with a permission check per result until the next mount (slower, still
 correct). Clients should set permissions when they create a domain and leave them.

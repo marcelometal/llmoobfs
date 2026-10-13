@@ -73,7 +73,8 @@ model, reviewers cannot tell whether the credentials scheme is exploitable.
 *Status, 2026-10-13 (journals 0075, 0077, 0079).* fstests runs over the layer through a small
 port (`vm/fstests/`). The `quick` group is recorded over ext4, btrfs and XFS; every failure is
 classified; the file-attribute gaps are closed; the exclusion list is written
-(`vm/fstests/exclude-quick.txt`). Open: the complete run with that list, and the `auto` group.
+(`vm/fstests/exclude-quick.txt`). The complete run with that list passes on the three lowers
+(journal 0091), which meets "done when" for the `quick` group. Open: the `auto` group.
 
 Precedent: the kernel documentation "Adding New Filesystems" calls fstests standard
 infrastructure and its use strongly recommended; bcachefs reported fstests under lockdep and

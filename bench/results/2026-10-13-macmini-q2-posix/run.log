@@ -1,0 +1,39 @@
+18:16:09 environment recorded in /home/debian/m4-q2/environment.txt
+18:16:09 manifest: 10000 memories, profile 8; 9 query shapes
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:16:53 A-ext4: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:17:34 A-btrfs: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:18:08 A-xfs: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:19:03 C-ext4: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:19:54 C-btrfs: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:20:37 C-xfs: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:21:30 C-ext4: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:22:23 C-btrfs: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:23:09 C-xfs: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:23:56 A-ext4: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:24:37 A-btrfs: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:25:14 A-xfs: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:25:57 A-ext4: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:26:38 A-btrfs: done
+EQUIV_PASS: 9 shapes (SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 0
+18:27:15 A-xfs: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:28:11 C-ext4: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:29:04 C-btrfs: done
+EQUIV_PASS: 8 shapes (kernel, SQLite, oracle); SQLite SCAN plans to justify: 1; kernel answers truncated at the UAPI limit: 1
+18:29:51 C-xfs: done
+18:30:01 BENCH_RUN_DONE: 3 repetitions, artifacts in /home/debian/m4-q2

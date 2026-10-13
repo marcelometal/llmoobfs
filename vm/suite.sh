@@ -108,6 +108,20 @@ run_lower() {
     $BIN/moobfs-attr set $LAYER/insp/$deep/$deep/$deep/leaf lp string deep || fail "insp-deep-attr-$fs"
     $BIN/query $LAYER lp eq string deep > /tmp/k.txt || fail "insp-deep-query-$fs"
     [ "$(wc -l < /tmp/k.txt)" -eq 1 ] && grep -q '(truncated)$' /tmp/k.txt || { cat /tmp/k.txt; fail "insp-deep-truncated-$fs"; }
+    # moobfs-check --domain-depth lists the files QUERY2 would leave out, with the reason
+    mkdir -p $LAYER/insp/lo/dom/open $LAYER/insp/lo/dom/shut && chmod 755 $LAYER/insp/lo $LAYER/insp/lo/dom $LAYER/insp/lo/dom/open || fail "lo-mkdir-$fs"
+    chmod 700 $LAYER/insp/lo/dom/shut || fail "lo-chmod-$fs"
+    for f in dom/open/in.md dom/shut/hidden.md dom/open/linked.md top.md; do
+        echo x > $LAYER/insp/lo/$f && chmod 644 $LAYER/insp/lo/$f && $BIN/moobfs-attr set $LAYER/insp/lo/$f lo string v || fail "lo-file-$f-$fs"
+    done
+    ln $LAYER/insp/lo/dom/open/linked.md $LAYER/insp/lo/dom/open/second-name.md || fail "lo-link-$fs"
+    $BIN/moobfs-check --domain-depth 1 $LOWER/insp/lo > /tmp/lo.json; [ $? -eq 0 ] || { cat /tmp/lo.json; fail "lo-check-status-$fs"; }
+    grep -q '"left_out_count": 4' /tmp/lo.json || { cat /tmp/lo.json; fail "lo-count-$fs"; }
+    grep -q '"path": "dom/shut/hidden.md", "reason": "directory dom/shut: more private than the domain directory"' /tmp/lo.json || { cat /tmp/lo.json; fail "lo-private-dir-$fs"; }
+    grep -q '"path": "dom/open/linked.md", "reason": "has more than one hard link"' /tmp/lo.json || fail "lo-hardlink-$fs"
+    grep -q '"path": "top.md", "reason": "above every domain directory"' /tmp/lo.json || fail "lo-above-$fs"
+    grep -q '"path": "dom/open/in.md"' /tmp/lo.json && { cat /tmp/lo.json; fail "lo-listed-a-queryable-file-$fs"; }
+    $BIN/moobfs-check $LOWER/insp/lo | grep -q left_out && fail "lo-listed-without-option-$fs"
     rm -rf $LAYER/insp || fail "insp-cleanup-$fs"
     same_query lp eq string deep || fail "insp-cleanup-query-$fs"
     [ ! -s /tmp/k.txt ] || fail "insp-cleanup-stale-$fs"

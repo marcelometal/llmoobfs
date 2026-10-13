@@ -6,7 +6,7 @@ HEADERS = include/moobfs_format.h
 KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
-.PHONY: all help tools attr-tools bench-tools bench-smoke hostile-test test fuzz lint checkpatch module layer vm-test
+.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint checkpatch module layer vm-test
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -56,6 +56,10 @@ $(BUILD)/bench-readcost: bench/readcost.c include/moobfs_attr.h include/moobfs_i
 # stage 2 of the real-client test (docs/client-test-plan.md): SQLite and QUERY2 in one process
 $(BUILD)/bench-aimem-latency: bench/client/aimem-latency.c bench/common.h include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude bench/client/aimem-latency.c $(SQLITE_LIBS) -lm $(LDFLAGS) -o $@
+# User-space baseline of the index (journal 0092): SQLite per domain kept current by inotify. Linux only.
+userspace-tools: $(BUILD)/udx-index $(BUILD)/udx-watch $(BUILD)/udx-query
+$(BUILD)/udx-%: bench/userspace/udx-%.c bench/userspace/udx.h tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude -Itools $< common/attr.c $(SQLITE_LIBS) $(LDFLAGS) -o $@
 bench-smoke: bench-tools attr-tools
 	sh bench/smoke.sh $(BUILD)
 # Security roadmap S4, user-space line: trees no well-behaved writer would leave on the lower.

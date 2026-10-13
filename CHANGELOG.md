@@ -2,11 +2,38 @@
 
 ## Unreleased
 
+- User-space baseline (journal 0092): `bench/userspace/` builds the same per-domain index with
+  no kernel module (plain `user.*` attributes, one SQLite database per domain directory, an
+  inotify follower) and a query tool whose output equals the oracle's on 37 query shapes. The
+  journal records what it does not give (validation at write time, read-your-writes, a freshness
+  a reader can verify, the layer's sharing boundary) and what it gives that the layer does not.
+  No latency measured yet.
+- README and landing page (journal 0093) open with the problem, the three parts, four numbers
+  (one where the layer loses, one that is a cost) and a demonstration transcript taken from the
+  VM test; caveats moved down, none removed.
+- **M4 report** (journal 0088): the four questions of the benchmark plan answered with what was
+  measured, pilot-grade, including where the layer loses. New campaigns for it: latency per
+  operation on the current module (2 to 5 µs more per read, 6 to 13 µs more per attribute write,
+  nothing measurable on a create with `fsync`) and `bench/synccost.c`, which shows that keeping a
+  side SQLite in step costs almost nothing per write in its usual mode, so write cost is not an
+  argument for the layer.
+- S2 (journal 0091): with `vm/fstests/exclude-quick.txt`, the fstests `quick` group ends with no
+  failure over ext4, btrfs and XFS (631 tests each; 186, 280 and 307 pass, the rest are skipped
+  by fstests). No kernel diagnostic.
+- Tools (journal 0090): `moobfs-check --domain-depth N` lists the files that carry typed
+  attributes and that `QUERY2` leaves out, each with the reason (a directory more private than
+  the domain, another owner, an ACL, a hard link, a file above every domain). The specification
+  promised this list and the tool did not produce it.
+- Second client (journal 0089): `bench/client/langgraph_store.py`, a LangGraph `BaseStore` on a
+  layer directory, gives the same answers as LangGraph's in-memory store in five runs of 3 000 to
+  6 000 random operations at domain depths 1, 2 and 3, with no change to the layer. It also
+  showed how easily the homogeneity rule hides every file (one `os.makedirs` call).
+
 ## v0.3.0-experimental — 2026-10-13
 
 Third source pre-release, and the one to use instead of `v0.2.0-experimental`: it fixes the
 defects listed below, which that tag carries, all found by this project's own tests and reviews in
-three days. No
+two days (corrected on 2026-10-13: the tagged text said three). No
 binaries, no packaging, no support; nothing here has been reviewed by an outside party. Journal
 0087.
 

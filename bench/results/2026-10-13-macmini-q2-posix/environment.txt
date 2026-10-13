@@ -1,0 +1,10 @@
+date: 2026-10-13T18:16:09Z
+kernel: Linux 6.12.111+deb13-amd64 x86_64
+cpu: Intel(R) Core(TM) i7-2635QM CPU @ 2.00GHz  cores: 8
+memory: 16292816 kB
+kvm: present  (host virtualization: none
+unknown)
+sqlite: 3.46.1 2024-08-13
+scale: 10000 profile: 8 reps: 3 seed: 1 procs: 4 w3_repeat: 50 w3_uid: 65534 query_only: 0
+systems: plain=[ A-ext4=/srv/moob/ext4/q2plain A-btrfs=/srv/moob/btrfs/q2plain A-xfs=/srv/moob/xfs/q2plain ] layer=[ C-ext4=/srv/moob/q2-ext4:/srv/moob/ext4/q2root C-btrfs=/srv/moob/q2-btrfs:/srv/moob/btrfs/q2root C-xfs=/srv/moob/q2-xfs:/srv/moob/xfs/q2root ]
+commit: unknown
