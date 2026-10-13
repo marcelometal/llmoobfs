@@ -1,6 +1,7 @@
 # ADR-0012 — The index is built per domain on demand and can be released under memory pressure
 
-Date: 2026-10-13. Status: **proposed**; not implemented. It changes how
+Date: 2026-10-13. Status: **accepted** by the maintainer on 2026-10-13; not implemented. Agreed
+order: fault injection in the test suite first (journal 0095), then this. It changes how
 [ADR-0009](0009-query-role-and-user-space-index.md) builds the index, not what it answers.
 
 ## Context
@@ -19,7 +20,7 @@ the points where that alternative is plainly better: its index survives a restar
 is pageable. The maintainer's direction of 2026-10-13 is to keep the index in the kernel and
 remove these costs with kernel techniques.
 
-## Decision (proposed)
+## Decision
 
 1. **A domain's partition is built when it is first needed**, not at mount. Mount reads the lower
    root and returns. Each domain is in one of three states: not built, being built, built. The

@@ -32,6 +32,9 @@ For the risk to the machine, which cannot be removed, only reduced:
 | A test under a Linux security module policy | interactions never exercised | not started |
 | Readers from outside | what the author cannot see | requested on this date |
 
+Note of 2026-10-13, later the same day: the maintainer accepted ADR-0012 and the order (fault
+injection first, then the on-demand index).
+
 ## What is not decided
 
 Whether a small set of query operators enters the kernel (`not equal`, a count); a persistent
