@@ -124,3 +124,28 @@ footer p { margin: 0; }
   .plan .flow { grid-template-columns: 1fr; }
   .plan .flow-arrow { padding: 0; text-align: center; transform: rotate(90deg); line-height: 1; }
 }
+
+/* Landing page: links row, demonstration transcript, numbers, parts. */
+.hero { align-items: start; }
+.hero p { max-width: 54ch; }
+.hero figcaption { text-align: left; line-height: 1.6; }
+.toplinks { display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; font-size: 14px; margin-top: 1.6rem; }
+.term { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; font-size: 12.5px; line-height: 1.6; color: oklch(.87 .01 260); }
+.term .c { color: white; font-weight: bold; }
+.term .no { color: oklch(.86 .11 75); }
+.numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin: 2rem 0; }
+.numbers > div { min-width: 0; border-top: 3px solid var(--primary); padding-top: 1rem; }
+.numbers strong { display: block; font: 750 clamp(30px, 3vw, 40px)/1.1 Arial, sans-serif; letter-spacing: -.03em; white-space: nowrap; }
+.numbers b { display: block; margin: .6rem 0 .4rem; font-size: 15px; line-height: 1.4; }
+.numbers span { display: block; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.numbers a { display: inline-block; margin-top: .5rem; font-size: 13px; }
+.parts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3rem; margin-top: 2rem; }
+.parts h3 { font-size: 20px; line-height: 1.2; }
+.section ul { padding-left: 1.2rem; max-width: 70ch; }
+.section ul li { color: var(--muted); margin-bottom: .5rem; }
+.section ul li strong { color: var(--ink); }
+.measured { margin: 1.5rem 0; }
+@media (min-width: 801px) { .measured { grid-template-columns: 1fr 1fr; gap: 3rem; } }
+@media (max-width: 1000px) { .numbers { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 800px) { .parts { grid-template-columns: 1fr; gap: 1.5rem; } }
+@media (max-width: 480px) { .numbers { grid-template-columns: 1fr; } .term { font-size: 11.5px; } }
