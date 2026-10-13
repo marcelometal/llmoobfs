@@ -38,6 +38,58 @@ if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|possible (circular|recursive)
     echo "MOOBFS_VM_FAIL: kernel diagnostics under KASAN/lockdep"
     exit 1
 fi
+# Systematic allocation-failure injection (journal 0096): every allocation made with the module
+# on the stack is failed in turn, one system call at a time (tests/failnth.c, the kernel's own
+# fail-nth). No kernel diagnostic may follow, and once injection stops the index must equal the
+# oracle, or say that it is incomplete and equal the oracle after a remount.
+if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *) false ;; esac; then
+    mountpoint -q /sys/kernel/debug || mount -t debugfs none /sys/kernel/debug || fail fi-debugfs
+    [ -d /sys/kernel/debug/failslab ] || fail "fi-no-failslab (kernel built without CONFIG_FAILSLAB)"
+    insmod "$BIN/moobfs_layer.ko" || fail fi-insmod
+    text=$(cat /sys/module/moobfs_layer/sections/.text); size=$(cat /sys/module/moobfs_layer/coresize)
+    hi=${text%????????}; lo=${text#"$hi"}   # the address does not fit the shell's signed arithmetic
+    for f in failslab fail_page_alloc; do
+        d=/sys/kernel/debug/$f
+        echo N > $d/ignore-gfp-wait
+        [ -f $d/ignore-gfp-highmem ] && echo N > $d/ignore-gfp-highmem
+        echo "$text" > $d/require-start
+        printf '%s%08x' "$hi" $((0x$lo + size)) > $d/require-end
+        echo 32 > $d/stacktrace-depth
+        echo 0 > $d/probability; echo 0 > $d/verbose
+    done
+    mount -t ext4 "$DEV_EXT4" $LOWER || fail fi-lower-mount
+    rm -rf $LOWER/fi && mkdir -m 755 $LOWER/fi || fail fi-mkdir
+    mount -t moobfs_layer -o lower=$LOWER/fi,domain_depth=1 none $LAYER || fail fi-layer-mount
+    dmesg -c > /dev/null
+    $BIN/failnth $LAYER $LOWER/fi > "$OUT/failnth.txt" 2>&1; rc=$?
+    cat "$OUT/failnth.txt"
+    [ $rc -eq 0 ] || fail "fi-unexplained-error (see build/vng/failnth.txt)"
+    for f in failslab fail_page_alloc; do echo 0 > /sys/kernel/debug/$f/require-start; echo 0 > /sys/kernel/debug/$f/require-end; done
+    dmesg > "$OUT/dmesg-faults.txt"
+    if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|possible (circular|recursive) locking|INFO: (task|rcu)|UBSAN:' "$OUT/dmesg-faults.txt"; then
+        fail "fi-kernel-diagnostic under fault injection"
+    fi
+    fi_cmp() {   # kernel QUERY2 against the oracle on both domains, by path
+        for d in da db; do
+            $BIN/query $LAYER/$d q2 kind exists - - | cut -f2 | sort > /tmp/fi.k || return 1
+            $BIN/moobfs-index --domain $LOWER/fi/$d kind exists - - | cut -f2 | sort > /tmp/fi.o || return 1
+            cmp -s /tmp/fi.k /tmp/fi.o || { echo "domain $d: kernel $(wc -l < /tmp/fi.k) oracle $(wc -l < /tmp/fi.o)"; diff /tmp/fi.k /tmp/fi.o | head -5; return 1; }
+        done
+    }
+    $BIN/query $LAYER info > /tmp/fi.info || fail fi-info
+    flags=$(sed -n 's/.* flags=\(0x[0-9a-f]*\).*/\1/p' /tmp/fi.info)
+    if [ $(( flags & 0x8 )) -ne 0 ]; then
+        echo "FAULTS: the index declared itself incomplete (flags=$flags), as designed when an update fails after the lower write"
+    else
+        fi_cmp || fail "fi-index-differs-from-oracle without the incomplete flag"
+    fi
+    umount $LAYER || fail fi-umount
+    mount -t moobfs_layer -o lower=$LOWER/fi,domain_depth=1 none $LAYER || fail fi-remount
+    fi_cmp || fail fi-index-differs-after-remount
+    umount $LAYER && rm -rf $LOWER/fi && umount $LOWER || fail fi-cleanup
+    rmmod moobfs_layer || fail fi-rmmod
+    echo "FAULT_INJECTION_PASS: $(grep '^FAILNTH_DONE' "$OUT/failnth.txt" | cut -d' ' -f2-); no kernel diagnostic; index equal to the oracle"
+fi
 if [ -n "${MOOB_ONLY:-}" ]; then
     echo "MOOBFS_KASAN_ONLY_PASS: steps $MOOB_ONLY under KASAN, UBSAN and lockdep with no kernel diagnostics (not a complete run)"
 else

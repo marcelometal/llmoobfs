@@ -11,6 +11,7 @@
 # MOOB_ONLY (optional) runs only the named steps, for development:
 #   ext4 btrfs xfs      everything of run_lower for that lower filesystem
 #   demo clients powerloss ioerror reserve
+#   faults              only under the KASAN harness: the fault-injection block of kasan-guest.sh
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -20,7 +21,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
