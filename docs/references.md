@@ -93,6 +93,16 @@ in this repository. Code that ships in the repository keeps its own license and 
   The side-list method of ADR-0012 for building a domain's partition while writes continue.
   Checked on 2026-10-13 (Crossref metadata; the paper itself was not read in full).
 
+### Fault injection (journal 0096)
+
+- Linux kernel documentation, "Fault injection capabilities infrastructure"
+  (`Documentation/fault-injection/fault-injection.rst`, Linux 6.12.112): `failslab`,
+  `fail_page_alloc`, the stack-trace filter that confines faults to one module, and the per-task
+  `fail-nth` for systematic injection.
+
+  The technique of journal 0096 (`tests/failnth.c`, `vm/kasan-guest.sh`), implemented. Read in the
+  source tree of the kernel the tests are built with.
+
 ### Security roadmap (proposal)
 
 - Wen Xu, Hyungon Moon, Sanidhya Kashyap, et al. "Fuzzing File Systems via Two-Dimensional Input
@@ -102,13 +112,6 @@ in this repository. Code that ships in the repository keeps its own license and 
   https://doi.org/10.1145/3341301.3359662
 
   Precedents for item S3 of `docs/security-roadmap.md` (journal 0017).
-
-- Linux kernel documentation, "Fault injection capabilities infrastructure"
-  (`Documentation/fault-injection/fault-injection.rst`, Linux 6.12.112): `failslab`,
-  `fail_page_alloc`, the stack-trace filter that confines faults to one module, and the per-task
-  `fail-nth` for systematic injection.
-
-  The technique of journal 0096. Read in the source tree of the kernel the tests are built with.
 
 ## 3. Systems and kernel facilities
 
@@ -121,11 +124,16 @@ in this repository. Code that ships in the repository keeps its own license and 
 | xarray, rbtree | https://docs.kernel.org/core-api/xarray.html, https://docs.kernel.org/core-api/rbtree.html | the in-kernel index (`layer/index.c`) |
 | iomap | https://docs.kernel.org/filesystems/iomap/index.html | the read-only M1 module (`kernel/main.c`) |
 | dm-log-writes, dm-flakey | https://docs.kernel.org/admin-guide/device-mapper/log-writes.html, https://docs.kernel.org/admin-guide/device-mapper/dm-flakey.html | power-loss and I/O-error tests |
+| Shrinker interface | `include/linux/shrinker.h` (`shrinker_alloc`, `shrinker_register`), `Documentation/admin-guide/mm/shrinker_debugfs.rst`, Linux 6.12.112 | how partitions are to be released under memory pressure (ADR-0012; not implemented) |
+| `list_lru` | `include/linux/list_lru.h`, as used in `fs/dcache.c` and `fs/inode.c`, Linux 6.12.112 | least-recently-used order of built partitions (ADR-0012; not implemented) |
+| btrfs extent-map shrinker | `fs/btrfs/extent_map.c` (`btrfs_extent_map_shrinker_worker`), Linux 6.12.112 | precedent for a filesystem dropping a map of its own and rebuilding it on demand (ADR-0012) |
+| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | readers against a partition being built (ADR-0012; not implemented) |
+| fstests | https://git.kernel.org/pub/scm/fs/xfs/xfstests-dev.git, GPL-2.0, `v2026.09.22` | the `generic` `quick` group over the layer (`vm/fstests/`, journals 0074 and 0091); not vendored |
 | KASAN, UBSAN, lockdep | https://docs.kernel.org/dev-tools/kasan.html, https://docs.kernel.org/dev-tools/ubsan.html, https://docs.kernel.org/locking/lockdep-design.html | the instrumented test kernel |
-| fanotify, inotify | https://man7.org/linux/man-pages/man7/fanotify.7.html | change-feed experiment (journal 0030) |
+| fanotify, inotify | https://man7.org/linux/man-pages/man7/fanotify.7.html | change-feed experiment (journal 0030); inotify follows changes in the user-space baseline (`bench/userspace/udx-watch.c`, journal 0092) |
 | Landlock | https://docs.kernel.org/userspace-api/landlock.html | confinement experiment (journal 0030), ADR-0008 and ADR-0009 |
 | idmapped mounts | https://docs.kernel.org/filesystems/idmappings.html | refused by the layer and tested |
-| SQLite | https://www.sqlite.org (public domain) | the benchmark baseline (`bench/sqlite-baseline.sh`, journal 0047) and the WAL acceptance tests |
+| SQLite | https://www.sqlite.org (public domain) | the benchmark baseline (`bench/sqlite-baseline.sh`, journal 0047), the WAL acceptance tests, the cost of a side index at write time (`bench/synccost.c`, journal 0088) and the user-space baseline of the index (`bench/userspace/`, journals 0092 and 0094; 3.46.1 on the benchmark host) |
 | Be File System query engine (Haiku) | [`Query.cpp`](https://github.com/haiku/haiku/blob/master/src/add-ons/kernel/file_systems/bfs/Query.cpp), MIT | how BFS chooses an index (ADR-0009 C') |
 | GUFI | https://github.com/mar-file-system/GUFI, BSD-3-Clause | per-permission-domain index model (ADR-0009) |
 | YoloFS | https://yolofs.github.io/, https://github.com/YoloFS/YoloFS, GPL-2.0 | closest prior art (see §2) |
@@ -141,7 +149,7 @@ in this repository. Code that ships in the repository keeps its own license and 
 | Letta | https://github.com/letta-ai/letta | Apache-2.0 | V1 server, branch `archive` at `56ba9c2` |
 | Letta Code | https://github.com/letta-ai/letta-code | Apache-2.0 | `271f119` |
 | Graphiti | https://github.com/getzep/graphiti | Apache-2.0 | `964bb11` |
-| LangGraph store | https://github.com/langchain-ai/langgraph | MIT | `799c2f0` |
+| LangGraph store | https://github.com/langchain-ai/langgraph | MIT | `799c2f0`; adapter and equality test against `InMemoryStore` with langgraph 1.2.15 and langgraph-checkpoint 4.3.0 from PyPI (`bench/client/langgraph_store.py`, journal 0089) |
 | LangMem | https://github.com/langchain-ai/langmem | MIT | `48e3c11` |
 | OpenAI Agents SDK sessions | https://github.com/openai/openai-agents-python | MIT | `125efa0` |
 

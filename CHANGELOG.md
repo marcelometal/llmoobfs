@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fault injection (journal 0096): `tests/failnth.c` and a block in `vm/kasan-guest.sh` fail every
+  allocation made on behalf of the module in turn, with the kernel's `fail-nth`, across 17
+  operations, under KASAN and lockdep. Fixed what it found: an allocation failure in the walk
+  from a file to its domain was taken for a path that is too deep, so a query returned `ENOTTY`
+  and a write could leave a file out of its domain without declaring the index incomplete. The
+  walk no longer allocates.
 - Direction (journal 0095, ADR-0012 proposed): the index stays in the kernel module; its mount
   and memory costs are to be removed by building each domain's partition on demand and releasing
   partitions under memory pressure. Not implemented.
