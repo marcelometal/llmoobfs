@@ -30,6 +30,8 @@
 #include <linux/xattr.h>
 #include <linux/fiemap.h>
 #include <linux/fileattr.h>
+#include <linux/magic.h>
+#include <linux/btrfs_tree.h>
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 #include "moobfs_attr.h"
@@ -316,6 +318,10 @@ static struct dentry *moobl_lookup(struct inode *dir, struct dentry *dentry,
 					       dentry->d_name.len);
 	if (IS_ERR(lower_dentry))
 		return ERR_CAST(lower_dentry);
+	if (moobl_nested_subvolume(lower_dentry)) {
+		dput(lower_dentry);
+		return ERR_PTR(-EXDEV);
+	}
 	err = moobl_set_lower_path(dentry, parent->mnt, lower_dentry);
 	if (err) {
 		dput(lower_dentry);
@@ -559,6 +565,10 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	if ((flags & RENAME_EXCHANGE) && target)
 		fsstack_copy_attr_all(d_inode(old_dentry),
 				      moobl_lower_inode(d_inode(old_dentry)));
+	/* A replaced file or directory is gone, unless other names still link to the file. */
+	if (target && !(flags & RENAME_EXCHANGE) &&
+	    (S_ISDIR(target->i_mode) || !moobl_lower_inode(target)->i_nlink))
+		moobl_index_drop_inode(old_dir->i_sb, target->i_ino);
 	/* The VFS moves the dentries after this returns: place each inode at its new name. */
 	moobl_index_renamed(old_dir->i_sb, d_inode(old_dentry), new_dentry);
 	if ((flags & RENAME_EXCHANGE) && target)

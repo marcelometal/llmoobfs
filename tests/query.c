@@ -461,8 +461,9 @@ int main(int argc, char **argv)
 		if (run_query(fd, &q, res, MOOB_QUERY_MAX_LIMIT)) { perror("MOOB_IOC_QUERY"); return 1; }
 		qsort(res, q.count, sizeof *res, by_ino);
 		for (i = 0; i < q.count; i++)
-			printf("%" PRIu64 "\t%s%s\n", (uint64_t)res[i].ino, res[i].path,
-			       (res[i].flags & MOOB_RES_PATH_UNKNOWN) ? "?" : "");
+			printf("%" PRIu64 "\t%s%s%s\n", (uint64_t)res[i].ino, res[i].path,
+			       (res[i].flags & MOOB_RES_PATH_UNKNOWN) ? "?" : "",
+			       (res[i].flags & MOOB_RES_PATH_TRUNCATED) ? "\t(truncated)" : "");
 		if (q.truncated)
 			fprintf(stderr, "query: results truncated\n");
 	}

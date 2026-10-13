@@ -3,6 +3,7 @@
  * Phase 2a/2b acceptance test for the MoobFS memory layer: exercises the
  * pass-through operations on a mounted layer and checks that the lower
  * directory reflects every change. Usage: layer <mount> <lower> <reflink: yes|no> <links|nolinks>
+ *   layer subvol <dir> <name>       create a btrfs subvolume <name> in <dir>
  *   layer syncfs <path>             syncfs(2) on the filesystem that holds <path>
  *   layer reserve <mount> <lower>   an ordinary user fills the layer; the blocks the lower
  *                                   reserves for its administrator must stay free
@@ -18,6 +19,7 @@
 #include <sys/wait.h>
 #include <linux/fs.h>
 #include <linux/fiemap.h>
+#include <linux/btrfs.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
@@ -139,6 +141,16 @@ int main(int argc, char **argv)
 	ssize_t n;
 
 	int reflink, links;
+	if (argc == 4 && !strcmp(argv[1], "subvol")) {
+		struct btrfs_ioctl_vol_args va;
+
+		memset(&va, 0, sizeof va);
+		fd = open(argv[2], O_RDONLY | O_DIRECTORY); CHECK(fd >= 0);
+		snprintf(va.name, sizeof va.name, "%s", argv[3]);
+		CHECK(!ioctl(fd, BTRFS_IOC_SUBVOL_CREATE, &va));
+		close(fd);
+		return 0;
+	}
 	if (argc == 3 && !strcmp(argv[1], "syncfs")) {
 		fd = open(argv[2], O_RDONLY); CHECK(fd >= 0);
 		CHECK(!syncfs(fd));

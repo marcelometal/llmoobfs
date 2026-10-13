@@ -757,6 +757,10 @@ static int scan_child(struct super_block *sb, struct scan_dir *cur, struct scan_
 		return PTR_ERR(child);
 	if (d_really_is_negative(child) || !(d_is_dir(child) || d_is_reg(child)))
 		goto out;
+	if (moobl_nested_subvolume(child)) {
+		pr_info_once("moobfs_layer: a btrfs subvolume inside the lower tree is left out\n");
+		goto out;
+	}
 	cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path, cur->path[0] ? "/" : "", sn->len,
 			  sn->name);
 	if (!cpath) {
@@ -863,6 +867,8 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 {
 	struct moobl_index *ix = IX(sb);
 
+	/* a cursor carries the value of the entry it stopped at */
+	BUILD_BUG_ON(MOOB_ATTR_STRING_MAX > MOOB_QUERY_VALUE_MAX);
 	init_rwsem(&ix->lock);
 	/* teach lockdep that reclaim takes this lock, so it reports an allocation outside a NOFS scope */
 	fs_reclaim_acquire(GFP_KERNEL);
@@ -929,6 +935,11 @@ int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *n
 
 	if (!ix->enabled)
 		return 0;
+	if (((const u8 *)value)[0] == MOOB_T_RAW) {
+		/* raw is stored and never indexed: an indexed value it replaces must go */
+		moobl_index_remove(sb, inode->i_ino, name);
+		return 0;
+	}
 	place_dentry(ix, dentry, NULL, &pl);	/* may sleep: outside the index lock */
 	nofs = ix_write_lock(ix);
 	err = index_put(ix, inode->i_ino, &pl, name, value, size);
@@ -1037,7 +1048,9 @@ void moobl_index_perm_changed(struct super_block *sb, struct dentry *dentry)
 		return;
 	if (d_is_dir(dentry) && depth_and_domain(ix, dentry, &depth, &domain) &&
 	    depth >= ix->domain_depth && domain)
-		xa_store(&ix->fallback, (unsigned long)domain, xa_mk_value(1), GFP_KERNEL);
+		if (xa_err(xa_store(&ix->fallback, (unsigned long)domain, xa_mk_value(1),
+				    GFP_KERNEL)))
+			WRITE_ONCE(ix->fallback_all, true);	/* no memory to note it: check everywhere */
 	place_dentry(ix, dentry, NULL, &pl);
 	nofs = ix_write_lock(ix);
 	rec = xa_load(&ix->inodes, d_inode(dentry)->i_ino);
@@ -1200,40 +1213,31 @@ static bool inode_matches_all(struct moobl_ix_inode *rec, const struct moob_quer
 	return true;
 }
 
-static void fill_result(struct moobl_index *ix, struct moobl_ix_inode *rec,
-			struct moob_query_result *r, char *pathbuf)
+/*
+ * The name of rec, relative to the mount root: from the dentry cache when the inode is in
+ * memory, else the name recorded at the scan. NULL when neither is known. *held gets a dentry
+ * reference to drop once the index lock is released: dropping the last reference to an
+ * unlinked file evicts its inode, and eviction takes the index lock.
+ */
+static const char *result_path(struct moobl_index *ix, struct moobl_ix_inode *rec,
+			       char *pathbuf, struct dentry **held)
 {
-	const char *path = NULL;
-
 	lockdep_assert_held(&ix->lock);
-	r->ino = rec->ino;
-	r->flags = 0;
+	*held = NULL;
 	if (rec->upper) {
 		struct dentry *alias = d_find_alias(rec->upper);
 
 		if (alias) {
 			char *p = dentry_path_raw(alias, pathbuf, PAGE_SIZE);
 
+			*held = alias;
 			if (!IS_ERR(p))
-				path = *p == '/' ? p + 1 : p;
-			dput(alias);
+				return *p == '/' ? p + 1 : p;
 		}
 	}
-	if (!path && rec->path && !ix->paths_stale)
-		path = rec->path;
-	if (!path) {
-		r->flags |= MOOB_RES_PATH_UNKNOWN;
-		r->path_len = 0;
-		r->path[0] = '\0';
-		return;
-	}
-	r->path_len = (u32)strlen(path);
-	if (r->path_len >= MOOB_QUERY_PATH_MAX) {
-		r->flags |= MOOB_RES_PATH_TRUNCATED;
-		r->path_len = MOOB_QUERY_PATH_MAX - 1;
-	}
-	memcpy(r->path, path, r->path_len);
-	r->path[r->path_len] = '\0';
+	if (rec->path && !ix->paths_stale)
+		return rec->path;
+	return NULL;
 }
 
 /*
@@ -1254,6 +1258,7 @@ static void fill_result(struct moobl_index *ix, struct moobl_ix_inode *rec,
 struct moobl_candidate {
 	u64 ino;
 	char *path;	/* mount-relative, or NULL when unknown */
+	struct dentry *held;	/* dropped after the index lock, see result_path() */
 	u8 type;	/* scan key of the entry that produced it (QUERY2 cursors) */
 	u16 len;
 	u8 *value;
@@ -1433,17 +1438,18 @@ static int add_candidate(struct moobl_index *ix, struct moobl_ix_entry *e,
 			 const struct moobl_qscope *sc, struct moobl_candidate *c, char *pathbuf,
 			 bool want_key)
 {
-	struct moob_query_result tmp;
+	const char *path;
 	int err = 0;
 
 	lockdep_assert_held(&ix->lock);
-	fill_result(ix, e->owner, &tmp, pathbuf);
-	c->ino = tmp.ino;
+	path = result_path(ix, e->owner, pathbuf, &c->held);
+	c->ino = e->owner->ino;
 	c->path = NULL;
 	c->value = NULL;
-	if (!(tmp.flags & MOOB_RES_PATH_UNKNOWN)) {
-		const char *rel = scope_path(tmp.path, sc->strip);
+	if (path) {
+		const char *rel = scope_path(path, sc->strip);
 
+		/* the whole name: the permission check resolves it; only the reply is cut */
 		if (rel) {
 			c->path = kstrdup(rel, GFP_KERNEL);
 			if (!c->path)
@@ -1585,8 +1591,14 @@ static int put_result(struct moob_query_result __user *dst, struct moob_query_re
 	memset(one, 0, sizeof(*one));
 	one->ino = c->ino;
 	if (c->path) {
-		one->path_len = (u32)strlen(c->path);
-		memcpy(one->path, c->path, one->path_len + 1);
+		size_t len = strlen(c->path);
+
+		if (len >= MOOB_QUERY_PATH_MAX) {
+			one->flags = MOOB_RES_PATH_TRUNCATED;
+			len = MOOB_QUERY_PATH_MAX - 1;
+		}
+		one->path_len = (u32)len;
+		memcpy(one->path, c->path, len);	/* the record is zeroed: NUL follows */
 	} else {
 		one->flags = MOOB_RES_PATH_UNKNOWN;
 	}
@@ -1741,6 +1753,8 @@ chunk_done:
 				if (!err)
 					count++;
 			}
+			dput(cand[i].held);
+			cand[i].held = NULL;
 			kfree(cand[i].path);
 			cand[i].path = NULL;
 			kfree(cand[i].value);
@@ -1752,6 +1766,7 @@ chunk_done:
 out:
 	if (cand)
 		for (i = 0; i < MOOBL_QUERY_CHUNK; i++) {
+			dput(cand[i].held);
 			kfree(cand[i].path);
 			kfree(cand[i].value);
 		}
@@ -1997,7 +2012,8 @@ static long query2_exec(struct super_block *sb, struct file *file, struct moob_q
 
 	sc.domain = domain;
 	sc.strip = depth;
-	sc.check = xa_load(&ix->fallback, (unsigned long)domain) != NULL;
+	sc.check = READ_ONCE(ix->fallback_all) ||
+		   xa_load(&ix->fallback, (unsigned long)domain) != NULL;
 	sc.ordered = q->order_by[0] != '\0';
 	sc.desc = q->order == MOOB_ORDER_DESC;
 	sc.otype = q->order_type;

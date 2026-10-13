@@ -8,7 +8,20 @@
 #   DEV_SCRATCH DEV_LOG          blank block devices for dm-log-writes and dm-flakey
 # and a fail() function. LOWER and LAYER (mount points) default to /lower and /mnt/layer.
 # Prints MOOBFS_LAYER_PASS and MOOBFS_ACCEPTANCE_PASS on success.
+# MOOB_ONLY (optional) runs only the named steps, for development:
+#   ext4 btrfs xfs      everything of run_lower for that lower filesystem
+#   demo clients powerloss ioerror reserve
+# A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
+# be taken for a complete run.
 set -u
+want() {
+    [ -z "${MOOB_ONLY:-}" ] && return 0
+    case " $MOOB_ONLY " in *" $1 "*) return 0 ;; esac
+    return 1
+}
+for step in ${MOOB_ONLY:-}; do
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
 mkdir -p "$LOWER" "$LAYER" /tmp
@@ -68,6 +81,36 @@ run_lower() {
     [ "$(wc -l < /tmp/k.txt)" -eq 1 ] && grep -q 'q/f1$' /tmp/k.txt || fail "query-eq-content-$fs"
     same_query kind eq string note score ge int64 40 || fail "query-and-$fs"
     [ "$(wc -l < /tmp/k.txt)" -eq 1 ] && grep -q 'q/f4$' /tmp/k.txt || fail "query-and-content-$fs"
+    # Index findings of the inspection of 2026-10-13 (journal 0083), in a directory of their own.
+    mkdir -p $LAYER/insp || fail "insp-mkdir-$fs"
+    echo v > $LAYER/insp/victim && echo m > $LAYER/insp/mover || fail "insp-create-$fs"
+    $BIN/moobfs-attr set $LAYER/insp/victim rk string victim || fail "insp-attr-$fs"
+    $BIN/moobfs-attr set $LAYER/insp/mover rk string mover || fail "insp-attr-$fs"
+    # a rename over an indexed file removes the replaced file from the index
+    n0=$($BIN/query $LAYER info | sed -n 's/.* inodes=\([0-9]*\).*/\1/p')
+    mv $LAYER/insp/mover $LAYER/insp/victim || fail "insp-rename-$fs"
+    n1=$($BIN/query $LAYER info | sed -n 's/.* inodes=\([0-9]*\).*/\1/p')
+    [ -n "$n0" ] && [ "$n1" -eq $((n0 - 1)) ] || { echo "inodes $n0 -> $n1"; fail "insp-rename-over-count-$fs"; }
+    same_query rk eq string victim || fail "insp-rename-over-$fs"
+    [ ! -s /tmp/k.txt ] || fail "insp-rename-over-stale-$fs"
+    same_query rk eq string mover || fail "insp-rename-mover-$fs"
+    [ "$(wc -l < /tmp/k.txt)" -eq 1 ] && grep -q 'insp/victim$' /tmp/k.txt || fail "insp-rename-mover-content-$fs"
+    # a typed value replaced by a raw one is no longer found
+    $BIN/moobfs-attr set $LAYER/insp/victim tr string typed || fail "insp-typed-$fs"
+    same_query tr eq string typed || fail "insp-typed-query-$fs"
+    [ "$(wc -l < /tmp/k.txt)" -eq 1 ] || fail "insp-typed-count-$fs"
+    $BIN/moobfs-attr set $LAYER/insp/victim tr raw c0ffee || fail "insp-raw-$fs"
+    same_query tr eq string typed || fail "insp-raw-over-typed-$fs"
+    [ ! -s /tmp/k.txt ] || fail "insp-raw-over-typed-stale-$fs"
+    # a name longer than the result field is returned cut and marked, not dropped
+    deep=$(head -c 120 /dev/zero | tr '\0' d)
+    mkdir -p $LAYER/insp/$deep/$deep/$deep && echo l > $LAYER/insp/$deep/$deep/$deep/leaf || fail "insp-deep-$fs"
+    $BIN/moobfs-attr set $LAYER/insp/$deep/$deep/$deep/leaf lp string deep || fail "insp-deep-attr-$fs"
+    $BIN/query $LAYER lp eq string deep > /tmp/k.txt || fail "insp-deep-query-$fs"
+    [ "$(wc -l < /tmp/k.txt)" -eq 1 ] && grep -q '(truncated)$' /tmp/k.txt || { cat /tmp/k.txt; fail "insp-deep-truncated-$fs"; }
+    rm -rf $LAYER/insp || fail "insp-cleanup-$fs"
+    same_query lp eq string deep || fail "insp-cleanup-query-$fs"
+    [ ! -s /tmp/k.txt ] || fail "insp-cleanup-stale-$fs"
     same_query kind prefix string dec || fail "query-prefix-$fs"
     [ "$(wc -l < /tmp/k.txt)" -eq 2 ] || fail "query-prefix-count-$fs"
     same_query score gt int64 20 || fail "query-gt-$fs"
@@ -600,14 +643,29 @@ run_lower() {
     mount -t moobfs_layer -o lower=$LOWER/hostile none $LAYER || fail "hostile-marker-valid-$fs"
     umount $LAYER || fail "hostile-marker-umount-$fs"
     rm -rf $LOWER/hostile
+    # A btrfs subvolume inside the tree numbers its files from the start again, so two files
+    # could share one index record: the layer refuses to enter it and the scan leaves it out.
+    if [ "$fs" = btrfs ]; then
+        $BIN/layer subvol $LOWER nested || fail "subvol-create"
+        echo inside > $LOWER/nested/f || fail "subvol-file"
+        $BIN/moobfs-attr set $LOWER/nested/f sv string inside || fail "subvol-attr"
+        mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail "subvol-mount"
+        [ -e $LAYER/nested ] && fail "subvol-entered"
+        $BIN/query $LAYER sv eq string inside > /tmp/k.txt || fail "subvol-query"
+        [ ! -s /tmp/k.txt ] || { cat /tmp/k.txt; fail "subvol-indexed"; }
+        umount $LAYER || fail "subvol-umount"
+        rm $LOWER/nested/f && rmdir $LOWER/nested || fail "subvol-remove"
+        echo "NESTED_SUBVOLUME_REFUSED"
+    fi
     echo "HOSTILE_LOWER_PASS: $fs, ${HOSTILE_SEEDS:-3} trees"
     umount $LOWER || fail "lower-unmount-$fs"
     echo "LAYER_LOWER_PASS: $fs reflink=$reflink"
 }
-run_lower ext4 "$DEV_EXT4" no
-run_lower btrfs "$DEV_BTRFS" yes
-run_lower xfs "$DEV_XFS" yes
+want ext4 && run_lower ext4 "$DEV_EXT4" no
+want btrfs && run_lower btrfs "$DEV_BTRFS" yes
+want xfs && run_lower xfs "$DEV_XFS" yes
 
+if want demo; then
 # Readable demonstration, quoted in the README: typed attributes written through the layer,
 # QUERY2 on domain directories under the default mount options, results filtered by permission.
 # Lines starting with "DEMO| " are each command as run (with $BIN on PATH) and its output.
@@ -656,6 +714,7 @@ umount $LAYER || fail demo-umount
 rm -rf $LOWER/alice $LOWER/bob $LOWER/team /tmp/demo.out || fail demo-cleanup
 umount $LOWER || fail demo-lower-umount
 echo "DEMO_PASS: QUERY2 per domain, v1 refused to a user, heterogeneous file left out"
+fi
 
 # Phase 2e: acceptance with clients that do not know MoobFS (git, SQLite), an own memory
 # client, power loss under dm-log-writes and I/O errors under dm-flakey.
@@ -673,6 +732,8 @@ remember() {   # remember <mount> <relative path> <kind> <score> : the client co
     mv "$tmp" "$1/$2" || return 1
     sync    # a rename is durable only after the parent directory is synced; clients must fsync it
 }
+SCRATCH=$DEV_SCRATCH; LOGDEV=$DEV_LOG
+if want clients; then
 mount -t ext4 "$DEV_EXT4" $LOWER || fail acc-lower-mount
 mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail acc-layer-mount
 # git: a repository living on the layer, with memories as tracked files
@@ -728,9 +789,10 @@ $BIN/moobfs-check $LOWER > /dev/null || fail acc-check
 umount $LAYER || fail acc-layer-umount
 umount $LOWER || fail acc-lower-umount
 echo "ACCEPTANCE_CLIENTS_PASS"
+fi
+if want powerloss; then
 # Power loss: format and use a device under dm-log-writes, then replay the log to each mark
 # on a zeroed disk and check that every memory completed before the mark is whole.
-SCRATCH=$DEV_SCRATCH; LOGDEV=$DEV_LOG
 dd if=/dev/zero of=$SCRATCH bs=1M count=64 2>/dev/null || fail lw-zero
 $TOOLS/dmsetup create lw --table "0 $(blockdev --getsz $SCRATCH) log-writes $SCRATCH $LOGDEV" || fail lw-create
 $TOOLS/mke2fs -q -F -t ext4 -b 4096 /dev/mapper/lw || fail lw-mkfs
@@ -778,6 +840,8 @@ check_mark m4 4 || fail lw-check-m4
 check_mark sf 4 syncfs || fail lw-check-syncfs
 check_mark end 4 syncfs || fail lw-check-end
 echo "POWER_LOSS_REPLAY_PASS: marks mkfs m1 m2 m4 sf end"
+fi
+if want ioerror; then
 # I/O errors: the lower device starts erroring every write; errors must reach the caller,
 # nothing may crash, and the tree must come back clean once the device is healthy again.
 dd if=/dev/zero of=$SCRATCH bs=1M count=64 2>/dev/null || fail fl-zero
@@ -802,6 +866,8 @@ grep -q 'memory ok.md' $LAYER/ok.md || fail fl-ok-content
 $BIN/moobfs-check $LOWER > /dev/null || fail fl-check
 umount $LAYER && umount $LOWER || fail fl-final-umount
 echo "IO_ERROR_INJECTION_PASS"
+fi
+if want reserve; then
 # Reserved space: the mounter credentials carry no CAP_SYS_RESOURCE (as overlayfs), so an ordinary
 # user writing through the layer cannot spend the blocks ext4 reserves. The lower is mounted with a
 # reserve owner other than root: with resuid=0, ext4 itself grants the reserve to the mounter's
@@ -811,7 +877,12 @@ mount -t ext4 -o resuid=4242 $SCRATCH $LOWER || fail rs-lower-mount
 mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail rs-layer-mount
 $BIN/layer reserve $LAYER $LOWER || fail rs-reserve
 umount $LAYER && umount $LOWER || fail rs-final-umount
+fi
 rmmod moobfs_layer || fail layer-unload
 if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
+if [ -n "${MOOB_ONLY:-}" ]; then
+    echo "MOOBFS_ONLY_PASS: steps $MOOB_ONLY (not a complete run)"
+else
 echo "MOOBFS_ACCEPTANCE_PASS: git, sqlite wal, memory client, dm-log-writes replay, dm-flakey"
 echo "MOOBFS_LAYER_PASS: pass-through over ext4, btrfs and xfs; layer tests; typed attributes and tools; index and QUERY equal to the oracle; fsx 9000 ops each; reflink on btrfs/xfs; nolinks; unload"
+fi

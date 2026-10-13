@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Fixes** (journal 0083; from an outside read-only inspection of `layer/index.c`):
+  - a rename over a file with typed attributes left the replaced file in the index until
+    unmount;
+  - a result whose name is 256 bytes or longer was dropped when results are checked one by one,
+    and `MOOB_RES_PATH_TRUNCATED` was never set; it is now returned cut and marked;
+  - a typed attribute overwritten by a raw one kept answering queries with the old value;
+  - a failed allocation while noting a permission change of a directory left the domain
+    answering without per-result checks; it now turns the checks on for every domain;
+  - a dentry reference is no longer dropped with the index lock held.
+- **Behaviour change** (journal 0083): a btrfs subvolume or snapshot inside the lower tree is
+  not entered (`EXDEV`) and not indexed. Its files reuse inode numbers, and two files with one
+  number shared an index record: setting an attribute on one removed the other from answers.
 - **Fix** (journal 0082; found from an outside inspection report): allocations made with the
   index lock held could recurse into memory reclaim, which evicts inodes and takes the same lock.
   An ordinary user setting a typed attribute under memory pressure could hang every query and

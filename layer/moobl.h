@@ -8,6 +8,8 @@
 #include <linux/rwsem.h>
 #include <linux/path.h>
 #include <linux/cred.h>
+#include <linux/magic.h>
+#include <linux/btrfs_tree.h>
 #include <linux/siphash.h>
 
 #define MOOBL_SUPER_MAGIC 0x4d4f4f42	/* "MOOB" */
@@ -27,6 +29,7 @@ struct moobl_index {
 	bool initialized;		/* moobl_index_init() ran for this superblock */
 	unsigned int domain_depth;	/* depth of domain directories below the root; 0: off */
 	struct xarray fallback;		/* domain ino -> value: answer with per-result checks */
+	bool fallback_all;		/* a domain could not be recorded above: check every domain */
 	u32 hetero_count;		/* indexed inodes failing the homogeneity rule */
 	siphash_key_t cursor_key;	/* per-mount key authenticating QUERY2 cursors */
 };
@@ -61,6 +64,20 @@ static inline struct moobl_inode *MOOBL_I(struct inode *inode)
 static inline struct inode *moobl_lower_inode(struct inode *inode)
 {
 	return MOOBL_I(inode)->lower;
+}
+
+/*
+ * The root directory of a btrfs subvolume. Each subvolume numbers its inodes from the start
+ * again, and the index and the layer's inode cache identify a file by its inode number alone,
+ * so a subvolume below the lower root cannot be entered: its files could not be told from
+ * those outside it. The lower root may itself be such a directory; it is never looked up.
+ */
+static inline bool moobl_nested_subvolume(struct dentry *lower)
+{
+	struct inode *inode = READ_ONCE(lower->d_inode);
+
+	return inode && S_ISDIR(inode->i_mode) && inode->i_sb->s_magic == BTRFS_SUPER_MAGIC &&
+	       inode->i_ino == BTRFS_FIRST_FREE_OBJECTID;
 }
 
 static inline struct path *moobl_lower_path(struct dentry *dentry)
