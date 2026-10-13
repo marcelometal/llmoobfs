@@ -11,7 +11,8 @@ them not implemented yet).
 
 | Version | Supported |
 | --- | --- |
-| `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported. `v0.2.0-experimental` has defects fixed on `main` since (journals 0074 and 0078). |
+| `v0.3.0-experimental` | Source snapshot, not supported; the one to use. |
+| `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported. They carry defects fixed in `v0.3.0-experimental`, security ones included (see `CHANGELOG.md`). |
 | `main` | Fixes land here only. There are no backports and no maintenance branches. |
 
 ## How to report a vulnerability

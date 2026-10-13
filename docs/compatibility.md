@@ -84,5 +84,5 @@ advisory when it is a vulnerability under `SECURITY.md`; older versions are not 
 
 - Rule 1.2 (refusing to build against an unlisted kernel) needs a build-time check, which is a
   code change not made yet.
-- Decided on 2026-10-13: no patch release of `v0.2.0-experimental` for now, although it has the
-  defects fixed in journals 0074 and 0078.
+- Decided on 2026-10-13, later the same day: instead of a patch release of `v0.2.0-experimental`,
+  a new pre-release `v0.3.0-experimental` carries every fix (journal 0087).
