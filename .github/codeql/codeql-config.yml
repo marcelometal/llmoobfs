@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# CodeQL configuration for the user-space C sources (journal 0080).
+#
+# cpp/path-injection is turned off. It reports every file opened under a name that comes from the
+# command line, which is the interface of every program analyzed here: tools and benchmarks run
+# by an operator, with the operator's own privileges, on the files the operator names. 21 of the
+# 22 alerts dismissed up to 2026-10-13 were this rule; none pointed at a defect.
+#
+# Turn it back on before adding a program that opens paths chosen by someone less trusted than
+# the user running it: a set-user-ID tool, a daemon, a network service, or a tool that follows
+# paths read from a file another party wrote.
+name: moobfs user space
+query-filters:
+  - exclude:
+      id: cpp/path-injection

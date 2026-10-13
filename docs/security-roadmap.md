@@ -131,6 +131,10 @@ kernel não promete segurança ao montar imagem hostil.
 
 ### S6. Processo de divulgação e política de versões
 
+*Status, 2026-10-13 (journal 0080; in English).* `SECURITY.md` is published. The policy of
+supported kernels and of compatibility is written as a proposal in `docs/compatibility.md`,
+linked from the README, awaiting the maintainer.
+
 - `SECURITY.md` com canal de contato, prazo de resposta e o que conta como vulnerabilidade
   (inclui DoS por usuário comum).
 - Política de kernels suportados e de compatibilidade da UAPI, já prevista no M1 hardening.
