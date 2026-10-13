@@ -4,7 +4,12 @@
 ai-memory page into typed MoobFS attributes on the page file, read from ai-memory's own SQLite so
 that the ordering key (`updated_at`, store clock) is identical on both sides. Standard library only.
 
-  aimem-mirror.py --db DATA_DIR/db/memory.sqlite --wiki WIKI_ON_THE_LAYER [--out FILE.csv]
+  aimem-mirror.py --db DATA_DIR/db/memory.sqlite --wiki WIKI_ON_THE_LAYER [--out FILE.csv] [--verify]
+
+--verify writes nothing: it compares the attributes already on each page (set by the live
+aimem-sidecar.py) with what this tool would write. The structured fields must be equal; the
+ordering key is the file's mtime there, so it reports how far that is from the store's
+`updated_at` and how many neighbouring pages of a project swap places when ordered by it.
 
 Attributes: family (first path segment), tier, kind (front matter `kind`, else derived from the
 path exactly as ai-memory's `page_kind_expr`),
@@ -44,11 +49,13 @@ def main():
     ap.add_argument("--db", required=True)
     ap.add_argument("--wiki", required=True)
     ap.add_argument("--out")
+    ap.add_argument("--verify", action="store_true")
     a = ap.parse_args()
     con = sqlite3.connect("file:%s?mode=ro" % a.db, uri=True)
     rows = con.execute("SELECT workspace_id, project_id, path, tier, pinned, updated_at, expires_at, "
                        "frontmatter_json FROM pages WHERE is_latest = 1").fetchall()
     done, missing, per, t0 = 0, 0, [], time.monotonic()
+    wrong, unset, delta, order = 0, 0, [], {}
     for ws, proj, path, tier, pinned, updated, expires, fm in rows:
         f = os.path.join(a.wiki, str(uuid.UUID(bytes=ws)), str(uuid.UUID(bytes=proj)), path)
         if not os.path.exists(f):
@@ -65,11 +72,42 @@ def main():
                  ("pinned", enc_bool(pinned)), ("updated_at", enc_time_us(updated))]
         if expires is not None:
             attrs.append(("expires_at", enc_time_us(expires)))
+        if a.verify:
+            have = {}
+            for name in os.listxattr(f):
+                if name.startswith("user.moob."):
+                    have[name[10:]] = os.getxattr(f, name)
+            if "updated_at" not in have:
+                unset += 1
+                continue
+            want = dict(attrs)
+            live = struct.unpack("<q", have.pop("updated_at")[1:])[0]
+            del want["updated_at"]
+            if have != want:
+                wrong += 1
+                if wrong <= 5:
+                    print("VERIFY %s: have=%s want=%s" % (path, sorted(have), sorted(want)), file=sys.stderr)
+            delta.append(live / 1e9 - updated / 1e6)
+            order.setdefault((ws, proj), []).append((updated, live))
+            done += 1
+            continue
         s = time.monotonic()
         for name, value in attrs:
             os.setxattr(f, "user.moob." + name, value)
         per.append(time.monotonic() - s)
         done += 1
+    if a.verify:
+        swaps = 0
+        for pairs in order.values():
+            pairs.sort()
+            swaps += sum(1 for x, y in zip(pairs, pairs[1:]) if y[1] < x[1])
+        delta.sort()
+        mid = len(delta) // 2
+        print("VERIFY: pages=%d checked=%d fields_differ=%d not_mirrored=%d missing_files=%d "
+              "mtime_minus_updated_ms_p50=%.1f min=%.1f max=%.1f order_swaps=%d"
+              % (len(rows), done, wrong, unset, missing, delta[mid] * 1e3 if delta else 0,
+                 delta[0] * 1e3 if delta else 0, delta[-1] * 1e3 if delta else 0, swaps))
+        return 0 if done and not (wrong or unset or missing) else 1
     if a.out:
         with open(a.out, "w") as o:
             o.write("seconds\n")

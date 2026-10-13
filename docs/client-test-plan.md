@@ -121,3 +121,8 @@ Update of the same day (journal 0068): the scales are done, 2 000 to 60 000 page
 answers at each. Pages above 6 000 are loaded as files and indexed by the client's `reindex`
 (decision 2 said MCP; its cost per write grows with the store). Still open: the live sidecar and
 its cost against the client's own synchronization.
+
+Update of 2026-10-13 (journal 0071): the live sidecar is built and measured at 2 000 pages. Every
+structured field equals the client's database, the file's mtime orders pages as the store's clock
+does, and the client's writes and watcher are unaffected. Stage 2 is done; its measurements are
+pilot-grade and from one client.

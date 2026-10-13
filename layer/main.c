@@ -96,6 +96,14 @@ static int moobl_inode_set(struct inode *inode, void *data)
 	fsstack_copy_attr_all(inode, lower);
 	fsstack_copy_inode_size(inode, lower);
 	inode->i_ino = lower->i_ino;
+#ifdef CONFIG_FS_POSIX_ACL
+	/*
+	 * ACLs are the lower's. The VFS would otherwise remember here the first one it
+	 * read and return it after the lower's changed.
+	 */
+	inode->i_acl = ACL_DONT_CACHE;
+	inode->i_default_acl = ACL_DONT_CACHE;
+#endif
 	inode->i_mapping->a_ops = &moobl_aops;
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &moobl_dir_iops;
@@ -185,11 +193,32 @@ static int moobl_show_options(struct seq_file *m, struct dentry *root)
 	return 0;
 }
 
+/*
+ * syncfs(2) on the layer has to reach the lower filesystem, which holds every page and all
+ * metadata. sync(2) visits the lower superblock by itself, so the layer is skipped there
+ * (SB_I_SKIP_SYNC) and this runs for syncfs, and for the final sync of an unmount.
+ */
+static int moobl_sync_fs(struct super_block *sb, int wait)
+{
+	struct moobl_sb *sbi = MOOBL_SB(sb);
+	struct super_block *lower_sb;
+	int err;
+
+	if (!wait || !sbi || !sbi->lower.dentry)
+		return 0;
+	lower_sb = sbi->lower.dentry->d_sb;
+	down_read(&lower_sb->s_umount);
+	err = sync_filesystem(lower_sb);
+	up_read(&lower_sb->s_umount);
+	return err;
+}
+
 static const struct super_operations moobl_sops = {
 	.alloc_inode = moobl_alloc_inode,
 	.free_inode = moobl_free_inode,
 	.evict_inode = moobl_evict_inode,
 	.statfs = moobl_statfs,
+	.sync_fs = moobl_sync_fs,
 	.show_options = moobl_show_options,
 };
 
@@ -724,10 +753,22 @@ static int moobl_xattr_set(const struct xattr_handler *handler, struct mnt_idmap
 		if (err)
 			return err;
 	}
-	if (value)
+	if (value) {
 		err = vfs_setxattr(&nop_mnt_idmap, lower, full, value, size, flags);
-	else
+	} else if (!strcmp(full, XATTR_NAME_CAPS)) {
+		/*
+		 * File capabilities are removed by the kernel when an ordinary user changes
+		 * the file (cap_inode_killpriv), a caller the lower would refuse. A removal
+		 * asked by a user was authorized on this inode before the handler ran
+		 * (cap_inode_removexattr), so the mounter's credentials are safe here.
+		 */
+		const struct cred *old = override_creds(MOOBL_SB(inode->i_sb)->creds);
+
 		err = vfs_removexattr(&nop_mnt_idmap, lower, full);
+		revert_creds(old);
+	} else {
+		err = vfs_removexattr(&nop_mnt_idmap, lower, full);
+	}
 	if (err)
 		return err;
 	moobl_copy_attr(inode, d_inode(lower));
@@ -1015,6 +1056,19 @@ static loff_t moobl_remap_file_range(struct file *in, loff_t pos_in, struct file
 
 	if (file_inode(in)->i_sb != inode_out->i_sb)
 		return -EXDEV;
+	if (!(flags & REMAP_FILE_DEDUP)) {
+		/*
+		 * A clone changes the content. The lower call runs with the mounter's
+		 * credentials, which keep set-user-ID, set-group-ID and file capabilities,
+		 * so they are dropped here with the caller's, as for a write. A dedupe
+		 * leaves the content as it was. The lock is held across the lower call, as
+		 * for a write.
+		 */
+		inode_lock(inode_out);
+		ret = file_remove_privs(out);
+		if (ret)
+			goto unlock;
+	}
 	old = override_creds(MOOBL_SB(inode_out->i_sb)->creds);
 	if (flags & REMAP_FILE_DEDUP)
 		ret = vfs_dedupe_file_range_one(in->private_data, pos_in, out->private_data,
@@ -1024,6 +1078,9 @@ static loff_t moobl_remap_file_range(struct file *in, loff_t pos_in, struct file
 					   pos_out, len, flags);
 	revert_creds(old);
 	moobl_file_modified(out);
+unlock:
+	if (!(flags & REMAP_FILE_DEDUP))
+		inode_unlock(inode_out);
 	return ret;
 }
 
@@ -1035,11 +1092,18 @@ static ssize_t moobl_copy_file_range(struct file *in, loff_t pos_in, struct file
 
 	if (file_inode(in)->i_sb != file_inode(out)->i_sb)
 		return -EXDEV;
+	/* as for a clone: drop the privileges of the target with the caller's credentials */
+	inode_lock(file_inode(out));
+	ret = file_remove_privs(out);
+	if (ret)
+		goto unlock;
 	old = override_creds(MOOBL_SB(file_inode(out)->i_sb)->creds);
 	ret = vfs_copy_file_range(in->private_data, pos_in, out->private_data, pos_out,
 				  len, flags);
 	revert_creds(old);
 	moobl_file_modified(out);
+unlock:
+	inode_unlock(file_inode(out));
 	return ret;
 }
 
@@ -1222,9 +1286,12 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 
 			if (!version || version > MOOB_ATTR_FORMAT_VERSION)
 				return invalfc(fc, "lower tree uses an unsupported moobfs attribute format");
+		} else if (n == 0 || n == -ERANGE) {
+			/* An empty marker, or one longer than any version number, is not a version. */
+			return invalfc(fc, "lower tree uses an unsupported moobfs attribute format");
 		} else if (n == -EOPNOTSUPP) {
 			pr_info("moobfs_layer: lower filesystem has no user xattr support; typed attributes unavailable\n");
-		} else if (n != -ENODATA && n != -ERANGE && n < 0) {
+		} else if (n != -ENODATA) {
 			return invalfc(fc, "cannot read the moobfs format marker on the lower root");
 		}
 	}
@@ -1238,7 +1305,7 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	sb->s_flags |= SB_NOSEC;	/* lower enforces suid/sgid clearing */
 	if (sbi->lower.dentry->d_sb->s_flags & SB_POSIXACL)
 		sb->s_flags |= SB_POSIXACL;	/* ACL xattrs route to get_acl/set_acl, delegated below */
-	sb->s_iflags |= SB_I_NOEXEC | SB_I_NODEV;
+	sb->s_iflags |= SB_I_NOEXEC | SB_I_NODEV | SB_I_SKIP_SYNC;
 
 	root_inode = moobl_get_inode(sb, d_inode(sbi->lower.dentry));
 	if (IS_ERR(root_inode))

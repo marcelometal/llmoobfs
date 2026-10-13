@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- **Fix** (journal 0078; found with fstests `generic/674` over btrfs): `syncfs` on the layer, and
+  the sync of its unmount, returned success without syncing the lower filesystem. `fsync` and
+  `sync` were not affected. The layer now delegates `sync_fs` to the lower, as overlayfs does.
+- S2 (journal 0077): fstests group `quick` over btrfs (271 pass, 360 not run, 16 fail) and XFS
+  (298 pass, 333 not run, 16 fail), no kernel diagnostic. The reflink and dedupe tests run and
+  pass. The same 15 tests fail on the three lowers (10 by design, 1 not applicable, 4 gaps);
+  `generic/674` on btrfs exposed that `syncfs` on the layer did not reach the lower.
+- **Fix** (journal 0076; found with fstests `generic/318`): an ACL read through the layer right
+  after it was changed could be the earlier one, until a remount. Access decisions were not
+  affected; they are made on the lower.
+- S2, first run (journal 0075): fstests v2026.09.22 runs over the layer through a small port
+  (`vm/fstests/`, `vm/fstests-local.sh`). Group `quick` over ext4: 647 tests, 178 pass, 451 not
+  run, 18 fail, of which 10 by design (no execution, no device nodes), 4 gaps, 1 fixed, 1 open.
+- **Security fix** (journal 0074, ADR-0011 F5; found with fstests): `copy_file_range` and a clone
+  through the layer left set-user-ID, set-group-ID and file capabilities on the target, so an
+  ordinary user with write access to such a file could change its content and keep them. Also
+  fixed: ordinary writes to a file with capabilities failed with `EIO`.
+- S4 (journal 0073): adversarial lower trees (`tests/hostile.c`) in the VM suite on the three lower
+  filesystems, under KASAN, and through the tools under sanitizers in CI (`make hostile-test`).
+  **Fix:** an empty or over-long `user.moob.format` marker on the lower root was accepted as "no
+  marker"; it now refuses the mount. `moobfs-check` no longer passes a null array to `qsort`.
+- M3 closed (journal 0072): a batch read of content is dropped and the change cursor stays in the
+  client, both with measurements. `bench/readcost.c` shows that reading the attributes of a
+  query's results costs far more than the query (16 µs per file against 0.9 µs per result);
+  returning chosen values with the results is proposed, not built.
+- Stage 2 closed with a live mirror (journal 0071): a process that only watches files keeps the
+  attributes of 2 000 pages equal to the client's database as they are written, without slowing
+  its writes or waking its watcher; the scale of 20 000 pages repeated on the module with the
+  fixes of journals 0061 and 0069 gives the same numbers.
+- `docs/client-contract.md` (M3 phase 3a, journal 0070): what any agent-memory system must follow
+  to use the layer, with no client named.
 - **Security fix** (journal 0069; review of journal 0066): any user writing to or truncating a
   set-user-ID or set-group-ID file through the layer, and any `chown` of one, crashed the kernel
   (`BUG()` in `notify_change`). Regression test in `tests/layer.c`.

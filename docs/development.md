@@ -195,6 +195,7 @@ mkdir -p build/linux && tar -xJf build/linux.tar.xz -C build/linux --strip-compo
 make layer KDIR="$PWD/build/linux"
 make attr-tools BUILD=build/vng CFLAGS="-O2 -g -static"
 gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o build/vng/layer
+gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o build/vng/hostile
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
 gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
 gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap

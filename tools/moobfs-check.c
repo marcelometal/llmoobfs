@@ -134,6 +134,9 @@ static int ident_cmp(const void *x, const void *y)
 static void check_identities(void)
 {
 	size_t i;
+
+	if (nidents < 2)
+		return;		/* nothing to compare; qsort() must not get a null array */
 	qsort(idents, nidents, sizeof *idents, ident_cmp);
 	for (i = 1; i < nidents; i++) {
 		if (strcmp(idents[i].id, idents[i - 1].id)) continue;

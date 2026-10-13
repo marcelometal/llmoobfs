@@ -55,6 +55,7 @@ make layer KDIR="/lib/modules/$(uname -r)/build" > "$BUILD.layer.log" 2>&1 || { 
 make attr-tools bench-tools BUILD=$BUILD CFLAGS="-O2 -g" > /dev/null
 gcc -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o $BUILD/query
 gcc -O2 -Wall -Wextra -Werror tests/layer.c -o $BUILD/layer
+gcc -O2 -Wall -Wextra -Werror tests/hostile.c -o $BUILD/hostile
 gcc -O2 -Wall -Wextra -Werror tests/idmap.c -o $BUILD/idmap
 gcc -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o $BUILD/fsx
 gcc -O2 tests/third_party/log-writes/replay-log.c tests/third_party/log-writes/log-writes.c -o $BUILD/replay-log

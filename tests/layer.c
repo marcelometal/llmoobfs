@@ -3,6 +3,7 @@
  * Phase 2a/2b acceptance test for the MoobFS memory layer: exercises the
  * pass-through operations on a mounted layer and checks that the lower
  * directory reflects every change. Usage: layer <mount> <lower> <reflink: yes|no> <links|nolinks>
+ *   layer syncfs <path>             syncfs(2) on the filesystem that holds <path>
  *   layer reserve <mount> <lower>   an ordinary user fills the layer; the blocks the lower
  *                                   reserves for its administrator must stay free
  */
@@ -76,11 +77,14 @@ static int count_entries(const char *dir)
 }
 
 /*
- * As uid and gid 1001, writes to (how 0), truncates (how 1) or fills until ENOSPC (how 2) a
- * descriptor that root opened.
+ * As uid and gid 1001, on a descriptor that root opened: writes to it (how 0), truncates it
+ * (how 1), fills it until ENOSPC (how 2), copies into it with copy_file_range (how 3), clones
+ * into it (how 4) or preallocates in it (how 5). src_fd is the source of 3 and 4.
  * Without CAP_FSETID the VFS then clears set-user-ID and set-group-ID through ->setattr, the
  * path that reached BUG() in notify_change (journal 0069). Returns the child's exit status.
  */
+static int src_fd = -1;
+
 static int as_user(int fd, int how)
 {
 	pid_t pid = fork();
@@ -93,6 +97,13 @@ static int as_user(int fd, int how)
 		if (setgroups(0, NULL) || setgid(1001) || setuid(1001)) _exit(2);
 		if (how == 0) _exit(write(fd, "y", 1) == 1 ? 0 : 3);
 		if (how == 1) _exit(ftruncate(fd, 2) ? 4 : 0);
+		if (how == 3) {
+			loff_t in = 0, out = 0;
+
+			_exit(copy_file_range(src_fd, &in, fd, &out, 4096, 0) == 4096 ? 0 : 6);
+		}
+		if (how == 4) _exit(ioctl(fd, FICLONE, src_fd) ? 7 : 0);
+		if (how == 5) _exit(fallocate(fd, 0, 0, 65536) ? 8 : 0);
 		while (write(fd, block, sizeof block) > 0)
 			;
 		_exit(errno == ENOSPC ? 0 : 5);
@@ -110,6 +121,12 @@ int main(int argc, char **argv)
 	ssize_t n;
 
 	int reflink, links;
+	if (argc == 3 && !strcmp(argv[1], "syncfs")) {
+		fd = open(argv[2], O_RDONLY); CHECK(fd >= 0);
+		CHECK(!syncfs(fd));
+		close(fd);
+		return 0;
+	}
 	if (argc == 4 && !strcmp(argv[1], "reserve")) {
 		/* the lower is mounted with a reserve owner that is not the mounter, so only
 		 * CAP_SYS_RESOURCE in the mounter credentials could spend the reserve */
@@ -379,8 +396,67 @@ int main(int argc, char **argv)
 	/* chown clears them too, for every caller, through the same ->setattr path */
 	CHECK(!fchmod(fd, 06755) && !fchown(fd, 1001, 1001));
 	CHECK(!stat(lo("suid"), &lst) && (lst.st_mode & 07777) == 0755);
+	/* so do the calls that change the content without a write: copy_file_range, a clone and
+	 * fallocate. The lower runs them with the mounter's credentials, which would keep the bits,
+	 * so the layer must clear them first, as it does for a write. */
+	src_fd = open(up("suidsrc"), O_RDWR | O_CREAT | O_EXCL, 0644); CHECK(src_fd >= 0);
+	memset(buf, 'S', 4096);
+	CHECK(write(src_fd, buf, 4096) == 4096 && !fsync(src_fd));
+	for (i = 3; i <= 5; i++) {
+		if (i == 4 && !reflink)
+			continue;
+		CHECK(!fchmod(fd, 06755));
+		CHECK(!stat(lo("suid"), &lst) && (lst.st_mode & 07777) == 06755);
+		CHECK(as_user(fd, i) == 0);
+		CHECK(!stat(lo("suid"), &lst) && (lst.st_mode & 07777) == 0755);
+	}
+	CHECK(pread(fd, buf, 1, 0) == 1 && buf[0] == 'S');
+	{
+		/* file capabilities go the same way: an ordinary write removes them and succeeds */
+		static const unsigned char caps[20] = { 0x01, 0x00, 0x00, 0x02, 0xc0 };	/* v2, setuid+setgid, effective */
+		int how[] = { 0, 3, 5 };
+		unsigned k;
+
+		for (k = 0; k < 3; k++) {
+			CHECK(!fsetxattr(fd, "security.capability", caps, sizeof caps, 0));
+			CHECK(getxattr(lo("suid"), "security.capability", buf, sizeof buf) == (ssize_t)sizeof caps);
+			CHECK(as_user(fd, how[k]) == 0);
+			errno = 0;
+			CHECK(getxattr(lo("suid"), "security.capability", buf, sizeof buf) == -1 && errno == ENODATA);
+		}
+	}
+	close(src_fd);
 	close(fd);
-	CHECK(!unlink(up("suid")));
+	CHECK(!unlink(up("suid")) && !unlink(up("suidsrc")));
+
+	/* an ACL read through the layer is the one just set, not one remembered from an earlier read */
+	{
+		/* version 2; then tag, permissions and id of each entry, little-endian */
+		unsigned char acl[2][44] = {
+			{ 2, 0, 0, 0,  1, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,  2, 0, 4, 0, 0xe9, 3, 0, 0,
+			  4, 0, 4, 0, 0xff, 0xff, 0xff, 0xff,  0x10, 0, 4, 0, 0xff, 0xff, 0xff, 0xff,
+			  0x20, 0, 4, 0, 0xff, 0xff, 0xff, 0xff },	/* user 1001: r-- */
+			{ 2, 0, 0, 0,  1, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,  2, 0, 6, 0, 0xea, 3, 0, 0,
+			  4, 0, 4, 0, 0xff, 0xff, 0xff, 0xff,  0x10, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+			  0x20, 0, 4, 0, 0xff, 0xff, 0xff, 0xff },	/* user 1002: rw- */
+		};
+		const char *name = "system.posix_acl_access";
+		unsigned char got[64];
+
+		fd = open(up("acl"), O_WRONLY | O_CREAT | O_EXCL, 0644); CHECK(fd >= 0); close(fd);
+		if (getxattr(up("acl"), name, got, sizeof got) < 0 && errno == EOPNOTSUPP) {
+			puts("note: lower mounted without POSIX ACLs, ACL read test skipped");
+		} else {
+			for (i = 0; i < 4; i++) {
+				CHECK(!setxattr(up("acl"), name, acl[i % 2], sizeof acl[0], 0));
+				CHECK(getxattr(up("acl"), name, got, sizeof got) == (ssize_t)sizeof acl[0]);
+				CHECK(!memcmp(got, acl[i % 2], sizeof acl[0]));
+				CHECK(getxattr(lo("acl"), name, got, sizeof got) == (ssize_t)sizeof acl[0]);
+				CHECK(!memcmp(got, acl[i % 2], sizeof acl[0]));
+			}
+		}
+		CHECK(!unlink(up("acl")));
+	}
 
 	/* unlink removes from lower; open descriptor keeps reading */
 	fd = open(up("a.txt"), O_RDONLY); CHECK(fd >= 0);

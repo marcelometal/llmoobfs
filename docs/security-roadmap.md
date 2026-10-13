@@ -66,6 +66,14 @@ escrito, revisores não conseguem dizer se o esquema de credenciais é exploráv
 
 ### S2. fstests (xfstests) sobre a camada
 
+*Status, 2026-10-13 (journal 0075; in English).* Started: fstests runs over the layer with a small
+port (`vm/fstests/`), and the `quick` group has one recorded run over ext4. btrfs and XFS, the
+exclusion list and the four gaps it showed are open.
+
+*Status, 2026-10-13 (journal 0077; in English).* The `quick` group is recorded over btrfs and XFS
+too; the same 15 tests fail on the three lowers. Open: the exclusion list, the four gaps, the
+`auto` group.
+
 Precedente: a documentação do kernel "Adding New Filesystems" chama fstests de infraestrutura
 padrão e seu uso de fortemente recomendado; bcachefs reportou fstests sob lockdep e KASAN antes
 do merge.
@@ -90,6 +98,13 @@ Precedente: Janus achou 90 bugs em oito filesystems do kernel com 32 CVEs; Hydra
   relatos abertos, e reprodutores de crashes anteriores guardados em `tests/`.
 
 ### S4. Inferior como entrada hostil
+
+*Status, 2026-10-13 (journal 0073; in English, as the rest of the repository since ADR-0010).*
+Done for the scope below: `tests/hostile.c` generates the adversarial trees, `vm/suite.sh` mounts
+the layer over them on ext4, btrfs and XFS (`HOSTILE_LOWER_PASS`, also under KASAN), and
+`make hostile-test` runs them through the tools under sanitizers in CI. The behaviour is recorded
+in ADR-0011. The choice made: an invalid attribute is skipped silently and reported by
+`moobfs-check`, not logged in `dmesg`, because a writer on the lower could otherwise fill the log.
 
 Precedente: CVE-2019-19319 (ext4, `setxattr` após imagem forjada escreve fora de limites),
 CVE-2009-2406 (eCryptfs, overflow em parser de metadados), posição dos maintainers de que o

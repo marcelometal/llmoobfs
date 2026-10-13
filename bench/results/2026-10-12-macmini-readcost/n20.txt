@@ -1,0 +1,11 @@
+files=20 bytes_per_file=2791 attrs_per_file=7.4 rounds=499
+what	round_p50_us	per_file_us
+query	17.2	0.86
+read	120.7	6.04
+lower	89.1	4.45
+pread	33.4	1.67
+attrs	327.5	16.37
+attr1	39.7	1.98
+lattrs	306.7	15.33
+nullsys	24.7	1.24
+ceiling of a batch read (read - pread)	87.3	4.37
