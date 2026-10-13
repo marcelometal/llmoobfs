@@ -244,6 +244,11 @@ rule and the reason, runnable by the domain's owner, so "why is my page missing"
 answer. An unprivileged way to learn that one's own domain is heterogeneous is needed, since the
 counters are now hidden; a per-domain flag in the `QUERY2` reply is the proposal.
 
+Note of 2026-10-13: the second client met this on its first run (journal 0089), and
+`moobfs-check --domain-depth N` now lists the files left out with the reason (journal 0090). It
+runs on the lower tree, so it serves the administrator; a client confined to its domain still
+has no way to ask.
+
 **Residual.** The rule is what makes one permission check per query sound; it stays.
 
 ## 12. Content and attributes are separate writes

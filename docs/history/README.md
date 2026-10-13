@@ -115,3 +115,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0085 — M4 question 3: space saved by reflink and dedupe through the layer](0085-m4-question-3-space.md)
 - [0086 — The last two Portuguese documents are in English](0086-last-two-translations.md)
 - [0089 — Second client: a LangGraph store on the layer, equal to the reference store](0089-second-client-langgraph-adapter.md)
+- [0090 — `moobfs-check` lists the files left out of `QUERY2` answers](0090-check-lists-left-out-files.md)

@@ -184,7 +184,8 @@ whole subtrees between partitions inside a `rename`.
 
 - `moobfs-index --domain DIR`: oracle that evaluates the same homogeneity rule and answers only
   about the domain, for comparison.
-- `moobfs-check`: lists heterogeneous files per domain.
+- `moobfs-check --domain-depth N`: lists the files left out of `QUERY2` answers, with the reason
+  (implemented in journal 0090; until then the tool did not do it).
 - `bench`: W3 shape per domain and the timing-channel experiment of journal 0030 as a test.
 
 ## 7. Required tests

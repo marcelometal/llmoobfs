@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Tools (journal 0090): `moobfs-check --domain-depth N` lists the files that carry typed
+  attributes and that `QUERY2` leaves out, each with the reason (a directory more private than
+  the domain, another owner, an ACL, a hard link, a file above every domain). The specification
+  promised this list and the tool did not produce it.
 - Second client (journal 0089): `bench/client/langgraph_store.py`, a LangGraph `BaseStore` on a
   layer directory, gives the same answers as LangGraph's in-memory store in five runs of 3 000 to
   6 000 random operations at domain depths 1, 2 and 3, with no change to the layer. It also
