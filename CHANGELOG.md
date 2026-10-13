@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **M4 report** (journal 0088): the four questions of the benchmark plan answered with what was
+  measured, pilot-grade, including where the layer loses. New campaigns for it: latency per
+  operation on the current module (2 to 5 µs more per read, 6 to 13 µs more per attribute write,
+  nothing measurable on a create with `fsync`) and `bench/synccost.c`, which shows that keeping a
+  side SQLite in step costs almost nothing per write in its usual mode, so write cost is not an
+  argument for the layer.
 - S2 (journal 0091): with `vm/fstests/exclude-quick.txt`, the fstests `quick` group ends with no
   failure over ext4, btrfs and XFS (631 tests each; 186, 280 and 307 pass, the rest are skipped
   by fstests). No kernel diagnostic.

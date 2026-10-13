@@ -1,0 +1,45 @@
+rep=1 fs=ext4 where=plain mode=files n=3000 body=3000 p50_us=7829.7 p95_us=11201.1 mean_us=8639.0 total_s=25.92
+rep=1 fs=ext4 where=plain mode=xattr n=3000 body=3000 p50_us=10497.0 p95_us=14487.5 mean_us=10641.2 total_s=31.92
+rep=1 fs=ext4 where=layer mode=xattr n=3000 body=3000 p50_us=9812.5 p95_us=14618.7 mean_us=10625.1 total_s=31.88
+rep=1 fs=ext4 where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=9662.6 p95_us=13319.1 mean_us=10885.6 total_s=32.66
+rep=1 fs=ext4 where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=7909.1 p95_us=11393.1 mean_us=8844.6 total_s=26.53
+rep=1 fs=btrfs where=plain mode=files n=3000 body=3000 p50_us=8512.1 p95_us=12769.8 mean_us=9617.2 total_s=28.85
+rep=1 fs=btrfs where=plain mode=xattr n=3000 body=3000 p50_us=8538.9 p95_us=12892.5 mean_us=9783.2 total_s=29.35
+rep=1 fs=btrfs where=layer mode=xattr n=3000 body=3000 p50_us=8719.1 p95_us=13097.9 mean_us=9991.2 total_s=29.97
+rep=1 fs=btrfs where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=13134.2 p95_us=17708.7 mean_us=14917.9 total_s=44.75
+rep=1 fs=btrfs where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=8726.3 p95_us=12989.2 mean_us=10059.7 total_s=30.18
+rep=1 fs=xfs where=plain mode=files n=3000 body=3000 p50_us=6574.3 p95_us=7258.8 mean_us=7082.1 total_s=21.25
+rep=1 fs=xfs where=plain mode=xattr n=3000 body=3000 p50_us=6599.1 p95_us=7280.7 mean_us=7162.1 total_s=21.49
+rep=1 fs=xfs where=layer mode=xattr n=3000 body=3000 p50_us=7049.6 p95_us=7858.7 mean_us=7556.2 total_s=22.67
+rep=1 fs=xfs where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=8528.3 p95_us=11183.3 mean_us=9380.5 total_s=28.14
+rep=1 fs=xfs where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=6686.6 p95_us=7484.5 mean_us=7247.6 total_s=21.74
+rep=2 fs=ext4 where=plain mode=files n=3000 body=3000 p50_us=7894.5 p95_us=11329.1 mean_us=8718.2 total_s=26.15
+rep=2 fs=ext4 where=plain mode=xattr n=3000 body=3000 p50_us=10370.2 p95_us=14467.9 mean_us=10619.4 total_s=31.86
+rep=2 fs=ext4 where=layer mode=xattr n=3000 body=3000 p50_us=8850.4 p95_us=14784.4 mean_us=10754.5 total_s=32.26
+rep=2 fs=ext4 where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=9691.8 p95_us=13322.9 mean_us=10922.8 total_s=32.77
+rep=2 fs=ext4 where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=8002.5 p95_us=11567.8 mean_us=8956.6 total_s=26.87
+rep=2 fs=btrfs where=plain mode=files n=3000 body=3000 p50_us=8570.1 p95_us=12730.5 mean_us=9798.4 total_s=29.40
+rep=2 fs=btrfs where=plain mode=xattr n=3000 body=3000 p50_us=8579.0 p95_us=12758.6 mean_us=9665.0 total_s=29.00
+rep=2 fs=btrfs where=layer mode=xattr n=3000 body=3000 p50_us=8699.6 p95_us=12982.3 mean_us=9991.5 total_s=29.97
+rep=2 fs=btrfs where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=13084.1 p95_us=17551.6 mean_us=14870.3 total_s=44.61
+rep=2 fs=btrfs where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=8720.0 p95_us=13117.0 mean_us=10181.8 total_s=30.55
+rep=2 fs=xfs where=plain mode=files n=3000 body=3000 p50_us=6610.6 p95_us=7221.0 mean_us=7109.6 total_s=21.33
+rep=2 fs=xfs where=plain mode=xattr n=3000 body=3000 p50_us=6708.0 p95_us=7407.8 mean_us=7288.9 total_s=21.87
+rep=2 fs=xfs where=layer mode=xattr n=3000 body=3000 p50_us=6876.7 p95_us=7605.1 mean_us=7375.4 total_s=22.13
+rep=2 fs=xfs where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=8263.7 p95_us=11030.7 mean_us=9160.2 total_s=27.48
+rep=2 fs=xfs where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=6630.1 p95_us=7482.3 mean_us=7191.8 total_s=21.58
+rep=3 fs=ext4 where=plain mode=files n=3000 body=3000 p50_us=7817.7 p95_us=11258.9 mean_us=8662.9 total_s=25.99
+rep=3 fs=ext4 where=plain mode=xattr n=3000 body=3000 p50_us=10576.6 p95_us=14507.7 mean_us=10663.5 total_s=31.99
+rep=3 fs=ext4 where=layer mode=xattr n=3000 body=3000 p50_us=10151.1 p95_us=14605.2 mean_us=10619.3 total_s=31.86
+rep=3 fs=ext4 where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=9829.4 p95_us=13412.4 mean_us=11024.1 total_s=33.07
+rep=3 fs=ext4 where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=7800.0 p95_us=11369.8 mean_us=8705.4 total_s=26.12
+rep=3 fs=btrfs where=plain mode=files n=3000 body=3000 p50_us=8473.3 p95_us=12650.2 mean_us=9696.6 total_s=29.09
+rep=3 fs=btrfs where=plain mode=xattr n=3000 body=3000 p50_us=8669.7 p95_us=12838.9 mean_us=9792.9 total_s=29.38
+rep=3 fs=btrfs where=layer mode=xattr n=3000 body=3000 p50_us=8807.6 p95_us=13002.6 mean_us=10031.9 total_s=30.10
+rep=3 fs=btrfs where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=12856.6 p95_us=17607.0 mean_us=14685.5 total_s=44.06
+rep=3 fs=btrfs where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=8635.3 p95_us=13271.2 mean_us=10154.2 total_s=30.46
+rep=3 fs=xfs where=plain mode=files n=3000 body=3000 p50_us=6491.0 p95_us=7144.9 mean_us=7001.8 total_s=21.01
+rep=3 fs=xfs where=plain mode=xattr n=3000 body=3000 p50_us=6497.8 p95_us=7172.5 mean_us=7085.6 total_s=21.26
+rep=3 fs=xfs where=layer mode=xattr n=3000 body=3000 p50_us=6962.0 p95_us=7624.2 mean_us=7459.2 total_s=22.38
+rep=3 fs=xfs where=plain mode=sqlite sync=full n=3000 body=3000 p50_us=8215.5 p95_us=10915.3 mean_us=9145.0 total_s=27.43
+rep=3 fs=xfs where=plain mode=sqlite sync=normal n=3000 body=3000 p50_us=6625.5 p95_us=7376.3 mean_us=7209.3 total_s=21.63
