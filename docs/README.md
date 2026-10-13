@@ -18,6 +18,7 @@ accepted but may be only partly implemented, and only the journals and
 | [when-not-to-use.md](when-not-to-use.md) | EN | Comparison with plain files, SQLite, FUSE and memory frameworks; when not to use MoobFS |
 | [adoption-risks.md](adoption-risks.md) | EN | Proposal: fifteen adoption risks, the evidence for each and the fix, work or deployment rule that answers it |
 | [faq.md](faq.md) | EN | Short sourced answers to common questions |
+| [help-wanted.md](help-wanted.md) | EN | What would help most, by how much kernel knowledge it takes |
 | [development.md](development.md) | EN | Environment setup, `make` targets, devcontainer, lint and checkpatch |
 | [testing.md](testing.md) | EN | What each test runs, its success markers, and what they do not prove |
 | [labels.md](labels.md) | EN | Issue and pull request labels, including `good first issue` and `help wanted` |
