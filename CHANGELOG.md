@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Harness (journal 0084): `MOOB_ONLY="btrfs reserve" make vm-test` runs only the named suite
+  steps (101 s against 261 s) and ends in `MOOBFS_ONLY_PASS`, which no check accepts as a
+  complete run. The KASAN workflow now starts on every pull request and skips its heavy steps
+  when nothing the module is built or tested from changed, so it can be a required check.
 - **Fixes** (journal 0083; from an outside read-only inspection of `layer/index.c`):
   - a rename over a file with typed attributes left the replaced file in the index until
     unmount;

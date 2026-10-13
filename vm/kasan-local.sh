@@ -7,7 +7,8 @@
 #   sh vm/kasan-local.sh
 # Needs the packages and virtme-ng listed in the workflow's "Install" step (virtme-ng from
 # vm/kasan-requirements.txt). Exit status 0 only on MOOBFS_KASAN_PASS. HOSTILE_SEEDS=N plants N adversarial
-# lower trees per filesystem instead of 3 (security roadmap S4). This is a faster loop
+# lower trees per filesystem instead of 3 (security roadmap S4). MOOB_ONLY="xfs ioerror" runs only those
+# suite steps and ends in MOOBFS_KASAN_ONLY_PASS. This is a faster loop
 # for development; the required check is still the workflow on the pull request.
 set -eu
 PATH=$PATH:/usr/sbin:/sbin   # mke2fs, mkfs.btrfs, mkfs.xfs and dmsetup for a non-root user
@@ -64,12 +65,16 @@ for attempt in 1 2; do
         --rwdir "$R/build" \
         --disk "$R/build/vng/lower-ext4.img" --disk "$R/build/vng/lower-btrfs.img" \
         --disk "$R/build/vng/lower-xfs.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/log.img" \
-        --exec "HOSTILE_SEEDS=${HOSTILE_SEEDS:-3} sh $R/vm/kasan-guest.sh") > "build/vng/console-$attempt.log" 2>&1 || true
+        --exec "HOSTILE_SEEDS=${HOSTILE_SEEDS:-3} MOOB_ONLY='${MOOB_ONLY:-}' sh $R/vm/kasan-guest.sh") > "build/vng/console-$attempt.log" 2>&1 || true
     cp "build/vng/console-$attempt.log" build/vng/console.log
     grep -q '^MOOBFS_VM_ENV_FAIL:' build/vng/console.log || break
     echo "kasan-local: attempt $attempt hit a boot-time diagnostic; retrying once"
 done
 grep -E '^MOOBFS_[A-Z_]*(PASS|FAIL)' build/vng/console.log | tail -5
-grep -q '^MOOBFS_KASAN_PASS:' build/vng/console.log || exit 1
+if [ -n "${MOOB_ONLY:-}" ]; then
+    grep -q '^MOOBFS_KASAN_ONLY_PASS:' build/vng/console.log || exit 1
+else
+    grep -q '^MOOBFS_KASAN_PASS:' build/vng/console.log || exit 1
+fi
 if grep -q '^MOOBFS_VM_FAIL:\|^MOOBFS_VM_ENV_FAIL:' build/vng/console.log; then exit 1; fi
 echo "kasan-local: pass (console in build/vng/console.log)"

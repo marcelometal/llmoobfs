@@ -40,5 +40,8 @@ echo "MOOBFS_VM_PASS: shared extents, independent inodes, reads, readonly, remou
 # filesystems on the virtio disks prepared by vm/in-container.sh.
 BIN=/ TOOLS=/tools MODS=/mods DEV_EXT4=/dev/vda DEV_BTRFS=/dev/vdb DEV_XFS=/dev/vdc DEV_SCRATCH=/dev/vdd DEV_LOG=/dev/vde
 export BIN TOOLS MODS DEV_EXT4 DEV_BTRFS DEV_XFS DEV_SCRATCH DEV_LOG
+# moob_only=a,b on the kernel command line: run only those suite steps (see vm/suite.sh)
+MOOB_ONLY=$(sed -n 's/.*moob_only=\([a-z0-9,]*\).*/\1/p' /proc/cmdline | tr ',' ' ')
+export MOOB_ONLY
 . /suite.sh
 poweroff -f

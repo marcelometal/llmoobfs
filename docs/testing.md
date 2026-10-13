@@ -143,9 +143,16 @@ such edits. A `MOOB_ONLY=<step>` switch is planned (community plan, section 1).
 
 ## 6. KASAN locally and in CI
 
+While developing, `MOOB_ONLY="btrfs powerloss" make vm-test` (or the same variable before
+`sh vm/kasan-local.sh`) runs only those steps of `vm/suite.sh`: `ext4`, `btrfs`, `xfs`, `demo`,
+`clients`, `powerloss`, `ioerror`, `reserve`. Such a run ends in `MOOBFS_ONLY_PASS` and is not
+evidence for a pull request.
+
 See [development.md](development.md) section 6 for the command-by-command
-reproduction of `.github/workflows/kasan.yml`. The workflow runs automatically
-on pull requests that touch `layer/`, `vm/` or the workflow, weekly on Monday,
+reproduction of `.github/workflows/kasan.yml`. The job starts on every pull
+request and is a required check of `main`; it runs the suite when the pull
+request touches `layer/`, `vm/`, `include/`, `common/`, `tests/`, the `Makefile`
+or the workflow, and passes at once otherwise. It also runs weekly on Monday,
 and on demand with `gh workflow run kasan.yml --ref <branch>`. For `layer/` or
 `vm/` changes the PR must link a green run on the final revision.
 
