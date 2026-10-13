@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- User-space baseline (journal 0092): `bench/userspace/` builds the same per-domain index with
+  no kernel module (plain `user.*` attributes, one SQLite database per domain directory, an
+  inotify follower) and a query tool whose output equals the oracle's on 37 query shapes. The
+  journal records what it does not give (validation at write time, read-your-writes, a freshness
+  a reader can verify, the layer's sharing boundary) and what it gives that the layer does not.
+  No latency measured yet.
 - README and landing page (journal 0093) open with the problem, the three parts, four numbers
   (one where the layer loses, one that is a cost) and a demonstration transcript taken from the
   VM test; caveats moved down, none removed.
