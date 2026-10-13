@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- README and landing page (journal 0093) open with the problem, the three parts, four numbers
+  (one where the layer loses, one that is a cost) and a demonstration transcript taken from the
+  VM test; caveats moved down, none removed.
 - **M4 report** (journal 0088): the four questions of the benchmark plan answered with what was
   measured, pilot-grade, including where the layer loses. New campaigns for it: latency per
   operation on the current module (2 to 5 µs more per read, 6 to 13 µs more per attribute write,

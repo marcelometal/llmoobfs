@@ -112,8 +112,8 @@ production.** Facts as of 2026-10-13:
 - **No outside review yet.** It was requested on 2026-10-13. Our own tests and reviews found and
   fixed kernel-side defects, security ones among them; `v0.2.0-experimental` carries eleven of
   them, so use `v0.3.0-experimental` ([changelog](CHANGELOG.md)).
-- **The measurements are pilot-grade**, from one host, and the report that gathers them is
-  [in progress](docs/history/0088-m4-report.md). They are not a general speed claim.
+- **The measurements are pilot-grade**, from one host; the report that gathers them is
+  [journal 0088](docs/history/0088-m4-report.md). They are not a general speed claim.
 - The index lives **in RAM only**, cannot be paged out, and is rebuilt at every mount.
 - Mounting needs **`CAP_SYS_ADMIN` in the initial user namespace**.
 - **The interface may change**, with no compatibility promise.
@@ -195,17 +195,23 @@ each: [adoption-risks.md](docs/adoption-risks.md).
 ## What was measured
 
 The report that answers the four questions of the [benchmark plan](docs/benchmark-plan.md) is
-[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). It is **in progress**: its
-section on latency per operation against the bare lower filesystem waits for one more campaign
-on the current module. Every campaign is pilot-grade: one data-set seed, three repetitions at
+[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). Every campaign is pilot-grade: one data-set seed, three repetitions at
 most, often one run, and a run-to-run noise of about 20 to 25 % on values of tens of
 microseconds. Numbers from different hosts are not compared with each other. The index code
-changed after these measurements (journals [0082](docs/history/0082-index-lock-and-reclaim.md),
-[0083](docs/history/0083-index-inspection-fixes.md)) and they were not repeated.
+changed after most of these measurements (journals
+[0082](docs/history/0082-index-lock-and-reclaim.md),
+[0083](docs/history/0083-index-inspection-fixes.md)); only the two campaigns below were run after.
 
-<!-- PENDING_Q2_CAMPAIGN: the latency per operation of the current module against the bare
-     lower filesystem (report 0088, section 2.1) goes here when that campaign is recorded.
-     Do not quote the earlier per-operation figures as current. -->
+What the layer adds per operation, on the current module (10 000 memories, medians, bare lower
+against the layer): a read by path goes from 8.5 to 11.0 µs on ext4 (10.1 to 12.0 on btrfs, 9.8
+to 15.0 on XFS); setting one attribute from 8.9 to 21.7 µs (8.9 to 21.3; 6.0 to 11.6); creating a
+memory durably is unchanged within noise, because the device flushes take 12 to 14 ms.
+
+What a side database costs at write time, which this project had assumed and never measured:
+almost nothing. Publishing a memory durably takes 6.6 to 8.5 ms with the file alone, and 6.6 to
+8.7 ms with a row added to a SQLite database in its usual mode; through the layer, with eight
+attributes, 7.0 to 9.8 ms. So the layer does not make writes cheaper. What it removes is the
+second copy of the fields, which can disagree with the files after a crash.
 
 Where the layer wins:
 
@@ -422,7 +428,7 @@ Every document under `docs/`, with its language, is listed in the [docs index](d
 | What does M3 specify (identity, isolation, provenance, change cursor, batch reads)? | [spec-m3.md](docs/spec-m3.md) | EN |
 | How will performance be measured? | [benchmark-plan.md](docs/benchmark-plan.md), [benchmark-harness.md](docs/benchmark-harness.md) | PT (English translation in review) |
 | What does a memory system need to use the layer, and what does it risk? | [client-contract.md](docs/client-contract.md), [adoption-risks.md](docs/adoption-risks.md) | EN |
-| What has been measured so far (pilot-grade)? | [M4 report, in progress](docs/history/0088-m4-report.md); [bench/results/](bench/results/README.md); raw archives in the [`bench-evidence`](https://github.com/studiomoob/llmoobfs/releases/tag/bench-evidence) release | EN |
+| What has been measured so far (pilot-grade)? | [M4 report](docs/history/0088-m4-report.md); [bench/results/](bench/results/README.md); raw archives in the [`bench-evidence`](https://github.com/studiomoob/llmoobfs/releases/tag/bench-evidence) release | EN |
 | What does the domain-scoped `QUERY2` (UAPI v2) specify? | [spec-query-v2.md](docs/spec-query-v2.md) | EN |
 | What is the M1 image format? | [format-m1.md](docs/format-m1.md) | EN |
 | What was the original full MVP proposal? | [native-mvp.md](docs/native-mvp.md) (write interface superseded by ADR-0007) | EN |
