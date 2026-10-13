@@ -6,7 +6,7 @@ HEADERS = include/moobfs_format.h
 KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
-.PHONY: all help tools attr-tools bench-tools bench-smoke test fuzz lint checkpatch module layer vm-test
+.PHONY: all help tools attr-tools bench-tools bench-smoke hostile-test test fuzz lint checkpatch module layer vm-test
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -18,6 +18,7 @@ help:
 	@echo 'Linux-only targets:'
 	@echo '  make attr-tools    moobfs-attr, moobfs-check, moobfs-index'
 	@echo '  make bench-tools   M4 harness binaries; make bench-smoke runs its smoke test'
+	@echo '  make hostile-test  adversarial lower trees through moobfs-check and moobfs-index (S4)'
 	@echo 'Kernel (inside the VM container, not on your host):'
 	@echo '  make vm-test       full native suite in a disposable QEMU VM; needs only Docker'
 	@echo '  make module/layer  build the kernel modules against KDIR'
@@ -57,6 +58,11 @@ $(BUILD)/bench-aimem-latency: bench/client/aimem-latency.c bench/common.h includ
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude bench/client/aimem-latency.c $(SQLITE_LIBS) -lm $(LDFLAGS) -o $@
 bench-smoke: bench-tools attr-tools
 	sh bench/smoke.sh $(BUILD)
+# Security roadmap S4, user-space line: trees no well-behaved writer would leave on the lower.
+$(BUILD)/hostile: tests/hostile.c | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Wall -Wextra -Werror tests/hostile.c $(LDFLAGS) -o $@
+hostile-test: attr-tools $(BUILD)/hostile
+	sh tests/hostile-user.sh $(BUILD) $(HOSTILE_SEEDS)
 test: tools
 	$(BUILD)/attr_test
 	MOOB_BUILD_DIR=$(BUILD) python3 tests/test_images.py

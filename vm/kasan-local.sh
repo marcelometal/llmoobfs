@@ -6,7 +6,8 @@
 # Run from the repository root as a user in the kvm group (no root needed):
 #   sh vm/kasan-local.sh
 # Needs the packages and virtme-ng listed in the workflow's "Install" step (virtme-ng from
-# vm/kasan-requirements.txt). Exit status 0 only on MOOBFS_KASAN_PASS. This is a faster loop
+# vm/kasan-requirements.txt). Exit status 0 only on MOOBFS_KASAN_PASS. HOSTILE_SEEDS=N plants N adversarial
+# lower trees per filesystem instead of 3 (security roadmap S4). This is a faster loop
 # for development; the required check is still the workflow on the pull request.
 set -eu
 PATH=$PATH:/usr/sbin:/sbin   # mke2fs, mkfs.btrfs, mkfs.xfs and dmsetup for a non-root user
@@ -44,6 +45,7 @@ cp bench/sqlbase.sh build/vng/bench-sqlbase.sh
 cp bench/equiv.sh build/vng/bench-equiv.sh
 cp bench/run.sh build/vng/bench-run.sh
 gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o build/vng/layer
+gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o build/vng/hostile
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
 gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
 gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap
@@ -62,7 +64,7 @@ for attempt in 1 2; do
         --rwdir "$R/build" \
         --disk "$R/build/vng/lower-ext4.img" --disk "$R/build/vng/lower-btrfs.img" \
         --disk "$R/build/vng/lower-xfs.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/log.img" \
-        --exec "sh $R/vm/kasan-guest.sh") > "build/vng/console-$attempt.log" 2>&1 || true
+        --exec "HOSTILE_SEEDS=${HOSTILE_SEEDS:-3} sh $R/vm/kasan-guest.sh") > "build/vng/console-$attempt.log" 2>&1 || true
     cp "build/vng/console-$attempt.log" build/vng/console.log
     grep -q '^MOOBFS_VM_ENV_FAIL:' build/vng/console.log || break
     echo "kasan-local: attempt $attempt hit a boot-time diagnostic; retrying once"

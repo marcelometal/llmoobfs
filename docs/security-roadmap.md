@@ -91,6 +91,13 @@ Precedente: Janus achou 90 bugs em oito filesystems do kernel com 32 CVEs; Hydra
 
 ### S4. Inferior como entrada hostil
 
+*Status, 2026-10-13 (journal 0073; in English, as the rest of the repository since ADR-0010).*
+Done for the scope below: `tests/hostile.c` generates the adversarial trees, `vm/suite.sh` mounts
+the layer over them on ext4, btrfs and XFS (`HOSTILE_LOWER_PASS`, also under KASAN), and
+`make hostile-test` runs them through the tools under sanitizers in CI. The behaviour is recorded
+in ADR-0011. The choice made: an invalid attribute is skipped silently and reported by
+`moobfs-check`, not logged in `dmesg`, because a writer on the lower could otherwise fill the log.
+
 Precedente: CVE-2019-19319 (ext4, `setxattr` após imagem forjada escreve fora de limites),
 CVE-2009-2406 (eCryptfs, overflow em parser de metadados), posição dos maintainers de que o
 kernel não promete segurança ao montar imagem hostil.

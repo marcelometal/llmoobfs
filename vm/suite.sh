@@ -543,6 +543,64 @@ run_lower() {
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0,nolinks none $LAYER || fail "layer-remount-$fs"
     $BIN/layer $LAYER $LOWER "$reflink" nolinks || fail "layer-nolinks-tests-$fs"
     umount $LAYER || fail "layer-second-unmount-$fs"
+    # The lower as hostile input (security roadmap S4, ADR-0011 promise 5): trees planted directly
+    # on the lower with every rule of the attribute encoding broken, names the layer must skip and
+    # files beyond the per-file limit. The mount must succeed, the index must equal the user-space
+    # oracle, changes made behind the mount must not crash or hang, and after a remount the index
+    # must equal the oracle again. HOSTILE_SEEDS sets how many trees (default 3).
+    hsame() {   # tag, then a term: inode sets of the kernel and of the oracle must be equal
+        tag=$1; shift
+        $BIN/query $LAYER "$@" | cut -f1 | sort -u > /tmp/k.txt || fail "hostile-query-$tag-$fs"
+        $BIN/moobfs-index $LOWER/hostile "$@" | cut -f1 | sort -u > /tmp/o.txt || fail "hostile-oracle-$tag-$fs"
+        cmp -s /tmp/k.txt /tmp/o.txt || { echo "kernel:"; cat /tmp/k.txt; echo "oracle:"; cat /tmp/o.txt; fail "hostile-mismatch-$tag-$fs"; }
+    }
+    hall() {
+        for n in k0 k1 k2 k3 k4 k5; do hsame "$1-$n" $n exists - -; done
+        hsame "$1-str" k0 eq string a; hsame "$1-pfx" k1 prefix string b; hsame "$1-int" k2 ge int64 3
+        hsame "$1-bool" k3 eq bool true; hsame "$1-and" k4 exists - - k5 exists - -
+    }
+    hseed=1
+    while [ $hseed -le "${HOSTILE_SEEDS:-3}" ]; do
+        rm -rf $LOWER/hostile; mkdir $LOWER/hostile || fail "hostile-mkdir-$fs"
+        $BIN/hostile plant $LOWER/hostile $hseed 300 > /tmp/h.txt || { cat /tmp/h.txt; fail "hostile-plant-$hseed-$fs"; }
+        mount -t moobfs_layer -o lower=$LOWER/hostile,domain_depth=0 none $LAYER || fail "hostile-mount-$hseed-$fs"
+        hall "s$hseed"
+        [ -s /tmp/k.txt ] || fail "hostile-empty-answer-$hseed-$fs"   # the last query must have matched something
+        $BIN/hostile probe $LAYER > /dev/null || fail "hostile-probe-$hseed-$fs"
+        $BIN/moobfs-check $LOWER/hostile > /dev/null; [ $? -eq 2 ] || fail "hostile-check-$hseed-$fs"
+        $BIN/hostile mutate $LOWER/hostile $hseed 300 > /dev/null || fail "hostile-mutate-$hseed-$fs"
+        $BIN/hostile probe $LAYER > /dev/null || fail "hostile-probe-stale-$hseed-$fs"
+        for n in k0 k1 k2 k3 k4 k5; do $BIN/query $LAYER $n exists - - > /dev/null 2>&1; done   # stale by contract; must return
+        umount $LAYER || fail "hostile-umount-$hseed-$fs"
+        mount -t moobfs_layer -o lower=$LOWER/hostile,domain_depth=0 none $LAYER || fail "hostile-remount-$hseed-$fs"
+        hall "r$hseed"
+        umount $LAYER || fail "hostile-umount2-$hseed-$fs"
+        # with domains on, each first-level directory answers like the oracle of that domain
+        mount -t moobfs_layer -o lower=$LOWER/hostile none $LAYER || fail "hostile-domain-mount-$hseed-$fs"
+        for d in d0 d1 d2 d3 d4; do
+            [ -d $LOWER/hostile/$d ] || continue
+            $BIN/query $LAYER/$d q2 k0 exists - - | cut -f1 | sort -u > /tmp/k.txt || fail "hostile-q2-$d-$hseed-$fs"
+            $BIN/moobfs-index --domain $LOWER/hostile/$d k0 exists - - | cut -f1 | sort -u > /tmp/o.txt || fail "hostile-q2-oracle-$d-$hseed-$fs"
+            cmp -s /tmp/k.txt /tmp/o.txt || { echo "kernel:"; cat /tmp/k.txt; echo "oracle:"; cat /tmp/o.txt; fail "hostile-q2-mismatch-$d-$hseed-$fs"; }
+        done
+        umount $LAYER || fail "hostile-domain-umount-$hseed-$fs"
+        hseed=$((hseed + 1))
+    done
+    # the format marker on the lower root: only a decimal version this module knows is accepted
+    rm -rf $LOWER/hostile; mkdir $LOWER/hostile || fail "hostile-marker-mkdir-$fs"
+    for m in 2 999999999 abc 1x " 1" -1; do
+        $BIN/hostile marker $LOWER/hostile "$m" || fail "hostile-marker-set-$fs"
+        mount -t moobfs_layer -o lower=$LOWER/hostile none $LAYER 2>/dev/null && fail "hostile-marker-accepted-$m-$fs"
+    done
+    for n in 0 10 17 4000; do
+        $BIN/hostile marker $LOWER/hostile --size $n || fail "hostile-marker-size-set-$fs"
+        mount -t moobfs_layer -o lower=$LOWER/hostile none $LAYER 2>/dev/null && fail "hostile-marker-size-accepted-$n-$fs"
+    done
+    $BIN/hostile marker $LOWER/hostile 1 || fail "hostile-marker-valid-set-$fs"
+    mount -t moobfs_layer -o lower=$LOWER/hostile none $LAYER || fail "hostile-marker-valid-$fs"
+    umount $LAYER || fail "hostile-marker-umount-$fs"
+    rm -rf $LOWER/hostile
+    echo "HOSTILE_LOWER_PASS: $fs, ${HOSTILE_SEEDS:-3} trees"
     umount $LOWER || fail "lower-unmount-$fs"
     echo "LAYER_LOWER_PASS: $fs reflink=$reflink"
 }

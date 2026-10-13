@@ -58,6 +58,7 @@ jobs:
           make attr-tools BUILD=build/vng CFLAGS="-O2 -g -static"
           make bench-tools BUILD=build/vng CFLAGS="-O2 -g -static" SQLITE_LIBS="-lsqlite3 -ldl -lpthread" && cp bench/queries-w3.txt build/vng/bench-queries-w3.txt && cp bench/sqlbase.sh build/vng/bench-sqlbase.sh && cp bench/equiv.sh build/vng/bench-equiv.sh && cp bench/run.sh build/vng/bench-run.sh
           gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o build/vng/layer
+          gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o build/vng/hostile
           gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
           gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
           gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap

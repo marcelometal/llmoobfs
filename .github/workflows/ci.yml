@@ -38,6 +38,13 @@ jobs:
             CFLAGS='-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer' \
             LDFLAGS='-fsanitize=address,undefined' 2>&1 | tee /tmp/bench-smoke-asan.log
           if grep -qE 'runtime error|ERROR: AddressSanitizer|ERROR: LeakSanitizer' /tmp/bench-smoke-asan.log; then exit 1; fi
+      - name: Adversarial lower trees through the tools, under sanitizers (security roadmap S4)
+        run: |
+          make hostile-test CC=clang BUILD=build/asan-hostile HOSTILE_SEEDS=50 \
+            CFLAGS='-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer' \
+            LDFLAGS='-fsanitize=address,undefined' 2>&1 | tee /tmp/hostile-asan.log
+          grep -q '^HOSTILE_USER_PASS' /tmp/hostile-asan.log
+          if grep -qE 'runtime error|ERROR: AddressSanitizer' /tmp/hostile-asan.log; then exit 1; fi
       - name: Validate site links
         run: python3 scripts/check-site.py
   lint:

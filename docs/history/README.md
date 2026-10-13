@@ -100,3 +100,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0070 — M3 phase 3a: the client contract](0070-client-contract.md)
 - [0071 — Real-client test, stage 2: live mirror, and the current module on the benchmark host](0071-client-stage2-live-mirror.md)
 - [0072 — M3 phase 3c: batch reads and the change cursor revisited with numbers](0072-m3-phase-3c.md)
+- [0073 — S4: the lower tree as hostile input](0073-s4-hostile-lower.md)

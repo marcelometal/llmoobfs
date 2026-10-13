@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- S4 (journal 0073): adversarial lower trees (`tests/hostile.c`) in the VM suite on the three lower
+  filesystems, under KASAN, and through the tools under sanitizers in CI (`make hostile-test`).
+  **Fix:** an empty or over-long `user.moob.format` marker on the lower root was accepted as "no
+  marker"; it now refuses the mount. `moobfs-check` no longer passes a null array to `qsort`.
 - M3 closed (journal 0072): a batch read of content is dropped and the change cursor stays in the
   client, both with measurements. `bench/readcost.c` shows that reading the attributes of a
   query's results costs far more than the query (16 µs per file against 0.9 µs per result);

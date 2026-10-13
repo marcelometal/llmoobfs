@@ -127,6 +127,21 @@ Added on 2026-10-12, from the review of journal 0066 (`docs/research-stacked-fs-
   with the default `resuid` an ordinary user writing through the layer still spends that reserve.
   Promise 2 does not hold for it; the README lists the workaround (another `resuid`).
 
+Added on 2026-10-13, with the tests of promise 5 (security roadmap S4, journal 0073). The
+behaviour on input the layer did not write is now stated in full and tested:
+
+- An attribute on the lower with a name outside the rules, or a value that fails the encoding, is
+  not indexed, does not fail the mount and is not logged; `moobfs-check` reports it. `getxattr`
+  through the layer returns it unchanged: the layer validates what it writes, and a client that
+  reads raw attributes validates what it reads, as the tools do.
+- The limit of 64 typed attributes per file applies to writes through the layer. A file that
+  already has more on the lower is indexed whole, and further attributes cannot be added to it.
+- The format marker `user.moob.format` on the lower root must be a decimal version this module
+  knows. Anything else refuses the mount, including an empty marker and one longer than a version
+  number, which were accepted as "no marker" until this date.
+- What changes on the lower behind a mounted layer reaches the index at the next mount
+  (non-promise 2); until then calls return stale or failing answers, never a crash or a hang.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that

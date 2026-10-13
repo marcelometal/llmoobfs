@@ -1222,9 +1222,12 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 
 			if (!version || version > MOOB_ATTR_FORMAT_VERSION)
 				return invalfc(fc, "lower tree uses an unsupported moobfs attribute format");
+		} else if (n == 0 || n == -ERANGE) {
+			/* An empty marker, or one longer than any version number, is not a version. */
+			return invalfc(fc, "lower tree uses an unsupported moobfs attribute format");
 		} else if (n == -EOPNOTSUPP) {
 			pr_info("moobfs_layer: lower filesystem has no user xattr support; typed attributes unavailable\n");
-		} else if (n != -ENODATA && n != -ERANGE && n < 0) {
+		} else if (n != -ENODATA) {
 			return invalfc(fc, "cannot read the moobfs format marker on the lower root");
 		}
 	}
