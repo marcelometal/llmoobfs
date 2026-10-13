@@ -287,6 +287,13 @@ UDX_FN int udx_open(struct udx_db *d, const char *dir, int create)
 		fprintf(stderr, "udx: %s: not a plain file of the domain owner, refused\n", path);
 		return -1;
 	}
+	/* the domain changed hands: root gives the index to the new owner, so they can ask */
+	if (geteuid() == 0 && (st.st_uid != d->dst.st_uid || st.st_gid != d->dst.st_gid)) {
+		if (lchown(path, d->dst.st_uid, d->dst.st_gid))
+			perror(path);
+		st.st_uid = d->dst.st_uid;
+		st.st_gid = d->dst.st_gid;
+	}
 	udx_sqlite_init();
 	if (sqlite3_open_v2(path, &d->db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOFOLLOW, NULL) != SQLITE_OK) {
 		fprintf(stderr, "udx: %s: %s\n", path, sqlite3_errmsg(d->db));

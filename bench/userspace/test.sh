@@ -348,7 +348,14 @@ mv "$T/ns2" "$T/ns2-renamed"
 moved=$(for dd in "$T"/ns3/a*/; do [ -d "$dd" ] && echo "${dd%/}"; done | head -1)
 mv "$moved" "$T/ns4/from-ns3"
 say "renamed the domain ns2 to ns2-renamed and moved ${moved#"$T"/} ($(find "$T/ns4/from-ns3" -type f | wc -l | tr -d ' ') files) to ns4/from-ns3"
-settle; check "after removing a domain, renaming a domain and moving a directory across domains"
+# a domain changes owner: the root watcher re-evaluates it and hands the index to the new owner
+chown -R 1002:1002 "$T/ns5"
+settle; check "after removing a domain, renaming a domain, moving a directory across domains and giving a domain away"
+[ "$(stat -c '%a %u' "$T/ns5/.udx.db")" = "600 1002" ] || bad "ns5/.udx.db is $(stat -c '%a %u' "$T/ns5/.udx.db") after chown, expected 600 1002"
+asuser 1002 "$B/udx-query" "$T/ns5" kind eq string note > "$W/out/newowner.txt" 2>&1 || bad "the new owner cannot query: $(head -1 "$W/out/newowner.txt")"
+"$B/moobfs-index" --uid 1002 --domain "$T/ns5" kind eq string note > "$W/out/newowner-oracle.txt"
+cmp -s "$W/out/newowner.txt" "$W/out/newowner-oracle.txt" && [ -s "$W/out/newowner.txt" ] || bad "the new owner's answer differs from the oracle as that user"
+say "ns5 given to uid 1002 with the watcher running: database is $(stat -c '%a %u' "$T/ns5/.udx.db"), uid 1002 gets $(wc -l < "$W/out/newowner.txt" | tr -d ' ') lines, equal to the oracle as uid 1002"
 
 # ---- 4. events lost: a queue of 16 events and a watcher that is not scheduled ---------------
 stop_watch
