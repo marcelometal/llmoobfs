@@ -270,5 +270,6 @@ static void __exit moob_exit(void) { unregister_filesystem(&moob_type); }
 module_init(moob_init);
 module_exit(moob_exit);
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Studio Moob");
 MODULE_DESCRIPTION("MoobFS experimental read-only shared-object filesystem");
 MODULE_ALIAS_FS("moobfs");

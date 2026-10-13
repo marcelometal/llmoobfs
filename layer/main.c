@@ -1453,4 +1453,5 @@ module_init(moobl_init);
 module_exit(moobl_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Studio Moob");
+MODULE_VERSION("0.2.0+dev");	/* the last release, plus unreleased changes */
 MODULE_DESCRIPTION("MoobFS memory layer (phase 2a pass-through)");

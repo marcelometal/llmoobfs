@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fix** (journal 0082; found from an outside inspection report): allocations made with the
+  index lock held could recurse into memory reclaim, which evicts inodes and takes the same lock.
+  An ordinary user setting a typed attribute under memory pressure could hang every query and
+  attribute change of the mount. Sections under the lock now run in a no-filesystem-reclaim
+  scope, the mount scan takes the lock per attribute, and lockdep is told about the dependency.
+  Not reproduced as a hang; proved with lockdep. The layer module now has a `MODULE_VERSION`.
 - Decisions (journal 0081): the second real client is the LangGraph store (`BaseStore`), through
   an adapter; outside review is requested now (community action 15).
 - S6 (journal 0080): `docs/compatibility.md` proposes the policy of supported kernels and of
