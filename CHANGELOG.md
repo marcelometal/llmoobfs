@@ -10,6 +10,39 @@
   layer directory, gives the same answers as LangGraph's in-memory store in five runs of 3 000 to
   6 000 random operations at domain depths 1, 2 and 3, with no change to the layer. It also
   showed how easily the homogeneity rule hides every file (one `os.makedirs` call).
+
+## v0.3.0-experimental — 2026-10-13
+
+Third source pre-release, and the one to use instead of `v0.2.0-experimental`: it fixes the
+defects listed below, which that tag carries, all found by this project's own tests and reviews in
+two days (corrected on 2026-10-13: the tagged text said three). No
+binaries, no packaging, no support; nothing here has been reviewed by an outside party. Journal
+0087.
+
+Fixed, present in `v0.2.0-experimental`:
+
+- **Security:** a write to a set-user-ID file crashed the kernel (0069); set-user-ID,
+  set-group-ID and file capabilities survived `copy_file_range` and clone (0074); `GET_INFO`
+  showed every user's index totals to any user (0061); delegated writes could ignore quota limits
+  (0069).
+- **Durability:** `syncfs` on the layer did not sync the lower filesystem (0078).
+- **Availability:** an attribute write under memory pressure could hang every query and
+  attribute change of the mount (0082).
+- **Wrong answers:** files in a btrfs subvolume inside the tree shared index records with files
+  outside it (0083); a rename over an indexed file left it in the index (0083); long names
+  vanished from answers (0083); a typed attribute replaced by a raw one kept answering (0083); an
+  ACL read back could be the earlier one (0076).
+
+Changes of behaviour to know before upgrading: a btrfs subvolume inside the lower tree is not
+entered (`EXDEV`); an empty or over-long `user.moob.format` marker refuses the mount; `GET_INFO`
+counters are zero for callers without `CAP_SYS_ADMIN` (**UAPI change**, `MOOB_FLAG_COUNTERS`);
+unmounting the layer waits for a sync of the lower; `lsattr` and `chattr` now work through the
+layer.
+
+Still open and documented: on ext4 with the default reserve owner, ordinary users writing
+through the layer can use root's reserved blocks (ADR-0011 F4); one index budget is shared by
+all users of a mount (F2); the layer's `atime` mount options have no effect.
+
 - Documentation (journal 0086): `docs/security-roadmap.md` and `docs/benchmark-harness.md` are in
   English, from the translations of an outside contributor (pull requests 46 and 47), put in
   place of the originals. Nothing in the repository is in Portuguese now.

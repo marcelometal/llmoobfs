@@ -72,7 +72,7 @@ grep '^DEMO| ' build/vm/console.log   # the session above, from your own run
 Never load the modules on your host. Setup details are in [docs/development.md](docs/development.md),
 and what each success marker proves is in [docs/testing.md](docs/testing.md).
 
-> **Experimental. Source pre-release tags only (`v0.1.0-experimental`, `v0.2.0-experimental`); not for production.**
+> **Experimental. Source pre-release tags only; the current one is `v0.3.0-experimental`. Not for production.**
 > Facts as of 2026-10-13:
 > - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
 >   KASAN/UBSAN/lockdep; lower filesystems ext4, btrfs and XFS only.
@@ -89,8 +89,10 @@ and what each success marker proves is in [docs/testing.md](docs/testing.md).
 >   [0035](docs/history/0035-phase-q2a-domain-query.md),
 >   [0069](docs/history/0069-setattr-crash-and-mounter-capability.md),
 >   [0074](docs/history/0074-privileges-kept-on-copy.md),
->   [0078](docs/history/0078-syncfs-reaches-the-lower.md)); the last two are fixed on `main`
->   and present in `v0.2.0-experimental`.
+>   [0078](docs/history/0078-syncfs-reaches-the-lower.md),
+>   [0082](docs/history/0082-index-lock-and-reclaim.md),
+>   [0083](docs/history/0083-index-inspection-fixes.md)). `v0.2.0-experimental` carries the
+>   defects of the last five; use `v0.3.0-experimental`.
 > - Reflink, deduplication and durability come from the lower filesystem, not from MoobFS.
 >
 > Contributions are welcome ([CONTRIBUTING.md](CONTRIBUTING.md)). Everything in the repository is
