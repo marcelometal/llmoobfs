@@ -30,6 +30,15 @@
 - ADR-0011 (accepted; journal 0060): threat and credential model of the layer (security roadmap S1),
   with two findings: `GET_INFO` counters cross users (F1) and one index budget for all users (F2).
 - `ROADMAP.md` brought up to date, planned items in the agreed order (journal 0059).
+
+## v0.2.0-experimental — 2026-10-12
+
+Second source pre-release: the per-domain `QUERY2` of ADR-0009 (phases Q2a to Q2e) and its
+measurements on a dedicated host, the first test with a real, unmodified memory client (and the
+layer bug it found), the repository in English (ADR-0010) and verified references. No binaries, no
+packaging, no support; the UAPI is experimental and changed in this release (see the entries
+marked **UAPI change**). Journal 0062.
+
 - First real-client test (journal 0054, `docs/client-test-plan.md`): ai-memory v2.6.3 unchanged on
   the layer. Stage 1a, its own test suites: 1 147 pass on plain ext4 and on the layer once the
   rename fix (journal 0057) is in. Stage 1b, LongMemEval-S retrieval (50 questions): identical
