@@ -1,0 +1,9 @@
+fs=xfs kernel=6.12.111+deb13-amd64
+files=60000 bytes=182657997 bytes_in_4k_blocks=325300224 le2048=30229 le4096=16670 gt4096=13101
+distinct_contents=50898 files=60000 groups_with_copies=6749 redundant_files=9102
+dedupe_calls_ok=9102 dedupe_calls_refused=0 bytes_deduped=27310643
+used_before=824950784
+plain_copy=359321600
+after_dedupe_through_layer=310296576 saved=49025024
+second_copy_reflink_through_layer=34054144
+second_copy_plain_through_layer=359202816

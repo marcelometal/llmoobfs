@@ -15,6 +15,10 @@ README and its journal before quoting any number.
 | [`2026-10-11-azure-query-scale`](2026-10-11-azure-query-scale/README.md) | `QUERY` and SQLite from 1000 to 60,000 memories, ext4 | 0029 |
 | [`2026-10-11-azure-remount`](2026-10-11-azure-remount/README.md) | Remount (index rebuild) time, 25,000 to 60,000 memories | 0031 |
 
+Later campaigns ran on a dedicated host (journal 0042) and have a directory each under this one,
+named `2026-10-12-macmini-*` and `2026-10-13-macmini-*`, with their own `README.md`; the table
+above was not extended for them.
+
 ## Raw archives
 
 The raw records (`*.rec`, SQLite databases, manifests, `perf.data`) are too large for Git. They

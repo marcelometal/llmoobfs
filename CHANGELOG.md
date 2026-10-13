@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- M4 question 3 (journal 0085, `bench/q3-space.sh`): on the 60 000-file data set, whole-file
+  dedupe through the layer frees 6.7 % on btrfs and 13.6 % on XFS (15 % of the files are
+  copies), and a reflink copy of the tree costs 47 % of a plain copy on btrfs and 9.5 % on XFS.
+  The saving is the lower filesystem's; small files limit it.
 - Harness (journal 0084): `MOOB_ONLY="btrfs reserve" make vm-test` runs only the named suite
   steps (101 s against 261 s) and ends in `MOOBFS_ONLY_PASS`, which no check accepts as a
   complete run. The KASAN workflow now starts on every pull request and skips its heavy steps
