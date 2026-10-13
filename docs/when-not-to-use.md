@@ -1,6 +1,6 @@
 # Comparison and when not to use MoobFS
 
-An English summary of [value-assessment.md](value-assessment.md) (in Portuguese), written so
+A summary of [value-assessment.md](value-assessment.md), written so
 that a reader can decide quickly whether the project is relevant to them. The short version,
 copied from that assessment: **today, for anything outside a laboratory, SQLite or plain
 files are the recommendation.** MoobFS is an experimental kernel module with only a source pre-release tag, no

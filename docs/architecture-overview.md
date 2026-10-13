@@ -5,7 +5,7 @@ document behind each statement. This page describes the code on `main` as of 202
 (M2 phases 2a to 2e and M3 phase 3b). It is a description of an **experimental research
 module**, not a compatibility promise: the UAPI is version 1 and may change, and the module
 has been tested on one kernel series only (Debian 6.12.111 in QEMU; upstream 6.12.112 under
-KASAN/UBSAN/lockdep). The specifications, in Portuguese, are [spec-m2.md](spec-m2.md) and
+KASAN/UBSAN/lockdep). The specifications are [spec-m2.md](spec-m2.md) and
 [spec-m3.md](spec-m3.md); the design decision is [ADR-0007](decisions/0007-stacked-memory-layer.md).
 
 ## 1. A stacked layer, not a volume

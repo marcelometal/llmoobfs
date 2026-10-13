@@ -112,3 +112,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0082 — Fix: allocations with the index lock held could deadlock against memory reclaim](0082-index-lock-and-reclaim.md)
 - [0083 — Fixes from a read-only inspection of the index: rename over a file, cut paths, raw over typed, nested subvolumes](0083-index-inspection-fixes.md)
 - [0084 — S6 closed: `MOOB_ONLY`, KASAN ready to be a required check, review requests sent](0084-s6-moob-only-kasan-required.md)
+- [0085 — M4 question 3: space saved by reflink and dedupe through the layer](0085-m4-question-3-space.md)
+- [0086 — The last two Portuguese documents are in English](0086-last-two-translations.md)
