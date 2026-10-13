@@ -29,6 +29,7 @@
 #include <linux/seq_file.h>
 #include <linux/xattr.h>
 #include <linux/fiemap.h>
+#include <linux/fileattr.h>
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 #include "moobfs_attr.h"
@@ -45,6 +46,8 @@ static struct kmem_cache *moobl_inode_cache;
  * CPUs race on the same inode. Link counts change only in the name
  * operations below, which the VFS serializes with the parent's lock.
  */
+#define MOOBL_COPY_I_FLAGS (S_SYNC | S_NOATIME | S_APPEND | S_IMMUTABLE)
+
 static void moobl_copy_attr(struct inode *dest, const struct inode *src)
 {
 	dest->i_mode = src->i_mode;
@@ -52,7 +55,8 @@ static void moobl_copy_attr(struct inode *dest, const struct inode *src)
 	dest->i_gid = src->i_gid;
 	dest->i_rdev = src->i_rdev;
 	dest->i_blkbits = src->i_blkbits;
-	dest->i_flags = src->i_flags;
+	/* only the flags the VFS enforces on this inode; the rest describe the lower's own state */
+	inode_set_flags(dest, src->i_flags & MOOBL_COPY_I_FLAGS, MOOBL_COPY_I_FLAGS);
 	fsstack_copy_attr_times(dest, src);
 	fsstack_copy_inode_size(dest, (struct inode *)src);
 }
@@ -635,6 +639,34 @@ static int moobl_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 	return err;
 }
 
+/*
+ * File flags (lsattr, chattr, FS_IOC_FS[GS]ETXATTR) are the lower's. Both calls run with the
+ * caller's credentials, so the lower decides who may change what (owner, CAP_LINUX_IMMUTABLE).
+ */
+static int moobl_fileattr_get(struct dentry *dentry, struct fileattr *fa)
+{
+	return vfs_fileattr_get(moobl_lower_dentry(dentry), fa);
+}
+
+static int moobl_fileattr_set(struct mnt_idmap *idmap, struct dentry *dentry,
+			      struct fileattr *fa)
+{
+	struct dentry *lower = moobl_lower_dentry(dentry);
+	struct fileattr old = {};
+	int err;
+
+	err = vfs_fileattr_get(lower, &old);
+	if (err)
+		return err;
+	/* names in this dentry cache are case-sensitive; a lower directory must stay so */
+	if (fa->flags_valid && ((fa->flags ^ old.flags) & FS_CASEFOLD_FL))
+		return -EOPNOTSUPP;
+	err = vfs_fileattr_set(&nop_mnt_idmap, lower, fa);
+	if (!err)
+		moobl_copy_attr(d_inode(dentry), d_inode(lower));
+	return err;
+}
+
 /* ---- POSIX ACLs: delegated to the lower dentry, as ecryptfs does ------------- */
 
 static struct posix_acl *moobl_get_acl(struct mnt_idmap *idmap, struct dentry *dentry, int type)
@@ -794,6 +826,9 @@ static const struct xattr_handler * const moobl_xattr_handlers[] = {
 
 /* ---- attribute operations shared by files and directories -------------- */
 
+#define MOOBL_STATX_ATTRS (STATX_ATTR_COMPRESSED | STATX_ATTR_IMMUTABLE | \
+			   STATX_ATTR_APPEND | STATX_ATTR_NODUMP)
+
 static int moobl_getattr(struct mnt_idmap *idmap, const struct path *path,
 			 struct kstat *stat, u32 request_mask, unsigned int flags)
 {
@@ -809,6 +844,13 @@ static int moobl_getattr(struct mnt_idmap *idmap, const struct path *path,
 	generic_fillattr(&nop_mnt_idmap, request_mask, inode, stat);
 	stat->blocks = lower_stat.blocks;
 	stat->blksize = lower_stat.blksize;
+	/* what statx reports beyond stat: the lower's file flags and its creation time */
+	stat->attributes |= lower_stat.attributes & MOOBL_STATX_ATTRS;
+	stat->attributes_mask |= lower_stat.attributes_mask & MOOBL_STATX_ATTRS;
+	if (lower_stat.result_mask & STATX_BTIME) {
+		stat->btime = lower_stat.btime;
+		stat->result_mask |= STATX_BTIME;
+	}
 	return 0;
 }
 
@@ -864,6 +906,8 @@ static const struct inode_operations moobl_dir_iops = {
 	.listxattr = moobl_listxattr,
 	.get_acl = moobl_get_acl,
 	.set_acl = moobl_set_acl,
+	.fileattr_get = moobl_fileattr_get,
+	.fileattr_set = moobl_fileattr_set,
 };
 
 static const struct inode_operations moobl_file_iops = {
@@ -874,6 +918,8 @@ static const struct inode_operations moobl_file_iops = {
 	.fiemap = moobl_fiemap,
 	.get_acl = moobl_get_acl,
 	.set_acl = moobl_set_acl,
+	.fileattr_get = moobl_fileattr_get,
+	.fileattr_set = moobl_fileattr_set,
 };
 
 static const struct inode_operations moobl_symlink_iops = {

@@ -5,15 +5,13 @@ short on ceremony but strict about evidence, because the code runs in ring 0.
 
 ## Experimental stage: what to expect
 
-MoobFS is an experimental research project with one maintainer and only a source pre-release tag (`v0.1.0-experimental`).
+MoobFS is an experimental research project with one maintainer and only source pre-release tags (`v0.1.0-experimental`, `v0.2.0-experimental`).
 The layer module has been tested on one kernel series (Debian 6.12.111 in QEMU,
 upstream 6.12.112 under KASAN/lockdep), over ext4, btrfs and XFS, in a VM. The
-attribute index lives only in RAM and is rebuilt at mount. The UAPI v1 may
-change. No performance numbers have been measured. Our own tests found three
-kernel-side defects during development (journals
-[0015](docs/history/0015-phase-2e-investigation.md) and
-[0016](docs/history/0016-kasan-lockdep-harness.md)); there has been no external
-audit. Do not expect production readiness, compatibility promises or quick
+attribute index lives only in RAM and is rebuilt at mount. The UAPI (v1 and v2) may
+change. Only pilot-grade measurements exist. Our own tests and reviews keep
+finding kernel-side defects (the README banner and `CHANGELOG.md` list them);
+there has been no external audit. Do not expect production readiness, compatibility promises or quick
 turnaround on every issue. See the status banner in [README.md](README.md).
 
 ## Where to start

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Decisions (journal 0081): the second real client is the LangGraph store (`BaseStore`), through
+  an adapter; outside review is requested now (community action 15).
+- S6 (journal 0080): `docs/compatibility.md` proposes the policy of supported kernels and of
+  compatibility for the attribute encoding, the ioctl interface, mount options and tools.
+  Accepted by the maintainer on 2026-10-13.
+- CodeQL (journal 0080): `cpp/path-injection` is turned off in `.github/codeql/codeql-config.yml`.
+  It accounted for 21 of the 22 alerts dismissed so far and describes the interface of the
+  command-line tools; the file says when to turn it back on.
+- File flags (journal 0079): `lsattr`, `chattr`, `FS_IOC_FSGETXATTR` and `FS_IOC_FSSETXATTR` work
+  through the layer, with the caller's credentials; `statx` reports the lower's attributes and
+  creation time. fstests `generic/169` and `generic/420` pass. Changing a directory's casefold
+  flag through the layer is refused.
+- Review of every place where the layer uses the mounter's credentials (journal 0079): no new
+  defect. The layer's inodes now carry only the four lower inode flags the VFS enforces.
+- Decision (journal 0079): the layer's `atime` mount options stay without effect; documented
+  as a limitation.
 - **Fix** (journal 0078; found with fstests `generic/674` over btrfs): `syncfs` on the layer, and
   the sync of its unmount, returned success without syncing the lower filesystem. `fsync` and
   `sync` were not affected. The layer now delegates `sync_fs` to the lower, as overlayfs does.

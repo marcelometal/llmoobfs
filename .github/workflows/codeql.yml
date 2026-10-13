@@ -7,9 +7,9 @@ name: CodeQL
 on:
   push:
     branches: [main]
-    paths: ['tools/**', 'common/**', 'bench/**', 'include/**', 'tests/*.c', 'Makefile', '.github/workflows/codeql.yml']
+    paths: ['tools/**', 'common/**', 'bench/**', 'include/**', 'tests/*.c', 'Makefile', '.github/workflows/codeql.yml', '.github/codeql/**']
   pull_request:
-    paths: ['tools/**', 'common/**', 'bench/**', 'include/**', 'tests/*.c', 'Makefile', '.github/workflows/codeql.yml']
+    paths: ['tools/**', 'common/**', 'bench/**', 'include/**', 'tests/*.c', 'Makefile', '.github/workflows/codeql.yml', '.github/codeql/**']
   schedule:
     - cron: '41 5 * * 2'
   workflow_dispatch:
@@ -39,6 +39,7 @@ jobs:
           languages: c-cpp
           build-mode: manual
           queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
       - name: Build (same targets as on a Linux host)
         run: make tools attr-tools bench-tools
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3

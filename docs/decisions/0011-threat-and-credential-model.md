@@ -151,6 +151,14 @@ behaviour on input the layer did not write is now stated in full and tested:
 - What changes on the lower behind a mounted layer reaches the index at the next mount
   (non-promise 2); until then calls return stale or failing answers, never a crash or a hang.
 
+Added on 2026-10-13, from the review of journal 0079 (the follow-up F5 asked for). Every site
+that acts on the lower with the mounter's credentials was checked against the kernel source for
+decisions taken from the caller; the table is in that journal. No new finding. Two things are now
+part of the credential model: the file flags (`lsattr`, `chattr`) are name operations, run with
+the caller's credentials; and the layer's inode carries only the lower's `S_SYNC`, `S_NOATIME`,
+`S_APPEND` and `S_IMMUTABLE` flags, which are the ones the VFS enforces before the layer is
+called. Not covered by the review: behaviour under a Linux security module policy.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that

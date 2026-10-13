@@ -4,7 +4,7 @@ Date: 2026-10-13. Status: **convention** (M3 phase 3a, journal [0070](history/00
 It gathers in one place what the specifications already decided, so that any agent-memory system
 can be checked against it without reading a particular client's test plan. It names no client.
 Each rule says where it comes from and whether it is enforced by the kernel, checked by a tool, or
-only a convention the client keeps. Two sections are marked **proposal**: they are not decided.
+only a convention the client keeps. One section is marked **proposal**: it is not decided.
 
 Sources: [spec-m2](spec-m2.md), [spec-m3](spec-m3.md) §2, [spec-query-v2](spec-query-v2.md),
 [ADR-0011](decisions/0011-threat-and-credential-model.md), `include/moobfs_attr.h`,
@@ -146,9 +146,14 @@ revisions (spec-m3 §5 keeps them in the client, with git or an attribute it mai
 that are not files. The layer removes the duplicated structured columns and their
 synchronization; it does not replace the client's database.
 
-## 9. A second client (proposal)
+## 9. A second client
 
 Every real-client result so far comes from one system. Before the layer or its interface changes
 for a client's convenience, the reason should hold for more than one of the systems surveyed in
 `research-client-query-patterns.md`, and a second system should pass §1 and run the equality test
 of `client-test-plan.md` stage 2. Client-specific handling belongs in that client's adapter.
+
+Decided on 2026-10-13 (journal [0081](history/0081-second-client-and-outside-review.md)): the
+second client is the **LangGraph store** (`BaseStore`), through an adapter in `bench/client/`.
+It was chosen because it does not fit perfectly; the plan and the known mismatches are in that
+journal.

@@ -72,8 +72,8 @@ grep '^DEMO| ' build/vm/console.log   # the session above, from your own run
 Never load the modules on your host. Setup details are in [docs/development.md](docs/development.md),
 and what each success marker proves is in [docs/testing.md](docs/testing.md).
 
-> **Experimental. Source pre-release tag only (`v0.1.0-experimental`); not for production.**
-> Facts as of 2026-10-11:
+> **Experimental. Source pre-release tags only (`v0.1.0-experimental`, `v0.2.0-experimental`); not for production.**
+> Facts as of 2026-10-13:
 > - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
 >   KASAN/UBSAN/lockdep; lower filesystems ext4, btrfs and XFS only.
 > - The attribute index lives **in RAM only**, bounded by `index_budget`, rebuilt at every mount.
@@ -86,7 +86,11 @@ and what each success marker proves is in [docs/testing.md](docs/testing.md).
 > - **No external audit.** Our own tests and reviews found and fixed kernel-side defects
 >   (journals [0015](docs/history/0015-phase-2e-investigation.md),
 >   [0016](docs/history/0016-kasan-lockdep-harness.md),
->   [0035](docs/history/0035-phase-q2a-domain-query.md)).
+>   [0035](docs/history/0035-phase-q2a-domain-query.md),
+>   [0069](docs/history/0069-setattr-crash-and-mounter-capability.md),
+>   [0074](docs/history/0074-privileges-kept-on-copy.md),
+>   [0078](docs/history/0078-syncfs-reaches-the-lower.md)); the last two are fixed on `main`
+>   and present in `v0.2.0-experimental`.
 > - Reflink, deduplication and durability come from the lower filesystem, not from MoobFS.
 >
 > Contributions are welcome ([CONTRIBUTING.md](CONTRIBUTING.md)). Everything in the repository is
@@ -184,10 +188,10 @@ measurements (only pilot-grade campaigns exist, in [bench/results/](bench/result
 - The index is RAM only, non-pageable, bounded by `index_budget` (default 128 MiB), rebuilt by
   a linear scan at every mount; behaviour near a saturated budget on large trees is untested.
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; no rootless containers.
-- UAPI v1 and v2 may change; the `v0.1.0-experimental` tag is a source snapshot, with no binaries, packaging or support.
+- UAPI v1 and v2 may change ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
 - Only pilot-grade figures exist (one Azure VM, one dataset seed; journals 0025–0031); no
   comparison with SQLite, FUSE or the bare lower filesystem may be stated as a result before M4.
-- No external audit, no syzkaller, no full xfstests, no threat-model document yet.
+- No external audit and no syzkaller. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md)). The threat model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md); no security module policy (SELinux, AppArmor) was exercised.
 - `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
   after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower
@@ -200,6 +204,8 @@ measurements (only pilot-grade campaigns exist, in [bench/results/](bench/result
   On ext4 with the default reserve owner (uid 0), ordinary users writing through the layer can
   still use the blocks reserved for root; mount the lower with another `resuid`, or set the
   reserve to zero, if that matters.
+- `noatime`, `relatime` and `strictatime` on the layer's mount have no effect; access times
+  follow the mount options of the lower filesystem.
 
 ## Compared with plain files, SQLite and memory frameworks
 
@@ -305,6 +311,7 @@ Every document under `docs/`, with its language, is listed in the [docs index](d
 | Which free software is relevant around the project? | [ecosystem.md](docs/ecosystem.md) | EN |
 | How is AI-assisted development governed? | [ai-workflow.md](docs/ai-workflow.md) (shared through `AGENTS.md`, `CLAUDE.md` and Cursor rules) | EN |
 | Prior art, what may and may not be claimed | [research-originality.md](docs/research-originality.md) | EN |
+| Which kernels are supported, and what may change between versions? | [compatibility.md](docs/compatibility.md) | EN |
 | Changes, governance, conduct, security | [CHANGELOG.md](CHANGELOG.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) | EN |
 
 Git records exact changes; journals record concise rationale, experiments and results. Future
