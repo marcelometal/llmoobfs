@@ -42,6 +42,24 @@ remove these costs with kernel techniques.
 No change to the attribute encoding, to `QUERY2` requests or replies, or to what a query
 returns. A new flag bit and two fields of `GET_INFO` taken from reserved space.
 
+## Prior art this builds on
+
+Nothing in this decision is a new technique. Each part follows something already solved, and the
+implementation should reuse the kernel's facility rather than write its own.
+
+| Part | Known solution | Where (verified on 2026-10-13) |
+| --- | --- | --- |
+| Releasing memory when the kernel asks | The shrinker interface: a cache registers a `count_objects` and a `scan_objects` callback and reclaim calls them | `include/linux/shrinker.h` (`shrinker_alloc`, `shrinker_register`), Linux 6.12.112 |
+| Keeping "least recently used" cheaply and per NUMA node and memory cgroup | `list_lru`, as the dentry and inode caches do (`prune_dcache_sb` calls `list_lru_shrink_walk`) | `include/linux/list_lru.h`, `fs/dcache.c`, `fs/inode.c` |
+| A filesystem that releases an in-memory map of its own under pressure and rebuilds it from disk on demand | The btrfs extent-map shrinker, which walks inodes and drops extent maps that can be read again | `fs/btrfs/extent_map.c` (`btrfs_extent_map_shrinker_worker`) |
+| Building an index while the data keeps changing | Online index build: scan, record the changes made meanwhile in a side list, apply the list at the end. C. Mohan and I. Narang, "Algorithms for Creating Indexes for Very Large Tables Without Quiescing Updates", SIGMOD 1992 | doi:10.1145/130283.130337 |
+| Readers that must not see a half-built state, without a lock on the fast path | A sequence counter that a reader samples and re-checks, as path lookup does against renames | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c` |
+| Seeing what the shrinker does while testing | The shrinker debugfs interface, which can also be asked to scan | `Documentation/admin-guide/mm/shrinker_debugfs.rst` |
+
+The side-list algorithm of Mohan and Narang is the "per-domain generation" described below; the
+paper's two variants differ in whether writers insert into the new index directly during the
+build, which is the choice the implementation has to make and justify.
+
 ## What has to be got right
 
 - **A scan that runs while the domain is being written.** Today's scan runs before anyone can

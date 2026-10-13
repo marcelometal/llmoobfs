@@ -85,6 +85,14 @@ in this repository. Code that ships in the repository keeps its own license and 
   These grounded the leapfrog (galloping) intersection of Q2c; measurement then replaced it with a
   scan of the shortest run (journal 0044).
 
+### The index built on demand (ADR-0012)
+
+- C. Mohan, Inderpal Narang. "Algorithms for Creating Indexes for Very Large Tables Without
+  Quiescing Updates". ACM SIGMOD 1992, 361-370. https://doi.org/10.1145/130283.130337
+
+  The side-list method of ADR-0012 for building a domain's partition while writes continue.
+  Checked on 2026-10-13 (Crossref metadata; the paper itself was not read in full).
+
 ### Security roadmap (proposal)
 
 - Wen Xu, Hyungon Moon, Sanidhya Kashyap, et al. "Fuzzing File Systems via Two-Dimensional Input
@@ -94,6 +102,13 @@ in this repository. Code that ships in the repository keeps its own license and 
   https://doi.org/10.1145/3341301.3359662
 
   Precedents for item S3 of `docs/security-roadmap.md` (journal 0017).
+
+- Linux kernel documentation, "Fault injection capabilities infrastructure"
+  (`Documentation/fault-injection/fault-injection.rst`, Linux 6.12.112): `failslab`,
+  `fail_page_alloc`, the stack-trace filter that confines faults to one module, and the per-task
+  `fail-nth` for systematic injection.
+
+  The technique of journal 0096. Read in the source tree of the kernel the tests are built with.
 
 ## 3. Systems and kernel facilities
 
