@@ -455,6 +455,9 @@ as new; what it explores is their combination in a stacked kernel layer, and whe
 measurable value ([research-originality.md](docs/research-originality.md) §4, §5, §9). Every work,
 project and tool used is listed with verified sources in [references.md](docs/references.md).
 
+Thank you to everyone whose published work this project stands on: the authors of those papers and
+the maintainers of the kernel, of the filesystems and of the test tools named there.
+
 ## Contributing and security
 
 Bug reports, format review, kernel review and reproducibility improvements are welcome. Read
