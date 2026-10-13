@@ -11,7 +11,7 @@ them not implemented yet).
 
 | Version | Supported |
 | --- | --- |
-| Releases | None exist. |
+| `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported. `v0.2.0-experimental` has defects fixed on `main` since (journals 0074 and 0078). |
 | `main` | Fixes land here only. There are no backports and no maintenance branches. |
 
 ## How to report a vulnerability
@@ -94,7 +94,7 @@ These are targets for a single volunteer maintainer, not guarantees:
 - The report stays private until a fix is in `main`. The reporter and the
   maintainer agree on the disclosure date; disclosure may happen earlier if the
   reporter agrees, or if the issue becomes public elsewhere.
-- Since there are no supported releases (`v0.1.0-experimental` is a source snapshot), "fixed" means a commit on `main` with a test in
+- Since there are no supported releases (the `-experimental` tags are source snapshots), "fixed" means a commit on `main` with a test in
   `vm/suite.sh` or `tests/` that reproduces the problem and passes afterwards.
 - When the defect affects anyone running the module, we request a CVE through
   GitHub's CNA from the advisory. No CVE is expected for test-only or
@@ -114,6 +114,6 @@ domains on, the v1 `QUERY` is limited to `CAP_SYS_ADMIN` (`docs/spec-query-v2.md
 The VM suite, the KASAN/lockdep workflow and the attribute fuzzer are not a
 security audit; no external audit has taken place. The threat and credential
 model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
-(accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and two
-known findings. [docs/security-roadmap.md](docs/security-roadmap.md) lists
+(accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and the
+findings F1 to F5, of which F2 and part of F4 are open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
 fstests, syzkaller, hostile-lower handling and the other open items.
