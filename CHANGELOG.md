@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- User-space baseline measured (journal 0094, `bench/userspace/compare.sh`): on 60 000 memories
+  the layer answered five query shapes 2 to 150 times faster than the generic per-attribute
+  SQLite index, writes are a tie for the writer, and the baseline's follower fell behind and
+  resynchronized under the bulk load. Most of the query gap is the generic schema: a SQLite
+  index written for the application's schema (journal 0047) is within 1.1 to 6 times of the layer.
 - User-space baseline (journal 0092): `bench/userspace/` builds the same per-domain index with
   no kernel module (plain `user.*` attributes, one SQLite database per domain directory, an
   inotify follower) and a query tool whose output equals the oracle's on 37 query shapes. The
