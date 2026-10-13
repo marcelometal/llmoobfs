@@ -6,7 +6,8 @@
  *
  *   udx-query [--require-live] [--order NAME TYPE asc|desc] [--limit N] <domain dir> [terms...]
  *   udx-query --status <domain dir>
- *   udx-query --sql ... <domain dir> [terms...]     prints the statement instead of running it
+ *   udx-query --sql ... <domain dir> [terms...]     prints the statement, values written in,
+ *                                                   instead of running it
  *
  * Terms: <name> <op> <type> <value>, up to four, ops eq lt le gt ge prefix exists, "exists"
  * takes "- -", an op ending in '?' also matches entries without the attribute
@@ -104,6 +105,41 @@ static void condition(const char *alias, const struct moob_query_term *t, int i)
 			add(" AND %s.v < ?%d", alias, bind_blob(uppers[i], n));
 		}
 	}
+}
+
+/* The statement with its values written in, on one line: what bench-sqlclient and EXPLAIN take. */
+static void print_sql(void)
+{
+	const char *p;
+	size_t k;
+
+	for (p = sql; *p; p++) {
+		const struct bind *b;
+
+		if (*p != '?') {
+			putchar(*p);
+			continue;
+		}
+		b = &binds[strtol(p + 1, (char **)&p, 10) - 1];
+		p--;
+		if (b->type == 1) {
+			printf("%lld", (long long)b->k);
+		} else if (b->type == 0) {
+			putchar('\'');
+			for (k = 0; k < b->n; k++) {
+				if (((const char *)b->p)[k] == '\'')
+					putchar('\'');
+				putchar(((const char *)b->p)[k]);
+			}
+			putchar('\'');
+		} else {
+			printf("x'");
+			for (k = 0; k < b->n; k++)
+				printf("%02x", ((const ma_u8 *)b->p)[k]);
+			putchar('\'');
+		}
+	}
+	putchar('\n');
 }
 
 static int status(const char *dir, int quiet)
@@ -228,7 +264,7 @@ int main(int argc, char **argv)
 		add(" ORDER BY e.ino");
 	add(" LIMIT ?%d", bind_int(limit < 0 ? -1 : limit));
 	if (show_sql) {
-		puts(sql);
+		print_sql();
 		return 0;
 	}
 

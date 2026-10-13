@@ -8,7 +8,7 @@
 #   sh bench/userspace/test.sh --inside   what runs in the container (or on any Linux, as root)
 #
 # Environment: UDX_IMAGE (default ubuntu:24.04; gcc, make, libsqlite3-dev and e2fsprogs are
-# installed with apt when missing), UDX_INODES (default 3000), UDX_CHANGES (default 400),
+# installed with apt when missing, and the sqlite3 shell for the plans), UDX_INODES (default 3000), UDX_CHANGES (default 400),
 # UDX_SEED (default 7). The container must be privileged: the data set lives on a loop-mounted
 # ext4 image, because user.* extended attributes are what is being tested.
 # Prints UDX_TEST_PASS or UDX_TEST_FAIL as the last line and exits non-zero on any difference.
@@ -43,10 +43,10 @@ summary=""
 
 # ---- build -------------------------------------------------------------------------------
 if ! command -v gcc >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1 || [ ! -e /usr/include/sqlite3.h ] ||
-   ! command -v mkfs.ext4 >/dev/null 2>&1; then
-    say "installing gcc, make, libsqlite3-dev, e2fsprogs"
+   ! command -v mkfs.ext4 >/dev/null 2>&1 || ! command -v sqlite3 >/dev/null 2>&1; then
+    say "installing gcc, make, libsqlite3-dev, sqlite3, e2fsprogs"
     apt-get update -qq >/dev/null
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends gcc make libc6-dev libsqlite3-dev e2fsprogs >/dev/null
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends gcc make libc6-dev libsqlite3-dev sqlite3 e2fsprogs >/dev/null
 fi
 if grep -q " $MNT " /proc/mounts; then umount "$MNT"; fi
 rm -rf "$W" && mkdir -p "$W/src" "$MNT" "$W/out"
@@ -139,7 +139,7 @@ compare() {
     cmp_bad=0; cmp_n=0; cmp_lines=0
     for d in "$T"/*/; do
         d=${d%/}
-        [ -e "$d/.udx.db" ] || { echo "  no database in $d"; cmp_bad=$((cmp_bad + 1)); continue; }
+        [ -e "$d/.udx.db" ] || { [ "${quiet:-0}" = 1 ] || echo "  no database in $d"; cmp_bad=$((cmp_bad + 1)); continue; }
         while IFS='|' read -r opts terms; do
             # shellcheck disable=SC2086
             "$B/moobfs-index" --domain $opts "$d" $terms 2>&1 | grep -v "$TAB\\.udx\\.db" > "$W/out/oracle.txt" || true
@@ -270,6 +270,27 @@ check "after udx-index"
 "$B/udx-index" "$T" 1 > "$W/out/reindex.txt" || bad "the second udx-index failed"
 awk '{ exit !($9 == 2 * $2) }' "$W/out/reindex.txt" || bad "a second udx-index wrote rows on an unchanged tree: $(cat "$W/out/reindex.txt")"
 say "second pass, nothing changed (two meta rows per domain): $(cat "$W/out/reindex.txt")"
+# the plan of every W3 shape, printed and not measured. The attribute table must never be read
+# whole; walking entry in inode order and probing attr by its key is the planner's choice for a
+# term that many entries satisfy (Q9), since the output is ordered by inode anyway.
+n=0
+grep -v '^#' "$SRC/bench/queries-w3.txt" | while read -r q; do
+    n=$((n + 1))
+    # shellcheck disable=SC2086
+    plan=$(sqlite3 "file:$T/ns3/.udx.db?mode=ro" "EXPLAIN QUERY PLAN $("$B/udx-query" --sql "$T/ns3" $q)" | grep -v 'QUERY PLAN' | sed 's/^[ |`-]*//' | tr '\n' ';')
+    echo "udx-test: plan Q$n: $plan"
+    case $plan in *"SCAN a"*|*"SCAN m"*|*"SCAN o"*) echo "UDX_FAIL: Q$n reads the whole attribute table" ;; esac
+done > "$W/out/plans.txt"
+cat "$W/out/plans.txt"
+if grep -q UDX_FAIL "$W/out/plans.txt"; then bad "a W3 shape reads the whole attribute table"; fi
+# the same statements are what the harness's SQLite client would time on the benchmark host;
+# here only that it accepts them (two records of 32 bytes per shape), no timing is reported
+# shellcheck disable=SC2086
+grep -v '^#' "$SRC/bench/queries-w3.txt" | while read -r q; do "$B/udx-query" --sql "$T/ns3" $q; done > "$W/out/w3.sql"
+mkdir -p "$W/out/sqlclient"
+"$B/bench-sqlclient" --db "$T/ns3/.udx.db" --sql "$W/out/w3.sql" --out "$W/out/sqlclient/w3" --repeat 2 || bad "bench-sqlclient rejected the statements of udx-query --sql"
+[ "$(wc -c < "$W/out/sqlclient/w3.0.rec")" -eq $((18 * 32)) ] || bad "bench-sqlclient record count"
+say "bench-sqlclient accepted the nine statements of udx-query --sql (procedure check only)"
 
 # ---- 2. who can ask ------------------------------------------------------------------------
 asuser() { u=$1; shift; setpriv --reuid "$u" --regid "$u" --clear-groups "$@"; }
@@ -373,6 +394,38 @@ stop_watch; start_watch
 quiet=0
 check "after removing the outside link and a full pass"
 stop_watch
+
+# ---- 7. one watcher per user: no privileged component ----------------------------------------
+# uid 1001 indexes and watches its own domain (depth 0: the root given is the domain) and asks
+# as itself; the oracle runs as the same user. Root made files in that domain during the changes
+# above; what uid 1001 cannot read is outside both answers.
+asuser 1001 "$B/udx-index" "$T/ns1" 0 > "$W/out/user-index.txt" 2>&1 || bad "udx-index as uid 1001 failed: $(cat "$W/out/user-index.txt")"
+setpriv --reuid 1001 --regid 1001 --clear-groups "$B/udx-watch" "$T/ns1" 0 > "$W/out/user-watch.out" 2> "$W/out/user-watch.err" &
+user_pid=$!
+i=0; until grep -q UDX_WATCH_READY "$W/out/user-watch.out"; do i=$((i + 1)); [ "$i" -lt 100 ] || break; sleep 0.1; done
+mine=$(asuser 1001 "$B/moobfs-index" --domain "$T/ns1" kind exists - - | grep "$TAB"'a[0-9]*/m[0-9]*\.md$' | head -1 | cut -f2)
+asuser 1001 "$A" set "$T/ns1/$mine" kind string decision
+asuser 1001 "$A" set "$T/ns1/$mine" score int64 999
+asuser 1001 sh -c ': > "$1" && "$2" set "$1" kind string note' sh "$T/ns1/own-new.md" "$A"
+i=0; until [ -n "$(asuser 1001 "$B/udx-query" --require-live "$T/ns1" score eq int64 999 kind eq string decision 2>/dev/null | grep "$TAB$mine\$")" ]; do
+    i=$((i + 1)); [ "$i" -lt 500 ] || { bad "the unprivileged watcher did not index a change"; break; }; sleep 0.01
+done
+sleep 0.3
+ubad=0; un=0
+while IFS='|' read -r opts terms; do
+    # shellcheck disable=SC2086
+    "$B/moobfs-index" --uid 1001 --domain $opts "$T/ns1" $terms 2>/dev/null | grep -v "$TAB\\.udx\\.db" > "$W/out/oracle.txt" || true
+    # shellcheck disable=SC2086
+    asuser 1001 "$B/udx-query" $opts "$T/ns1" $terms > "$W/out/udx.txt" 2>&1 || true
+    un=$((un + 1)); cmp -s "$W/out/oracle.txt" "$W/out/udx.txt" || ubad=$((ubad + 1))
+done < "$W/out/queries.txt"
+kill "$user_pid" && wait "$user_pid" || true
+if [ "$ubad" -eq 0 ]; then
+    echo "UDX_COMPARE_OK one watcher per user: udx-index, udx-watch and udx-query all as uid 1001 on its own domain, $un comparisons with the oracle as uid 1001, all equal"
+else
+    bad "one watcher per user: $ubad of $un comparisons differ"
+fi
+say "as uid 1001: $(cat "$W/out/user-watch.out") / $(tail -1 "$W/out/user-watch.err")"
 
 summary="udx-index and udx-watch equal to moobfs-index --domain on $nq query shapes per domain, on $fs; $INODES memories, $((CHANGES * 2 + 300)) random changes, a W4 burst, an inotify overflow, a watcher restart (known gap shown: $gap comparisons differ after a hard link from outside)"
 finish

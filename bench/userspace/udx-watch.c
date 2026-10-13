@@ -61,9 +61,15 @@ static void on_signal(int sig)
 
 static void stats(void)
 {
+	struct rusage ru;
+	long cpu_ms = 0;
+
+	if (!getrusage(RUSAGE_SELF, &ru))
+		cpu_ms = (long)((ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) * 1000 +
+				(ru.ru_utime.tv_usec + ru.ru_stime.tv_usec) / 1000);
 	fprintf(stderr, "udx-watch: domains=%zu watches=%zu events=%lu batches=%lu refreshed=%lu max_batch=%lu "
-		"rows_written=%lu overflows=%lu resyncs=%lu\n", ndoms, nwatches, n_events, n_batches, n_refreshed,
-		max_batch, udx_rows_written, n_overflows, n_resyncs);
+		"rows_written=%lu overflows=%lu resyncs=%lu cpu_ms=%ld\n", ndoms, nwatches, n_events, n_batches,
+		n_refreshed, max_batch, udx_rows_written, n_overflows, n_resyncs, cpu_ms);
 }
 
 /* path relative to root ("" is the root) -> a path the system calls take */
