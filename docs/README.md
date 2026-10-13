@@ -3,8 +3,8 @@
 Every document under `docs/`, with its language and one line on what it covers. Everything in the
 repository is in English ([ADR-0010](decisions/0010-english-everywhere.md)); documents first written
 in Portuguese were translated in place on 2026-10-12, and their originals remain in the git history.
-**PT (English translation in review)** marks the two documents whose translations are open pull
-requests from an outside contributor.
+The last two, `security-roadmap.md` and `benchmark-harness.md`, were translated by an outside
+contributor (pull requests 46 and 47) and put in place on 2026-10-13.
 
 Status words matter: a **proposal** describes intended behaviour, a **specification** is
 accepted but may be only partly implemented, and only the journals and
@@ -53,7 +53,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 | --- | --- | --- |
 | [client-test-plan.md](client-test-plan.md) | EN | Proposal: test with a real agent memory client (ai-memory), in three stages |
 | [benchmark-plan.md](benchmark-plan.md) | EN | M4 plan: questions, baselines, workloads, what a result must show |
-| [benchmark-harness.md](benchmark-harness.md) | PT (English translation in review) | Harness specification: dataset, SQLite baselines, latency records, report, where raw archives go |
+| [benchmark-harness.md](benchmark-harness.md) | EN | Harness specification: dataset, SQLite baselines, latency records, report, where raw archives go |
 | [bench-accelerated-guest.md](bench-accelerated-guest.md) | EN | How to run a campaign in an accelerated guest or a cloud VM |
 | [../bench/results/](../bench/results/README.md) | EN | Pilot campaign results and the `bench-evidence` release for raw archives |
 
@@ -76,7 +76,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [security-roadmap.md](security-roadmap.md) | PT (English translation in review) | Security and robustness items S1–S11 (threat model, syzkaller, fuzzing, hardening) |
+| [security-roadmap.md](security-roadmap.md) | EN | Security and robustness items S1–S11 (threat model, syzkaller, fuzzing, hardening) |
 | [research-stacked-fs-kernel-rules.md](research-stacked-fs-kernel-rules.md) | EN | Stacked-FS rules from kernel v6.12 primary sources (credentials, locking, lifetime, ioctl/UAPI, xattrs, hostile lower, memory), each with source and MoobFS compliance status |
 | [distribution-strategy.md](distribution-strategy.md) | EN | Proposed deployment model, DKMS packaging, kernel matrix and release stages |
 | [community-plan.md](community-plan.md) | EN | Plan for external contributions (policies, templates, CI); largely executed |

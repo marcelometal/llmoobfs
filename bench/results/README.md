@@ -43,5 +43,5 @@ remain; journal 0041 records the move.
    with `--apply`. The script uploads the archive, checks its size and SHA-256 through the API
    and the public URL, and refreshes the release text.
 
-Do not create a new pre-release per campaign. The procedure in Portuguese is in
+Do not create a new pre-release per campaign. The procedure is also in
 [`docs/benchmark-harness.md`](../../docs/benchmark-harness.md) §7.1.

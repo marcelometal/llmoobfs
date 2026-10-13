@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Documentation (journal 0086): `docs/security-roadmap.md` and `docs/benchmark-harness.md` are in
+  English, from the translations of an outside contributor (pull requests 46 and 47), put in
+  place of the originals. Nothing in the repository is in Portuguese now.
 - M4 question 3 (journal 0085, `bench/q3-space.sh`): on the 60 000-file data set, whole-file
   dedupe through the layer frees 6.7 % on btrfs and 13.6 % on XFS (15 % of the files are
   copies), and a reflink copy of the tree costs 47 % of a plain copy on btrfs and 9.5 % on XFS.
