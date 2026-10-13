@@ -1,0 +1,91 @@
+# ADR-0012 — The index is built per domain on demand and can be released under memory pressure
+
+Date: 2026-10-13. Status: **proposed**; not implemented. It changes how
+[ADR-0009](0009-query-role-and-user-space-index.md) builds the index, not what it answers.
+
+## Context
+
+Two costs of the layer come from one design choice, the index built whole at mount and kept
+whole in kernel memory (M4 report, journal 0088):
+
+- **Mount time.** Every file is scanned before any query is answered: 0.7 s warm and 18.5 to
+  19.3 s cold for 60 000 files on a SATA SSD, 126 s cold on a cloud disk, linear in the files.
+- **Memory.** 530 to 607 bytes per file by the index's own count, which cannot be paged out, for
+  every domain whether anybody queries it or not. At the budget (128 MiB by default) the index is
+  marked incomplete for everyone until the next mount (ADR-0011, finding F2).
+
+The comparison with an index kept in user space (journals 0092 and 0094) showed these two as
+the points where that alternative is plainly better: its index survives a restart and its memory
+is pageable. The maintainer's direction of 2026-10-13 is to keep the index in the kernel and
+remove these costs with kernel techniques.
+
+## Decision (proposed)
+
+1. **A domain's partition is built when it is first needed**, not at mount. Mount reads the lower
+   root and returns. Each domain is in one of three states: not built, being built, built. The
+   first `QUERY2` on a domain builds its partition by scanning that domain's subtree, with the
+   rule and the validation of today's mount scan; other callers of the same domain wait for it.
+2. **An attribute write updates the index only if the file's domain is built.** For a domain that
+   is not built there is nothing to keep current; the write is validated as today and goes to the
+   lower filesystem.
+3. **Built partitions can be released.** The module registers a shrinker. Under memory pressure
+   the kernel asks it for memory, and it drops the partitions least recently queried, which
+   return to "not built". A later query rebuilds them.
+4. **The budget becomes a limit on what is built**, enforced by releasing the least recently
+   used partitions, instead of a point after which the index is incomplete for all. A single
+   domain larger than the budget still fails, and says so to its own callers only.
+5. **The mount-wide `QUERY`** (administrators, or `domain_depth=0`) needs every partition; it
+   builds what is missing first. Its cost is then explicit to the caller who asks for it.
+6. `GET_INFO` reports how many domains are built and flags that the counters cover those only.
+
+No change to the attribute encoding, to `QUERY2` requests or replies, or to what a query
+returns. A new flag bit and two fields of `GET_INFO` taken from reserved space.
+
+## What has to be got right
+
+- **A scan that runs while the domain is being written.** Today's scan runs before anyone can
+  write. The new one must not miss a write that lands during it, nor index a state that a rename
+  or an unlink has already undone. The proposal is a per-domain generation: writes during
+  "being built" are recorded and applied after the scan, and the scan's own reads are
+  re-validated against that list. This is the part that needs the most review and tests.
+- **Lock order.** Releasing a partition from the shrinker runs in reclaim context, where the
+  index lock must not be taken in a way that can deadlock (journal 0082). The shrinker may only
+  try the lock and give up.
+- **First-query latency.** The caller of the first query on a domain pays the scan: by the
+  measured per-file costs, a domain of 7 500 files is about 0.1 s warm and 2.3 s cold on the SSD.
+  A way to ask for a build ahead of time (reading a domain directory is a candidate trigger)
+  must exist so that a service can warm what it needs.
+- **Thrashing.** A machine short of memory can release and rebuild the same partitions in a
+  loop. The shrinker needs a floor (recently used partitions are kept) and a counter in
+  `GET_INFO` so that it is visible.
+
+## Alternatives considered
+
+- **A persistent index on the lower filesystem**, validated at mount. It removes the scan and,
+  kept in the page cache, the unpageable memory too. Not chosen first: it adds an on-disk format
+  with its own compatibility promise (`docs/compatibility.md`, section 2) and the problem of an
+  index that disagrees with files changed while the layer was not mounted. It stays the next
+  step if on-demand building is not enough, and this decision does not close it.
+- **Building in the background after mount.** Queries are answered sooner only for domains
+  already reached, memory is still all unpageable, and it adds a kernel thread.
+- **Leaving the index in user space** (journals 0092, 0094). It gives up validation at write
+  time, an answer consistent with a write, and sharing between users without a privileged
+  process. Deferred by the maintainer to the end, as a no-module mode behind the same interface.
+- **Keeping things as they are.** The two costs grow with every file and are the first thing an
+  operator meets.
+
+## How it will be judged
+
+- Answers equal to the oracle on the three lower filesystems after on-demand builds, after
+  releases forced by the suite, and under a race of writes, renames and unlinks against a build.
+- The KASAN and lockdep job, with the reclaim priming of journal 0082, with no diagnostic.
+- Measured on the benchmark host against today's module: mount time, first-query time per
+  domain size, steady-state query latency (must not get worse), memory with one of eight
+  domains in use.
+
+## Consequences
+
+Mount becomes immediate and memory follows use. The cost moves to the first query on each
+domain and to more states in the index code, which is the code where this week's defects were
+found. The change is larger than any made to the index since ADR-0009 and should not be merged
+without a reader from outside, if one is available by then.

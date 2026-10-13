@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Direction (journal 0095, ADR-0012 proposed): the index stays in the kernel module; its mount
+  and memory costs are to be removed by building each domain's partition on demand and releasing
+  partitions under memory pressure. Not implemented.
 - User-space baseline measured (journal 0094, `bench/userspace/compare.sh`): on 60 000 memories
   the layer answered five query shapes 2 to 150 times faster than the generic per-attribute
   SQLite index, writes are a tie for the writer, and the baseline's follower fell behind and
