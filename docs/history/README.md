@@ -117,3 +117,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0087 — Third pre-release tag: v0.3.0-experimental](0087-third-prerelease-tag.md)
 - [0089 — Second client: a LangGraph store on the layer, equal to the reference store](0089-second-client-langgraph-adapter.md)
 - [0090 — `moobfs-check` lists the files left out of `QUERY2` answers](0090-check-lists-left-out-files.md)
+- [0091 — S2: the `quick` group passes on the three lower filesystems with the exclusion list](0091-s2-fstests-clean-with-exclusions.md)

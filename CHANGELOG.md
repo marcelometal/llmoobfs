@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- S2 (journal 0091): with `vm/fstests/exclude-quick.txt`, the fstests `quick` group ends with no
+  failure over ext4, btrfs and XFS (631 tests each; 186, 280 and 307 pass, the rest are skipped
+  by fstests). No kernel diagnostic.
 - Tools (journal 0090): `moobfs-check --domain-depth N` lists the files that carry typed
   attributes and that `QUERY2` leaves out, each with the reason (a directory more private than
   the domain, another owner, an ACL, a hard link, a file above every domain). The specification
