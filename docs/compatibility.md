@@ -1,10 +1,10 @@
 # Supported kernels and compatibility policy
 
-Date: 2026-10-13. Status: **proposal** (security roadmap S6, journal
-[0080](history/0080-compatibility-policy.md)). It states what is true today and proposes the rules
-for what changes; the rules bind the project only once the maintainer accepts them. It gathers
-what [spec-m2](spec-m2.md) §10, [spec-query-v2](spec-query-v2.md), the README and
-[distribution-strategy](distribution-strategy.md) §6 already say.
+Date: 2026-10-13. Status: **accepted** by the maintainer on 2026-10-13 (security roadmap S6,
+journal [0080](history/0080-compatibility-policy.md)). It states what is true today and the rules
+for what changes. It gathers what [spec-m2](spec-m2.md) §10, [spec-query-v2](spec-query-v2.md),
+the README and [distribution-strategy](distribution-strategy.md) §6 already say. Where a rule
+needs code that does not exist yet, the rule says so.
 
 There are three interfaces, each with its own version and its own rule.
 
@@ -18,7 +18,7 @@ There are three interfaces, each with its own version and its own rule.
 | Upstream 6.12.112, `vm/kasan.config` | yes, every pull request that touches `layer/` or `vm/` | yes | no |
 | Anything else | no | no | no |
 
-**Proposed rules.**
+**Rules.**
 
 1. A kernel is **supported** when the full suite (`make vm-test`) and the KASAN job pass on it in
    CI for every change to `layer/`. Everything else is unsupported, including other 6.12
@@ -38,7 +38,7 @@ There are three interfaces, each with its own version and its own rule.
 `user.moob.format` on the lower root (absent means version 1). The module refuses to mount a tree
 that declares a version it does not know.
 
-**Proposed rules.**
+**Rules.**
 
 1. A tree written by a released version stays readable by every later version. Data is never the
    price of an upgrade.
@@ -55,7 +55,7 @@ request carries its version; an unknown version or a reserved field that is not 
 `EINVAL`; an unknown command returns `ENOTTY`. `GET_INFO` reports the versions and a capability
 mask.
 
-**Proposed rules, from the first release that is not marked experimental.**
+**Rules, from the first release that is not marked experimental.**
 
 1. A structure, command number or meaning that shipped does not change. New behaviour is a new
    command, a new version number in the request, or a bit in a field that was reserved and
@@ -80,9 +80,9 @@ Versions are `MAJOR.MINOR.PATCH`, with `-experimental` while §3 rule 4 applies.
 defect that affects security or durability gets a patch release of the latest version, and an
 advisory when it is a vulnerability under `SECURITY.md`; older versions are not patched.
 
-## Open points for the maintainer
+## Open points
 
-- Accept, change or reject each rule above.
-- Whether `v0.2.0-experimental` gets a patch release now: it has the defects fixed in journals
-  0074 (set-user-ID kept on copy and clone) and 0078 (`syncfs` did not reach the lower).
-- Rule 1.2 needs a build-time check, which is a code change.
+- Rule 1.2 (refusing to build against an unlisted kernel) needs a build-time check, which is a
+  code change not made yet.
+- Decided on 2026-10-13: no patch release of `v0.2.0-experimental` for now, although it has the
+  defects fixed in journals 0074 and 0078.

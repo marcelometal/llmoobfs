@@ -132,8 +132,9 @@ kernel não promete segurança ao montar imagem hostil.
 ### S6. Processo de divulgação e política de versões
 
 *Status, 2026-10-13 (journal 0080; in English).* `SECURITY.md` is published. The policy of
-supported kernels and of compatibility is written as a proposal in `docs/compatibility.md`,
-linked from the README, awaiting the maintainer.
+supported kernels and of compatibility is in `docs/compatibility.md`, linked from the README,
+accepted by the maintainer the same day. S6's "done when" is met; the build-time check of an
+unlisted kernel is a follow-up.
 
 - `SECURITY.md` com canal de contato, prazo de resposta e o que conta como vulnerabilidade
   (inclui DoS por usuário comum).

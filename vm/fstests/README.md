@@ -83,6 +83,12 @@ or a sized `mkfs` under the filesystem.
 
 ## Not done
 
-The `auto` group, a run under the KASAN kernel, a repeat of the full ext4 run with the current
-module, and `make vm-test` integration. An exclusion list is not written yet: the table above is
-its draft.
+The `auto` group, a run under the KASAN kernel, a repeat of the full runs with the current
+module, and `make vm-test` integration.
+
+## Exclusion list
+
+[`exclude-quick.txt`](exclude-quick.txt) lists the 16 tests that fail for a reason that is a
+property of the layer (by design, a documented limitation, or not applicable), each with its
+reason; one of them, `generic/607`, is listed without having been investigated. Passed to `./check` with `-E`, a `quick` run is then expected to end with no failure on
+the three lower filesystems; that complete run with the list has **not been done yet**.

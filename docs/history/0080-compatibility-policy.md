@@ -47,6 +47,10 @@ a habit of dismissing hides the alert that matters); ignore the `bench/` and `to
 The three alerts that stay open are from Scorecard and are not about code: project younger than
 90 days, no approved reviews, static analysis not run on every commit.
 
+Note of 2026-10-13, later the same day: the maintainer accepted the policy as written.
+`docs/compatibility.md`, the README row and the roadmap now say "accepted"; the build-time check
+of rule 1.2 remains to be written.
+
 ## Evidence
 
 - The configuration is syntax only until it runs: the CodeQL workflow triggers on changes under

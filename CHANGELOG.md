@@ -3,8 +3,8 @@
 ## Unreleased
 
 - S6 (journal 0080): `docs/compatibility.md` proposes the policy of supported kernels and of
-  compatibility for the attribute encoding, the ioctl interface, mount options and tools. A
-  proposal until the maintainer accepts it.
+  compatibility for the attribute encoding, the ioctl interface, mount options and tools.
+  Accepted by the maintainer on 2026-10-13.
 - CodeQL (journal 0080): `cpp/path-injection` is turned off in `.github/codeql/codeql-config.yml`.
   It accounted for 21 of the 22 alerts dismissed so far and describes the interface of the
   command-line tools; the file says when to turn it back on.
