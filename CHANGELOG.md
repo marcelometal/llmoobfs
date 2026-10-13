@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Second client (journal 0089): `bench/client/langgraph_store.py`, a LangGraph `BaseStore` on a
+  layer directory, gives the same answers as LangGraph's in-memory store in five runs of 3 000 to
+  6 000 random operations at domain depths 1, 2 and 3, with no change to the layer. It also
+  showed how easily the homogeneity rule hides every file (one `os.makedirs` call).
 - Documentation (journal 0086): `docs/security-roadmap.md` and `docs/benchmark-harness.md` are in
   English, from the translations of an outside contributor (pull requests 46 and 47), put in
   place of the originals. Nothing in the repository is in Portuguese now.
