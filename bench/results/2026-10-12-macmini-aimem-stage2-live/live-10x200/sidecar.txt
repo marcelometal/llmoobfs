@@ -1,0 +1,4 @@
+SIDECAR: watching 1 directories
+
+Session terminated, killing shell...SIDECAR: events=4002 errors=0 overflow=0 directories=87 per_page_p50_us=793 lag_p50_ms=11.2 lag_p99_ms=17.9
+ ...killed.

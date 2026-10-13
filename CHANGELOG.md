@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Stage 2 closed with a live mirror (journal 0071): a process that only watches files keeps the
+  attributes of 2 000 pages equal to the client's database as they are written, without slowing
+  its writes or waking its watcher; the scale of 20 000 pages repeated on the module with the
+  fixes of journals 0061 and 0069 gives the same numbers.
 - `docs/client-contract.md` (M3 phase 3a, journal 0070): what any agent-memory system must follow
   to use the layer, with no client named.
 - **Security fix** (journal 0069; review of journal 0066): any user writing to or truncating a
