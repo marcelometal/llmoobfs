@@ -154,6 +154,16 @@ set. Read on 2026-10-14.
   returned twice. Checked on 2026-10-14: the PostgreSQL and MySQL pages read; for Oracle, the
   search results and summaries of the two pages, not the pages in full.
 
+### syzkaller (security roadmap S3, journal 0109)
+
+- syzkaller, https://github.com/google/syzkaller, main branch at `8fb0ae89890497b4` (2026-10-14):
+  `docs/linux/setup_ubuntu-host_qemu-vm_x86-64-kernel.md`, `docs/linux/kernel_configs.md`,
+  `docs/syscall_descriptions.md`, `sys/linux/filesystem.txt` (the `fs_options` types and
+  `mount$tmpfs`, followed for the layer's mount), `tools/create-image.sh`.
+
+  The fuzzer and its documentation, used as written; the layer's descriptions follow the existing
+  filesystem descriptions.
+
 ### Copies to user space under a lock (journal 0105)
 
 - Linux kernel, commit `a48b73eca4ce`, "btrfs: fix potential deadlock in the search ioctl"

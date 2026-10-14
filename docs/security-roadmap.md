@@ -98,6 +98,10 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
   coverage of `layer/`.
 - Done when: coverage of the ioctl and xattr handlers above a defined threshold, zero open
   reports, and reproducers of previous crashes kept in `tests/`.
+- **Status, 2026-10-14 (journal 0109):** set up (`vm/syzkaller/`, `vm/syzkaller-local.sh`); the
+  descriptions now also cover the mount and its options and `QUERY2`/`QUERY2_BATCH`, and each
+  program mounts the layer itself. A 30-minute run: 78 055 executions, the corpus reaching every
+  ioctl, no report. A six-hour run in progress; coverage threshold not set yet.
 
 ### S4. The lower layer as hostile input
 
