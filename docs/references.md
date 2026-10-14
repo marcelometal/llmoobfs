@@ -137,8 +137,9 @@ used here and is missing from this list, or is described wrongly, please open an
 | xarray, rbtree | https://docs.kernel.org/core-api/xarray.html, https://docs.kernel.org/core-api/rbtree.html | the in-kernel index (`layer/index.c`) |
 | iomap | https://docs.kernel.org/filesystems/iomap/index.html | the read-only M1 module (`kernel/main.c`) |
 | dm-log-writes, dm-flakey | https://docs.kernel.org/admin-guide/device-mapper/log-writes.html, https://docs.kernel.org/admin-guide/device-mapper/dm-flakey.html | power-loss and I/O-error tests |
-| Shrinker interface | `include/linux/shrinker.h` (`shrinker_alloc`, `shrinker_register`), `Documentation/admin-guide/mm/shrinker_debugfs.rst`, Linux 6.12.112 | how partitions are to be released under memory pressure (ADR-0012; not implemented) |
-| `list_lru` | `include/linux/list_lru.h`, as used in `fs/dcache.c` and `fs/inode.c`, Linux 6.12.112 | least-recently-used order of built partitions (ADR-0012; not implemented) |
+| Shrinker interface | `include/linux/shrinker.h` (`shrinker_alloc`, `shrinker_register`, `shrinker_free`), `mm/shrinker.c`, `Documentation/admin-guide/mm/shrinker_debugfs.rst`, Linux 6.12.112 | releases built domains under memory pressure (ADR-0012, implemented in journal 0101) |
+| `drop_caches` | `Documentation/admin-guide/sysctl/vm.rst` (`drop_caches`: writing 2 frees reclaimable slab objects through every shrinker), Linux 6.12.112 | how the suite asks the shrinker for everything (journal 0101) |
+| `list_lru` | `include/linux/list_lru.h`, as used in `fs/dcache.c` and `fs/inode.c`, Linux 6.12.112 | considered for the least-recently-used order of built partitions (ADR-0012); not used, a walk of the domains was enough (journal 0101) |
 | btrfs extent-map shrinker | `fs/btrfs/extent_map.c` (`btrfs_extent_map_shrinker_worker`), Linux 6.12.112 | precedent for a filesystem dropping a map of its own and rebuilding it on demand (ADR-0012) |
 | Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | reading where a file is (its depth and domain directory) consistently against renames, as path lookup does (`where_is()` in `layer/index.c`, journal 0098) |
 | fstests | https://git.kernel.org/pub/scm/fs/xfs/xfstests-dev.git, GPL-2.0, `v2026.09.22` | the `generic` `quick` group over the layer (`vm/fstests/`, journals 0074 and 0091); not vendored |

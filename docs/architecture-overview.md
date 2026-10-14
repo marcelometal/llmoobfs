@@ -14,7 +14,7 @@ KASAN/UBSAN/lockdep). The specifications are [spec-m2.md](spec-m2.md) and
 It is mounted over a directory of an existing, mature filesystem (the "lower"):
 
 ```sh
-mount -t moobfs_layer -o lower=/srv/memory[,nolinks][,noindex][,index_budget=<bytes>] none /mnt/memory
+mount -t moobfs_layer -o lower=/srv/memory[,nolinks][,noindex][,index_budget=<bytes>][,index_idle=<seconds>] none /mnt/memory
 ```
 
 Every file and directory visible under the mount is a real file or directory in the lower
@@ -34,6 +34,7 @@ Mount contract (`layer/main.c`, `moobl_fill_super` and `moobl_parse_param`):
 | `nolinks` refuses `link` and `symlink` creation | `moobl_link`, `moobl_symlink` |
 | `noindex` disables the index; `QUERY` and `QUERY2` then return `EOPNOTSUPP` (`ENOSYS` until journal 0050) | `layer/index.c` (`if (!ix->enabled) return -EOPNOTSUPP`) |
 | `index_budget` accepts 1M to 4G; the default is 128 MiB | `MOOBL_INDEX_BUDGET_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
+| `index_idle` accepts 0 to 86400 seconds; the default is 60: a domain queried more recently is not released by the shrinker | `MOOBL_INDEX_IDLE_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
 
 Modifying the lower tree from outside while the layer is mounted is undefined, as in
 overlayfs; changes made while unmounted are picked up when each domain is built after the next
@@ -98,7 +99,7 @@ first query on a domain directory walks that part of the lower tree and reads ev
 `user.moob.*` attribute in it, while the domain stays writable; the mount-wide `QUERY` builds
 every domain not yet built (journal 0098, ADR-0012, [spec-query-v2.md](spec-query-v2.md) §9).
 Nothing is scanned at mount. Once built, a domain is kept current by the xattr, unlink, rmdir
-and rename paths of `main.c` until unmount; nothing releases it yet. The index is never written
+and rename paths of `main.c` until it is released or the layer unmounted. The index is never written
 to disk. Structures:
 
 - an rbtree of attribute names (`struct moobl_ix_name`), one node per distinct name;
@@ -109,8 +110,11 @@ to disk. Structures:
   layer inode when one exists.
 
 Memory is accounted against `index_budget` (`charge()` returns `ENOMEM` when `used + bytes >
-budget`). If the budget is exceeded while building a domain, the query that started the build
-fails with `ENOMEM` and nothing of that domain is kept; if an index
+budget`). If the budget is exceeded while building a domain, the built domains queried least
+recently are released until it fits; a domain that does not fit alone fails its query with
+`ENOMEM` and nothing of it is kept. A shrinker also releases built domains under memory
+pressure, except those queried in the last `index_idle` seconds (journal 0101,
+[spec-query-v2.md](spec-query-v2.md) §9). If an index
 update fails after a lower write has already succeeded, the layer sets `incomplete`, logs one
 warning and reports `MOOB_FLAG_INDEX_INCOMPLETE` in `GET_INFO` until remount. Renaming a
 directory sets `paths_stale`, because descendants keep their recorded paths; `QUERY` then

@@ -31,6 +31,8 @@
 #include <linux/random.h>
 #include <linux/siphash.h>
 #include <linux/sched/mm.h>
+#include <linux/shrinker.h>
+#include <linux/jiffies.h>
 #include <linux/delay.h>
 #include <linux/moduleparam.h>
 #include "moobl.h"
@@ -159,8 +161,10 @@ static int entry_cmp(const struct moobl_ix_entry *e, u8 type, const u8 *v, u16 l
 
 static int charge(struct moobl_index *ix, size_t bytes)
 {
-	if (ix->used + bytes > ix->budget)
+	if (ix->used + bytes > ix->budget) {
+		ix->over_budget = true;
 		return -ENOMEM;
+	}
 	ix->used += bytes;
 	return 0;
 }
@@ -830,6 +834,104 @@ static void domain_drop(struct moobl_index *ix, u64 domain)
 }
 
 /*
+ * Takes a built domain down: back to "not built", nothing of it left in the index, and the next
+ * query builds it again. Caller holds dom->build, ix->query_sem for writing (no query is reading
+ * the domain) and the index lock for writing.
+ */
+static void domain_takedown(struct moobl_index *ix, struct moobl_domain *dom, u64 domain)
+{
+	lockdep_assert_held(&dom->build);
+	lockdep_assert_held_write(&ix->query_sem);
+	lockdep_assert_held_write(&ix->lock);
+	domain_drop(ix, domain);
+	WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
+	ix->domains_built--;
+	ix->drop_gen++;
+}
+
+/* How long a domain used by a query is kept from the shrinker (mount option index_idle). */
+static unsigned long reclaim_idle(const struct moobl_index *ix)
+{
+	return (unsigned long)ix->idle * HZ;
+}
+
+/*
+ * The built domain queried least recently, other than except, and not used in the last idle
+ * jiffies; NULL when there is none. Domains are never removed from ix->domains before unmount,
+ * so the walk needs no lock; the state is checked again under the locks by domain_release().
+ * A plain walk rather than a list_lru: the domains of one mount are few, and the index memory
+ * is not charged to a memory cgroup, so a per-cgroup, per-node list would buy nothing.
+ */
+static struct moobl_domain *domain_lru(struct moobl_index *ix, struct moobl_domain *except,
+				       unsigned long idle, u64 *key)
+{
+	struct moobl_domain *dom, *best = NULL;
+	unsigned long idx;
+
+	if (READ_ONCE(ix->outside.state) == MOOBL_DOM_BUILT && &ix->outside != except &&
+	    time_after_eq(jiffies, READ_ONCE(ix->outside.used_at) + idle)) {
+		best = &ix->outside;
+		*key = 0;
+	}
+	xa_for_each(&ix->domains, idx, dom) {
+		if (dom == except || READ_ONCE(dom->state) != MOOBL_DOM_BUILT ||
+		    time_before(jiffies, READ_ONCE(dom->used_at) + idle))
+			continue;
+		if (!best || time_before(READ_ONCE(dom->used_at), READ_ONCE(best->used_at))) {
+			best = dom;
+			*key = idx;
+		}
+	}
+	return best;
+}
+
+/*
+ * Releases the least recently queried built domain other than except. From the shrinker
+ * (reclaim), every lock is only tried: reclaim can run inside a query, a build or an index
+ * update of this very mount. From a build over the budget the caller holds except->build, so
+ * the other domain's build mutex is only tried (two builds could otherwise wait for each
+ * other) and the rest is taken in the order of domain_ensure(). Returns whether one was
+ * released.
+ */
+static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, bool reclaim)
+{
+	unsigned long idle = reclaim ? reclaim_idle(ix) : 0;
+	struct moobl_domain *dom;
+	unsigned int nofs;
+	bool done = false;
+	u64 key = 0;
+
+	dom = domain_lru(ix, except, idle, &key);
+	if (!dom || !mutex_trylock(&dom->build))
+		return false;
+	if (reclaim) {
+		if (!down_write_trylock(&ix->query_sem))
+			goto out_build;
+		nofs = memalloc_nofs_save();
+		if (!down_write_trylock(&ix->lock)) {
+			memalloc_nofs_restore(nofs);
+			goto out_query;
+		}
+	} else {
+		down_write(&ix->query_sem);
+		nofs = ix_write_lock(ix);
+	}
+	if (dom->state == MOOBL_DOM_BUILT) {
+		domain_takedown(ix, dom, key);
+		ix->releases++;
+		done = true;
+	}
+	ix_write_unlock(ix, nofs);
+out_query:
+	up_write(&ix->query_sem);
+out_build:
+	mutex_unlock(&dom->build);
+	return done;
+}
+
+#define MOOBL_BUDGET_RELEASES 1024
+
+/*
  * The typed attributes of one file as read from the lower filesystem: records of the value
  * size (u16), the attribute name with its NUL, and the value.
  */
@@ -1321,27 +1423,32 @@ static int scan_moved(struct scan_job *job, struct list_head *todo, struct dentr
 /*
  * Makes sure the domain whose directory is lower (mount-relative path) is built, building it
  * if it is not; domain 0 is what belongs to no domain, read from the lower root down to the
- * domain directories. Callers of a domain being built wait for it. Returns -EAGAIN when the
- * domain kept changing under the build, -ENOMEM also when it does not fit the index budget;
- * after a failure nothing of the domain is left in the index.
+ * domain directories. Callers of a domain being built wait for it. When the build does not fit
+ * the index budget and may_release is set, the domains queried least recently are released
+ * until it fits. Returns -EAGAIN when the domain kept changing under the build, -ENOMEM also
+ * when it does not fit the budget; after a failure nothing of the domain is left in the index.
  */
-static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domain, const char *path)
+static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domain, const char *path,
+			 bool may_release)
 {
 	struct moobl_sb *sbi = MOOBL_SB(sb);
 	struct moobl_index *ix = &sbi->index;
 	struct moobl_domain *dom = domain_get(ix, domain);
 	const struct cred *old;
 	struct scan_job job;
-	unsigned int nofs;
+	unsigned int nofs, released = 0;
 	int tries, err;
 
 	if (!dom)
 		return -ENOMEM;
-	if (domain_fresh(ix, dom))
+	if (domain_fresh(ix, dom)) {
+		WRITE_ONCE(dom->used_at, jiffies);
 		return 0;
+	}
 	if (mutex_lock_killable(&dom->build))
 		return -EINTR;
 	if (domain_fresh(ix, dom)) {
+		WRITE_ONCE(dom->used_at, jiffies);
 		mutex_unlock(&dom->build);
 		return 0;
 	}
@@ -1354,10 +1461,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 		/* stale: taken down with no query running on it, then built as if never built */
 		down_write(&ix->query_sem);
 		nofs = ix_write_lock(ix);
-		domain_drop(ix, domain);
-		WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
-		ix->domains_built--;
-		ix->drop_gen++;
+		domain_takedown(ix, dom, domain);
 		ix_write_unlock(ix, nofs);
 		up_write(&ix->query_sem);
 	}
@@ -1369,6 +1473,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 
 		nofs = ix_write_lock(ix);
 		WRITE_ONCE(dom->state, MOOBL_DOM_BUILDING);
+		ix->over_budget = false;
 		dom->restart = false;
 		dom->top_gen = ix->top_gen;
 		ix_write_unlock(ix, nofs);
@@ -1394,10 +1499,23 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 			domain_drop(ix, domain);
 			WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
 		} else {
+			WRITE_ONCE(dom->used_at, jiffies);
 			WRITE_ONCE(dom->state, MOOBL_DOM_BUILT);
 			dom->paths_stale = false;	/* every renamed directory was scanned again */
 			ix->domains_built++;
 			ix->builds++;
+		}
+		/* over the budget: make room by releasing what was queried least recently */
+		if (err == -ENOMEM && ix->over_budget && may_release &&
+		    released < MOOBL_BUDGET_RELEASES) {
+			ix_write_unlock(ix, nofs);
+			moved_list_free(&todo);
+			if (domain_release(ix, dom, false)) {
+				released++;
+				tries--;
+				continue;
+			}
+			break;
 		}
 		ix_write_unlock(ix, nofs);
 		moved_list_free(&todo);
@@ -1422,7 +1540,8 @@ static int domain_ensure_all(struct super_block *sb)
 	struct scan_dir *sd;
 	int err;
 
-	err = domain_ensure(sb, sbi->lower.dentry, 0, "");
+	/* no release over the budget: this query needs every domain at once */
+	err = domain_ensure(sb, sbi->lower.dentry, 0, "", false);
 	if (err || !ix->domain_depth)
 		return err;
 	err = scan_job_init(&job, sb);
@@ -1438,7 +1557,7 @@ static int domain_ensure_all(struct super_block *sb)
 	list_for_each_entry(sd, &job.found, list) {
 		if (err)
 			break;
-		err = domain_ensure(sb, sd->dentry, d_inode(sd->dentry)->i_ino, sd->path);
+		err = domain_ensure(sb, sd->dentry, d_inode(sd->dentry)->i_ino, sd->path, false);
 	}
 	scan_list_free(&job.found);
 	attr_buf_free(&job.buf);
@@ -1460,7 +1579,8 @@ void moobl_index_mount(struct super_block *sb)
 	sbi->index.xattr_ok = probe >= 0 || probe == -ENODATA;
 }
 
-void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth)
+void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth,
+		      unsigned int idle)
 {
 	struct moobl_index *ix = IX(sb);
 
@@ -1482,8 +1602,74 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 	ix->domain_depth = domain_depth;
 	get_random_bytes(&ix->cursor_key, sizeof(ix->cursor_key));
 	ix->budget = budget;
+	ix->idle = idle;
 	ix->enabled = enabled;
 	ix->initialized = true;
+}
+
+/*
+ * What the shrinker can free: an estimate in pages, the index memory shared out evenly among
+ * the built domains, times the number of those not used in the last ix->idle seconds. The
+ * index does not count its memory per domain.
+ */
+static unsigned long moobl_shrink_count(struct shrinker *s, struct shrink_control *sc)
+{
+	struct moobl_index *ix = s->private_data;
+	unsigned long idle = reclaim_idle(ix), n = 0, idx;
+	u32 built = READ_ONCE(ix->domains_built);
+	struct moobl_domain *dom;
+
+	if (!built)
+		return SHRINK_EMPTY;
+	if (READ_ONCE(ix->outside.state) == MOOBL_DOM_BUILT &&
+	    time_after_eq(jiffies, READ_ONCE(ix->outside.used_at) + idle))
+		n++;
+	xa_for_each(&ix->domains, idx, dom)
+		if (READ_ONCE(dom->state) == MOOBL_DOM_BUILT &&
+		    time_after_eq(jiffies, READ_ONCE(dom->used_at) + idle))
+			n++;
+	if (!n)
+		return SHRINK_EMPTY;
+	return max_t(unsigned long, 1, div_u64(READ_ONCE(ix->used), PAGE_SIZE) * n / built);
+}
+
+/*
+ * Releases built domains, least recently queried first, until about nr_to_scan pages are
+ * freed. Without __GFP_FS the caller may hold filesystem locks of this mount; nothing is tried.
+ */
+static unsigned long moobl_shrink_scan(struct shrinker *s, struct shrink_control *sc)
+{
+	struct moobl_index *ix = s->private_data;
+	unsigned long freed = 0;
+
+	if (!(sc->gfp_mask & __GFP_FS))
+		return SHRINK_STOP;
+	while (freed < sc->nr_to_scan) {
+		u64 before = READ_ONCE(ix->used), after;
+
+		if (!domain_release(ix, NULL, true))
+			break;
+		after = READ_ONCE(ix->used);
+		freed += max_t(unsigned long, 1, div_u64(before > after ? before - after : 0, PAGE_SIZE));
+	}
+	return freed ? freed : SHRINK_STOP;
+}
+
+int moobl_index_shrinker_start(struct super_block *sb)
+{
+	struct moobl_index *ix = IX(sb);
+
+	if (!ix->enabled)
+		return 0;
+	ix->shrinker = shrinker_alloc(0, "moobfs-index:%u:%u", MAJOR(sb->s_dev), MINOR(sb->s_dev));
+	if (!ix->shrinker)
+		return -ENOMEM;
+	ix->shrinker->count_objects = moobl_shrink_count;
+	ix->shrinker->scan_objects = moobl_shrink_scan;
+	ix->shrinker->seeks = DEFAULT_SEEKS;
+	ix->shrinker->private_data = ix;
+	shrinker_register(ix->shrinker);
+	return 0;
 }
 
 void moobl_index_destroy(struct super_block *sb)
@@ -1496,6 +1682,7 @@ void moobl_index_destroy(struct super_block *sb)
 
 	if (!ix->initialized)
 		return;	/* fill_super failed before the index existed */
+	shrinker_free(ix->shrinker);	/* waits for a scan that is running */
 	nofs = ix_write_lock(ix);
 	xa_for_each(&ix->inodes, ino, rec) {
 		struct moobl_ix_entry *e, *tmp;
@@ -2791,15 +2978,17 @@ static long query2_pin(struct super_block *sb, struct file *file, u64 domain)
 				err = PTR_ERR(p);
 			else
 				err = domain_ensure(sb, moobl_lower_dentry(file->f_path.dentry),
-						    domain, *p == '/' ? p + 1 : p);
+						    domain, *p == '/' ? p + 1 : p, true);
 			free_page((unsigned long)buf);
 			if (err)
 				return err;
 			dom = xa_load(&ix->domains, (unsigned long)domain);
 		}
 		down_read(&ix->query_sem);
-		if (dom && domain_fresh(ix, dom))
+		if (dom && domain_fresh(ix, dom)) {
+			WRITE_ONCE(dom->used_at, jiffies);
 			return 0;
+		}
 		up_read(&ix->query_sem);
 	}
 	return -EAGAIN;	/* directories kept being renamed in it */
@@ -3024,6 +3213,7 @@ static long do_get_info(struct super_block *sb, void __user *arg)
 		info.heterogeneous = ix->hetero_count;
 		info.domains_built = ix->domains_built;
 		info.domain_builds = ix->builds;
+		info.domain_releases = ix->releases;
 	}
 	ix_read_unlock(ix, nofs);
 	if (admin) {

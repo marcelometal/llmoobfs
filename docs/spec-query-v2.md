@@ -230,8 +230,8 @@ measurements moved from the Azure host to the Mac mini host (journal 0042).
 
 ## 9. Building a domain on demand (ADR-0012, journal 0098)
 
-Status: implemented and tested in the VM (journal 0098) for items 1, 2, 5 and 6 of ADR-0012.
-Releasing built domains under memory pressure (items 3 and 4) is not implemented. This section
+Status: implemented and tested in the VM (journal 0098) for items 1, 2, 5 and 6 of ADR-0012;
+items 3 and 4, releasing built domains, in journal 0101 (last bullets). This section
 replaces "the index is built at mount" wherever earlier sections or documents say so; what a
 query answers does not change.
 
@@ -285,8 +285,10 @@ query answers does not change.
   in the index, and the next query tries again. A build never answers with part of a domain: an
   ACL or a name that could not be read fails it.
 - **`GET_INFO`.** New flag `MOOB_FLAG_ON_DEMAND` (0x40), set whenever the index is on. New
-  fields in space that was reserved or padding: `domains_built` (`__u32`, "outside" included)
-  and `domain_builds` (`__u64`, builds completed since mount). Like the other counters they are
+  fields in space that was reserved or padding: `domains_built` (`__u32`, "outside" included),
+  `domain_builds` (`__u32`, builds completed since mount) and `domain_releases` (`__u32`, built
+  domains released since mount, journal 0101; `domain_builds` was a `__u64` until then, never
+  published). Like the other counters they are
   filled for `CAP_SYS_ADMIN` only, and `index_used`, `index_entries`, `index_inodes` and
   `heterogeneous` now cover the built domains only. The structure keeps its size and the
   fields already published keep their offsets; the new ones are output in what was padding and
@@ -294,5 +296,25 @@ query answers does not change.
   experimental. A program that needs the whole-mount counters must first issue the mount-wide
   `QUERY`.
 - **Not changed:** the attribute encoding, the `QUERY2` request and reply, cursors (a cursor is
-  bound to the mount, and domains are not yet released), `fallback_domains`, the budget rule
-  after a domain is built.
+  bound to the mount and carries a value and an inode number, not a position in memory, so it
+  resumes after its domain was released and built again; argued from the code, not tested),
+  `fallback_domains`, the budget rule for an update to a domain already built.
+- **Release under the budget** (journal 0101). When the build of a domain needs more than
+  `index_budget` allows, the built domain queried least recently (other than this one) is
+  released, back to "not built", and the build starts again; this repeats until the domain
+  fits or nothing is left to release. A single domain larger than the budget fails with
+  `ENOMEM` to its own callers, and the others stay as they were. A release needs the other
+  domain's build lock, which is only tried, and waits for running queries to finish. The
+  mount-wide `QUERY` never releases: it needs every domain at once, and fails with `ENOMEM`
+  when they do not all fit. An attribute write to a domain already built that does not fit
+  still marks the index incomplete, as before.
+- **Release by the shrinker** (journal 0101). Each mount registers a shrinker. Under memory
+  pressure the kernel asks it for memory, and it releases built domains, least recently queried
+  first, skipping any used in the last `index_idle` seconds (mount option, 0 to 86400, default
+  60; shown in `/proc/mounts` when not the default). It only tries its locks and gives up if
+  any is held, and does nothing for an allocation that may not enter the filesystem
+  (`__GFP_FS` clear). What it reports as freeable is an estimate: the index does not count its
+  memory per domain, so it shares `index_used` evenly among the built domains.
+- **Queries and releases.** A released domain is built again by the next query on it, at the
+  cost of a first query. The mount-wide `QUERY` returns `EAGAIN` if domains are released eight
+  times while it builds the others.

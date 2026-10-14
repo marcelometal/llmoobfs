@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Built domains are released** (journal 0101, ADR-0012 items 3 and 4): when the build of a
+  domain does not fit `index_budget`, the domains queried least recently are released until it
+  does; a shrinker releases built domains under memory pressure, except those queried in the
+  last `index_idle` seconds (new mount option, default 60). `GET_INFO` gains
+  `domain_releases`; `domain_builds` becomes 32-bit (neither was published before). The
+  mount-wide `QUERY` does not release and fails with `ENOMEM` when the domains do not all fit.
+  New suite step `release`.
 - A btrfs subvolume below the lower root is now recognised by the device `getattr` reports
   (`st_dev`) differing from the lower root's, as advised on linux-btrfs, instead of by inode
   number 256 (journal 0100). Behaviour is unchanged for btrfs: such a directory is not entered

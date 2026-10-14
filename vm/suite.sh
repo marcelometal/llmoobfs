@@ -13,6 +13,7 @@
 #   demo clients powerloss ioerror reserve
 #   faults              only under the KASAN harness: the fault-injection block of kasan-guest.sh
 #   buildrace           the first query on a domain racing with writes to it (journal 0098)
+#   release             built domains released by the budget and by the shrinker (journal 0101)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -22,7 +23,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -960,6 +961,107 @@ for fs in ext4 btrfs xfs; do
     [ $(( f & 8 )) -eq 0 ] || fail "br-index-incomplete-$fs"
     umount $LAYER && rm -rf $LOWER/br && umount $LOWER || fail "br-cleanup-$fs"
     echo "BUILD_RACE_PASS: $fs, $(cut -d' ' -f2- /tmp/br.txt) readings_repeated=$retries; every domain equal to the oracle"
+done
+fi
+if want release; then
+# ADR-0012, second half: a built domain is released when a build needs its room in the index
+# budget, least recently queried first, and by the shrinker under memory pressure, except the
+# domains used in the last index_idle seconds. Every answer after a release, and after the
+# rebuild it causes, must equal the oracle.
+rl_info() { $BIN/query $LAYER info | sed -n "s/.*$1=\([0-9]*\).*/\1/p" | head -1; }
+rl_cmp() {
+    for d in "$@"; do
+        $BIN/query $LAYER/$d q2 kind exists - - | cut -f2 | sort > /tmp/rl.k || return 1
+        $BIN/moobfs-index --domain $LOWER/rl/$d kind exists - - | cut -f2 | sort > /tmp/rl.o || return 1
+        [ -s /tmp/rl.o ] && cmp -s /tmp/rl.k /tmp/rl.o || { echo "domain $d: kernel $(wc -l < /tmp/rl.k) oracle $(wc -l < /tmp/rl.o)"; return 1; }
+    done
+}
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t $fs "$dev" $LOWER || fail "rl-lower-mount-$fs"
+    rm -rf $LOWER/rl && mkdir -m 755 $LOWER/rl || fail "rl-mkdir-$fs"
+    mount -t moobfs_layer -o lower=$LOWER/rl none $LAYER || fail "rl-mount-$fs"
+    for d in d0 d1 d2 d3; do
+        mkdir -m 755 $LAYER/$d || fail "rl-domain-$fs"
+        $BIN/bench-gen --seed 7 --inodes 500 --profile 16 --out /tmp/rl-m.txt || fail "rl-gen-$fs"
+        $BIN/bench-load --manifest /tmp/rl-m.txt --target $LAYER/$d --workload W1 --procs 2 --out /tmp/rl-w1 > /dev/null || fail "rl-w1-$fs"
+    done
+    umount $LAYER || fail "rl-umount-$fs"
+
+    # the budget: sized from what one domain takes, so that two fit and three do not
+    mount -t moobfs_layer -o lower=$LOWER/rl none $LAYER || fail "rl-measure-mount-$fs"
+    rl_cmp d0 || fail "rl-measure-$fs"
+    one=$(rl_info used)
+    umount $LAYER || fail "rl-measure-umount-$fs"
+    budget=$(( one * 5 / 2 ))
+    [ $budget -ge 1048576 ] || fail "rl-domains-too-small-for-the-1M-minimum-budget-$fs (one domain: $one bytes)"
+    mount -t moobfs_layer -o lower=$LOWER/rl,index_budget=$budget none $LAYER || fail "rl-budget-mount-$fs"
+    rl_cmp d0 d1 d2 d3 || fail "rl-budget-answer-differs-$fs"
+    [ "$(rl_info domain_releases)" -ge 2 ] || { $BIN/query $LAYER info; fail "rl-budget-nothing-released-$fs"; }
+    [ "$(rl_info domains_built)" -le 2 ] || { $BIN/query $LAYER info; fail "rl-budget-too-many-built-$fs"; }
+    [ "$(rl_info used)" -le $budget ] || fail "rl-budget-exceeded-$fs"
+    rl_cmp d0 || fail "rl-budget-rebuild-differs-$fs"
+    # the least recently queried goes first: once d0 and d1 are the last two queried, both stay
+    rl_cmp d1 || fail "rl-budget-lru-query-$fs"
+    rl_cmp d0 || fail "rl-budget-lru-query2-$fs"
+    b0=$(rl_info domain_builds)
+    rl_cmp d0 d1 || fail "rl-budget-lru-again-$fs"
+    [ "$(rl_info domain_builds)" -eq "$b0" ] || fail "rl-budget-recent-domain-was-released-$fs"
+    # the mount-wide query needs every domain at once and does not release any: it fails
+    $BIN/query $LAYER build 2> /dev/null && fail "rl-budget-mount-wide-query-did-not-fail-$fs"
+    f=$($BIN/query $LAYER info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
+    [ $(( f & 8 )) -eq 0 ] || fail "rl-budget-index-incomplete-$fs"
+    umount $LAYER || fail "rl-budget-umount-$fs"
+
+    # the shrinker, with no idle floor: drop_caches=2 asks every shrinker for everything
+    mount -t moobfs_layer -o lower=$LOWER/rl,index_idle=0 none $LAYER || fail "rl-shrink-mount-$fs"
+    grep -q "index_idle=0" /proc/mounts || fail "rl-shrink-option-not-shown-$fs"
+    rl_cmp d0 d1 d2 d3 || fail "rl-shrink-before-$fs"
+    [ "$(rl_info domains_built)" -eq 4 ] || fail "rl-shrink-built-$fs"
+    sync; echo 2 > /proc/sys/vm/drop_caches
+    [ "$(rl_info domains_built)" -eq 0 ] || { $BIN/query $LAYER info; fail "rl-shrinker-released-nothing-$fs"; }
+    [ "$(rl_info domain_releases)" -eq 4 ] || fail "rl-shrink-count-$fs"
+    rl_cmp d0 d1 d2 d3 || fail "rl-shrink-rebuild-differs-$fs"
+    umount $LAYER || fail "rl-shrink-umount-$fs"
+
+    # with the default floor (60 s) the domains just queried stay
+    mount -t moobfs_layer -o lower=$LOWER/rl none $LAYER || fail "rl-idle-mount-$fs"
+    rl_cmp d0 d1 d2 d3 || fail "rl-idle-before-$fs"
+    sync; echo 2 > /proc/sys/vm/drop_caches
+    [ "$(rl_info domains_built)" -eq 4 ] && [ "$(rl_info domain_releases)" -eq 0 ] || { $BIN/query $LAYER info; fail "rl-idle-floor-not-kept-$fs"; }
+    umount $LAYER || fail "rl-idle-umount-$fs"
+
+    # releases racing with builds and writes: the shrinker runs in a loop during buildrace
+    rm -rf $LOWER/rl/* && mount -t moobfs_layer -o lower=$LOWER/rl,index_idle=0 none $LAYER || fail "rl-race-mount-$fs"
+    for d in $(seq 0 7); do
+        dd=$LAYER/$(printf 'r%03d' $d)
+        mkdir -p $dd/s/t $dd/u || fail "rl-race-domain-$fs"
+        for i in $(seq 0 59); do
+            f=$dd/$(printf 'f%04d' $i); : > $f
+            $BIN/moobfs-attr set $f kind string k$((i % 4)) > /dev/null || fail "rl-race-attr-$fs"
+        done
+    done
+    rm -f /tmp/rl.stop
+    ( while [ ! -e /tmp/rl.stop ]; do echo 2 > /proc/sys/vm/drop_caches; done ) &
+    # one buildrace lasts well under a second; five, with pauses in which the loop releases
+    # what they built, so that later rounds build again what was released while being written
+    rc=0
+    for k in 1 2 3 4 5; do
+        $BIN/buildrace $LAYER 8 60 > /tmp/rl-br.txt || { rc=1; break; }
+        sleep 0.3
+    done
+    touch /tmp/rl.stop; wait
+    [ $rc -eq 0 ] || { cat /tmp/rl-br.txt; fail "rl-race-run-$fs"; }
+    rl_race_releases=$(rl_info domain_releases)
+    [ "$rl_race_releases" -gt 0 ] || fail "rl-race-no-release-happened-$fs (the test proved nothing)"
+    for d in $(seq 0 7); do
+        d=$(printf 'r%03d' $d)
+        $BIN/query $LAYER/$d q2 kind exists - - | cut -f2 | sort > /tmp/rl.k || fail "rl-race-query-$fs"
+        $BIN/moobfs-index --domain $LOWER/rl/$d kind exists - - | cut -f2 | sort > /tmp/rl.o || fail "rl-race-oracle-$fs"
+        cmp -s /tmp/rl.k /tmp/rl.o || fail "rl-race-differs-$d-$fs"
+    done
+    umount $LAYER && rm -rf $LOWER/rl && umount $LOWER || fail "rl-cleanup-$fs"
+    echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker and idle floor; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
 fi
 rmmod moobfs_layer || fail layer-unload

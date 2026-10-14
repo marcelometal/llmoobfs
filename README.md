@@ -31,7 +31,7 @@ directory of ext4, btrfs or XFS and moves those two jobs into the filesystem. It
    directory is still a plain tree that `grep`, `getfattr`, `git` and `rsync` read.
 2. **An index in the kernel.** The module indexes those attributes in RAM and updates the index
    when an attribute is written. Nothing is scanned at mount: the first query on a directory
-   builds that directory's part of the index, which then lives until unmount.
+   builds that directory's part of the index, which is released again when memory is short.
 3. **A query scoped by directory and authorized by file permissions.** One `ioctl` (`QUERY2`) on
    a directory answers up to four comparisons joined by AND, optionally ordered by one
    attribute. It returns only files that everyone allowed into that directory may read.
@@ -116,7 +116,8 @@ production.** Facts as of 2026-10-13:
 - **The measurements are pilot-grade**, from one host; the report that gathers them is
   [journal 0088](docs/history/0088-m4-report.md). They are not a general speed claim.
 - The index lives **in RAM only** and cannot be paged out. It is built per domain by the first
-  query on it and nothing releases it before unmount yet; a query that needs every domain (the
+  query on it, and released again under memory pressure or to stay within its budget, least
+  recently queried first; a query that needs every domain (the
   mount-wide `QUERY`) costs what the mount scan used to.
 - Mounting needs **`CAP_SYS_ADMIN` in the initial user namespace**.
 - **The interface may change**, with no compatibility promise.
@@ -339,8 +340,10 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
   kernel APIs are version-specific and the pinned test target is not a compatibility promise.
-- The index is RAM only, non-pageable, bounded by `index_budget` (default 128 MiB), rebuilt by
-  a linear scan at every mount; behaviour near a saturated budget on large trees is untested.
+- The index is RAM only, non-pageable and bounded by `index_budget` (default 128 MiB). Each
+  domain is built by a linear scan on its first query after mount, and again after it was
+  released or a directory in it was renamed; the budget and the shrinker were tested on small
+  trees only (journal 0101).
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
   mounts are refused; no rootless containers.
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.

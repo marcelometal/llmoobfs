@@ -110,7 +110,8 @@ struct moob_info {
 	__u32 heterogeneous;			/* indexed inodes that fail the homogeneity rule */
 	__u32 fallback_domains;			/* domains answered with per-result checks */
 	__u32 domains_built;			/* domains whose index is built, the part outside every domain included */
-	__u64 domain_builds;			/* builds completed since mount; grows when a domain is rebuilt */
+	__u32 domain_builds;			/* builds completed since mount; grows when a domain is rebuilt */
+	__u32 domain_releases;			/* built domains released since mount, to free memory */
 	__u64 reserved[1];
 };
 

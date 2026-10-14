@@ -16,6 +16,7 @@
 #define MOOBL_SUPER_MAGIC 0x4d4f4f42	/* "MOOB" */
 #define MOOBL_NAME "moobfs_layer"
 #define MOOBL_INDEX_BUDGET_DEFAULT (128ULL << 20)
+#define MOOBL_INDEX_IDLE_DEFAULT 60U
 
 /*
  * One permission domain's part of the index (ADR-0012): not built until somebody queries the
@@ -31,6 +32,7 @@ struct moobl_domain {
 	bool restart;			/* one of them could not be recorded: build again */
 	bool paths_stale;		/* a directory was renamed in it since it was built */
 	u64 top_gen;			/* ix->top_gen when its build began */
+	unsigned long used_at;		/* jiffies of the last query that used it */
 };
 
 struct moobl_index {
@@ -57,7 +59,11 @@ struct moobl_index {
 	struct list_head loaders;	/* struct moobl_loader: files being read into the index now */
 	u64 move_gen;			/* bumped by every rename and link: a placement is recomputed on change */
 	u32 domains_built;		/* domains in state built, the outside part included */
-	u64 builds;			/* builds completed since mount */
+	u32 builds;			/* builds completed since mount */
+	u32 releases;			/* built domains released since mount */
+	bool over_budget;		/* charge() refused an allocation (index lock) */
+	unsigned int idle;		/* seconds a used domain is kept from the shrinker */
+	struct shrinker *shrinker;	/* releases built domains under memory pressure */
 };
 
 struct moobl_sb {
@@ -108,7 +114,9 @@ struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower);
 
 /* index.c */
 int moobl_other_device(struct super_block *sb, struct dentry *lower);
-void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth);
+void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth,
+		      unsigned int idle);
+int moobl_index_shrinker_start(struct super_block *sb);
 void moobl_index_mount(struct super_block *sb);
 void moobl_index_destroy(struct super_block *sb);
 int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *name,

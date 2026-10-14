@@ -202,6 +202,9 @@ static int moobl_show_options(struct seq_file *m, struct dentry *root)
 		seq_printf(m, ",index_budget=%llu", MOOBL_SB(root->d_sb)->index.budget);
 	if (MOOBL_SB(root->d_sb)->index.domain_depth != 1)
 		seq_printf(m, ",domain_depth=%u", MOOBL_SB(root->d_sb)->index.domain_depth);
+	if (MOOBL_SB(root->d_sb)->index.enabled &&
+	    MOOBL_SB(root->d_sb)->index.idle != MOOBL_INDEX_IDLE_DEFAULT)
+		seq_printf(m, ",index_idle=%u", MOOBL_SB(root->d_sb)->index.idle);
 	return 0;
 }
 
@@ -1278,9 +1281,10 @@ struct moobl_fc {
 	bool noindex;
 	u64 index_budget;
 	int domain_depth;		/* -1: default */
+	int index_idle;			/* -1: default */
 };
 
-enum { Opt_lower, Opt_nolinks, Opt_noindex, Opt_index_budget, Opt_domain_depth };
+enum { Opt_lower, Opt_nolinks, Opt_noindex, Opt_index_budget, Opt_domain_depth, Opt_index_idle };
 
 static const struct fs_parameter_spec moobl_params[] = {
 	fsparam_string("lower", Opt_lower),
@@ -1288,6 +1292,7 @@ static const struct fs_parameter_spec moobl_params[] = {
 	fsparam_flag("noindex", Opt_noindex),
 	fsparam_string("index_budget", Opt_index_budget),
 	fsparam_u32("domain_depth", Opt_domain_depth),
+	fsparam_u32("index_idle", Opt_index_idle),
 	{}
 };
 
@@ -1325,6 +1330,11 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 			return invalfc(fc, "domain_depth must be between 0 and 8");
 		ctx->domain_depth = (int)result.uint_32;
 		break;
+	case Opt_index_idle:
+		if (result.uint_32 > 86400)
+			return invalfc(fc, "index_idle must be between 0 and 86400 seconds");
+		ctx->index_idle = (int)result.uint_32;
+		break;
 	}
 	return 0;
 }
@@ -1346,7 +1356,8 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	sb->s_fs_info = sbi;
 	/* Initialize the index state first: kill_sb tears it down on every failure path. */
 	moobl_index_init(sb, ctx->index_budget ? ctx->index_budget : MOOBL_INDEX_BUDGET_DEFAULT,
-			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth);
+			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth,
+			 ctx->index_idle < 0 ? MOOBL_INDEX_IDLE_DEFAULT : (unsigned int)ctx->index_idle);
 	err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &sbi->lower);
 	if (err)
 		return invalfc(fc, "cannot resolve lower directory");
@@ -1413,6 +1424,9 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	err = moobl_set_lower_path(root, sbi->lower.mnt, dget(sbi->lower.dentry));
 	if (err)
 		return err;
+	err = moobl_index_shrinker_start(sb);
+	if (err)
+		return err;
 	moobl_index_mount(sb);
 	return 0;
 }
@@ -1445,6 +1459,7 @@ static int moobl_init_fs_context(struct fs_context *fc)
 	if (!ctx)
 		return -ENOMEM;
 	ctx->domain_depth = -1;
+	ctx->index_idle = -1;
 	fc->fs_private = ctx;
 	fc->ops = &moobl_context_ops;
 	return 0;

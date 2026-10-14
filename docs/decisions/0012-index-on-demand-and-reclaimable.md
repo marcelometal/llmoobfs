@@ -129,3 +129,19 @@ The text above is kept as decided. Three points changed while implementing items
 The warm-up trigger ("reading a domain directory is a candidate") is not implemented; the
 mount-wide `QUERY` warms everything, and a `QUERY2` warms one domain.
 
+
+## Note of 2026-10-14: items 3 and 4 (journal 0101)
+
+Implemented as decided, with these choices:
+
+- **No `list_lru`.** The least recently queried domain is found by walking the domains of the
+  mount. The domains are few, and the index memory is not charged to a memory cgroup, so the
+  per-node, per-cgroup lists of `list_lru` would buy nothing here.
+- **The floor** is the mount option `index_idle` (seconds, default 60), as agreed on
+  2026-10-13. It applies to the shrinker only; a build over the budget may release a domain
+  used a moment ago, since the budget is a limit the administrator set.
+- **The mount-wide `QUERY` never releases** to make room: it needs every domain at once.
+- **What the shrinker reports as freeable is an estimate.** The index does not count memory per
+  domain; per-domain accounting would make the count exact and was left for later.
+- The counter of releases is in `GET_INFO` (`domain_releases`); `domain_builds` became 32-bit
+  to make room, before either was published.

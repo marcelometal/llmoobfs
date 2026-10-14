@@ -313,8 +313,9 @@ int main(int argc, char **argv)
 		printf("domain_depth=%u heterogeneous=%u fallback_domains=%u counters=%s\n", info.domain_depth,
 		       info.heterogeneous, info.fallback_domains,
 		       (info.flags & MOOB_FLAG_COUNTERS) ? "shown" : "hidden");
-		printf("domains_built=%u domain_builds=%" PRIu64 " on_demand=%d\n", info.domains_built,
-		       (uint64_t)info.domain_builds, (info.flags & MOOB_FLAG_ON_DEMAND) != 0);
+		printf("domains_built=%u domain_builds=%u domain_releases=%u on_demand=%d\n",
+		       info.domains_built, info.domain_builds, info.domain_releases,
+		       (info.flags & MOOB_FLAG_ON_DEMAND) != 0);
 		printf("lower=%s caps=%#x flags=%#x budget=%" PRIu64 " used=%" PRIu64 " entries=%u inodes=%u\n",
 		       info.lower_fs, info.caps, info.flags, (uint64_t)info.index_budget,
 		       (uint64_t)info.index_used, info.index_entries, info.index_inodes);
