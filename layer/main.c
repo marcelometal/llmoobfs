@@ -1365,7 +1365,7 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	struct moobl_fc *ctx = fc->fs_private;
 	struct moobl_sb *sbi;
 	struct inode *root_inode;
-	struct dentry *root;
+	struct dentry *root, *lower_root;
 	struct cred *cred;
 	int err;
 
@@ -1380,8 +1380,11 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth,
 			 ctx->index_idle < 0 ? MOOBL_INDEX_IDLE_DEFAULT : (unsigned int)ctx->index_idle);
 	err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &sbi->lower);
-	if (err)
-		return invalfc(fc, "cannot resolve lower directory");
+	if (err) {
+		/* the walk's own error: ENOENT, ENOTDIR, EACCES, or ENOMEM, not always EINVAL */
+		errorfc(fc, "cannot resolve lower directory");
+		return err;
+	}
 	if (sbi->lower.dentry->d_sb->s_magic == MOOBL_SUPER_MAGIC)
 		return invalfc(fc, "lower cannot be another moobfs_layer mount");
 	sb->s_stack_depth = sbi->lower.dentry->d_sb->s_stack_depth + 1;
@@ -1420,7 +1423,8 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 		} else if (n == -EOPNOTSUPP) {
 			pr_info("moobfs_layer: lower filesystem has no user xattr support; typed attributes unavailable\n");
 		} else if (n != -ENODATA) {
-			return invalfc(fc, "cannot read the moobfs format marker on the lower root");
+			errorfc(fc, "cannot read the moobfs format marker on the lower root");
+			return n;
 		}
 	}
 	sb->s_magic = MOOBL_SUPER_MAGIC;
@@ -1442,9 +1446,17 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	if (!root)
 		return -ENOMEM;
 	sb->s_root = root;
-	err = moobl_set_lower_path(root, sbi->lower.mnt, dget(sbi->lower.dentry));
-	if (err)
+	/*
+	 * moobl_set_lower_path() takes the reference only when it succeeds: on failure it is
+	 * dropped here, or the lower root stays pinned after the mount fails (found by syzkaller
+	 * with an allocation fault, journal 0112).
+	 */
+	lower_root = dget(sbi->lower.dentry);
+	err = moobl_set_lower_path(root, sbi->lower.mnt, lower_root);
+	if (err) {
+		dput(lower_root);
 		return err;
+	}
 	err = moobl_index_shrinker_start(sb);
 	if (err)
 		return err;

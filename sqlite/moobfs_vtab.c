@@ -18,9 +18,8 @@
  * What is handed to the kernel: =, <, <=, >, >=, IS NOT NULL on attribute columns (up to the four
  * terms of QUERY2, the key's EXISTS included); an IN list, whole, as one QUERY2_BATCH per eight
  * values; an ORDER BY on one attribute column that cannot be NULL. Everything else (OR, other
- * operators, sorting, LIMIT, aggregation) is SQLite's. A constraint is declared handled ("omit")
- * only when its right-hand side is a constant of the column's kind, checked while planning; any
- * other pushed constraint is checked again by SQLite on each row.
+ * operators, sorting, LIMIT, aggregation) is SQLite's. Only IS NOT NULL is declared handled
+ * ("omit"); SQLite checks every other pushed condition again on each row.
  *
  * Built as a loadable extension (entry point sqlite3_moobfs_init), or with -DSQLITE_CORE into a
  * program that calls sqlite3_moobfs_init itself.
@@ -473,7 +472,6 @@ static int mv_best_index(sqlite3_vtab *vt, sqlite3_index_info *ix)
 			const struct sqlite3_index_constraint *c = &ix->aConstraint[i];
 			struct mv_term *tm;
 			int op = mv_op(c->op), is_in = 0;
-			sqlite3_value *rhs = NULL;
 
 			if (!c->usable || c->iColumn < 1 || !op || ix->aConstraintUsage[i].argvIndex)
 				continue;
@@ -505,16 +503,16 @@ static int mv_best_index(sqlite3_vtab *vt, sqlite3_index_info *ix)
 				/* IS NOT NULL has no right-hand side; it is still consumed by the kernel */
 				ix->aConstraintUsage[i].argvIndex = 0;
 			}
-			/* "handled" only for a constant of the column's kind (an IN list is checked again) */
-			if (op == MOOB_OP_EXISTS) {
+			/*
+			 * Only IS NOT NULL is declared handled. Every other condition is checked again
+			 * by SQLite on each row: the value seen here (sqlite3_vtab_rhs_value) need not be
+			 * the one xFilter receives (an older SQLite hands 5 here and 5.0 there for an
+			 * INTEGER column), and xFilter drops a condition it cannot represent exactly, so a
+			 * condition declared handled here could reach nobody (journal 0112). An equality's
+			 * column is answered from the request (mv_column), so its check costs no read.
+			 */
+			if (op == MOOB_OP_EXISTS)
 				ix->aConstraintUsage[i].omit = 1;
-			} else if (!is_in && sqlite3_vtab_rhs_value(ix, i, &rhs) == SQLITE_OK && rhs) {
-				unsigned char buf[MOOB_QUERY_VALUE_MAX];
-				unsigned short len;
-
-				ix->aConstraintUsage[i].omit = (unsigned char)mv_encode(t->col[c->iColumn].type,
-											rhs, buf, &len);
-			}
 			if (t->col[c->iColumn].required && !covered[c->iColumn])
 				uncovered--;
 			covered[c->iColumn] = 1;
@@ -943,7 +941,7 @@ __declspec(dllexport)
 int sqlite3_moobfs_init(sqlite3 *db, char **err, const sqlite3_api_routines *api)
 {
 	SQLITE_EXTENSION_INIT2(api);
-	/* sqlite3_vtab_in, sqlite3_vtab_rhs_value and LIMIT constraints arrived in 3.38.0 */
+	/* sqlite3_vtab_in and LIMIT constraints arrived in 3.38.0 */
 	if (sqlite3_libversion_number() < 3038000) {
 		if (err)
 			*err = sqlite3_mprintf("moobfs: needs SQLite 3.38.0 or later (this is %s)",

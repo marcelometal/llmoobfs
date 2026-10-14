@@ -50,8 +50,9 @@ created EXISTS; ORDER BY created DESC; LIMIT ?3`.
 - `OR` between conditions on different columns: SQLite runs one scan of the table per branch and
   unites the rows by rowid ("MULTI-INDEX OR"), so no file comes twice.
 - `ORDER BY` one required column (or the key), ascending or descending, with the `LIMIT`.
-- A condition is reported handled only when its value is a constant of the column's type; any
-  other is checked again by SQLite on each row, with SQLite's own type rules.
+- Only `IS NOT NULL` is reported handled; SQLite checks every other condition again on each row,
+  with its own type rules. A column under an equality the kernel matched is answered from the
+  request, so that check reads no file.
 
 ## Cost
 

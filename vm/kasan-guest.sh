@@ -91,6 +91,11 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     mount -t moobfs_layer -o lower=$LOWER/fi,domain_depth=1 none $LAYER || fail fi-remount
     fi_cmp '*' || fail fi-index-differs-after-remount
     umount $LAYER && rm -rf $LOWER/fi && umount $LOWER || fail fi-cleanup
+    # a reference the layer kept on a lower dentry shows only here, when the lower goes
+    # ("Dentry still in use", found by syzkaller after a failed mount, journal 0112)
+    if dmesg | grep -E 'BUG: Dentry|still in use|BUG:|WARNING:'; then
+        fail "fi-lower-pinned after the layer was unmounted"
+    fi
     rmmod moobfs_layer || fail fi-rmmod
     echo "FAULT_INJECTION_PASS: $(grep '^FAILNTH_DONE' "$OUT/failnth.txt" | cut -d' ' -f2-); no kernel diagnostic; index equal to the oracle"
 fi
