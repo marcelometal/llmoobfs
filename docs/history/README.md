@@ -127,3 +127,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0097 — First answers from outside, and the decisions that followed](0097-outside-answers-and-decisions.md)
 - [0098 — ADR-0012, first half: the index of a domain is built by the first query on it](0098-index-on-demand.md)
 - [0099 — The credential model was described as overlayfs's; it is not](0099-credential-model-corrected.md)
+- [0100 — A nested subvolume is recognised by its device, not by its inode number](0100-subvolume-by-device.md)

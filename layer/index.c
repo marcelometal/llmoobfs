@@ -1167,8 +1167,11 @@ static int scan_child(struct scan_job *job, struct scan_dir *cur, struct scan_na
 		goto out;
 	if (!job->index && !d_is_dir(child))
 		goto out;
-	if (moobl_nested_subvolume(child)) {
-		pr_info_once("moobfs_layer: a btrfs subvolume inside the lower tree is left out\n");
+	err = moobl_other_device(job->sb, child);
+	if (err) {
+		if (err > 0)
+			pr_info_once("moobfs_layer: a directory on another device (a btrfs subvolume) inside the lower tree is left out\n");
+		err = err < 0 ? err : 0;
 		goto out;
 	}
 	cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path, cur->path[0] ? "/" : "", sn->len,

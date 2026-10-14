@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A btrfs subvolume below the lower root is now recognised by the device `getattr` reports
+  (`st_dev`) differing from the lower root's, as advised on linux-btrfs, instead of by inode
+  number 256 (journal 0100). Behaviour is unchanged for btrfs: such a directory is not entered
+  (`EXDEV`) and is left out of the index; any other directory that reports another device is
+  now treated the same way.
 - Correction (journal 0099): ADR-0011 and `docs/research-stacked-fs-kernel-rules.md` called
   MoobFS's credential split (name operations with the caller's credentials, data operations
   with the mounter's) "the overlayfs model". It is not: overlayfs checks every access against

@@ -310,6 +310,29 @@ static const struct dentry_operations moobl_dops = {
 
 /* ---- directory inode operations --------------------------------------- */
 
+/*
+ * 1 when lower is a directory on another device than the lower root, 0 when not, or an error.
+ * A btrfs subvolume below the root is the usual case: it is a separate filesystem with its own
+ * anonymous device, and it numbers its inodes from the start again, while the index and the
+ * layer's inode cache identify a file by its inode number alone, so it cannot be entered. Every
+ * inode of a subvolume reports the subvolume's device, so checking directories is enough. The
+ * device is the one getattr reports (st_dev), not i_sb->s_dev, which btrfs subvolumes share.
+ * The lower root may itself be a subvolume; it is never looked up.
+ */
+int moobl_other_device(struct super_block *sb, struct dentry *lower)
+{
+	struct path p = { .mnt = MOOBL_SB(sb)->lower.mnt, .dentry = lower };
+	struct kstat st;
+	int err;
+
+	if (!d_is_dir(lower))
+		return 0;
+	err = vfs_getattr_nosec(&p, &st, STATX_BASIC_STATS, AT_STATX_DONT_SYNC);
+	if (err)
+		return err;
+	return st.dev != MOOBL_SB(sb)->lower_dev;
+}
+
 static struct dentry *moobl_lookup(struct inode *dir, struct dentry *dentry,
 				   unsigned int flags)
 {
@@ -324,9 +347,10 @@ static struct dentry *moobl_lookup(struct inode *dir, struct dentry *dentry,
 					       dentry->d_name.len);
 	if (IS_ERR(lower_dentry))
 		return ERR_CAST(lower_dentry);
-	if (moobl_nested_subvolume(lower_dentry)) {
+	err = moobl_other_device(dir->i_sb, lower_dentry);
+	if (err) {
 		dput(lower_dentry);
-		return ERR_PTR(-EXDEV);
+		return ERR_PTR(err < 0 ? err : -EXDEV);
 	}
 	err = moobl_set_lower_path(dentry, parent->mnt, lower_dentry);
 	if (err) {
@@ -1329,6 +1353,14 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	if (sbi->lower.dentry->d_sb->s_magic == MOOBL_SUPER_MAGIC)
 		return invalfc(fc, "lower cannot be another moobfs_layer mount");
 	sb->s_stack_depth = sbi->lower.dentry->d_sb->s_stack_depth + 1;
+	{
+		struct kstat st;
+
+		err = vfs_getattr_nosec(&sbi->lower, &st, STATX_BASIC_STATS, AT_STATX_DONT_SYNC);
+		if (err)
+			return err;
+		sbi->lower_dev = st.dev;
+	}
 	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH)
 		return invalfc(fc, "maximum filesystem stacking depth exceeded");
 	cred = prepare_creds();

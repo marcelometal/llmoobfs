@@ -11,7 +11,6 @@
 #include <linux/path.h>
 #include <linux/cred.h>
 #include <linux/magic.h>
-#include <linux/btrfs_tree.h>
 #include <linux/siphash.h>
 
 #define MOOBL_SUPER_MAGIC 0x4d4f4f42	/* "MOOB" */
@@ -63,6 +62,7 @@ struct moobl_index {
 
 struct moobl_sb {
 	struct path lower;		/* lower root */
+	dev_t lower_dev;		/* device getattr reports for the lower root */
 	const struct cred *creds;	/* mounter credentials for delegated work */
 	bool nolinks;			/* refuse link and symlink creation */
 	struct moobl_index index;
@@ -93,20 +93,6 @@ static inline struct inode *moobl_lower_inode(struct inode *inode)
 	return MOOBL_I(inode)->lower;
 }
 
-/*
- * The root directory of a btrfs subvolume. Each subvolume numbers its inodes from the start
- * again, and the index and the layer's inode cache identify a file by its inode number alone,
- * so a subvolume below the lower root cannot be entered: its files could not be told from
- * those outside it. The lower root may itself be such a directory; it is never looked up.
- */
-static inline bool moobl_nested_subvolume(struct dentry *lower)
-{
-	struct inode *inode = READ_ONCE(lower->d_inode);
-
-	return inode && S_ISDIR(inode->i_mode) && inode->i_sb->s_magic == BTRFS_SUPER_MAGIC &&
-	       inode->i_ino == BTRFS_FIRST_FREE_OBJECTID;
-}
-
 static inline struct path *moobl_lower_path(struct dentry *dentry)
 {
 	return &((struct moobl_dentry *)dentry->d_fsdata)->lower;
@@ -121,6 +107,7 @@ static inline struct dentry *moobl_lower_dentry(struct dentry *dentry)
 struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower);
 
 /* index.c */
+int moobl_other_device(struct super_block *sb, struct dentry *lower);
 void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth);
 void moobl_index_mount(struct super_block *sb);
 void moobl_index_destroy(struct super_block *sb);
