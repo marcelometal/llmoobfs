@@ -19,10 +19,21 @@ without growing the kernel interface.
   lists because a file holds one value per attribute; ordered merges that read the order
   attribute of each compared result, which makes projection of values its third use case; no NOT.
 
+## Revision of the same day
+
+The maintainer asked whether a mature engine, or code in the kernel, already does this before a
+planner is written. Study in `docs/research-query-frontends.md`: SQLite virtual tables, DuckDB,
+Apache DataFusion, Polars IO plugins, osquery as proof of the pattern, the filter documents the
+agent stores already use (Chroma, Qdrant), CEL, and in the kernel the ftrace event filter and
+nftables' PIPAPO sets. ADR-0013 now proposes no planner of our own: an optional SQLite extension
+with a virtual table over `QUERY2`, framework adapters that only translate their filters into SQL,
+and the kernel interface unchanged; the planner library of the first draft is recorded as a
+rejected alternative.
+
 ## Decision needed
 
-The three questions at the end of ADR-0013.
+The two questions at the end of ADR-0013.
 
 ## Next step
 
-After the decision: the oracle extended to an OR of branches, then the library, test first.
+The prototype of ADR-0013 point 5, after the maintainer's answer.

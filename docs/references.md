@@ -131,6 +131,14 @@ used here and is missing from this list, or is described wrongly, please open an
   The technique of journal 0096 (`tests/failnth.c`, `vm/kasan-guest.sh`), implemented. Read in the
   source tree of the kernel the tests are built with.
 
+### Query front-ends (ADR-0013, proposed; `docs/research-query-frontends.md`)
+
+The sources of the study are listed in its last section: SQLite's virtual table mechanism and
+optimizer documentation, DuckDB's C API table functions, Apache DataFusion's `TableProvider`,
+Polars' `register_io_source`, osquery's table and SDK documentation, Chroma's and Qdrant's
+filtering documentation, CEL, and in Linux 6.12.112 the ftrace event filter and nftables' PIPAPO
+set. Read on 2026-10-14.
+
 ### Disjunctions over index scans (ADR-0013, proposed)
 
 - PostgreSQL documentation, "Combining Multiple Indexes" (current version, read on 2026-10-14).
