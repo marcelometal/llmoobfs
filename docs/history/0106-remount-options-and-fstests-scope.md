@@ -45,6 +45,16 @@ vendored `fsx` or `replay-log` goes upstream as a patch.
   run for this journal. KASAN: with the next batch. Note of 2026-10-14: the complete run of journal
   0108 passed them on ext4, btrfs and XFS.
 
+## Note of 2026-10-14: the KASAN job failed, and why
+
+The KASAN workflow of pull request 71 failed at `remount-fsconfig-change-accepted-ext4`. The
+KASAN harness (`.github/workflows/kasan.yml` and `vm/kasan-local.sh`) builds the test binaries
+from its own list, and `tests/reconf.c` (this journal) and `tests/sqlq.c` (journal 0108) had been
+added only to the local VM's build (`vm/in-container.sh`): in the KASAN guest the check ran a
+program that did not exist, and the failure read as "accepted". Not a defect of the module. Both
+are now in the two lists. The test binaries are listed in three places; one list shared by the
+three is a cleanup left open.
+
 ## Next step
 
 The KASAN batch with journals 0105 and 0106.
