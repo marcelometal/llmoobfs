@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Decisions after the first answers from outside (journal 0097): nested btrfs subvolumes are
+  to be detected by comparing `st_dev`, as advised on linux-btrfs, instead of by inode number
+  (not implemented); two items added to the security roadmap, a run under SELinux (S12) and
+  tracepoints for the index (S13); `docs/references.md` gains a section of thanks.
 - Fault injection (journal 0096): `tests/failnth.c` and a block in `vm/kasan-guest.sh` fail every
   allocation made on behalf of the module in turn, with the kernel's `fail-nth`, across 17
   operations, under KASAN and lockdep. Fixed what it found: an allocation failure in the walk

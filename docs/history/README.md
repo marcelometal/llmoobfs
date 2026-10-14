@@ -124,3 +124,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0094 — The user-space baseline measured against the layer](0094-userspace-baseline-measured.md)
 - [0095 — Direction after the user-space comparison: keep the module, remove its costs](0095-direction-after-the-baseline.md)
 - [0096 — Systematic allocation-failure injection; the domain walk no longer allocates](0096-fault-injection.md)
+- [0097 — First answers from outside, and the decisions that followed](0097-outside-answers-and-decisions.md)

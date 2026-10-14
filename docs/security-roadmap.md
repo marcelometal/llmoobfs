@@ -185,6 +185,39 @@ require `CAP_DAC_READ_SEARCH` in the caller; verify the layer does not bypass th
 revisions and snapshots (data leakage across revisions; garbage collection as a DoS surface);
 LLM clients (content policies live in the client, not in the layer).
 
+### S12. Mandatory access control: one run under SELinux (added 2026-10-13)
+
+Accepted by the maintainer on 2026-10-13 as a bounded investigation, after the btrfs subvolume
+test is replaced (decision in journal 0097).
+
+- The module has never been loaded with SELinux enforcing, the default on Fedora, RHEL and
+  Android. The layer acts on the lower filesystem with the mounter's credentials, and SELinux
+  decides by the label of the process and of the file. Two outcomes are possible and unknown:
+  the module does not work there (denials), or a confined process reaches through the layer a
+  file that the policy would deny it directly. The second would be a security defect and
+  belongs to the threat model (ADR-0011).
+- One run of the suite on a distribution with SELinux enforcing, plus a test with a confined
+  process and a file it may not read. Result in a journal.
+- Before designing anything: read how overlayfs handles labels and what the SELinux test suite
+  and fstests do for stacked filesystems, and cite them. Not verified yet.
+- Done when: the result is recorded and one of two things is true: the defects found are
+  fixed, or the README and `docs/when-not-to-use.md` say the layer is not supported with
+  SELinux enforcing. AppArmor (Debian, Ubuntu) is not covered by this item.
+
+### S13. Observability: tracepoints for the index (added 2026-10-13)
+
+Accepted by the maintainer on 2026-10-13, small, to arrive with the second half of ADR-0012.
+
+- ADR-0012 adds behaviour nobody can see: when a domain is built, how long it took, when it is
+  released, whether it is released and rebuilt in a loop. The test of the first half already
+  needed two ad hoc module parameters to see whether a race had happened.
+- Tracepoints for: build start and end (domain, files, time, result), release of a domain,
+  the index marked incomplete. Dynamic debug (`pr_debug`) where a message helps.
+- Readable by root only, like the counters of `GET_INFO` (ADR-0011, finding F1): a count
+  visible to every user leaks across users. Declared not to be a stable interface.
+- Done when: the tracepoints exist, a test turns them on and reads them, and the test-only
+  parameters of journal 0098 are replaced by them where possible.
+
 ## Out of scope for this list
 
 - LLM content guardrails: the layer is storage; control over what an agent reads or writes
