@@ -8,12 +8,13 @@ authors:
 repository-code: "https://github.com/studiomoob/llmoobfs"
 url: "https://studiomoob.github.io/llmoobfs/"
 license: GPL-2.0-only
-version: "v0.1.0-experimental"
-date-released: "2026-10-10"
+version: "v0.3.0-experimental"
+date-released: "2026-10-13"
 abstract: >-
   Experimental Linux kernel module (no FUSE): a stacked filesystem layer over
   ext4, btrfs or XFS that adds typed extended attributes, an in-memory index and
-  a QUERY ioctl whose results are authorized by the caller's POSIX credentials.
+  query ioctls scoped by directory, whose results are limited to files every
+  caller allowed into that directory may read.
   Research project, not for production use.
 keywords:
   - linux-kernel
