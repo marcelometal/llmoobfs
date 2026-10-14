@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remount (journal 0106): an option change through the new mount API (`fsconfig`) is refused
+  with `EINVAL`, as overlayfs does; through `mount(2)` options are still ignored. The suite now
+  tests `remount,ro` and `remount,rw` of the layer.
 - **Queries no longer copy results to user space with the query semaphore held** (journal 0105,
   finding F7 of ADR-0011): a caller whose results buffer was slow to fault could hold up the
   queries of every user of the mount. Results are gathered in a kernel buffer and copied after

@@ -80,7 +80,8 @@ Items, with what was done:
   fallback after a permission change lasts until remount, although a rebuild recomputes the
   partition (a permission change does not cause a rebuild, so the gain is small); a remount with
   new options appears to be accepted and ignored, since the filesystem has no `reconfigure`
-  operation (read in the kernel source, not tried).
+  operation (read in the kernel source, not tried). Note of 2026-10-14: checked in journal 0106;
+  for `mount(2)` that is what overlayfs does on purpose, and only the new mount API differed.
 - **Recorded, not changed:** `struct moob_query_term` has one byte of implicit tail padding
   (1097 bytes declared, 1098 in size; nothing leaks, the kernel writes back only what the caller
   sent), and the ioctl letter `'M'` is shared with other drivers in

@@ -1310,8 +1310,19 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 {
 	struct moobl_fc *ctx = fc->fs_private;
 	struct fs_parse_result result;
-	int opt = fs_parse(fc, moobl_params, param, &result);
+	int opt;
 
+	/*
+	 * No option can change on remount (read-only and read-write are the VFS's). As overlayfs
+	 * does: the old mount(2) API passes the current options again and they are ignored; the
+	 * new API is told, instead of having a change accepted and dropped (journal 0106).
+	 */
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE) {
+		if (fc->oldapi)
+			return 0;
+		return invalfc(fc, "No changes allowed in reconfigure");
+	}
+	opt = fs_parse(fc, moobl_params, param, &result);
 	if (opt < 0)
 		return opt;
 	switch (opt) {
