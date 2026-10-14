@@ -1,6 +1,6 @@
 # 0100 — A nested subvolume is recognised by its device, not by its inode number
 
-Date: 2026-10-14. Status: implemented; run in the local VM (results below). Not run under KASAN.
+Date: 2026-10-14. Status: implemented; run in the local VM and under KASAN on the benchmark host (results below).
 
 ## Goal
 
@@ -44,6 +44,9 @@ by a build. Not measured.
 - Negative run: with `moobl_other_device()` forced to return 0, `MOOB_ONLY=btrfs make vm-test`
   fails at `subvol-entered`. The step therefore depends on the check.
 - Module built with no compiler warning; `sh scripts/checkpatch.sh`: exit 0.
+- `sh vm/kasan-local.sh` on the benchmark host (kernel 6.12.112 from `vm/kasan.config`), complete
+  suite: `MOOBFS_KASAN_PASS: layer suite under KASAN, UBSAN and lockdep with no kernel
+  diagnostics`.
 
 ## Limitations
 
