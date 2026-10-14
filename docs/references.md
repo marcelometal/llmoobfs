@@ -5,6 +5,17 @@ Every entry was checked against its primary source on 2026-10-12 (DOI metadata, 
 USENIX page, official repository or kernel documentation); "Used for" points to where it mattered
 in this repository. Code that ships in the repository keeps its own license and provenance file.
 
+## Thanks
+
+MoobFS exists because other people published their work. To the authors of the papers below, to
+the maintainers of the Linux kernel and of its documentation, of overlayfs, eCryptfs, ext4, btrfs
+and XFS, of fstests, virtme-ng, KASAN, lockdep and the fault-injection framework, of SQLite, and
+to the authors of the agent-memory projects that were read and used as test clients: thank you.
+To the people on the kernel mailing lists who took the time to answer this project's questions
+(the first answer is recorded in journal 0097): thank you.
+Errors in how this project understood or used any of it are this project's own. If your work is
+used here and is missing from this list, or is described wrongly, please open an issue.
+
 ## 1. Code included or pinned in this repository
 
 | Project | Where it comes from | License | Pinned | Used for |
