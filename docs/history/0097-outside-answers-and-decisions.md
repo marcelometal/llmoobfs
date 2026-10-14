@@ -15,18 +15,11 @@ ADR-0012 that was in progress on the same day is journal 0098.
   `st_dev`, so checking directories is enough, and added that each subvolume's `st_dev` comes
   from a limited pool of anonymous devices: with very many subvolumes a new one cannot be
   read, which he calls rare in normal use.
-- Courtesy replies to three of the thank-you notes of 2026-10-12 (two authors of cited papers
-  and the maintainer of virtme-ng). Three other notes did not reach anybody (an automatic
-  reply, a list that refuses HTML, an address that bounces).
-- A third-party public index of code asked to include one commit of this repository as a
-  reference for coding agents. The licence already allows it. The answer given: no objection,
-  with the request that the entry be marked as experimental and not as a known-good solution,
-  since the commit fixes defects of this project's own.
-- A question posted to the LangChain forum with the results of the LangGraph adapter (journal
-  0089) is waiting for the forum's moderation. A request for review posted to one Brazilian
-  free-software group on 2026-10-13 has no answer; a second group could not be reached.
-- No outside person has read the code yet. linux-unionfs and the two direct requests have no
-  answer after one day.
+- No outside person has read the code yet. linux-unionfs has no answer after one day.
+
+Note of 2026-10-14: items about outreach (courtesy replies, requests posted elsewhere, a
+third-party index) were removed from this list by the maintainer's decision: the repository
+records the technical content of outside answers, not outreach activity (`AGENTS.md`).
 
 ## Decisions
 
@@ -47,11 +40,11 @@ ADR-0012 that was in progress on the same day is journal 0098.
    released by the shrinker; the time is a mount option. Decided before the code exists.
 4. **Returning attribute values with query results** (journal 0072) waits for a third use
    case: the second client reads every result's file anyway (journal 0089).
-5. **Not done, on purpose:** the undelivered thank-you notes are not sent again; a paper draft
-   written outside the repository is put aside until the project is more mature, to be looked
-   at again at the end of November 2026.
-6. **Every work used is cited and thanked** (`docs/references.md`, section "Thanks"), as a
+5. **Every work used is cited and thanked** (`docs/references.md`, section "Thanks"), as a
    standing rule for new journals and decisions.
+
+Note of 2026-10-14: a decision about outreach was removed from this list for the same reason;
+the last item was renumbered.
 
 ## Changes in this journal
 

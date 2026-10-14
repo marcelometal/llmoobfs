@@ -11,6 +11,7 @@ Read `README.md`, `docs/history/README.md`, the most recent session journal and 
 - Update `CHANGELOG.md` for relevant changes. Keep reproducible commands and summaries of results; never present an unexecuted test as passed.
 - Make small, readable local commits when a unit is complete. Do not rewrite shared history, do not force-push and do not delete records to hide attempts or limitations. Single, recorded exception: on 2026-10-10 the history was rewritten, with the user's explicit authorization, to remove questions recorded by mistake and personal data (journal 0018).
 - Do not store credentials, tokens, environment dumps or unnecessary personal data. Histories record brief technical justifications, not the assistant's private internal reasoning.
+- Outreach stays outside the repository: drafts of messages, calls for reviewers or contributors, conversations, where something was posted, and research about people. When an outside answer changes the project, the journal records its technical content and the public link to it, with the person described by role, not by name.
 - Before finishing a task, make clear the current state, the tests, the limitations and the next step. Correct factually wrong records with a dated note.
 
 ## Technical documentation
