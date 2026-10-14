@@ -14,7 +14,7 @@ KASAN/UBSAN/lockdep). The specifications are [spec-m2.md](spec-m2.md) and
 It is mounted over a directory of an existing, mature filesystem (the "lower"):
 
 ```sh
-mount -t moobfs_layer -o lower=/srv/memory[,nolinks][,noindex][,index_budget=<bytes>] none /mnt/memory
+mount -t moobfs_layer -o lower=/srv/memory[,nolinks][,noindex][,index_budget=<bytes>][,index_idle=<seconds>] none /mnt/memory
 ```
 
 Every file and directory visible under the mount is a real file or directory in the lower
@@ -34,10 +34,11 @@ Mount contract (`layer/main.c`, `moobl_fill_super` and `moobl_parse_param`):
 | `nolinks` refuses `link` and `symlink` creation | `moobl_link`, `moobl_symlink` |
 | `noindex` disables the index; `QUERY` and `QUERY2` then return `EOPNOTSUPP` (`ENOSYS` until journal 0050) | `layer/index.c` (`if (!ix->enabled) return -EOPNOTSUPP`) |
 | `index_budget` accepts 1M to 4G; the default is 128 MiB | `MOOBL_INDEX_BUDGET_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
+| `index_idle` accepts 0 to 86400 seconds; the default is 60: a domain queried more recently is not released by the shrinker | `MOOBL_INDEX_IDLE_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
 
 Modifying the lower tree from outside while the layer is mounted is undefined, as in
-overlayfs; changes made while unmounted are picked up by the index rebuild at the next mount
-([spec-m2.md](spec-m2.md) §5).
+overlayfs; changes made while unmounted are picked up when each domain is built after the next
+mount ([spec-m2.md](spec-m2.md) §5).
 
 ## 2. Dentry and inode mapping
 
@@ -52,8 +53,10 @@ inode numbers; the pass-through test checks this (`tests/layer.c`).
 File I/O is delegated through the kernel's backing-file helpers from `fs/backing-file.c`:
 `backing_file_open` in `moobl_open`, `backing_file_read_iter`, `backing_file_write_iter`,
 `backing_file_splice_read`, `backing_file_splice_write` and `backing_file_mmap`
-(`layer/main.c`). Delegated operations on the lower tree run under the mounter's credentials
-with `override_creds(MOOBL_SB(sb)->creds)`, as overlayfs does. Permission decisions are not
+(`layer/main.c`). Data operations on an open file run on the lower tree under the mounter's
+credentials with `override_creds(MOOBL_SB(sb)->creds)`; name operations run with the caller's.
+This split is not overlayfs's, which checks both credentials and runs every real operation as
+the mounter (journal 0099). Permission decisions are not
 re-implemented: `moobl_permission` calls `inode_permission` on the lower inode, which runs
 the lower filesystem's full check including POSIX ACLs. ACLs are read and written through
 `moobl_get_acl`/`moobl_set_acl`, which delegate to `vfs_get_acl`, `vfs_set_acl` and
@@ -93,9 +96,13 @@ conflicts) and `moobfs-index` (oracle for `QUERY`) live in `tools/`; the encoder
 
 ## 4. In-memory index
 
-The index (`layer/index.c`, `struct moobl_index` in `layer/moobl.h`) is built at mount by
-walking the lower tree and reading every `user.moob.*` attribute, kept current by the xattr,
-unlink, rmdir and rename paths of `main.c`, and never written to disk. Structures:
+The index (`layer/index.c`, `struct moobl_index` in `layer/moobl.h`) is built per domain: the
+first query on a domain directory walks that part of the lower tree and reads every
+`user.moob.*` attribute in it, while the domain stays writable; the mount-wide `QUERY` builds
+every domain not yet built (journal 0098, ADR-0012, [spec-query-v2.md](spec-query-v2.md) §9).
+Nothing is scanned at mount. Once built, a domain is kept current by the xattr, unlink, rmdir
+and rename paths of `main.c` until it is released or the layer unmounted. The index is never written
+to disk. Structures:
 
 - an rbtree of attribute names (`struct moobl_ix_name`), one node per distinct name;
 - under each name, an rbtree of entries (`struct moobl_ix_entry`) ordered by
@@ -105,13 +112,18 @@ unlink, rmdir and rename paths of `main.c`, and never written to disk. Structure
   layer inode when one exists.
 
 Memory is accounted against `index_budget` (`charge()` returns `ENOMEM` when `used + bytes >
-budget`). If the budget is exceeded while building at mount, the mount fails; if an index
+budget`). If the budget is exceeded while building a domain, the built domains queried least
+recently are released until it fits; a domain that does not fit alone fails its query with
+`ENOMEM` and nothing of it is kept. A shrinker also releases built domains under memory
+pressure, except those queried in the last `index_idle` seconds (journal 0101,
+[spec-query-v2.md](spec-query-v2.md) §9). If an index
 update fails after a lower write has already succeeded, the layer sets `incomplete`, logs one
 warning and reports `MOOB_FLAG_INDEX_INCOMPLETE` in `GET_INFO` until remount. Renaming a
 directory sets `paths_stale`, because descendants keep their recorded paths; `QUERY` then
-resolves those entries through the dentry cache and reports `MOOB_FLAG_PATHS_STALE`. Rebuild
-cost is linear in the number of files; it has not been measured (M4,
-[benchmark-plan.md](benchmark-plan.md)). Behaviour near a saturated budget on large trees is
+resolves those entries through the dentry cache and reports `MOOB_FLAG_PATHS_STALE`; a
+`QUERY2` on a domain where a directory was renamed builds that domain again first. Build cost is
+linear in the number of files of the domain: 2.7 s cold and 0.10 s warm for 7 459 files on one
+host (journal 0098). Behaviour near a saturated budget on large trees is
 not tested ([testing.md](testing.md) §3).
 
 ## 5. `QUERY` and `GET_INFO` (UAPI version 1)

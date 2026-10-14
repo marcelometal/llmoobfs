@@ -81,6 +81,11 @@ struct moob_query {
 #define MOOB_FLAG_INDEX_INCOMPLETE 0x8U
 #define MOOB_FLAG_DOMAINS 0x10U			/* domain_depth > 0: QUERY2 on domain directories */
 #define MOOB_FLAG_COUNTERS 0x20U		/* the index counters below are filled (CAP_SYS_ADMIN) */
+/*
+ * The index of a domain is built by the first query on it, not at mount (ADR-0012): the
+ * counters below cover the domains built so far, and a mount-wide QUERY builds all of them.
+ */
+#define MOOB_FLAG_ON_DEMAND 0x40U
 
 struct moob_info {
 	__u32 uapi_version;
@@ -104,8 +109,10 @@ struct moob_info {
 	__u32 domain_depth;			/* 0: domains off (v1 only) */
 	__u32 heterogeneous;			/* indexed inodes that fail the homogeneity rule */
 	__u32 fallback_domains;			/* domains answered with per-result checks */
-	__u32 pad;
-	__u64 reserved[2];
+	__u32 domains_built;			/* domains whose index is built, the part outside every domain included */
+	__u32 domain_builds;			/* builds completed since mount; grows when a domain is rebuilt */
+	__u32 domain_releases;			/* built domains released since mount, to free memory */
+	__u64 reserved[1];
 };
 
 /*

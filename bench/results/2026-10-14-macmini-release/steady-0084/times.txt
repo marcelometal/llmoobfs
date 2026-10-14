@@ -1,0 +1,7 @@
+cold mount_ms=20567 after_mount[used=36443423 entries=437882 inodes=60000] first_query_ms=69 results=3030 after_first_query[used=36443423 entries=437882 inodes=60000] domains_built=0 second_query_ms=6
+warm mount_ms=738 after_mount[used=36443423 entries=437882 inodes=60000] first_query_ms=7 results=3030 after_first_query[used=36443423 entries=437882 inodes=60000] domains_built=0 second_query_ms=5
+cold mount_ms=17072 after_mount[used=36443423 entries=437882 inodes=60000] first_query_ms=8 results=3030 after_first_query[used=36443423 entries=437882 inodes=60000] domains_built=0 second_query_ms=6
+warm mount_ms=734 after_mount[used=36443423 entries=437882 inodes=60000] first_query_ms=7 results=3030 after_first_query[used=36443423 entries=437882 inodes=60000] domains_built=0 second_query_ms=5
+cold mount_wide_query_ms=94 after[used=36443423 entries=437882 inodes=60000] domains_built=0
+warm mount_wide_query_ms=4 after[used=36443423 entries=437882 inodes=60000] domains_built=0
+steady state with one domain: [used=36443423 entries=437882 inodes=60000] domains_built=0

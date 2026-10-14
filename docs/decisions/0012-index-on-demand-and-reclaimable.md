@@ -1,6 +1,8 @@
 # ADR-0012 — The index is built per domain on demand and can be released under memory pressure
 
-Date: 2026-10-13. Status: **accepted** by the maintainer on 2026-10-13; not implemented. Agreed
+Date: 2026-10-13. Status: **accepted** by the maintainer on 2026-10-13. Items 1, 2, 5 and 6 are
+implemented and measured in journal 0098 (2026-10-14), which also records where the
+implementation departs from the sketch below; items 3 and 4 are not implemented. Agreed
 order: fault injection in the test suite first (journal 0095), then this. It changes how
 [ADR-0009](0009-query-role-and-user-space-index.md) builds the index, not what it answers.
 
@@ -108,3 +110,46 @@ Mount becomes immediate and memory follows use. The cost moves to the first quer
 domain and to more states in the index code, which is the code where this week's defects were
 found. The change is larger than any made to the index since ADR-0009 and should not be merged
 without a reader from outside, if one is available by then.
+
+## Note of 2026-10-14: what the implementation did differently (journal 0098)
+
+The text above is kept as decided. Three points changed while implementing items 1, 2, 5 and 6:
+
+- **"A per-domain generation" became a conflict per file.** One counter per mount, then the
+  idea of one per domain, made a build re-read on any write; under a steady write load no build
+  finished. The scan now announces the file it is reading and re-reads it only if that same
+  file is written.
+- **Directory renames use a side list**, the other variant of the cited paper, and after the
+  build they make the domain stale: the next query builds it again. The decision did not
+  foresee that a rename also changes the homogeneity of the files below the directory.
+- **"Readers that must not see a half-built state"** are kept out by a semaphore that queries
+  hold for reading, not by a sequence counter on the fast path. The sequence counter the table
+  cites (`rename_lock`) is used for another purpose: reading where a file is.
+
+The warm-up trigger ("reading a domain directory is a candidate") is not implemented; the
+mount-wide `QUERY` warms everything, and a `QUERY2` warms one domain.
+
+
+## Note of 2026-10-14: items 3 and 4 (journal 0101)
+
+Implemented as decided, with these choices:
+
+- **No `list_lru`.** The least recently queried domain is found by walking the domains of the
+  mount. The domains are few, and the index memory is not charged to a memory cgroup, so the
+  per-node, per-cgroup lists of `list_lru` would buy nothing here.
+- **The floor** is the mount option `index_idle` (seconds, default 60), as agreed on
+  2026-10-13. It applies to the shrinker only; a build over the budget may release a domain
+  used a moment ago, since the budget is a limit the administrator set.
+- **The mount-wide `QUERY` never releases** to make room: it needs every domain at once.
+- **What the shrinker reports as freeable is an estimate.** The index does not count memory per
+  domain; per-domain accounting would make the count exact and was left for later.
+- The counter of releases is in `GET_INFO` (`domain_releases`); `domain_builds` became 32-bit
+  to make room, before either was published.
+
+## Note of 2026-10-14: measured (journal 0103)
+
+"Steady-state query latency must not get worse" is still not shown. With ten repetitions, the
+module with releases matches the one without; both have medians 8 to 15 % above the module
+built at mount on three filtered shapes, with ranges that overlap. A budget smaller than the
+working set, queried in a loop, rebuilds a domain on every query (the known weakness of
+least-recently-used order); no other policy was adopted.

@@ -74,6 +74,12 @@ The model the layer follows is overlayfs's: name operations with the caller's cr
 operations on an open file with the mounter's. ADR-0011 "Credentials (as implemented)" states it;
 these rules check it against the sources.
 
+*Note, 2026-10-14 (journal 0099).* The first sentence is wrong: that split is MoobFS's, not
+overlayfs's. Overlayfs checks every access twice, the caller against the overlay inode and the
+mounter against the real inode, and runs the real operation, name operations included, with the
+mounter's credentials (`Documentation/filesystems/overlayfs.rst`, "Permission model"). R-CRED-4
+below already said so; the rules themselves are unchanged.
+
 **R-CRED-1 — mounter credentials captured by copy-and-replace, reverted after use.**
 Source: `Documentation/security/credentials.rst:273-278` ("copy-and-replace principle", a task may
 alter only its own creds) and `:555-563` ("Overriding the VFS's Use of Credentials"). Reference:

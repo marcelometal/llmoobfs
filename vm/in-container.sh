@@ -91,6 +91,7 @@ PY
 gcc -static -O2 -Wall -Wextra -Werror tests/mounted.c -o "$STAGE/mounted"
 gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o "$STAGE/layer"
 gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o "$STAGE/hostile"
+gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/buildrace.c -lpthread -o "$STAGE/buildrace"
 make attr-tools BUILD=build/linux CFLAGS="-O2 -g -static"
 cp build/linux/moobfs-attr build/linux/moobfs-check build/linux/moobfs-index "$STAGE/"
 make bench-tools BUILD=build/linux CFLAGS="-O2 -g -static" SQLITE_LIBS="-lsqlite3 -ldl -lpthread"

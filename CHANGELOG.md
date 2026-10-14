@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+- Releases measured (journal 0103, `bench/release.sh`, `bench/results/2026-10-14-macmini-release/`):
+  a released domain of 7 500 files is rebuilt in about 0.14 s from the page cache and 2.3 s from
+  disk; under a budget smaller than the working set, a loop over the domains rebuilds on every
+  query. Steady-state `QUERY2` with releases equals the module without them; against the module
+  built at mount, three shapes are 8 to 15 % slower at the median, inside the spread. The suite
+  step `release` now checks that a cursor resumes across a release.
+- Tracepoints for the index (journal 0102, security roadmap S13): `moobfs_domain_build`,
+  `moobfs_domain_release`, `moobfs_scan_reread`, `moobfs_index_incomplete`, readable by root
+  through tracefs. The test-only module parameter `scan_retries` is removed.
+- **Built domains are released** (journal 0101, ADR-0012 items 3 and 4): when the build of a
+  domain does not fit `index_budget`, the domains queried least recently are released until it
+  does; a shrinker releases built domains under memory pressure, except those queried in the
+  last `index_idle` seconds (new mount option, default 60). `GET_INFO` gains
+  `domain_releases`; `domain_builds` becomes 32-bit (neither was published before). The
+  mount-wide `QUERY` does not release and fails with `ENOMEM` when the domains do not all fit.
+  New suite step `release`.
+- A btrfs subvolume below the lower root is now recognised by the device `getattr` reports
+  (`st_dev`) differing from the lower root's, as advised on linux-btrfs, instead of by inode
+  number 256 (journal 0100). Behaviour is unchanged for btrfs: such a directory is not entered
+  (`EXDEV`) and is left out of the index; any other directory that reports another device is
+  now treated the same way.
+- Correction (journal 0099): ADR-0011 and `docs/research-stacked-fs-kernel-rules.md` called
+  MoobFS's credential split (name operations with the caller's credentials, data operations
+  with the mounter's) "the overlayfs model". It is not: overlayfs checks every access against
+  both the caller and the mounter and runs the real operation, name operations included, with
+  the mounter's credentials. Dated notes added; the model itself and the code are unchanged.
+- **Index built on demand** (journal 0098, ADR-0012 items 1, 2, 5 and 6): nothing is scanned
+  at mount; the first query on a domain builds its part of the index while the domain stays
+  writable; the mount-wide `QUERY` builds the rest. On 60 000 memories in eight domains a cold
+  mount went from about 20 s to 0.3 s and the index memory with one domain in use from 36.4 MB
+  to 4.5 MB; the first query on a domain of 7 459 files costs 2.7 s cold and 0.1 s warm.
+  `GET_INFO` gains `MOOB_FLAG_ON_DEMAND`, `domains_built` and `domain_builds`. A directory
+  renamed inside a built domain now makes the next query build that domain again, which
+  replaces "names stay stale until the next mount". New suite step `buildrace`; fault
+  injection covers the build. Fixed on the way: a rename racing with a write could leave the
+  write out of the index (in `main` since journal 0096), and a write to a file unlinked a
+  moment before left a record for ever. Releasing domains under memory pressure is not
+  implemented.
 - Decisions after the first answers from outside (journal 0097): nested btrfs subvolumes are
   to be detected by comparing `st_dev`, as advised on linux-btrfs, instead of by inode number
   (not implemented); two items added to the security roadmap, a run under SELinux (S12) and

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * failnth: systematic allocation-failure injection into the layer, one system call at a time
- * (journal 0096). For each operation it asks the kernel to fail the 1st, then the 2nd, then the
+ * (journal 0096; the first query on a domain, which builds its index, since journal 0098). For each operation it asks the kernel to fail the 1st, then the 2nd, then the
  * N-th allocation made on behalf of this thread, through /proc/thread-self/fail-nth, until an
  * attempt runs with no fault injected. The caller (vm/kasan-guest.sh) confines the faults to
  * allocations with the module on the stack (failslab and fail_page_alloc, require-start and
@@ -103,11 +103,12 @@ static void q2_fill(struct moob_query2 *q, struct moob_query_result *res, __u32 
 
 enum { OP_SET_NEW, OP_SET_REPLACE, OP_SET_RAW_OVER, OP_REMOVE, OP_CREATE, OP_MKDIR, OP_RENAME_OVER,
        OP_UNLINK, OP_QUERY2, OP_QUERY2_ORDER, OP_BATCH, OP_INFO, OP_CHMOD_DIR, OP_READ, OP_LOOKUP,
-       OP_FIEMAP, OP_SYNCFS, OP_COUNT };
+       OP_FIEMAP, OP_SYNCFS, OP_BUILD, OP_COUNT };
 static const char *const names[OP_COUNT] = {
 	"setxattr-new", "setxattr-replace", "setxattr-raw-over-typed", "removexattr", "create",
 	"mkdir", "rename-over-indexed", "unlink-indexed", "query2", "query2-ordered", "query2-batch",
 	"get-info", "chmod-directory", "open-read", "lookup-cold", "fiemap", "syncfs",
+	"query2-first-on-a-domain",
 };
 
 int main(int argc, char **argv)
@@ -123,6 +124,19 @@ int main(int argc, char **argv)
 	nth_fd = open(path, O_RDWR);
 	if (nth_fd < 0) { perror(path); return 2; }
 	mkdir(up("da"), 0755); mkdir(up("db"), 0755);
+	/*
+	 * The index of a domain is built by the first query on it (ADR-0012), and a write to a
+	 * domain that is not built does not touch the index: build both, so that the write
+	 * operations below fail inside the index updates.
+	 */
+	for (op = 0; op < 2; op++) {
+		struct moob_query2 q0;
+		int d0 = open(up(op ? "db" : "da"), O_RDONLY | O_DIRECTORY);
+
+		q2_fill(&q0, res, 64);
+		if (d0 < 0 || ioctl(d0, MOOB_IOC_QUERY2, &q0)) { perror("first query"); return 2; }
+		close(d0);
+	}
 
 	for (op = 0; op < OP_COUNT; op++) {
 		int n, faults = 0, clean_fail = 0, ok_despite = 0;
@@ -146,6 +160,13 @@ int main(int argc, char **argv)
 			case OP_CREATE: snprintf(a, sizeof a, "da/c%06d", seq++); break;
 			case OP_MKDIR: snprintf(a, sizeof a, "da/d%06d", seq++); break;
 			case OP_LOOKUP: fresh(a, sizeof a, "db", 1); break;
+			case OP_BUILD:	/* a domain nobody has queried: the armed query builds it */
+				snprintf(b, sizeof b, "e%06d", seq++);
+				if (mkdir(up(b), 0755)) { perror("domain"); return 2; }
+				fresh(a, sizeof a, b, 1); fresh(a, sizeof a, b, 1); fresh(a, sizeof a, b, 0);
+				dfd = open(up(b), O_RDONLY | O_DIRECTORY);
+				if (dfd < 0) { perror("domain"); return 2; }
+				break;
 			default: break;
 			}
 			if (op == OP_QUERY2 || op == OP_QUERY2_ORDER || op == OP_BATCH || op == OP_SYNCFS) {
@@ -172,7 +193,7 @@ int main(int argc, char **argv)
 				r = rename(up(a), up(b)); break;
 			case OP_UNLINK:
 				r = unlink(up(a)); break;
-			case OP_QUERY2:
+			case OP_QUERY2: case OP_BUILD:
 				q2_fill(&q[0], res, 64); r = ioctl(dfd, MOOB_IOC_QUERY2, &q[0]); break;
 			case OP_QUERY2_ORDER:
 				q2_fill(&q[0], res, 20);

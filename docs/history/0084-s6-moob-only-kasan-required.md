@@ -42,13 +42,14 @@ same reason. Until then the rule in `CONTRIBUTING.md` (a green run is required) 
 
 ## Outside review requested (community action 15)
 
-On this date the maintainer posted the request in the Telegram groups of two Brazilian kernel
-study groups (FLUSP and LKCAMP) and sent one question on the credential model to the overlayfs
-mailing list (linux-unionfs). Issues 16 and 17 carry the questions, the files to read, the
-known limitations, and the commit under review. Two things learnt on the way: the FLUSP e-mail
-group does not accept posts from non-members, and the kernel lists reject HTML mail.
+Issues 16 and 17 carry the questions, the files to read, the known limitations, and the commit
+under review. Learnt on the way: the kernel lists reject HTML mail.
 
 Nothing has been reviewed yet. A reply is recorded as an issue comment and a journal entry.
+
+Note of 2026-10-14: a description of where the request was posted was removed from this
+section by the maintainer's decision: the repository records the technical content of outside
+answers, not outreach activity (`AGENTS.md`).
 
 ## State of S6
 

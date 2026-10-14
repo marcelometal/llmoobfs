@@ -150,6 +150,12 @@ static struct inode *moobl_get_inode(struct super_block *sb, struct inode *lower
 	return inode;
 }
 
+/* The layer inode of a lower inode if it is in memory, referenced; NULL otherwise. May sleep. */
+struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower)
+{
+	return ilookup5(sb, (unsigned long)lower, moobl_inode_test, lower);
+}
+
 static struct inode *moobl_alloc_inode(struct super_block *sb)
 {
 	struct moobl_inode *mi = alloc_inode_sb(sb, moobl_inode_cache, GFP_KERNEL);
@@ -196,6 +202,9 @@ static int moobl_show_options(struct seq_file *m, struct dentry *root)
 		seq_printf(m, ",index_budget=%llu", MOOBL_SB(root->d_sb)->index.budget);
 	if (MOOBL_SB(root->d_sb)->index.domain_depth != 1)
 		seq_printf(m, ",domain_depth=%u", MOOBL_SB(root->d_sb)->index.domain_depth);
+	if (MOOBL_SB(root->d_sb)->index.enabled &&
+	    MOOBL_SB(root->d_sb)->index.idle != MOOBL_INDEX_IDLE_DEFAULT)
+		seq_printf(m, ",index_idle=%u", MOOBL_SB(root->d_sb)->index.idle);
 	return 0;
 }
 
@@ -304,6 +313,29 @@ static const struct dentry_operations moobl_dops = {
 
 /* ---- directory inode operations --------------------------------------- */
 
+/*
+ * 1 when lower is a directory on another device than the lower root, 0 when not, or an error.
+ * A btrfs subvolume below the root is the usual case: it is a separate filesystem with its own
+ * anonymous device, and it numbers its inodes from the start again, while the index and the
+ * layer's inode cache identify a file by its inode number alone, so it cannot be entered. Every
+ * inode of a subvolume reports the subvolume's device, so checking directories is enough. The
+ * device is the one getattr reports (st_dev), not i_sb->s_dev, which btrfs subvolumes share.
+ * The lower root may itself be a subvolume; it is never looked up.
+ */
+int moobl_other_device(struct super_block *sb, struct dentry *lower)
+{
+	struct path p = { .mnt = MOOBL_SB(sb)->lower.mnt, .dentry = lower };
+	struct kstat st;
+	int err;
+
+	if (!d_is_dir(lower))
+		return 0;
+	err = vfs_getattr_nosec(&p, &st, STATX_BASIC_STATS, AT_STATX_DONT_SYNC);
+	if (err)
+		return err;
+	return st.dev != MOOBL_SB(sb)->lower_dev;
+}
+
 static struct dentry *moobl_lookup(struct inode *dir, struct dentry *dentry,
 				   unsigned int flags)
 {
@@ -318,9 +350,10 @@ static struct dentry *moobl_lookup(struct inode *dir, struct dentry *dentry,
 					       dentry->d_name.len);
 	if (IS_ERR(lower_dentry))
 		return ERR_CAST(lower_dentry);
-	if (moobl_nested_subvolume(lower_dentry)) {
+	err = moobl_other_device(dir->i_sb, lower_dentry);
+	if (err) {
 		dput(lower_dentry);
-		return ERR_PTR(-EXDEV);
+		return ERR_PTR(err < 0 ? err : -EXDEV);
 	}
 	err = moobl_set_lower_path(dentry, parent->mnt, lower_dentry);
 	if (err) {
@@ -570,9 +603,9 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	    (S_ISDIR(target->i_mode) || !moobl_lower_inode(target)->i_nlink))
 		moobl_index_drop_inode(old_dir->i_sb, target->i_ino);
 	/* The VFS moves the dentries after this returns: place each inode at its new name. */
-	moobl_index_renamed(old_dir->i_sb, d_inode(old_dentry), new_dentry);
+	moobl_index_renamed(old_dir->i_sb, old_dentry, new_dentry);
 	if ((flags & RENAME_EXCHANGE) && target)
-		moobl_index_renamed(old_dir->i_sb, target, old_dentry);
+		moobl_index_renamed(old_dir->i_sb, new_dentry, old_dentry);
 out_unlock:
 	unlock_rename(lower_old_dir, lower_new_dir);
 out_put:
@@ -601,8 +634,10 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	if (!err)
 		set_nlink(inode, moobl_lower_inode(inode)->i_nlink);
 	moobl_unlock_parent(lower_dentry, lower_dir);
-	if (!err)
+	if (!err) {
+		moobl_index_linked(dir->i_sb, new_dentry);
 		moobl_index_perm_changed(dir->i_sb, old_dentry);	/* nlink > 1: heterogeneous */
+	}
 	return err;
 }
 
@@ -1246,9 +1281,10 @@ struct moobl_fc {
 	bool noindex;
 	u64 index_budget;
 	int domain_depth;		/* -1: default */
+	int index_idle;			/* -1: default */
 };
 
-enum { Opt_lower, Opt_nolinks, Opt_noindex, Opt_index_budget, Opt_domain_depth };
+enum { Opt_lower, Opt_nolinks, Opt_noindex, Opt_index_budget, Opt_domain_depth, Opt_index_idle };
 
 static const struct fs_parameter_spec moobl_params[] = {
 	fsparam_string("lower", Opt_lower),
@@ -1256,6 +1292,7 @@ static const struct fs_parameter_spec moobl_params[] = {
 	fsparam_flag("noindex", Opt_noindex),
 	fsparam_string("index_budget", Opt_index_budget),
 	fsparam_u32("domain_depth", Opt_domain_depth),
+	fsparam_u32("index_idle", Opt_index_idle),
 	{}
 };
 
@@ -1293,6 +1330,11 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 			return invalfc(fc, "domain_depth must be between 0 and 8");
 		ctx->domain_depth = (int)result.uint_32;
 		break;
+	case Opt_index_idle:
+		if (result.uint_32 > 86400)
+			return invalfc(fc, "index_idle must be between 0 and 86400 seconds");
+		ctx->index_idle = (int)result.uint_32;
+		break;
 	}
 	return 0;
 }
@@ -1314,13 +1356,22 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	sb->s_fs_info = sbi;
 	/* Initialize the index state first: kill_sb tears it down on every failure path. */
 	moobl_index_init(sb, ctx->index_budget ? ctx->index_budget : MOOBL_INDEX_BUDGET_DEFAULT,
-			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth);
+			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth,
+			 ctx->index_idle < 0 ? MOOBL_INDEX_IDLE_DEFAULT : (unsigned int)ctx->index_idle);
 	err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &sbi->lower);
 	if (err)
 		return invalfc(fc, "cannot resolve lower directory");
 	if (sbi->lower.dentry->d_sb->s_magic == MOOBL_SUPER_MAGIC)
 		return invalfc(fc, "lower cannot be another moobfs_layer mount");
 	sb->s_stack_depth = sbi->lower.dentry->d_sb->s_stack_depth + 1;
+	{
+		struct kstat st;
+
+		err = vfs_getattr_nosec(&sbi->lower, &st, STATX_BASIC_STATS, AT_STATX_DONT_SYNC);
+		if (err)
+			return err;
+		sbi->lower_dev = st.dev;
+	}
 	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH)
 		return invalfc(fc, "maximum filesystem stacking depth exceeded");
 	cred = prepare_creds();
@@ -1373,7 +1424,11 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	err = moobl_set_lower_path(root, sbi->lower.mnt, dget(sbi->lower.dentry));
 	if (err)
 		return err;
-	return moobl_index_build(sb);
+	err = moobl_index_shrinker_start(sb);
+	if (err)
+		return err;
+	moobl_index_mount(sb);
+	return 0;
 }
 
 static int moobl_get_tree(struct fs_context *fc)
@@ -1404,6 +1459,7 @@ static int moobl_init_fs_context(struct fs_context *fc)
 	if (!ctx)
 		return -ENOMEM;
 	ctx->domain_depth = -1;
+	ctx->index_idle = -1;
 	fc->fs_private = ctx;
 	fc->ops = &moobl_context_ops;
 	return 0;
