@@ -227,3 +227,72 @@ suite races mode changes, renames, unlink and recreate, files moving to another 
 and `chmod` of the domain directory against paged `QUERY2` over the plain, equality and ordered
 plans. Q2c and Q2d went in one combined pull request by the maintainer's decision, and the
 measurements moved from the Azure host to the Mac mini host (journal 0042).
+
+## 9. Building a domain on demand (ADR-0012, journal 0098)
+
+Status: implemented and tested in the VM (journal 0098) for items 1, 2, 5 and 6 of ADR-0012.
+Releasing built domains under memory pressure (items 3 and 4) is not implemented. This section
+replaces "the index is built at mount" wherever earlier sections or documents say so; what a
+query answers does not change.
+
+- **Mount** reads nothing but whether the lower root answers `listxattr`. No file is scanned.
+- **States.** A domain is not built, being built, or built. "Outside" (what lies above depth N,
+  and everything when `domain_depth=0`) is one more unit with the same three states.
+- **First query.** `MOOB_IOC_QUERY2` and `MOOB_IOC_QUERY2_BATCH` on a domain that is not built
+  build it before answering, by scanning that domain's subtree with the mounter's credentials
+  and the homogeneity rule of section 3. Other callers of the same domain wait (the wait can be
+  interrupted by a fatal signal, `EINTR`). The authorization of section 4.2 comes first: a
+  caller who may not query the domain cannot make it be built.
+- **Mount-wide `MOOB_IOC_QUERY`** builds "outside" and every domain directory that exists at
+  that moment, then answers. Its first use after a mount costs what the mount scan used to.
+- **Writes.** A change to a file whose domain is not built does not touch the index: the build
+  will read it. A file that enters a built domain from one that is not (rename, new hard link)
+  has its attributes read from the lower filesystem at that moment; one that leaves the built
+  part is dropped.
+- **Build against concurrent writes.** The domain stays writable during the build. The scan
+  announces the file it is reading, reads its attributes with no lock held, and replaces that
+  file's entries under the index lock only if no write path touched the same file meanwhile,
+  reading the file again otherwise. A file is absent from the index or whole in it. This is the
+  online index build of Mohan and Narang (SIGMOD 1992) in its variant without a side file for
+  attribute writes. Three cases need more than that:
+  - a **directory renamed** during the build can carry a subtree from a part not yet scanned
+    into one already scanned. The rename records the directory in a side list of the domain,
+    and the build scans it again, in the order of the renames, before the domain is declared
+    built;
+  - a **file renamed** during the build may have a record that holds only the attributes
+    written since the build began (the scan had not reached it). The rename reads the file
+    whole from the lower filesystem;
+  - a **write to a file that has just been unlinked** (the path was resolved before the
+    unlink) is not indexed: the file has no name left.
+- **Where a file is** (its depth and its domain directory) is read as one consistent view
+  under the dcache's `rename_lock` sequence counter, and a write computes it again if a rename
+  or a link completed meanwhile. Two separate walks let a rename between them misplace the
+  write (found by `tests/buildrace.c`, journal 0098).
+- **A directory renamed in a built domain makes the domain stale.** The names recorded below
+  it are old, and its files now have other directories between them and the domain, so their
+  homogeneity may have changed. The next query on the domain takes it down and builds it
+  again. A rename of a domain directory, or of a directory above it, does the same to every
+  domain. This replaces "names stay stale until the next mount" (`MOOB_FLAG_PATHS_STALE` still
+  reports that a directory was renamed since mount). Cost: the query after such a rename pays
+  the build of the whole domain.
+- **A running query keeps its domain.** `QUERY2`, `QUERY2_BATCH` and `QUERY` hold a semaphore
+  for reading while they run; taking a built domain down takes it for writing.
+- **Errors a first query can now return**, besides those of section 4: `ENOMEM` (no memory, or
+  the domain does not fit `index_budget`), `EAGAIN` (the domain kept changing: 16 readings of
+  one file each overtaken by a write to that file, or directories renamed in it for 64 rounds
+  or between 8 attempts to start; the caller may retry), `EINTR`, and any error
+  the lower filesystem returned to the scan. After a failed build nothing of the domain is left
+  in the index, and the next query tries again. A build never answers with part of a domain: an
+  ACL or a name that could not be read fails it.
+- **`GET_INFO`.** New flag `MOOB_FLAG_ON_DEMAND` (0x40), set whenever the index is on. New
+  fields in space that was reserved or padding: `domains_built` (`__u32`, "outside" included)
+  and `domain_builds` (`__u64`, builds completed since mount). Like the other counters they are
+  filled for `CAP_SYS_ADMIN` only, and `index_used`, `index_entries`, `index_inodes` and
+  `heterogeneous` now cover the built domains only. The structure keeps its size and the
+  fields already published keep their offsets; the new ones are output in what was padding and
+  reserved space, which `docs/compatibility.md` (section 3) allows while the interface is
+  experimental. A program that needs the whole-mount counters must first issue the mount-wide
+  `QUERY`.
+- **Not changed:** the attribute encoding, the `QUERY2` request and reply, cursors (a cursor is
+  bound to the mount, and domains are not yet released), `fallback_domains`, the budget rule
+  after a domain is built.

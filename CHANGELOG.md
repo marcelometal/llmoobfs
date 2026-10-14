@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Index built on demand** (journal 0098, ADR-0012 items 1, 2, 5 and 6): nothing is scanned
+  at mount; the first query on a domain builds its part of the index while the domain stays
+  writable; the mount-wide `QUERY` builds the rest. On 60 000 memories in eight domains a cold
+  mount went from about 20 s to 0.3 s and the index memory with one domain in use from 36.4 MB
+  to 4.5 MB; the first query on a domain of 7 459 files costs 2.7 s cold and 0.1 s warm.
+  `GET_INFO` gains `MOOB_FLAG_ON_DEMAND`, `domains_built` and `domain_builds`. A directory
+  renamed inside a built domain now makes the next query build that domain again, which
+  replaces "names stay stale until the next mount". New suite step `buildrace`; fault
+  injection covers the build. Fixed on the way: a rename racing with a write could leave the
+  write out of the index (in `main` since journal 0096), and a write to a file unlinked a
+  moment before left a record for ever. Releasing domains under memory pressure is not
+  implemented.
 - Decisions after the first answers from outside (journal 0097): nested btrfs subvolumes are
   to be detected by comparing `st_dev`, as advised on linux-btrfs, instead of by inode number
   (not implemented); two items added to the security roadmap, a run under SELinux (S12) and

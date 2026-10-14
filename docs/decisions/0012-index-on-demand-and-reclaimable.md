@@ -1,6 +1,8 @@
 # ADR-0012 — The index is built per domain on demand and can be released under memory pressure
 
-Date: 2026-10-13. Status: **accepted** by the maintainer on 2026-10-13; not implemented. Agreed
+Date: 2026-10-13. Status: **accepted** by the maintainer on 2026-10-13. Items 1, 2, 5 and 6 are
+implemented and measured in journal 0098 (2026-10-14), which also records where the
+implementation departs from the sketch below; items 3 and 4 are not implemented. Agreed
 order: fault injection in the test suite first (journal 0095), then this. It changes how
 [ADR-0009](0009-query-role-and-user-space-index.md) builds the index, not what it answers.
 
@@ -108,3 +110,22 @@ Mount becomes immediate and memory follows use. The cost moves to the first quer
 domain and to more states in the index code, which is the code where this week's defects were
 found. The change is larger than any made to the index since ADR-0009 and should not be merged
 without a reader from outside, if one is available by then.
+
+## Note of 2026-10-14: what the implementation did differently (journal 0098)
+
+The text above is kept as decided. Three points changed while implementing items 1, 2, 5 and 6:
+
+- **"A per-domain generation" became a conflict per file.** One counter per mount, then the
+  idea of one per domain, made a build re-read on any write; under a steady write load no build
+  finished. The scan now announces the file it is reading and re-reads it only if that same
+  file is written.
+- **Directory renames use a side list**, the other variant of the cited paper, and after the
+  build they make the domain stale: the next query builds it again. The decision did not
+  foresee that a rename also changes the homogeneity of the files below the directory.
+- **"Readers that must not see a half-built state"** are kept out by a semaphore that queries
+  hold for reading, not by a sequence counter on the fast path. The sequence counter the table
+  cites (`rename_lock`) is used for another purpose: reading where a file is.
+
+The warm-up trigger ("reading a domain directory is a candidate") is not implemented; the
+mount-wide `QUERY` warms everything, and a `QUERY2` warms one domain.
+

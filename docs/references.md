@@ -101,7 +101,9 @@ used here and is missing from this list, or is described wrongly, please open an
 - C. Mohan, Inderpal Narang. "Algorithms for Creating Indexes for Very Large Tables Without
   Quiescing Updates". ACM SIGMOD 1992, 361-370. https://doi.org/10.1145/130283.130337
 
-  The side-list method of ADR-0012 for building a domain's partition while writes continue.
+  The method of ADR-0012 for building a domain's partition while writes continue, implemented
+  in journal 0098: without a side file for attribute writes, with a side list for directory
+  renames.
   Checked on 2026-10-13 (Crossref metadata; the paper itself was not read in full).
 
 ### Fault injection (journal 0096)
@@ -138,7 +140,7 @@ used here and is missing from this list, or is described wrongly, please open an
 | Shrinker interface | `include/linux/shrinker.h` (`shrinker_alloc`, `shrinker_register`), `Documentation/admin-guide/mm/shrinker_debugfs.rst`, Linux 6.12.112 | how partitions are to be released under memory pressure (ADR-0012; not implemented) |
 | `list_lru` | `include/linux/list_lru.h`, as used in `fs/dcache.c` and `fs/inode.c`, Linux 6.12.112 | least-recently-used order of built partitions (ADR-0012; not implemented) |
 | btrfs extent-map shrinker | `fs/btrfs/extent_map.c` (`btrfs_extent_map_shrinker_worker`), Linux 6.12.112 | precedent for a filesystem dropping a map of its own and rebuilding it on demand (ADR-0012) |
-| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | readers against a partition being built (ADR-0012; not implemented) |
+| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | reading where a file is (its depth and domain directory) consistently against renames, as path lookup does (`where_is()` in `layer/index.c`, journal 0098) |
 | fstests | https://git.kernel.org/pub/scm/fs/xfs/xfstests-dev.git, GPL-2.0, `v2026.09.22` | the `generic` `quick` group over the layer (`vm/fstests/`, journals 0074 and 0091); not vendored |
 | KASAN, UBSAN, lockdep | https://docs.kernel.org/dev-tools/kasan.html, https://docs.kernel.org/dev-tools/ubsan.html, https://docs.kernel.org/locking/lockdep-design.html | the instrumented test kernel |
 | fanotify, inotify | https://man7.org/linux/man-pages/man7/fanotify.7.html | change-feed experiment (journal 0030); inotify follows changes in the user-space baseline (`bench/userspace/udx-watch.c`, journal 0092) |
