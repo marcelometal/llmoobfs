@@ -2580,9 +2580,9 @@ static int leap_collect(struct moobl_index *ix, const struct moobl_qscope *sc,
 	return 0;
 }
 
-/* Copies one candidate to the caller as a result; last gets its scan key (cursor). */
-static int put_result(struct moob_query_result __user *dst, struct moob_query_result *one,
-		      const struct moobl_candidate *c, struct moobl_resume *last)
+/* Fills one result record from a candidate; last gets its scan key (cursor). */
+static void put_result(struct moob_query_result *one, const struct moobl_candidate *c,
+		       struct moobl_resume *last)
 {
 	memset(one, 0, sizeof(*one));
 	one->ino = c->ino;
@@ -2598,8 +2598,6 @@ static int put_result(struct moob_query_result __user *dst, struct moob_query_re
 	} else {
 		one->flags = MOOB_RES_PATH_UNKNOWN;
 	}
-	if (copy_to_user(dst, one, sizeof(*one)))
-		return -EFAULT;
 	if (last) {
 		last->valid = true;
 		last->type = c->type;
@@ -2607,6 +2605,22 @@ static int put_result(struct moob_query_result __user *dst, struct moob_query_re
 		last->ino = c->ino;
 		memcpy(last->value, c->value, c->len);
 	}
+}
+
+/*
+ * Results reach the caller only here, once ix->query_sem is released. A copy to user space can
+ * wait on a page fault for as long as whoever backs that memory decides, and a query must not
+ * hold up the queries of every other user of the mount meanwhile: a writer of query_sem (a
+ * rebuild, a release over the budget) would wait for it, and new readers behind the writer
+ * (journal 0105). btrfs's search ioctl avoids faulting under its locks for a related reason
+ * (commit a48b73eca4ce).
+ */
+static int results_to_user(struct moobl_index *ix, u64 uptr, const struct moob_query_result *k,
+			   u32 n)
+{
+	lockdep_assert_not_held(&ix->query_sem);
+	if (n && copy_to_user(u64_to_user_ptr(uptr), k, (size_t)n * sizeof(*k)))
+		return -EFAULT;
 	return 0;
 }
 
@@ -2615,14 +2629,13 @@ static int put_result(struct moob_query_result __user *dst, struct moob_query_re
  * scan key; last (may be NULL) receives the key of the last result returned.
  */
 static long query_run(struct super_block *sb, struct file *file,
-		      const struct moob_query_term *terms, u32 nterms, u32 limit, u64 results,
-		      const struct moobl_qscope *sc, const struct moobl_resume *start,
+		      const struct moob_query_term *terms, u32 nterms, u32 limit,
+		      struct moob_query_result *kres, const struct moobl_qscope *sc,
+		      const struct moobl_resume *start,
 		      struct moobl_resume *last, u32 *count_out, u32 *truncated_out)
 {
 	unsigned int nofs;
 	struct moobl_index *ix = IX(sb);
-	struct moob_query_result __user *uout = u64_to_user_ptr(results);
-	struct moob_query_result *one;
 	struct moobl_candidate *cand;
 	struct moobl_resume *resume;
 	char *pathbuf;
@@ -2632,15 +2645,10 @@ static long query_run(struct super_block *sb, struct file *file,
 	bool exhausted = false;
 	long err = 0;
 
-	/*
-	 * one result at a time is copied to the caller's array, so the kernel never allocates
-	 * (or zeroes) a limit-sized buffer: the cost is per result, not per requested limit
-	 */
-	one = kmalloc(sizeof(*one), GFP_KERNEL);
 	cand = kcalloc(MOOBL_QUERY_CHUNK, sizeof(*cand), GFP_KERNEL);
 	resume = kzalloc(sizeof(*resume), GFP_KERNEL);
 	pathbuf = (char *)__get_free_page(GFP_KERNEL);
-	if (!one || !cand || !resume || !pathbuf) {
+	if (!cand || !resume || !pathbuf) {
 		err = -ENOMEM;
 		goto out;
 	}
@@ -2745,9 +2753,8 @@ chunk_done:
 				truncated = 1;
 				exhausted = true;
 			} else if (ok) {
-				err = put_result(&uout[count], one, &cand[i], last);
-				if (!err)
-					count++;
+				put_result(&kres[count], &cand[i], last);
+				count++;
 			}
 			dput(cand[i].held);
 			cand[i].held = NULL;
@@ -2770,7 +2777,6 @@ out:
 	kfree(resume);
 	if (pathbuf)
 		free_page((unsigned long)pathbuf);
-	kfree(one);
 	return err;
 }
 
@@ -2779,6 +2785,7 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 {
 	struct moobl_index *ix = IX(sb);
 	struct moobl_qscope sc = { .all = true, .check = true };
+	struct moob_query_result *kres = NULL;
 	struct moob_query *q;
 	u32 i;
 	long err = 0;
@@ -2787,25 +2794,10 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 		return -EOPNOTSUPP;	/* noindex (ENOSYS until journal 0050) */
 	if (ix->domain_depth && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	/* this query reads every partition: all built, and none taken down while it runs */
-	for (i = 0;; i++) {
-		u64 gen = READ_ONCE(ix->drop_gen);
-
-		err = domain_ensure_all(sb);
-		if (err)
-			return err;
-		down_read(&ix->query_sem);
-		if (READ_ONCE(ix->drop_gen) == gen)
-			break;
-		up_read(&ix->query_sem);
-		if (i == 8)
-			return -EAGAIN;
-	}
+	/* the request is read and checked before anything is built for it (journal 0105) */
 	q = memdup_user(arg, sizeof(*q));
-	if (IS_ERR(q)) {
-		up_read(&ix->query_sem);
+	if (IS_ERR(q))
 		return PTR_ERR(q);
-	}
 	if (q->version != MOOB_UAPI_VERSION || !q->nterms || q->nterms > MOOB_QUERY_MAX_TERMS ||
 	    !q->limit || q->limit > MOOB_QUERY_MAX_LIMIT || q->flags || q->reserved[0] ||
 	    q->reserved[1]) {
@@ -2814,14 +2806,39 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 	}
 	for (i = 0; i < q->nterms && !err; i++)
 		err = term_check(&q->terms[i], 0);
+	if (err)
+		goto out;
+	kres = kvmalloc_array(q->limit, sizeof(*kres), GFP_KERNEL);
+	if (!kres) {
+		err = -ENOMEM;
+		goto out;
+	}
+	/* this query reads every partition: all built, and none taken down while it runs */
+	for (i = 0;; i++) {
+		u64 gen = READ_ONCE(ix->drop_gen);
+
+		err = domain_ensure_all(sb);
+		if (err)
+			goto out;
+		down_read(&ix->query_sem);
+		if (READ_ONCE(ix->drop_gen) == gen)
+			break;
+		up_read(&ix->query_sem);
+		if (i == 8) {
+			err = -EAGAIN;
+			goto out;
+		}
+	}
 	sc.scan = q->terms[0].name;
+	err = query_run(sb, file, q->terms, q->nterms, q->limit, kres, &sc, NULL, NULL,
+			&q->count, &q->truncated);
+	up_read(&ix->query_sem);
 	if (!err)
-		err = query_run(sb, file, q->terms, q->nterms, q->limit, q->results, &sc, NULL, NULL,
-				&q->count, &q->truncated);
+		err = results_to_user(ix, q->results, kres, q->count);
 	if (!err && copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 out:
-	up_read(&ix->query_sem);
+	kvfree(kres);
 	kfree(q);
 	return err;
 }
@@ -3065,7 +3082,7 @@ static bool lsm_labels(struct super_block *sb)
 
 /* Runs a validated request (kernel copy) and fills its count, truncated and cursor. */
 static long query2_exec(struct super_block *sb, struct file *file, struct moob_query2 *q,
-			u64 domain, unsigned int depth)
+			u64 domain, unsigned int depth, struct moob_query_result *kres)
 {
 	struct moobl_index *ix = IX(sb);
 	struct moobl_qscope sc = { 0 };
@@ -3114,7 +3131,7 @@ static long query2_exec(struct super_block *sb, struct file *file, struct moob_q
 		if (err)
 			goto out;
 	}
-	err = query_run(sb, file, t, q->nterms, q->limit, q->results, &sc, start, last,
+	err = query_run(sb, file, t, q->nterms, q->limit, kres, &sc, start, last,
 			&q->count, &q->truncated);
 	if (err)
 		goto out;
@@ -3125,6 +3142,29 @@ out:
 	kfree(t);
 	kfree(start);
 	kfree(last);
+	return err;
+}
+
+/*
+ * One validated QUERY2: built and pinned, run into a kernel buffer, unpinned, and only then
+ * copied to the caller (results_to_user).
+ */
+static long query2_one(struct super_block *sb, struct file *file, struct moob_query2 *q,
+		       u64 domain, unsigned int depth)
+{
+	struct moob_query_result *kres = kvmalloc_array(q->limit, sizeof(*kres), GFP_KERNEL);
+	long err;
+
+	if (!kres)
+		return -ENOMEM;
+	err = query2_pin(sb, file, domain);
+	if (!err) {
+		err = query2_exec(sb, file, q, domain, depth, kres);
+		up_read(&IX(sb)->query_sem);
+	}
+	if (!err)
+		err = results_to_user(IX(sb), q->results, kres, q->count);
+	kvfree(kres);
 	return err;
 }
 
@@ -3143,11 +3183,7 @@ static long do_query2(struct super_block *sb, struct file *file, void __user *ar
 		return PTR_ERR(q);
 	err = query2_validate(q);
 	if (!err)
-		err = query2_pin(sb, file, domain);
-	if (!err) {
-		err = query2_exec(sb, file, q, domain, depth);
-		up_read(&IX(sb)->query_sem);
-	}
+		err = query2_one(sb, file, q, domain, depth);
 	if (!err && copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 	kfree(q);
@@ -3183,13 +3219,8 @@ static long do_query2_batch(struct super_block *sb, struct file *file, void __us
 	}
 	for (i = 0; i < b.nqueries && !err; i++)
 		err = query2_validate(&qs[i]);
-	if (!err)
-		err = query2_pin(sb, file, domain);
-	if (!err) {
-		for (i = 0; i < b.nqueries && !err; i++)
-			err = query2_exec(sb, file, &qs[i], domain, depth);
-		up_read(&IX(sb)->query_sem);
-	}
+	for (i = 0; i < b.nqueries && !err; i++)
+		err = query2_one(sb, file, &qs[i], domain, depth);
 	if (!err && copy_to_user(uq, qs, b.nqueries * sizeof(*qs)))
 		err = -EFAULT;
 out:
