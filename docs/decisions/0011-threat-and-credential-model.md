@@ -203,6 +203,15 @@ Added on 2026-10-14, from the code review of journal 0105:
   search ioctl avoids faulting under its locks. v1 `QUERY` also reads and checks its request
   before building anything.
 
+Added on 2026-10-14, from syzkaller (journals 0109, 0112):
+
+- **F8 — a failed mount kept a reference on the lower root.** When an allocation failed while
+  the root dentry was set up, the reference taken on the lower root was never dropped; the lower
+  could not then be unmounted cleanly, a leak of the kind that can end in a use-after-free.
+  Reachable only by whoever may mount, but it broke promise 1. **Fixed** in journal 0112, with
+  the mount added to the fault-injection test and the kernel log checked after the lower is
+  unmounted.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that

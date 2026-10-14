@@ -136,3 +136,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0106 — Remount: options refused through the new mount API; the fstests port stays local](0106-remount-options-and-fstests-scope.md)
 - [0107 — Proposal: richer queries in a user-space library (ADR-0013)](0107-query-library-proposal.md)
 - [0108 — Prototype: SQL over a domain through a SQLite virtual table (ADR-0013)](0108-sqlite-virtual-table-prototype.md)
+- [0112 — A lower dentry pinned by a failed mount (syzkaller); ENOMEM reported as EINVAL; a SQL condition dropped on an older SQLite](0112-mount-leak-and-sql-omit.md)

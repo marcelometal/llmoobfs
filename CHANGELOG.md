@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fixed (journal 0112): a mount that failed on an allocation kept a reference on the lower root
+  (finding F8, found by syzkaller); out of memory while resolving `lower=` was reported as
+  `EINVAL`; the SQLite extension could drop a condition it had declared handled, on an older
+  SQLite. The fault-injection test now covers the mount and checks the log after the lower is
+  unmounted.
 - **SQL over a domain, without a database** (prototype, ADR-0013, journal 0108): `sqlite/`, a
   SQLite virtual table that turns conditions, IN lists and ordering on a required column into
   `QUERY2` calls and leaves OR, sorting, counts and grouping to SQLite (`make sqlite-ext`). New
