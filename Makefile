@@ -6,7 +6,7 @@ HEADERS = include/moobfs_format.h
 KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
-.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint checkpatch module layer vm-test
+.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint checkpatch module layer vm-test sqlite-ext
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -19,11 +19,16 @@ help:
 	@echo '  make attr-tools    moobfs-attr, moobfs-check, moobfs-index'
 	@echo '  make bench-tools   M4 harness binaries; make bench-smoke runs its smoke test'
 	@echo '  make hostile-test  adversarial lower trees through moobfs-check and moobfs-index (S4)'
+	@echo '  make sqlite-ext    the moobfs SQLite extension, $$(BUILD)/moobfs.so (needs libsqlite3-dev >= 3.38)'
 	@echo 'Kernel (inside the VM container, not on your host):'
 	@echo '  make vm-test       full native suite in a disposable QEMU VM; needs only Docker'
 	@echo '  make module/layer  build the kernel modules against KDIR'
 	@echo 'Details: docs/development.md and docs/testing.md'
 tools: $(BUILD)/mkfs.moobfs $(BUILD)/fsck.moobfs $(BUILD)/attr_test
+# SQL over a domain, no database (ADR-0013, journal 0108): load with .load or load_extension
+sqlite-ext: $(BUILD)/moobfs.so
+$(BUILD)/moobfs.so: sqlite/moobfs_vtab.c common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 -D_GNU_SOURCE -Wall -Wextra -Werror -fPIC -shared -Iinclude sqlite/moobfs_vtab.c common/attr.c $(LDFLAGS) -o $@
 $(BUILD):
 	mkdir -p $(BUILD)
 $(BUILD)/mkfs.moobfs: tools/mkfs.c $(COMMON) $(HEADERS) | $(BUILD)
