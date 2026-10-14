@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Test policy for the layer under SELinux (journal 0104), after the structure of
+# policy/test_overlayfs.te in SELinuxProject/selinux-testsuite: one client domain and file
+# types it may read and write, only read, or not touch at all.
+policy_module(moobtest, 1.0)
+
+gen_require(`
+	type kernel_t, unconfined_t, unlabeled_t;
+	role unconfined_r;
+')
+
+type moobtest_client_t;
+domain_type(moobtest_client_t)
+corecmd_bin_entry_type(moobtest_client_t)
+role system_r types moobtest_client_t;
+role unconfined_r types moobtest_client_t;
+
+# the test runs as kernel_t (no init policy in the guest) or unconfined_t
+allow { kernel_t unconfined_t } moobtest_client_t:process transition;
+allow moobtest_client_t { kernel_t unconfined_t }:fd use;
+allow moobtest_client_t { kernel_t unconfined_t }:process sigchld;
+# its output goes to the test's pipes
+allow moobtest_client_t { kernel_t unconfined_t }:fifo_file rw_fifo_file_perms;
+
+# what any program needs to start
+libs_use_ld_so(moobtest_client_t)
+libs_use_shared_libs(moobtest_client_t)
+corecmd_exec_bin(moobtest_client_t)
+miscfiles_read_localization(moobtest_client_t)
+dev_rw_null(moobtest_client_t)
+files_search_tmp(moobtest_client_t)
+fs_search_tmpfs(moobtest_client_t)
+kernel_read_system_state(moobtest_client_t)
+# test environment only: the guest's root (9p from the host) has no labels. Search on
+# unlabeled directories also applies to the layer's directories under the stock policy.
+allow moobtest_client_t unlabeled_t:dir search;
+
+type moobtest_dir_t;
+files_type(moobtest_dir_t)
+type moobtest_rw_t;
+files_type(moobtest_rw_t)
+type moobtest_ro_t;
+files_type(moobtest_ro_t)
+type moobtest_none_t;
+files_type(moobtest_none_t)
+
+allow moobtest_client_t moobtest_dir_t:dir { list_dir_perms add_entry_dir_perms del_entry_dir_perms };
+allow moobtest_client_t moobtest_rw_t:file { manage_file_perms map };
+allow moobtest_client_t moobtest_ro_t:file { read_file_perms map };
+allow moobtest_client_t moobtest_ro_t:dir list_dir_perms;
+type_transition moobtest_client_t moobtest_dir_t:file moobtest_rw_t;
+# moobtest_none_t: no rule at all
+
+# the layer's typed attributes are user.* xattrs, governed by the file's own setattr/getattr
+fs_getattr_xattr_fs(moobtest_client_t)
