@@ -131,6 +131,21 @@ used here and is missing from this list, or is described wrongly, please open an
   The technique of journal 0096 (`tests/failnth.c`, `vm/kasan-guest.sh`), implemented. Read in the
   source tree of the kernel the tests are built with.
 
+### Disjunctions over index scans (ADR-0013, proposed)
+
+- PostgreSQL documentation, "Combining Multiple Indexes" (current version, read on 2026-10-14).
+  https://www.postgresql.org/docs/current/indexes-bitmap-scans.html
+- MySQL 8.4 Reference Manual, "Index Merge Optimization" (read on 2026-10-14).
+  https://dev.mysql.com/doc/refman/8.4/en/index-merge-optimization.html
+- Oracle Database 18c SQL Tuning Guide, "Query Transformations" (OR expansion), and the Oracle
+  optimizer team's article "Optimizer transformations: OR expansion".
+  https://docs.oracle.com/en/database/oracle/oracle-database/18/tgsql/query-transformations.html
+  https://blogs.oracle.com/optimizer/post/optimizer-transformations-or-expansion
+
+  How databases answer OR with several index scans, and how OR expansion keeps a row from being
+  returned twice. Checked on 2026-10-14: the PostgreSQL and MySQL pages read; for Oracle, the
+  search results and summaries of the two pages, not the pages in full.
+
 ### Copies to user space under a lock (journal 0105)
 
 - Linux kernel, commit `a48b73eca4ce`, "btrfs: fix potential deadlock in the search ioctl"

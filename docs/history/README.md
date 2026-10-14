@@ -134,3 +134,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0104 — SELinux: first investigation (security roadmap S12)](0104-selinux-investigation.md)
 - [0105 — Query results are copied to the caller after the query semaphore is released](0105-query-results-copied-outside-the-lock.md)
 - [0106 — Remount: options refused through the new mount API; the fstests port stays local](0106-remount-options-and-fstests-scope.md)
+- [0107 — Proposal: richer queries in a user-space library (ADR-0013)](0107-query-library-proposal.md)
