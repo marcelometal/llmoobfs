@@ -997,6 +997,15 @@ for fs in ext4 btrfs xfs; do
         $BIN/bench-gen --seed 7 --inodes 500 --profile 16 --out /tmp/rl-m.txt || fail "rl-gen-$fs"
         $BIN/bench-load --manifest /tmp/rl-m.txt --target $LAYER/$d --workload W1 --procs 2 --out /tmp/rl-w1 > /dev/null || fail "rl-w1-$fs"
     done
+    # for the cursor check below: twelve files with values longer than the cursor's inline space
+    mkdir -m 755 $LAYER/d0/cur || fail "rl-cur-dir-$fs"
+    long=$(head -c 100 /dev/zero | tr '\0' x)
+    for i in $(seq 10 21); do
+        f=$LAYER/d0/cur/c$i; : > $f
+        $BIN/moobfs-attr set $f rlcur string "$long$i" > /dev/null &&
+            $BIN/moobfs-attr set $f rlgrp string g > /dev/null &&
+            $BIN/moobfs-attr set $f rltag string t > /dev/null || fail "rl-cur-attr-$fs"
+    done
     umount $LAYER || fail "rl-umount-$fs"
 
     # the budget: sized from what one domain takes, so that two fit and three do not
@@ -1039,6 +1048,21 @@ for fs in ext4 btrfs xfs; do
     [ "$(grep ' moobfs_domain_release: ' $TR/trace | grep -c ' by=shrinker ')" -eq 4 ] || { cat $TR/trace; fail "rl-trace-shrinker-releases-$fs"; }
     [ "$(rl_info domain_releases)" -eq 4 ] || fail "rl-shrink-count-$fs"
     rl_cmp d0 d1 d2 d3 || fail "rl-shrink-rebuild-differs-$fs"
+    # a cursor taken before a release resumes after the rebuild (spec §9): the first page, a
+    # release, the remaining pages; together they must be the whole answer, in its order
+    rl_page() {
+        $BIN/query $LAYER/d0 q2 --raw --limit 5 --cursor-out /tmp/rl.c "$@" > /tmp/rl.p || return 1
+        r0=$(rl_info domain_releases)
+        sync; echo 2 > /proc/sys/vm/drop_caches
+        [ "$(rl_info domain_releases)" -gt "$r0" ] || { echo "nothing was released"; return 1; }
+        $BIN/query $LAYER/d0 q2 --raw --limit 5 --pages --cursor-in /tmp/rl.c "$@" >> /tmp/rl.p || return 1
+        $BIN/query $LAYER/d0 q2 --raw "$@" > /tmp/rl.f || return 1
+        [ "$(wc -l < /tmp/rl.f)" -eq 12 ] && cmp -s /tmp/rl.p /tmp/rl.f || { cat /tmp/rl.p; echo ---; cat /tmp/rl.f; return 1; }
+    }
+    rl_page --order rlcur string asc || fail "rl-cursor-long-asc-$fs"
+    rl_page --order rlcur string desc || fail "rl-cursor-long-desc-$fs"
+    rl_page rlgrp eq string g || fail "rl-cursor-unordered-$fs"
+    rl_page rlgrp eq string g rltag eq string t || fail "rl-cursor-intersection-$fs"
     tr_off moobfs_domain_build moobfs_domain_release
     # tracefs is root's: the counts these events carry must not reach other users (ADR-0011, F1)
     [ "$(stat -c %a $TR)" = 700 ] || fail "rl-tracefs-not-root-only-$fs ($(stat -c %a $TR))"
@@ -1081,7 +1105,7 @@ for fs in ext4 btrfs xfs; do
         cmp -s /tmp/rl.k /tmp/rl.o || fail "rl-race-differs-$d-$fs"
     done
     umount $LAYER && rm -rf $LOWER/rl && umount $LOWER || fail "rl-cleanup-$fs"
-    echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker and idle floor; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
+    echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
 fi
 rmmod moobfs_layer || fail layer-unload

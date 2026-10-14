@@ -297,7 +297,8 @@ query answers does not change.
   `QUERY`.
 - **Not changed:** the attribute encoding, the `QUERY2` request and reply, cursors (a cursor is
   bound to the mount and carries a value and an inode number, not a position in memory, so it
-  resumes after its domain was released and built again; argued from the code, not tested),
+  resumes after its domain was released and built again; argued from the code, not tested;
+  note of 2026-10-14: now tested by the suite step `release`, journal 0103),
   `fallback_domains`, the budget rule for an update to a domain already built.
 - **Release under the budget** (journal 0101). When the build of a domain needs more than
   `index_budget` allows, the built domain queried least recently (other than this one) is
