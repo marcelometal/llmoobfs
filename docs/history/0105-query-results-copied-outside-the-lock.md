@@ -1,6 +1,6 @@
 # 0105 — Query results are copied to the caller after the query semaphore is released
 
-Date: 2026-10-14. Status: **in progress**; implemented; confirmation runs below.
+Date: 2026-10-14. Status: implemented; confirmed by lockdep; local suite and KASAN pass.
 
 ## Goal
 
@@ -102,4 +102,6 @@ Items, with what was done:
   semaphore held.
 - `make vm-test`, complete, with the fix: pass (`MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS`).
 - Build with `W=1` and `sparse`: clean. `sh scripts/checkpatch.sh`: exit 0.
-- KASAN with the fix (the assertion now sits in `results_to_user()`): see below when recorded.
+- `sh vm/kasan-local.sh` with the fix (upstream 6.12.112, KASAN, UBSAN, lockdep, fault injection;
+  the assertion now in `results_to_user()`): `MOOBFS_KASAN_PASS`, no `WARNING` or `BUG` in the
+  console. The assertion stayed silent through the whole suite.
