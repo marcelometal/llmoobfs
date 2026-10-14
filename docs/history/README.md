@@ -129,3 +129,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0099 — The credential model was described as overlayfs's; it is not](0099-credential-model-corrected.md)
 - [0100 — A nested subvolume is recognised by its device, not by its inode number](0100-subvolume-by-device.md)
 - [0101 — ADR-0012, second half: built domains are released](0101-domains-released.md)
+- [0102 — Tracepoints for the index (security roadmap S13)](0102-index-tracepoints.md)

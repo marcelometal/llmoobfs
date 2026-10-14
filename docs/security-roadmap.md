@@ -218,6 +218,10 @@ Accepted by the maintainer on 2026-10-13, small, to arrive with the second half 
 - Done when: the tracepoints exist, a test turns them on and reads them, and the test-only
   parameters of journal 0098 are replaced by them where possible.
 
+*Note, 2026-10-14 (journal 0102).* Done: four events (build, release, file read again, index
+incomplete); the suite enables and reads them; `scan_retries` is replaced, `scan_delay_us` stays
+because it changes timing.
+
 ## Out of scope for this list
 
 - LLM content guardrails: the layer is storage; control over what an agent reads or writes

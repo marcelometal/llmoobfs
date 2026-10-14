@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Tracepoints for the index (journal 0102, security roadmap S13): `moobfs_domain_build`,
+  `moobfs_domain_release`, `moobfs_scan_reread`, `moobfs_index_incomplete`, readable by root
+  through tracefs. The test-only module parameter `scan_retries` is removed.
 - **Built domains are released** (journal 0101, ADR-0012 items 3 and 4): when the build of a
   domain does not fit `index_budget`, the domains queried least recently are released until it
   does; a shrinker releases built domains under memory pressure, except those queried in the

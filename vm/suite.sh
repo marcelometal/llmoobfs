@@ -899,6 +899,16 @@ mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail rs-laye
 $BIN/layer reserve $LAYER $LOWER || fail rs-reserve
 umount $LAYER && umount $LOWER || fail rs-final-umount
 fi
+# Tracepoints of the index (journal 0102): tr_on clears the buffer and enables the named events
+# of the moobfs system, tr_count counts one event in the buffer.
+TR=/sys/kernel/tracing
+tr_on() {
+    [ -e $TR/trace ] || mount -t tracefs nodev $TR || return 1
+    echo > $TR/trace || return 1
+    for e in "$@"; do echo 1 > $TR/events/moobfs/$e/enable || return 1; done
+}
+tr_off() { for e in "$@"; do echo 0 > $TR/events/moobfs/$e/enable; done; }
+tr_count() { grep -c " $1: " $TR/trace; }
 if want buildrace; then
 # ADR-0012: the index of a domain is built by the first query on it, with the domain still
 # being written. tests/buildrace.c writes, renames and unlinks inside each domain while the
@@ -925,13 +935,14 @@ for fs in ext4 btrfs xfs; do
     # window the counter check protects; without the delay this test passes with the check
     # removed. Not longer than this: at 300 us nearly every reading saw a write and no build
     # ever finished (EAGAIN for ever), which is the starvation journal 0098 records as a limit.
-    r0=$(cat /sys/module/moobfs_layer/parameters/scan_retries)
+    tr_on moobfs_scan_reread || fail "br-trace-on-$fs"
     echo 40 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail "br-delay-$fs"
     $BIN/buildrace $LAYER 24 60 | tee /tmp/br.txt; rc=$?
     echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
     [ $rc -eq 0 ] || fail "br-run-$fs"
     grep -q '^BUILDRACE_DONE' /tmp/br.txt || fail "br-done-$fs"
-    retries=$(( $(cat /sys/module/moobfs_layer/parameters/scan_retries) - r0 ))
+    retries=$(tr_count moobfs_scan_reread)
+    tr_off moobfs_scan_reread
     [ $retries -gt 0 ] || fail "br-no-write-landed-in-the-window-$fs (the test proved nothing)"
     br_cmp() {
         for p in $LOWER/br/*; do
@@ -996,7 +1007,11 @@ for fs in ext4 btrfs xfs; do
     budget=$(( one * 5 / 2 ))
     [ $budget -ge 1048576 ] || fail "rl-domains-too-small-for-the-1M-minimum-budget-$fs (one domain: $one bytes)"
     mount -t moobfs_layer -o lower=$LOWER/rl,index_budget=$budget none $LAYER || fail "rl-budget-mount-$fs"
+    tr_on moobfs_domain_build moobfs_domain_release || fail "rl-trace-on-$fs"
     rl_cmp d0 d1 d2 d3 || fail "rl-budget-answer-differs-$fs"
+    # the tracepoints saw it: four builds that succeeded, at least two of them after releasing
+    [ "$(grep ' moobfs_domain_build: ' $TR/trace | grep -c ' err=0 ')" -eq 4 ] || { cat $TR/trace; fail "rl-trace-builds-$fs"; }
+    [ "$(grep ' moobfs_domain_release: ' $TR/trace | grep -c ' by=budget ')" -ge 2 ] || { cat $TR/trace; fail "rl-trace-budget-releases-$fs"; }
     [ "$(rl_info domain_releases)" -ge 2 ] || { $BIN/query $LAYER info; fail "rl-budget-nothing-released-$fs"; }
     [ "$(rl_info domains_built)" -le 2 ] || { $BIN/query $LAYER info; fail "rl-budget-too-many-built-$fs"; }
     [ "$(rl_info used)" -le $budget ] || fail "rl-budget-exceeded-$fs"
@@ -1018,10 +1033,15 @@ for fs in ext4 btrfs xfs; do
     grep -q "index_idle=0" /proc/mounts || fail "rl-shrink-option-not-shown-$fs"
     rl_cmp d0 d1 d2 d3 || fail "rl-shrink-before-$fs"
     [ "$(rl_info domains_built)" -eq 4 ] || fail "rl-shrink-built-$fs"
+    echo > $TR/trace
     sync; echo 2 > /proc/sys/vm/drop_caches
     [ "$(rl_info domains_built)" -eq 0 ] || { $BIN/query $LAYER info; fail "rl-shrinker-released-nothing-$fs"; }
+    [ "$(grep ' moobfs_domain_release: ' $TR/trace | grep -c ' by=shrinker ')" -eq 4 ] || { cat $TR/trace; fail "rl-trace-shrinker-releases-$fs"; }
     [ "$(rl_info domain_releases)" -eq 4 ] || fail "rl-shrink-count-$fs"
     rl_cmp d0 d1 d2 d3 || fail "rl-shrink-rebuild-differs-$fs"
+    tr_off moobfs_domain_build moobfs_domain_release
+    # tracefs is root's: the counts these events carry must not reach other users (ADR-0011, F1)
+    [ "$(stat -c %a $TR)" = 700 ] || fail "rl-tracefs-not-root-only-$fs ($(stat -c %a $TR))"
     umount $LAYER || fail "rl-shrink-umount-$fs"
 
     # with the default floor (60 s) the domains just queried stay

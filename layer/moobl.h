@@ -64,6 +64,7 @@ struct moobl_index {
 	bool over_budget;		/* charge() refused an allocation (index lock) */
 	unsigned int idle;		/* seconds a used domain is kept from the shrinker */
 	struct shrinker *shrinker;	/* releases built domains under memory pressure */
+	dev_t dev;			/* the layer's anonymous device, for tracepoints */
 };
 
 struct moobl_sb {

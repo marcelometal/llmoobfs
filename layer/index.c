@@ -33,11 +33,15 @@
 #include <linux/sched/mm.h>
 #include <linux/shrinker.h>
 #include <linux/jiffies.h>
+#include <linux/ktime.h>
 #include <linux/delay.h>
 #include <linux/moduleparam.h>
 #include "moobl.h"
 #include "moobfs_attr.h"
 #include "moobfs_ioctl.h"
+
+#define CREATE_TRACE_POINTS
+#include "moobl_trace.h"
 
 /*
  * The index lock is taken when a layer inode is evicted (moobl_index_inode_evicted), and
@@ -167,6 +171,15 @@ static int charge(struct moobl_index *ix, size_t bytes)
 	}
 	ix->used += bytes;
 	return 0;
+}
+
+/* An update failed after the lower change: answers may miss files until remount. */
+static void index_mark_incomplete(struct moobl_index *ix, int err)
+{
+	lockdep_assert_held_write(&ix->lock);
+	if (!ix->incomplete)
+		trace_moobfs_index_incomplete(ix->dev, err);
+	ix->incomplete = true;
 }
 
 static void uncharge(struct moobl_index *ix, size_t bytes)
@@ -398,7 +411,7 @@ static int rec_set_partition(struct moobl_index *ix, struct moobl_ix_inode *rec,
 	rec->domain = pl->domain;
 	rec->hetero = pl->hetero;
 	if (err)
-		ix->incomplete = true;
+		index_mark_incomplete(ix, err);
 	return err;
 }
 
@@ -731,16 +744,13 @@ static void moved_list_free(struct list_head *head)
 /*
  * For tests only (tests/buildrace.c, vm/suite.sh). The window between reading a file and
  * storing what was read lasts microseconds, so concurrent writes almost never land in it and
- * a test cannot tell a correct build from one without the counter check. scan_delay_us makes
- * the scan sleep in that window; scan_retries counts the readings repeated because an update
- * arrived, for every mount of the module.
+ * a test cannot tell a correct build from one without the conflict check. scan_delay_us makes
+ * the scan sleep in that window. A reading repeated because an update arrived is reported by
+ * the tracepoint moobfs_scan_reread (journal 0102), which replaced a counter parameter.
  */
 static unsigned int scan_delay_us;
 module_param(scan_delay_us, uint, 0644);
 MODULE_PARM_DESC(scan_delay_us, "tests only: microseconds the index scan sleeps between reading a file and storing it");
-static unsigned long scan_retries;	/* approximate when several mounts build at once */
-module_param(scan_retries, ulong, 0444);
-MODULE_PARM_DESC(scan_retries, "tests only: file readings the index scan repeated because of a concurrent update");
 
 /* One file being read from the lower filesystem into the index, by a build or an adoption. */
 struct moobl_loader {
@@ -917,8 +927,11 @@ static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, 
 		nofs = ix_write_lock(ix);
 	}
 	if (dom->state == MOOBL_DOM_BUILT) {
+		u64 before = ix->used;
+
 		domain_takedown(ix, dom, key);
 		ix->releases++;
+		trace_moobfs_domain_release(ix->dev, key, reclaim, (s64)(before - ix->used));
 		done = true;
 	}
 	ix_write_unlock(ix, nofs);
@@ -1082,7 +1095,7 @@ static int index_load(struct super_block *sb, struct dentry *lower, struct dentr
 		nofs = ix_write_lock(ix);
 		if (ld.dirty) {		/* this file was updated while it was being read */
 			ld.dirty = false;
-			scan_retries++;
+			trace_moobfs_scan_reread(ix->dev, li->i_ino);
 			ix_write_unlock(ix, nofs);
 			cond_resched();
 			err = -EAGAIN;
@@ -1437,6 +1450,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	const struct cred *old;
 	struct scan_job job;
 	unsigned int nofs, released = 0;
+	u64 t0, used0;
 	int tries, err;
 
 	if (!dom)
@@ -1466,6 +1480,8 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 		up_write(&ix->query_sem);
 	}
 	job.stop = domain ? 0 : ix->domain_depth;
+	t0 = ktime_get_ns();
+	used0 = READ_ONCE(ix->used);
 	old = override_creds(sbi->creds);
 	for (tries = 0; tries < MOOBL_BUILD_TRIES; tries++) {
 		LIST_HEAD(todo);
@@ -1524,6 +1540,8 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	}
 	revert_creds(old);
 	attr_buf_free(&job.buf);
+	trace_moobfs_domain_build(ix->dev, domain, err, min_t(int, tries + 1, MOOBL_BUILD_TRIES),
+				  released, (s64)(READ_ONCE(ix->used) - used0), ktime_get_ns() - t0);
 	mutex_unlock(&dom->build);
 	if (err && err != -EINTR)
 		pr_warn_ratelimited("moobfs_layer: building the index of a domain failed (%d)\n", err);
@@ -1603,6 +1621,7 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 	get_random_bytes(&ix->cursor_key, sizeof(ix->cursor_key));
 	ix->budget = budget;
 	ix->idle = idle;
+	ix->dev = sb->s_dev;
 	ix->enabled = enabled;
 	ix->initialized = true;
 }
@@ -1752,7 +1771,7 @@ int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *n
 		/* The lower write already succeeded; the index is now incomplete until remount. */
 		if (!ix->incomplete)
 			pr_warn("moobfs_layer: index update failed (%d); QUERY results are incomplete until remount\n", err);
-		ix->incomplete = true;
+		index_mark_incomplete(ix, err);
 	} else {
 		rec = xa_load(&ix->inodes, inode->i_ino);
 		if (rec) {
@@ -1840,7 +1859,7 @@ static void index_adopt(struct super_block *sb, struct dentry *lower, struct den
 		nofs = ix_write_lock(ix);
 		if (!ix->incomplete)
 			pr_warn("moobfs_layer: index update failed (%d); QUERY results are incomplete until remount\n", err);
-		ix->incomplete = true;
+		index_mark_incomplete(ix, err);
 		ix_write_unlock(ix, nofs);
 	}
 }
