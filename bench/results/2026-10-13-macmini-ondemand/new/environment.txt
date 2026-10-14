@@ -1,0 +1,4 @@
+6.12.111+deb13-amd64
+0.3.0
+90F17A3C1276C00A7544B11
+mount options: lower=/srv/moob/ext4/udx-lower
