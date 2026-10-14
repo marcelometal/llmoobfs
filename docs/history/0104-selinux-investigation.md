@@ -1,7 +1,7 @@
 # 0104 — SELinux: first investigation (security roadmap S12)
 
 Date: 2026-10-14. Status: three rounds run on the benchmark host; two defects found and fixed;
-KASAN and the local suite with the fixes are recorded below.
+the local suite and KASAN pass with both fixes.
 
 ## Goal
 
@@ -120,8 +120,12 @@ stock policy the query is refused at the domain directory, as every other access
   differ=5 denied_directly=7` and `MOOBFS_SELINUX_RESULT: fsuse differ=0 denied_directly=7`,
   with the `QUERY2` answer `rw`, `ro`. Negative runs: each fix undone alone fails at its own
   check.
-- `make vm-test`, complete, with the first fix: pass (`MOOBFS_LAYER_PASS`,
-  `MOOBFS_ACCEPTANCE_PASS`). With both fixes: see the note below when recorded.
+- `make vm-test`, complete, with the first fix and again with both: pass (`MOOBFS_LAYER_PASS`,
+  `MOOBFS_ACCEPTANCE_PASS`). The local guest has no SELinux, so the second fix is inert there:
+  the run shows that it changes nothing else.
+- `sh vm/kasan-local.sh` on the benchmark host with both fixes (upstream 6.12.112, KASAN, UBSAN,
+  lockdep, fault injection): `MOOBFS_KASAN_PASS`, no kernel diagnostic. The KASAN guest has no
+  SELinux either.
 - `sh scripts/checkpatch.sh`: exit 0.
 
 ## Limitations
@@ -139,5 +143,5 @@ stock policy the query is refused at the domain directory, as every other access
 
 ## Next step
 
-Record the KASAN run with both fixes. Then the README and `docs/when-not-to-use.md` say what is
-needed under SELinux, and S12 can be closed or narrowed to what is not covered.
+S12 narrowed to what is not covered (security roadmap). The fixes go out as a pull request on
+top of ADR-0012's.
