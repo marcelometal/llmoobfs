@@ -156,7 +156,9 @@ Finding memories is one `QUERY2` call on a domain directory: up to four attribut
 joined by AND, answered from that domain's partition of the index after one permission check on
 the directory. A file that not everyone entering the domain may read is left out of the
 partition ([spec-query-v2](docs/spec-query-v2.md) §3). The client then opens the file
-normally. Unmount the layer and the lower
+normally. For IN lists, OR, sorting and counts there is an optional SQLite extension
+([sqlite/](sqlite/README.md), prototype): SQL over a domain with no database, every row still a
+`QUERY2` answer. Unmount the layer and the lower
 directory is a plain tree that `grep`, `getfattr`, `git` and `rsync` read without the module.
 Details with source citations: [architecture overview](docs/architecture-overview.md); the
 same flow as a diagram: [site/plan.html](https://studiomoob.github.io/llmoobfs/plan.html#flow).

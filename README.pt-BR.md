@@ -163,7 +163,9 @@ o índice. Encontrar memórias é uma chamada `QUERY2` num diretório de domíni
 predicados de atributo unidos por E, respondidos pela partição daquele domínio no índice depois de
 uma verificação de permissão no diretório. Um arquivo que nem todos que entram no domínio podem
 ler fica fora da partição ([spec-query-v2](docs/spec-query-v2.md) §3). O cliente então abre o
-arquivo normalmente. Desmonte a camada e o diretório de baixo é uma árvore comum que `grep`,
+arquivo normalmente. Para listas IN, OR, ordenação e contagens há uma extensão opcional do SQLite
+([sqlite/](sqlite/README.md), protótipo): SQL sobre um domínio sem banco de dados, e cada linha
+continua sendo uma resposta do `QUERY2`. Desmonte a camada e o diretório de baixo é uma árvore comum que `grep`,
 `getfattr`, `git` e `rsync` leem sem o módulo. Detalhes com citações do código:
 [visão de arquitetura](docs/architecture-overview.md); o mesmo fluxo como diagrama:
 [site/plan.html](https://studiomoob.github.io/llmoobfs/plan.html#flow).

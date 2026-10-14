@@ -42,7 +42,8 @@ vendored `fsx` or `replay-log` goes upstream as a patch.
 - What libmount sends on `mount -o remount,ro` was not traced; the remount checks pass with the
   guest's `mount`.
 - The suite runs the new checks on the three lower filesystems in a complete run; only ext4 was
-  run for this journal. KASAN: with the next batch.
+  run for this journal. KASAN: with the next batch. Note of 2026-10-14: the complete run of journal
+  0108 passed them on ext4, btrfs and XFS.
 
 ## Next step
 

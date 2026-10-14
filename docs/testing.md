@@ -164,6 +164,12 @@ needs the packages of the workflow's install step, virtme-ng from `vm/kasan-requ
 (a virtualenv is fine) and membership in the `kvm` group. A local pass is a faster development
 loop; the workflow on the pull request stays the required check.
 
+### SQLite virtual table
+
+`MOOB_ONLY=sqlext make vm-test` (journal 0108) runs the step that compares the `moobfs` virtual
+table (`sqlite/`) with an ordinary SQLite table filled from the lower filesystem, statement by
+statement, and prints each plan. Marker: `SQLEXT_PASS`. It is part of the complete run.
+
 ### SELinux
 
 `sh vm/selinux-local.sh` (journal 0104) runs, on a Debian host with KVM and the module built,

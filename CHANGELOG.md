@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **SQL over a domain, without a database** (prototype, ADR-0013, journal 0108): `sqlite/`, a
+  SQLite virtual table that turns conditions, IN lists and ordering on a required column into
+  `QUERY2` calls and leaves OR, sorting, counts and grouping to SQLite (`make sqlite-ext`). New
+  suite step `sqlext` (30 statements equal to an ordinary table). Measured: the newest 20 rows in
+  0.24 ms against 2.5 ms on an ordinary SQLite table; a getxattr per row (about 10 µs) where a
+  column of every row is read.
 - Remount (journal 0106): an option change through the new mount API (`fsconfig`) is refused
   with `EINVAL`, as overlayfs does; through `mount(2)` options are still ignored. The suite now
   tests `remount,ro` and `remount,rw` of the layer.

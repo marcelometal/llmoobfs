@@ -1,6 +1,8 @@
 # ADR-0013 — Richer queries through a mature engine: a SQLite virtual table over QUERY2
 
-Date: 2026-10-14. Status: **proposed**; not accepted, nothing implemented. Revised the same day:
+Date: 2026-10-14. Status: **accepted** by the maintainer on 2026-10-14, with a point of attention:
+SQLite is the engine unless something better is found, and the choice is to be revisited in the
+future. Prototype: journal 0108. Revised the same day before acceptance:
 the first draft proposed a planner library of our own; at the maintainer's request mature
 engines and kernel precedents were studied first (`docs/research-query-frontends.md`), and the
 draft is kept below as a rejected alternative.
