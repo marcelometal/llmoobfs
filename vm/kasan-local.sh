@@ -48,6 +48,7 @@ cp bench/run.sh build/vng/bench-run.sh
 gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o build/vng/layer
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/failnth.c -o build/vng/failnth
 gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o build/vng/hostile
+gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/buildrace.c -lpthread -o build/vng/buildrace
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
 gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
 gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap

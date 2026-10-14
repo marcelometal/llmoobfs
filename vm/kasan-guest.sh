@@ -69,8 +69,9 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|possible (circular|recursive) locking|INFO: (task|rcu)|UBSAN:' "$OUT/dmesg-faults.txt"; then
         fail "fi-kernel-diagnostic under fault injection"
     fi
-    fi_cmp() {   # kernel QUERY2 against the oracle on both domains, by path
-        for d in da db; do
+    fi_cmp() {   # kernel QUERY2 against the oracle on the domains matching the pattern, by path
+        for p in $LOWER/fi/$1; do
+            d=${p##*/}
             $BIN/query $LAYER/$d q2 kind exists - - | cut -f2 | sort > /tmp/fi.k || return 1
             $BIN/moobfs-index --domain $LOWER/fi/$d kind exists - - | cut -f2 | sort > /tmp/fi.o || return 1
             cmp -s /tmp/fi.k /tmp/fi.o || { echo "domain $d: kernel $(wc -l < /tmp/fi.k) oracle $(wc -l < /tmp/fi.o)"; diff /tmp/fi.k /tmp/fi.o | head -5; return 1; }
@@ -78,14 +79,17 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     }
     $BIN/query $LAYER info > /tmp/fi.info || fail fi-info
     flags=$(sed -n 's/.* flags=\(0x[0-9a-f]*\).*/\1/p' /tmp/fi.info)
+    # The domains failnth only built (e*) were never written while built: whatever the faults
+    # did to their builds, what is in the index now must be the whole answer.
+    fi_cmp 'e*' || fail "fi-built-under-faults-differs-from-oracle"
     if [ $(( flags & 0x8 )) -ne 0 ]; then
         echo "FAULTS: the index declared itself incomplete (flags=$flags), as designed when an update fails after the lower write"
     else
-        fi_cmp || fail "fi-index-differs-from-oracle without the incomplete flag"
+        fi_cmp '*' || fail "fi-index-differs-from-oracle without the incomplete flag"
     fi
     umount $LAYER || fail fi-umount
     mount -t moobfs_layer -o lower=$LOWER/fi,domain_depth=1 none $LAYER || fail fi-remount
-    fi_cmp || fail fi-index-differs-after-remount
+    fi_cmp '*' || fail fi-index-differs-after-remount
     umount $LAYER && rm -rf $LOWER/fi && umount $LOWER || fail fi-cleanup
     rmmod moobfs_layer || fail fi-rmmod
     echo "FAULT_INJECTION_PASS: $(grep '^FAILNTH_DONE' "$OUT/failnth.txt" | cut -d' ' -f2-); no kernel diagnostic; index equal to the oracle"

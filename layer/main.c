@@ -150,6 +150,12 @@ static struct inode *moobl_get_inode(struct super_block *sb, struct inode *lower
 	return inode;
 }
 
+/* The layer inode of a lower inode if it is in memory, referenced; NULL otherwise. May sleep. */
+struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower)
+{
+	return ilookup5(sb, (unsigned long)lower, moobl_inode_test, lower);
+}
+
 static struct inode *moobl_alloc_inode(struct super_block *sb)
 {
 	struct moobl_inode *mi = alloc_inode_sb(sb, moobl_inode_cache, GFP_KERNEL);
@@ -570,9 +576,9 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	    (S_ISDIR(target->i_mode) || !moobl_lower_inode(target)->i_nlink))
 		moobl_index_drop_inode(old_dir->i_sb, target->i_ino);
 	/* The VFS moves the dentries after this returns: place each inode at its new name. */
-	moobl_index_renamed(old_dir->i_sb, d_inode(old_dentry), new_dentry);
+	moobl_index_renamed(old_dir->i_sb, old_dentry, new_dentry);
 	if ((flags & RENAME_EXCHANGE) && target)
-		moobl_index_renamed(old_dir->i_sb, target, old_dentry);
+		moobl_index_renamed(old_dir->i_sb, new_dentry, old_dentry);
 out_unlock:
 	unlock_rename(lower_old_dir, lower_new_dir);
 out_put:
@@ -601,8 +607,10 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	if (!err)
 		set_nlink(inode, moobl_lower_inode(inode)->i_nlink);
 	moobl_unlock_parent(lower_dentry, lower_dir);
-	if (!err)
+	if (!err) {
+		moobl_index_linked(dir->i_sb, new_dentry);
 		moobl_index_perm_changed(dir->i_sb, old_dentry);	/* nlink > 1: heterogeneous */
+	}
 	return err;
 }
 
@@ -1373,7 +1381,8 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	err = moobl_set_lower_path(root, sbi->lower.mnt, dget(sbi->lower.dentry));
 	if (err)
 		return err;
-	return moobl_index_build(sb);
+	moobl_index_mount(sb);
+	return 0;
 }
 
 static int moobl_get_tree(struct fs_context *fc)

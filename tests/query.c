@@ -294,6 +294,16 @@ int main(int argc, char **argv)
 		puts("QUERY2_INVALID_REQUESTS_REFUSED");
 		return 0;
 	}
+	if (!strcmp(argv[2], "build")) {
+		/* the mount-wide QUERY reads every partition, so it builds every domain (ADR-0012) */
+		static struct moob_query_result one[1];
+		struct moob_query bq;
+
+		memset(&bq, 0, sizeof bq); bq.nterms = 1;
+		strcpy(bq.terms[0].name, "kind"); bq.terms[0].op = MOOB_OP_EXISTS;
+		if (run_query(fd, &bq, one, 1)) { perror("MOOB_IOC_QUERY (build)"); return 1; }
+		return 0;
+	}
 	if (!strcmp(argv[2], "info")) {
 		struct moob_info info;
 		CHECK(!ioctl(fd, MOOB_IOC_GET_INFO, &info));
@@ -303,6 +313,8 @@ int main(int argc, char **argv)
 		printf("domain_depth=%u heterogeneous=%u fallback_domains=%u counters=%s\n", info.domain_depth,
 		       info.heterogeneous, info.fallback_domains,
 		       (info.flags & MOOB_FLAG_COUNTERS) ? "shown" : "hidden");
+		printf("domains_built=%u domain_builds=%" PRIu64 " on_demand=%d\n", info.domains_built,
+		       (uint64_t)info.domain_builds, (info.flags & MOOB_FLAG_ON_DEMAND) != 0);
 		printf("lower=%s caps=%#x flags=%#x budget=%" PRIu64 " used=%" PRIu64 " entries=%u inodes=%u\n",
 		       info.lower_fs, info.caps, info.flags, (uint64_t)info.index_budget,
 		       (uint64_t)info.index_used, info.index_entries, info.index_inodes);

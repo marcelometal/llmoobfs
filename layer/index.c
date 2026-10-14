@@ -2,9 +2,10 @@
 /*
  * In-memory attribute index of the MoobFS memory layer (phase 2d, domains in Q2a).
  *
- * Built at mount time by walking the lower tree and reading every
- * user.moob.* attribute; kept current by the xattr, unlink, rmdir, rename,
- * setattr, set_acl and link paths of main.c; never persisted. The index is
+ * Built per permission domain by the first query on it (ADR-0012), by walking
+ * that domain's lower subtree and reading every user.moob.* attribute; a built
+ * domain is kept current by the xattr, unlink, rmdir, rename, setattr, set_acl
+ * and link paths of main.c; never persisted. The index is
  * partitioned by permission domain (docs/spec-query-v2.md): a partition is the
  * set of entries of one attribute name in one domain, split again by whether
  * the inode passes the homogeneity rule. Answers MOOB_IOC_QUERY (all
@@ -19,6 +20,8 @@
 #include <linux/xattr.h>
 #include <linux/uaccess.h>
 #include <linux/dcache.h>
+#include <linux/seqlock.h>
+#include <linux/lockref.h>
 #include <linux/list.h>
 #include <linux/string.h>
 #include <linux/uio.h>
@@ -28,6 +31,8 @@
 #include <linux/random.h>
 #include <linux/siphash.h>
 #include <linux/sched/mm.h>
+#include <linux/delay.h>
+#include <linux/moduleparam.h>
 #include "moobl.h"
 #include "moobfs_attr.h"
 #include "moobfs_ioctl.h"
@@ -441,24 +446,25 @@ static int index_put(struct moobl_index *ix, u64 ino, const struct moobl_place *
 	return 0;
 }
 
-static void index_set_path(struct moobl_index *ix, struct moobl_ix_inode *rec, const char *path)
+static int index_set_path(struct moobl_index *ix, struct moobl_ix_inode *rec, const char *path)
 {
 	size_t len = strlen(path) + 1;
 	char *copy;
 
 	if (rec->path && !strcmp(rec->path, path))
-		return;
+		return 0;
 	if (charge(ix, len))
-		return;	/* keep the old name; QUERY will fall back to the dentry cache */
+		return -ENOMEM;	/* the old name is kept; QUERY will fall back to the dentry cache */
 	copy = kmemdup(path, len, GFP_KERNEL);
 	if (!copy) {
 		uncharge(ix, len);
-		return;
+		return -ENOMEM;
 	}
 	if (rec->path)
 		uncharge(ix, strlen(rec->path) + 1);
 	kfree(rec->path);
 	rec->path = copy;
+	return 0;
 }
 
 /* ---- domains and the homogeneity rule (docs/spec-query-v2.md §2, §3) ---- */
@@ -466,7 +472,7 @@ static void index_set_path(struct moobl_index *ix, struct moobl_ix_inode *rec, c
 #define MOOBL_MAX_DEPTH 64
 
 /* True when the inode carries an access ACL beyond the minimal one (mode bits only). */
-static bool ext_acl(struct inode *inode)
+static bool ext_acl(struct inode *inode, int *err)
 {
 	struct posix_acl *acl;
 	bool ext;
@@ -474,8 +480,11 @@ static bool ext_acl(struct inode *inode)
 	if (!IS_POSIXACL(inode))
 		return false;
 	acl = get_inode_acl(inode, ACL_TYPE_ACCESS);
-	if (IS_ERR(acl))
+	if (IS_ERR(acl)) {
+		if (err)
+			*err = PTR_ERR(acl);
 		return true;	/* unknown: treat as restrictive */
+	}
 	if (!acl)
 		return false;
 	ext = acl->a_count > 3;
@@ -489,18 +498,19 @@ static bool ext_acl(struct inode *inode)
  * (an intermediate directory). Either in grants the class bit to others and has no
  * extended ACL, or in and dom share owner and group, neither has an extended ACL, and in
  * grants the bit to every class that dom lets traverse. Lower inodes: permissions are the
- * lower filesystem's.
+ * lower filesystem's. An ACL that could not be read counts as restrictive; a caller that
+ * must not take that for an answer (a build) passes err and gets the error there.
  */
-static bool reach_ok(struct inode *in, struct inode *dom, bool want_read)
+static bool reach_ok(struct inode *in, struct inode *dom, bool want_read, int *err)
 {
 	/* octal class bits: read 0444 or search 0111, split per owner, group, other */
 	umode_t u = want_read ? 0400 : 0100, g = want_read ? 0040 : 0010;
 	umode_t o = want_read ? 0004 : 0001;
-	bool acl = ext_acl(in);
+	bool acl = ext_acl(in, err);
 
 	if (!acl && (in->i_mode & o))
 		return true;
-	if (acl || ext_acl(dom))
+	if (acl || ext_acl(dom, err))
 		return false;
 	if (!uid_eq(in->i_uid, dom->i_uid) || !gid_eq(in->i_gid, dom->i_gid))
 		return false;
@@ -513,86 +523,138 @@ static bool reach_ok(struct inode *in, struct inode *dom, bool want_read)
 	return true;
 }
 
-static bool target_ok(struct inode *in, struct inode *dom)
+static bool target_ok(struct inode *in, struct inode *dom, int *err)
 {
 	if (S_ISREG(in->i_mode) && in->i_nlink > 1)
 		return false;	/* another name may live in another domain */
-	return reach_ok(in, dom, true);
+	return reach_ok(in, dom, true, err);
 }
 
 /*
- * Distance of a layer dentry from the mount root, or MOOBL_MAX_DEPTH + 1 when it is deeper.
- * Directory renames never change a dentry's depth or domain (EXDEV otherwise), so a
- * concurrent rename cannot move a directory between partitions behind the caller's back.
- * Nothing here allocates: an allocation failure used to be indistinguishable from a path
- * that is too deep, which turned memory pressure into ENOTTY on a query and into a file
- * silently left out of its domain on a write (journal 0096).
+ * Where a layer dentry is, as one consistent reading: its distance from the mount root in
+ * *depth and, when n is not 0 and the dentry is at least that deep, its ancestor at depth n
+ * (the domain directory) referenced in *domd. False when the path is deeper than
+ * MOOBL_MAX_DEPTH.
+ *
+ * The walk is done under the dcache's rename_lock sequence counter, as path lookup does, and
+ * repeated if a rename happened meanwhile. Reading the depth and the ancestor in two separate
+ * walks (journal 0096) let a rename of the file between them hand back a directory that is
+ * not at depth n: the write was then taken for one outside every built domain and the index
+ * was not updated (journal 0098). Nothing here allocates: an allocation failure must not be
+ * mistaken for a path that is too deep (journal 0096).
  */
-static unsigned int depth_of(struct dentry *dentry)
+static bool where_is(struct dentry *dentry, unsigned int n, unsigned int *depth,
+		     struct dentry **domd)
 {
-	struct dentry *d = dget(dentry), *p;
-	unsigned int k = 0;
+	struct dentry *d, *dom;
+	unsigned int k, i, seq;
+	bool need;
 
-	while (!IS_ROOT(d) && k <= MOOBL_MAX_DEPTH) {
-		p = dget_parent(d);
-		dput(d);
-		d = p;
-		k++;
+	for (;;) {
+		dom = NULL;
+		rcu_read_lock();
+		seq = read_seqbegin(&rename_lock);
+		for (k = 0, d = dentry; !IS_ROOT(d) && k <= MOOBL_MAX_DEPTH; k++)
+			d = READ_ONCE(d->d_parent);
+		need = n && k >= n && k <= MOOBL_MAX_DEPTH;
+		if (need) {
+			for (i = 0, d = dentry; i < k - n; i++)
+				d = READ_ONCE(d->d_parent);
+			if (lockref_get_not_dead(&d->d_lockref))
+				dom = d;
+		}
+		rcu_read_unlock();
+		if (!read_seqretry(&rename_lock, seq) && (!need || dom))
+			break;
+		dput(dom);
+		cond_resched();
 	}
-	dput(d);
-	return k;
-}
-
-/* The ancestor up levels above a layer dentry, referenced (the root when there are fewer). */
-static struct dentry *ancestor_get(struct dentry *dentry, unsigned int up)
-{
-	struct dentry *d = dget(dentry), *p;
-
-	while (up-- && !IS_ROOT(d)) {
-		p = dget_parent(d);
-		dput(d);
-		d = p;
-	}
-	return d;
+	*depth = k;
+	*domd = dom;
+	return k <= MOOBL_MAX_DEPTH;
 }
 
 /*
  * Partition of a layer dentry that carries attributes. With self, the inode is placed at the
  * name of dentry (a rename target, before the VFS moves the dentry). May sleep (ACL reads).
  */
-static void place_dentry(struct moobl_index *ix, struct dentry *dentry, struct inode *self,
-			 struct moobl_place *pl)
+static void place_dentry_above(struct moobl_index *ix, struct dentry *dentry, struct inode *self,
+			       struct moobl_place *pl, bool *above)
 {
-	unsigned int n = ix->domain_depth, k, i;
+	unsigned int n = ix->domain_depth, k, i, tries;
 	struct dentry *domd, *d, *p;
 	struct inode *dom;
-	bool ok = true;
+	bool ok;
 
 	pl->domain = 0;
 	pl->hetero = false;
+	if (above)
+		*above = false;
 	if (!n)
 		return;
-	k = depth_of(dentry);
-	if (k > MOOBL_MAX_DEPTH) {
-		pl->hetero = true;	/* cannot evaluate: keep it out of every domain answer */
-		return;
-	}
-	if (k > n) {
-		domd = ancestor_get(dentry, k - n);
+	for (tries = 0; tries < 8; tries++) {
+		if (!where_is(dentry, n, &k, &domd)) {
+			pl->hetero = true;	/* cannot evaluate: keep it out of every domain answer */
+			return;
+		}
+		if (k <= n) {
+			dput(domd);
+			return;
+		}
 		dom = moobl_lower_inode(d_inode(domd));
-		pl->domain = dom->i_ino;
+		ok = true;
+		/* the directories between the two; a file moved meanwhile no longer leads to domd */
 		d = dget_parent(dentry);
-		for (i = 1; i < k - n && ok; i++) {	/* the directories between the two */
-			ok = reach_ok(moobl_lower_inode(d_inode(d)), dom, false);
+		for (i = 0; d != domd && !IS_ROOT(d) && i < MOOBL_MAX_DEPTH; i++) {
+			if (ok)
+				ok = reach_ok(moobl_lower_inode(d_inode(d)), dom, false, NULL);
 			p = dget_parent(d);
 			dput(d);
 			d = p;
 		}
+		if (d == domd) {
+			dput(d);
+			if (above)
+				*above = ok;	/* every directory between the domain and the name passes */
+			if (ok)
+				ok = target_ok(moobl_lower_inode(self ? self : d_inode(dentry)), dom,
+					       NULL);
+			pl->domain = dom->i_ino;
+			pl->hetero = !ok;
+			dput(domd);
+			return;
+		}
 		dput(d);
-		if (ok)
-			ok = target_ok(moobl_lower_inode(self ? self : d_inode(dentry)), dom);
-		pl->hetero = !ok;
 		dput(domd);
+	}
+	pl->hetero = true;	/* it kept moving: out of every domain answer until it settles */
+}
+
+static void place_dentry(struct moobl_index *ix, struct dentry *dentry, struct inode *self,
+			 struct moobl_place *pl)
+{
+	place_dentry_above(ix, dentry, self, pl, NULL);
+}
+
+/*
+ * Places dentry and takes the index write lock with the placement still current: a rename or
+ * a link that completed while it was being computed (it sleeps, with no lock held) makes it
+ * be computed again. Without this a write could put a file back into the domain it had just
+ * been renamed out of.
+ */
+static unsigned int place_and_lock(struct moobl_index *ix, struct dentry *dentry,
+				   struct moobl_place *pl)
+{
+	unsigned int nofs, tries;
+	u64 gen;
+
+	for (tries = 0;; tries++) {
+		gen = READ_ONCE(ix->move_gen);
+		place_dentry(ix, dentry, NULL, pl);
+		nofs = ix_write_lock(ix);
+		if (ix->move_gen == gen || tries == 8)
+			return nofs;
+		ix_write_unlock(ix, nofs);
 	}
 }
 
@@ -600,24 +662,361 @@ static void place_dentry(struct moobl_index *ix, struct dentry *dentry, struct i
 static bool depth_and_domain(struct moobl_index *ix, struct dentry *dentry, unsigned int *depth,
 			     u64 *domain)
 {
-	unsigned int n = ix->domain_depth, k = depth_of(dentry);
 	struct dentry *dom;
 
-	if (k > MOOBL_MAX_DEPTH)
-		return false;
-	*depth = k;
 	*domain = 0;
+	if (!where_is(dentry, ix->domain_depth, depth, &dom))
+		return false;
 	/* the dentry itself may be negative (a rename target): it then has no domain inode yet */
-	if (n && k >= n) {
-		dom = ancestor_get(dentry, k - n);
-		if (d_really_is_positive(dom))
-			*domain = moobl_lower_inode(d_inode(dom))->i_ino;
-		dput(dom);
-	}
+	if (dom && d_really_is_positive(dom))
+		*domain = moobl_lower_inode(d_inode(dom))->i_ino;
+	dput(dom);
 	return true;
 }
 
-/* ---- mount-time scan --------------------------------------------------- */
+/* ---- building a domain on demand (ADR-0012) ----------------------------- */
+
+/*
+ * Nothing is indexed at mount. The part of the index that belongs to a domain is built by
+ * the first query on it, from the lower filesystem, while the domain stays writable. The
+ * method is the online index build of Mohan and Narang (SIGMOD 1992) in its variant without
+ * a side file: during the build the write paths update the index directly, and the scan
+ * must not overwrite what they wrote with an older reading. The scan announces the file it
+ * is reading (struct moobl_loader on ix->loaders), reads its attributes from the lower
+ * filesystem with no lock held, and replaces that file's entries under the index lock only
+ * if no update from main.c touched the same file meanwhile (index_touched), reading again
+ * otherwise. A first version compared one counter bumped by every update of the mount: under
+ * a steady write load no build ever finished (journal 0098). A file is therefore always absent
+ * from the index or whole in it. A directory rename can carry a subtree from a part not yet
+ * scanned into one already scanned: the rename records the directory in the domain's side
+ * list (struct moved_dir) and the build scans it again before it declares the domain built.
+ */
+#define MOOBL_LOAD_TRIES 16
+#define MOOBL_BUILD_TRIES 4
+#define MOOBL_MOVED_ROUNDS 64
+
+/* A directory renamed inside a domain while it was being built, at its new name. */
+struct moved_dir {
+	struct list_head list;
+	struct dentry *lower;		/* referenced */
+	char *path;			/* mount-relative */
+	unsigned int depth;
+	struct moobl_place self;	/* partition of its own attributes */
+	bool inner_ok;			/* every directory from the domain down to it passes */
+};
+
+static void moved_dir_free(struct moved_dir *md)
+{
+	if (!md)
+		return;
+	dput(md->lower);
+	kfree(md->path);
+	kfree(md);
+}
+
+static void moved_list_free(struct list_head *head)
+{
+	while (!list_empty(head)) {
+		struct moved_dir *md = list_first_entry(head, struct moved_dir, list);
+
+		list_del(&md->list);
+		moved_dir_free(md);
+	}
+}
+
+/*
+ * For tests only (tests/buildrace.c, vm/suite.sh). The window between reading a file and
+ * storing what was read lasts microseconds, so concurrent writes almost never land in it and
+ * a test cannot tell a correct build from one without the counter check. scan_delay_us makes
+ * the scan sleep in that window; scan_retries counts the readings repeated because an update
+ * arrived, for every mount of the module.
+ */
+static unsigned int scan_delay_us;
+module_param(scan_delay_us, uint, 0644);
+MODULE_PARM_DESC(scan_delay_us, "tests only: microseconds the index scan sleeps between reading a file and storing it");
+static unsigned long scan_retries;	/* approximate when several mounts build at once */
+module_param(scan_retries, ulong, 0444);
+MODULE_PARM_DESC(scan_retries, "tests only: file readings the index scan repeated because of a concurrent update");
+
+/* One file being read from the lower filesystem into the index, by a build or an adoption. */
+struct moobl_loader {
+	struct list_head list;
+	u64 ino;
+	bool dirty;	/* an update from main.c touched ino since the reading began */
+};
+
+/* Every update from main.c says which inode it is about. Caller holds the write lock. */
+static void index_touched(struct moobl_index *ix, u64 ino)
+{
+	struct moobl_loader *ld;
+
+	lockdep_assert_held_write(&ix->lock);
+	list_for_each_entry(ld, &ix->loaders, list)
+		if (ld->ino == ino)
+			ld->dirty = true;
+}
+
+static bool domain_live(struct moobl_index *ix, u64 domain)
+{
+	struct moobl_domain *dom = domain ? xa_load(&ix->domains, (unsigned long)domain)
+					  : &ix->outside;
+
+	lockdep_assert_held(&ix->lock);
+	return dom && dom->state != MOOBL_DOM_NONE;
+}
+
+/*
+ * Built, with names that can be trusted. A domain that is built but had a directory renamed
+ * in it (or above it) is built again by the next query: the names recorded below that
+ * directory are stale, and so may be the homogeneity of its files, which now have other
+ * directories between them and the domain.
+ */
+static bool domain_fresh(struct moobl_index *ix, const struct moobl_domain *dom)
+{
+	return READ_ONCE(dom->state) == MOOBL_DOM_BUILT && !READ_ONCE(dom->paths_stale) &&
+	       READ_ONCE(dom->top_gen) == READ_ONCE(ix->top_gen);
+}
+
+static struct moobl_domain *domain_get(struct moobl_index *ix, u64 domain)
+{
+	struct moobl_domain *dom, *cur;
+	unsigned int nofs;
+
+	if (!domain)
+		return &ix->outside;
+	dom = xa_load(&ix->domains, (unsigned long)domain);
+	if (dom)
+		return dom;
+	dom = kzalloc(sizeof(*dom), GFP_KERNEL);
+	if (!dom)
+		return NULL;
+	mutex_init(&dom->build);
+	INIT_LIST_HEAD(&dom->moved);
+	nofs = ix_write_lock(ix);
+	cur = xa_load(&ix->domains, (unsigned long)domain);
+	if (!cur && xa_err(xa_store(&ix->domains, (unsigned long)domain, dom, GFP_KERNEL)))
+		cur = ERR_PTR(-ENOMEM);
+	ix_write_unlock(ix, nofs);
+	if (cur) {
+		kfree(dom);
+		return IS_ERR(cur) ? NULL : cur;
+	}
+	return dom;
+}
+
+/* Removes everything the index holds for one domain. Caller holds the write lock. */
+static void domain_drop(struct moobl_index *ix, u64 domain)
+{
+	struct rb_node *n, *next;
+
+	lockdep_assert_held_write(&ix->lock);
+	for (n = rb_first(&ix->names); n; n = next) {
+		struct moobl_ix_name *nm = rb_entry(n, struct moobl_ix_name, node);
+		bool last = false;
+
+		next = rb_next(n);
+		if (nm->domain != domain)
+			continue;
+		while (!last) {		/* freeing its last entry frees nm */
+			struct moobl_ix_entry *e = rb_entry(rb_first(&nm->entries),
+							    struct moobl_ix_entry, node);
+			struct moobl_ix_inode *rec = e->owner;
+
+			last = nm->count == 1;
+			entry_free(ix, e);
+			inode_rec_put_if_empty(ix, rec);
+		}
+	}
+}
+
+/*
+ * The typed attributes of one file as read from the lower filesystem: records of the value
+ * size (u16), the attribute name with its NUL, and the value.
+ */
+struct attr_buf {
+	u8 *data;
+	size_t len, cap;
+	char *list;	/* XATTR_LIST_MAX bytes */
+	u8 *value;	/* MOOB_ATTR_VALUE_MAX + 1 bytes */
+};
+
+static void attr_buf_free(struct attr_buf *b)
+{
+	kvfree(b->data);
+	kvfree(b->list);
+	kfree(b->value);
+}
+
+static int attr_buf_init(struct attr_buf *b)
+{
+	memset(b, 0, sizeof(*b));
+	b->list = kvmalloc(XATTR_LIST_MAX, GFP_KERNEL);
+	b->value = kmalloc(MOOB_ATTR_VALUE_MAX + 1, GFP_KERNEL);
+	if (!b->list || !b->value) {
+		attr_buf_free(b);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static int attr_buf_add(struct attr_buf *b, const char *name, size_t n)
+{
+	size_t nl = strlen(name) + 1, need = b->len + sizeof(u16) + nl + n;
+	u16 size = (u16)n;
+
+	if (need > b->cap) {
+		size_t cap = max_t(size_t, need, max_t(size_t, 2 * b->cap, PAGE_SIZE));
+		u8 *data = kvmalloc(cap, GFP_KERNEL);
+
+		if (!data)
+			return -ENOMEM;
+		if (b->len)
+			memcpy(data, b->data, b->len);
+		kvfree(b->data);
+		b->data = data;
+		b->cap = cap;
+	}
+	memcpy(b->data + b->len, &size, sizeof(size));
+	memcpy(b->data + b->len + sizeof(size), name, nl);
+	memcpy(b->data + b->len + sizeof(size) + nl, b->value, n);
+	b->len = need;
+	return 0;
+}
+
+/* Reads the valid typed attributes of one lower dentry into b. No lock of ours is held. */
+static int attrs_read(struct dentry *lower, struct attr_buf *b)
+{
+	ssize_t len;
+	char *p;
+	int err = 0;
+
+	b->len = 0;
+	len = vfs_listxattr(lower, b->list, XATTR_LIST_MAX);
+	if (len == -EOPNOTSUPP || len == -ENODATA || len == 0)
+		return 0;
+	if (len == -ERANGE)
+		return 0;	/* more than the list holds: left out of the index, reported by moobfs-check */
+	if (len < 0)
+		return (int)len;
+	for (p = b->list; p < b->list + len && !err; p += strlen(p) + 1) {
+		const char *name = p + MOOB_ATTR_PREFIX_LEN;
+		ssize_t n;
+
+		if (strncmp(p, MOOB_ATTR_PREFIX, MOOB_ATTR_PREFIX_LEN))
+			continue;
+		if (moob_attr_name_reserved(name, strlen(name)) || !moob_attr_name_ok(name, strlen(name)))
+			continue;
+		n = vfs_getxattr(&nop_mnt_idmap, lower, p, b->value, MOOB_ATTR_VALUE_MAX + 1);
+		if (n <= 0 || moob_attr_validate(b->value, n) != MOOB_ATTR_OK)
+			continue;	/* invalid encodings are not indexed; moobfs-check reports them */
+		if (b->value[0] == MOOB_T_RAW)
+			continue;	/* raw payloads are stored but never indexed */
+		err = attr_buf_add(b, name, n);
+	}
+	return err;
+}
+
+/* Puts what b holds in place of whatever the index has for ino. Caller holds the write lock. */
+static int index_replace(struct moobl_index *ix, u64 ino, const struct moobl_place *pl,
+			 const struct attr_buf *b)
+{
+	struct moobl_ix_inode *rec = xa_load(&ix->inodes, ino);
+	struct moobl_ix_entry *e, *tmp;
+	size_t off = 0;
+	int err = 0;
+
+	if (rec) {
+		list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
+			entry_free(ix, e);
+		inode_rec_put_if_empty(ix, rec);
+	}
+	while (off < b->len && !err) {
+		const char *name = (const char *)b->data + off + sizeof(u16);
+		size_t nl = strlen(name) + 1;
+		u16 size;
+
+		memcpy(&size, b->data + off, sizeof(size));
+		err = index_put(ix, ino, pl, name, b->data + off + sizeof(size) + nl, size);
+		off += sizeof(size) + nl + size;
+	}
+	return err;
+}
+
+static void record_dentry_path(struct moobl_index *ix, struct moobl_ix_inode *rec,
+			       struct dentry *dentry);
+
+/*
+ * Brings the index to what the lower filesystem holds for one file or directory, placed at
+ * pl. A dentry that was removed meanwhile is skipped, and so is one that left parent, the
+ * lower directory its name was read from (when given): the write path that removed or moved
+ * it has updated the index. The name comes from path (the scan) or from where (a layer dentry).
+ * -EAGAIN when updates to this very file kept arriving for MOOBL_LOAD_TRIES readings.
+ */
+static int index_load(struct super_block *sb, struct dentry *lower, struct dentry *parent,
+		      const struct moobl_place *pl, const char *path, struct dentry *where,
+		      struct attr_buf *b)
+{
+	struct moobl_index *ix = IX(sb);
+	struct inode *li = d_inode(lower), *upper;
+	struct moobl_loader ld = { .ino = li->i_ino };
+	struct moobl_ix_inode *rec;
+	unsigned int nofs;
+	int tries, err = 0;
+
+	nofs = ix_write_lock(ix);
+	list_add(&ld.list, &ix->loaders);
+	ix_write_unlock(ix, nofs);
+	for (tries = 0; tries < MOOBL_LOAD_TRIES; tries++) {
+		err = 0;
+		if (!IS_ROOT(lower) && d_unhashed(lower))
+			break;	/* removed */
+		if (parent && READ_ONCE(lower->d_parent) != parent)
+			break;	/* renamed away */
+		err = attrs_read(lower, b);
+		if (err)
+			break;
+		if (unlikely(READ_ONCE(scan_delay_us)) && path)
+			usleep_range(scan_delay_us, scan_delay_us + 50);
+		nofs = ix_write_lock(ix);
+		if (ld.dirty) {		/* this file was updated while it was being read */
+			ld.dirty = false;
+			scan_retries++;
+			ix_write_unlock(ix, nofs);
+			cond_resched();
+			err = -EAGAIN;
+			continue;
+		}
+		list_del(&ld.list);
+		err = index_replace(ix, li->i_ino, pl, b);
+		rec = err ? NULL : xa_load(&ix->inodes, li->i_ino);
+		if (rec && path)
+			err = index_set_path(ix, rec, path);	/* a scan has no other source of the name */
+		else if (rec)
+			record_dentry_path(ix, rec, where);
+		ix_write_unlock(ix, nofs);
+		if (!rec || err)
+			return err;
+		/*
+		 * The layer inode may have been in memory before the record existed, in which
+		 * case moobl_index_inode_cached() found nothing to link. Looked up after the
+		 * record is in, so that one of the two always makes the link.
+		 */
+		upper = moobl_find_inode(sb, li);
+		if (upper) {
+			nofs = ix_write_lock(ix);
+			rec = xa_load(&ix->inodes, li->i_ino);
+			if (rec)
+				rec->upper = upper;
+			ix_write_unlock(ix, nofs);
+			iput(upper);	/* outside the lock: the last reference evicts, which takes it */
+		}
+		return 0;
+	}
+	nofs = ix_write_lock(ix);
+	list_del(&ld.list);
+	ix_write_unlock(ix, nofs);
+	return err;	/* -EAGAIN when every reading was overtaken by an update */
+}
 
 struct scan_name {
 	struct list_head list;
@@ -653,64 +1052,50 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 struct scan_dir {
 	struct list_head list;
 	struct dentry *dentry;		/* lower directory, referenced */
+	struct dentry *parent;		/* lower directory it was found in, referenced; NULL: the start */
 	char *path;			/* mount-relative, "" for the root */
 	unsigned int depth;		/* 0 for the root */
 	struct moobl_place self;	/* partition of the directory's own attributes */
+	bool skip_self;			/* its own attributes belong to another scan */
 	u64 inner;			/* domain of entries inside it; 0: none */
 	bool inner_ok;			/* every directory from the domain down to it passes */
 	struct dentry *dom;		/* lower domain directory, referenced, or NULL */
 };
 
-/* Reads the typed attributes of one lower dentry into the index. */
-static int scan_attrs(struct super_block *sb, struct dentry *lower, u64 ino, const char *path,
-		      const struct moobl_place *pl, char *list, size_t list_cap, u8 *value)
+/* One walk of a part of the lower tree. */
+struct scan_job {
+	struct super_block *sb;
+	struct attr_buf buf;
+	struct list_head stack;		/* directories still to read */
+	unsigned int stop;		/* directories at this depth are not entered; 0: none such */
+	bool index;			/* false: only collect the directories at depth stop */
+	struct list_head found;		/* those directories, when !index */
+};
+
+static void scan_dir_free(struct scan_dir *sd)
 {
-	struct moobl_index *ix = IX(sb);
-	unsigned int nofs;
-	ssize_t len;
-	char *p;
-	int err = 0;
-
-	len = vfs_listxattr(lower, list, list_cap);
-	if (len == -EOPNOTSUPP || len == -ENODATA || len == 0)
-		return 0;
-	if (len == -ERANGE)
-		return 0;	/* more than list_cap bytes of names: left out of the index, reported by moobfs-check */
-	if (len < 0)
-		return (int)len;
-	for (p = list; p < list + len && !err; p += strlen(p) + 1) {
-		const char *name = p + MOOB_ATTR_PREFIX_LEN;
-		ssize_t n;
-
-		if (strncmp(p, MOOB_ATTR_PREFIX, MOOB_ATTR_PREFIX_LEN))
-			continue;
-		if (moob_attr_name_reserved(name, strlen(name)) || !moob_attr_name_ok(name, strlen(name)))
-			continue;
-		n = vfs_getxattr(&nop_mnt_idmap, lower, p, value, MOOB_ATTR_VALUE_MAX + 1);
-		if (n <= 0 || moob_attr_validate(value, n) != MOOB_ATTR_OK)
-			continue;	/* invalid encodings are not indexed; moobfs-check reports them */
-		/*
-		 * The lock is taken per attribute, never across the calls into the lower
-		 * filesystem around it: those take inode locks under which the lower allocates,
-		 * and reclaim takes this lock.
-		 */
-		nofs = ix_write_lock(ix);
-		err = index_put(ix, ino, pl, name, value, n);
-		if (!err) {
-			struct moobl_ix_inode *rec = xa_load(&ix->inodes, ino);
-
-			if (rec)
-				index_set_path(ix, rec, path);
-		}
-		ix_write_unlock(ix, nofs);
-	}
-	return err;
+	dput(sd->dentry);
+	dput(sd->parent);
+	dput(sd->dom);
+	kfree(sd->path);
+	kfree(sd);
 }
 
-/* A child directory of the scan: its record goes on the stack and takes cpath. */
-static int scan_push_dir(struct moobl_index *ix, struct scan_dir *cur, struct dentry *child,
-			 char *cpath, struct list_head *stack)
+static void scan_list_free(struct list_head *head)
 {
+	while (!list_empty(head)) {
+		struct scan_dir *sd = list_first_entry(head, struct scan_dir, list);
+
+		list_del(&sd->list);
+		scan_dir_free(sd);
+	}
+}
+
+/* A child directory of the scan: its record takes cpath and goes on the stack. */
+static int scan_push_dir(struct scan_job *job, struct scan_dir *cur, struct dentry *child,
+			 char *cpath)
+{
+	struct moobl_index *ix = IX(job->sb);
 	struct scan_dir *nd = kzalloc(sizeof(*nd), GFP_KERNEL);
 	unsigned int dn = ix->domain_depth;
 
@@ -718,7 +1103,10 @@ static int scan_push_dir(struct moobl_index *ix, struct scan_dir *cur, struct de
 		kfree(cpath);
 		return -ENOMEM;
 	}
+	int err = 0;
+
 	nd->dentry = dget(child);
+	nd->parent = dget(cur->dentry);
 	nd->path = cpath;
 	nd->depth = cur->depth + 1;
 	if (dn && nd->depth == dn) {
@@ -731,31 +1119,43 @@ static int scan_push_dir(struct moobl_index *ix, struct scan_dir *cur, struct de
 		nd->dom = dget(cur->dom);
 		nd->inner = cur->inner;
 		nd->self.domain = cur->inner;
-		nd->self.hetero = !(cur->inner_ok && target_ok(d_inode(child), dom));
-		nd->inner_ok = cur->inner_ok && reach_ok(d_inode(child), dom, false);
+		nd->self.hetero = !(cur->inner_ok && target_ok(d_inode(child), dom, &err));
+		nd->inner_ok = cur->inner_ok && reach_ok(d_inode(child), dom, false, &err);
+		if (err) {	/* an ACL that could not be read is not an answer */
+			scan_dir_free(nd);
+			return err;
+		}
 	}
-	list_add(&nd->list, stack);
+	if (job->stop && nd->depth == job->stop) {
+		if (!job->index) {
+			list_add_tail(&nd->list, &job->found);
+			return 0;
+		}
+		/* a domain directory: its own attributes belong outside, its content to its domain */
+		err = index_load(job->sb, child, cur->dentry, &nd->self, cpath, NULL, &job->buf);
+		scan_dir_free(nd);
+		return err;
+	}
+	list_add(&nd->list, &job->stack);
 	return 0;
 }
 
 /* A child regular file of the scan: its attributes go into the index; frees cpath. */
-static int scan_file(struct super_block *sb, struct scan_dir *cur, struct dentry *child,
-		     char *cpath, char *list, u8 *value)
+static int scan_file(struct scan_job *job, struct scan_dir *cur, struct dentry *child, char *cpath)
 {
 	struct moobl_place fpl = { .domain = cur->inner };
-	int err;
+	int err = 0;
 
 	if (cur->inner)
-		fpl.hetero = !(cur->inner_ok && target_ok(d_inode(child), d_inode(cur->dom)));
-	err = scan_attrs(sb, child, d_inode(child)->i_ino, cpath, &fpl, list, XATTR_LIST_MAX,
-			 value);
+		fpl.hetero = !(cur->inner_ok && target_ok(d_inode(child), d_inode(cur->dom), &err));
+	if (!err)
+		err = index_load(job->sb, child, cur->dentry, &fpl, cpath, NULL, &job->buf);
 	kfree(cpath);
 	return err;
 }
 
 /* One name read from a scanned directory: a directory is queued, a regular file indexed. */
-static int scan_child(struct super_block *sb, struct scan_dir *cur, struct scan_name *sn,
-		      struct list_head *stack, char *list, u8 *value)
+static int scan_child(struct scan_job *job, struct scan_dir *cur, struct scan_name *sn)
 {
 	struct dentry *child = lookup_one_len_unlocked(sn->name, cur->dentry, sn->len);
 	char *cpath;
@@ -764,6 +1164,8 @@ static int scan_child(struct super_block *sb, struct scan_dir *cur, struct scan_
 	if (IS_ERR(child))
 		return PTR_ERR(child);
 	if (d_really_is_negative(child) || !(d_is_dir(child) || d_is_reg(child)))
+		goto out;
+	if (!job->index && !d_is_dir(child))
 		goto out;
 	if (moobl_nested_subvolume(child)) {
 		pr_info_once("moobfs_layer: a btrfs subvolume inside the lower tree is left out\n");
@@ -776,99 +1178,283 @@ static int scan_child(struct super_block *sb, struct scan_dir *cur, struct scan_
 		goto out;
 	}
 	if (d_is_dir(child))
-		err = scan_push_dir(IX(sb), cur, child, cpath, stack);
+		err = scan_push_dir(job, cur, child, cpath);
 	else
-		err = scan_file(sb, cur, child, cpath, list, value);
+		err = scan_file(job, cur, child, cpath);
 out:
 	dput(child);
 	return err;
 }
 
-int moobl_index_build(struct super_block *sb)
+/* Walks what is on job->stack, with the mounter's credentials already in effect. */
+static int scan_run(struct scan_job *job)
 {
-	struct moobl_sb *sbi = MOOBL_SB(sb);
-	struct moobl_index *ix = &sbi->index;
-	const struct cred *old;
-	LIST_HEAD(stack);
-	struct scan_dir *sd;
-	char *list;
-	u8 *value;
+	struct moobl_sb *sbi = MOOBL_SB(job->sb);
 	int err = 0;
 
-	if (!ix->enabled)
-		return 0;
-	list = kvmalloc(XATTR_LIST_MAX, GFP_KERNEL);
-	value = kmalloc(MOOB_ATTR_VALUE_MAX + 1, GFP_KERNEL);
-	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
-	if (!list || !value || !sd) {
-		err = -ENOMEM;
-		goto out;
-	}
-	sd->dentry = dget(sbi->lower.dentry);
-	sd->path = kstrdup("", GFP_KERNEL);
-	if (!sd->path) {
-		dput(sd->dentry);
-		err = -ENOMEM;
-		goto out;
-	}
-	list_add(&sd->list, &stack);
-	sd = NULL;
-	old = override_creds(sbi->creds);
-	{
-		ssize_t probe = vfs_listxattr(sbi->lower.dentry, NULL, 0);
-
-		ix->xattr_ok = probe >= 0 || probe == -ENODATA;
-	}
-	while (!list_empty(&stack) && !err) {
-		struct scan_dir *cur = list_first_entry(&stack, struct scan_dir, list);
+	while (!list_empty(&job->stack) && !err) {
+		struct scan_dir *cur = list_first_entry(&job->stack, struct scan_dir, list);
 		struct path dpath = { .mnt = sbi->lower.mnt, .dentry = cur->dentry };
 		struct scan_ctx sc = { .ctx.actor = scan_actor, .names = LIST_HEAD_INIT(sc.names) };
 		struct scan_name *sn, *tmp;
 		struct file *dir;
 
 		list_del(&cur->list);
-		err = scan_attrs(sb, cur->dentry, d_inode(cur->dentry)->i_ino, cur->path, &cur->self,
-				 list, XATTR_LIST_MAX, value);
-		if (err)
+		if (fatal_signal_pending(current)) {
+			err = -EINTR;
 			goto drop;
+		}
+		cond_resched();
+		if (job->index && !cur->skip_self) {
+			err = index_load(job->sb, cur->dentry, cur->parent, &cur->self, cur->path,
+					 NULL, &job->buf);
+			if (err)
+				goto drop;
+		}
 		dir = dentry_open(&dpath, O_RDONLY | O_DIRECTORY, sbi->creds);
 		if (IS_ERR(dir)) {
-			err = PTR_ERR(dir);
+			/* removed since its name was read: nothing below it is left */
+			err = PTR_ERR(dir) == -ENOENT && !IS_ROOT(cur->dentry) ? 0 : PTR_ERR(dir);
 			goto drop;
 		}
 		err = iterate_dir(dir, &sc.ctx);
 		fput(dir);
+		if (err == -ENOENT && !IS_ROOT(cur->dentry))
+			err = 0;
 		if (!err)
 			err = sc.err;
 		list_for_each_entry_safe(sn, tmp, &sc.names, list) {
 			if (!err)
-				err = scan_child(sb, cur, sn, &stack, list, value);
+				err = scan_child(job, cur, sn);
 			list_del(&sn->list);
 			kfree(sn);
 		}
 drop:
-		dput(cur->dentry);
-		dput(cur->dom);
-		kfree(cur->path);
-		kfree(cur);
+		scan_dir_free(cur);
 	}
-	while (!list_empty(&stack)) {
-		struct scan_dir *left = list_first_entry(&stack, struct scan_dir, list);
+	scan_list_free(&job->stack);
+	return err;
+}
 
-		list_del(&left->list);
-		dput(left->dentry);
-		dput(left->dom);
-		kfree(left->path);
-		kfree(left);
+static int scan_job_init(struct scan_job *job, struct super_block *sb)
+{
+	job->sb = sb;
+	INIT_LIST_HEAD(&job->stack);
+	INIT_LIST_HEAD(&job->found);
+	job->stop = 0;
+	job->index = true;
+	return attr_buf_init(&job->buf);
+}
+
+/* Queues the directory a scan starts from; path is copied. */
+static int scan_start(struct scan_job *job, struct dentry *lower, const char *path,
+		      unsigned int depth, bool domain_root)
+{
+	struct scan_dir *sd = kzalloc(sizeof(*sd), GFP_KERNEL);
+
+	if (!sd)
+		return -ENOMEM;
+	sd->path = kstrdup(path, GFP_KERNEL);
+	if (!sd->path) {
+		kfree(sd);
+		return -ENOMEM;
+	}
+	sd->dentry = dget(lower);
+	sd->depth = depth;
+	if (domain_root) {
+		sd->skip_self = true;
+		sd->inner = d_inode(lower)->i_ino;
+		sd->inner_ok = true;
+		sd->dom = dget(lower);
+	}
+	list_add(&sd->list, &job->stack);
+	return 0;
+}
+
+/* Scans again the directories of the side list; takes what each entry holds. */
+static int scan_moved(struct scan_job *job, struct list_head *todo, struct dentry *domlower,
+		      u64 domain)
+{
+	struct moved_dir *md;
+	int err = 0;
+
+	list_for_each_entry(md, todo, list) {
+		struct scan_dir *sd;
+
+		if (!domain && job->stop && md->depth == job->stop) {
+			/* a domain directory: only its own attributes belong outside */
+			err = index_load(job->sb, md->lower, NULL, &md->self, md->path, NULL,
+					 &job->buf);
+			if (err)
+				break;
+			continue;
+		}
+		sd = kzalloc(sizeof(*sd), GFP_KERNEL);
+		if (!sd) {
+			err = -ENOMEM;
+			break;
+		}
+		sd->dentry = md->lower;
+		sd->path = md->path;
+		md->lower = NULL;
+		md->path = NULL;
+		sd->depth = md->depth;
+		sd->self = md->self;
+		if (domain) {
+			sd->inner = domain;
+			sd->inner_ok = md->inner_ok;
+			sd->dom = dget(domlower);
+		}
+		/* in the order of the renames: the last name a directory was given is scanned last */
+		list_add_tail(&sd->list, &job->stack);
+	}
+	if (err) {
+		scan_list_free(&job->stack);
+		return err;
+	}
+	return scan_run(job);
+}
+
+/*
+ * Makes sure the domain whose directory is lower (mount-relative path) is built, building it
+ * if it is not; domain 0 is what belongs to no domain, read from the lower root down to the
+ * domain directories. Callers of a domain being built wait for it. Returns -EAGAIN when the
+ * domain kept changing under the build, -ENOMEM also when it does not fit the index budget;
+ * after a failure nothing of the domain is left in the index.
+ */
+static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domain, const char *path)
+{
+	struct moobl_sb *sbi = MOOBL_SB(sb);
+	struct moobl_index *ix = &sbi->index;
+	struct moobl_domain *dom = domain_get(ix, domain);
+	const struct cred *old;
+	struct scan_job job;
+	unsigned int nofs;
+	int tries, err;
+
+	if (!dom)
+		return -ENOMEM;
+	if (domain_fresh(ix, dom))
+		return 0;
+	if (mutex_lock_killable(&dom->build))
+		return -EINTR;
+	if (domain_fresh(ix, dom)) {
+		mutex_unlock(&dom->build);
+		return 0;
+	}
+	err = scan_job_init(&job, sb);
+	if (err) {
+		mutex_unlock(&dom->build);
+		return err;
+	}
+	if (READ_ONCE(dom->state) == MOOBL_DOM_BUILT) {
+		/* stale: taken down with no query running on it, then built as if never built */
+		down_write(&ix->query_sem);
+		nofs = ix_write_lock(ix);
+		domain_drop(ix, domain);
+		WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
+		ix->domains_built--;
+		ix->drop_gen++;
+		ix_write_unlock(ix, nofs);
+		up_write(&ix->query_sem);
+	}
+	job.stop = domain ? 0 : ix->domain_depth;
+	old = override_creds(sbi->creds);
+	for (tries = 0; tries < MOOBL_BUILD_TRIES; tries++) {
+		LIST_HEAD(todo);
+		unsigned int rounds;
+
+		nofs = ix_write_lock(ix);
+		WRITE_ONCE(dom->state, MOOBL_DOM_BUILDING);
+		dom->restart = false;
+		dom->top_gen = ix->top_gen;
+		ix_write_unlock(ix, nofs);
+		err = scan_start(&job, lower, path, domain ? ix->domain_depth : 0, domain != 0);
+		if (!err)
+			err = scan_run(&job);
+		/* the side list: directories renamed meanwhile, until none is left under the lock */
+		for (rounds = 0;; rounds++) {
+			nofs = ix_write_lock(ix);
+			if (!err && (dom->restart ||
+				     (rounds == MOOBL_MOVED_ROUNDS && !list_empty(&dom->moved))))
+				err = -EAGAIN;
+			if (err || list_empty(&dom->moved))
+				break;
+			list_splice_init(&dom->moved, &todo);
+			ix_write_unlock(ix, nofs);
+			err = scan_moved(&job, &todo, lower, domain);
+			moved_list_free(&todo);
+		}
+		/* still under the lock: no rename can be recorded between the check and the state */
+		list_splice_init(&dom->moved, &todo);
+		if (err) {
+			domain_drop(ix, domain);
+			WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
+		} else {
+			WRITE_ONCE(dom->state, MOOBL_DOM_BUILT);
+			dom->paths_stale = false;	/* every renamed directory was scanned again */
+			ix->domains_built++;
+			ix->builds++;
+		}
+		ix_write_unlock(ix, nofs);
+		moved_list_free(&todo);
+		if (err != -EAGAIN)
+			break;
 	}
 	revert_creds(old);
-	if (err)
-		pr_warn("moobfs_layer: index build failed (%d); mount with noindex to skip it\n", err);
-out:
-	kfree(sd);
-	kfree(value);
-	kvfree(list);
+	attr_buf_free(&job.buf);
+	mutex_unlock(&dom->build);
+	if (err && err != -EINTR)
+		pr_warn_ratelimited("moobfs_layer: building the index of a domain failed (%d)\n", err);
 	return err;
+}
+
+/* Everything, for the mount-wide QUERY: what is outside the domains, then every domain. */
+static int domain_ensure_all(struct super_block *sb)
+{
+	struct moobl_sb *sbi = MOOBL_SB(sb);
+	struct moobl_index *ix = &sbi->index;
+	const struct cred *old;
+	struct scan_job job;
+	struct scan_dir *sd;
+	int err;
+
+	err = domain_ensure(sb, sbi->lower.dentry, 0, "");
+	if (err || !ix->domain_depth)
+		return err;
+	err = scan_job_init(&job, sb);
+	if (err)
+		return err;
+	job.stop = ix->domain_depth;
+	job.index = false;
+	old = override_creds(sbi->creds);
+	err = scan_start(&job, sbi->lower.dentry, "", 0, false);
+	if (!err)
+		err = scan_run(&job);
+	revert_creds(old);
+	list_for_each_entry(sd, &job.found, list) {
+		if (err)
+			break;
+		err = domain_ensure(sb, sd->dentry, d_inode(sd->dentry)->i_ino, sd->path);
+	}
+	scan_list_free(&job.found);
+	attr_buf_free(&job.buf);
+	return err;
+}
+
+/* Mount: nothing is read but whether the lower root answers listxattr. */
+void moobl_index_mount(struct super_block *sb)
+{
+	struct moobl_sb *sbi = MOOBL_SB(sb);
+	const struct cred *old;
+	ssize_t probe;
+
+	if (!sbi->index.enabled)
+		return;
+	old = override_creds(sbi->creds);
+	probe = vfs_listxattr(sbi->lower.dentry, NULL, 0);
+	revert_creds(old);
+	sbi->index.xattr_ok = probe >= 0 || probe == -ENODATA;
 }
 
 void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth)
@@ -885,6 +1471,11 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 	ix->names = RB_ROOT;
 	xa_init(&ix->inodes);
 	xa_init(&ix->fallback);
+	xa_init(&ix->domains);
+	init_rwsem(&ix->query_sem);
+	INIT_LIST_HEAD(&ix->loaders);
+	mutex_init(&ix->outside.build);
+	INIT_LIST_HEAD(&ix->outside.moved);
 	ix->domain_depth = domain_depth;
 	get_random_bytes(&ix->cursor_key, sizeof(ix->cursor_key));
 	ix->budget = budget;
@@ -897,6 +1488,7 @@ void moobl_index_destroy(struct super_block *sb)
 	unsigned int nofs;
 	struct moobl_index *ix = IX(sb);
 	struct moobl_ix_inode *rec;
+	struct moobl_domain *dom;
 	unsigned long ino;
 
 	if (!ix->initialized)
@@ -911,6 +1503,9 @@ void moobl_index_destroy(struct super_block *sb)
 	}
 	xa_destroy(&ix->inodes);
 	xa_destroy(&ix->fallback);
+	xa_for_each(&ix->domains, ino, dom)
+		kfree(dom);
+	xa_destroy(&ix->domains);
 	ix_write_unlock(ix, nofs);
 }
 
@@ -948,8 +1543,20 @@ int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *n
 		moobl_index_remove(sb, inode->i_ino, name);
 		return 0;
 	}
-	place_dentry(ix, dentry, NULL, &pl);	/* may sleep: outside the index lock */
-	nofs = ix_write_lock(ix);
+	/*
+	 * A write that resolved its path before an unlink and ran after it (both under the
+	 * inode lock): the file has no name left, and a record made now would stay for ever
+	 * under the name it had. A file made with O_TMPFILE is read when it is linked in.
+	 */
+	if (!inode->i_nlink)
+		return 0;
+	nofs = place_and_lock(ix, dentry, &pl);
+	index_touched(ix, inode->i_ino);
+	if (!domain_live(ix, pl.domain)) {
+		/* nothing to keep current: the build of the domain will read this value */
+		ix_write_unlock(ix, nofs);
+		return 0;
+	}
 	err = index_put(ix, inode->i_ino, &pl, name, value, size);
 	if (err) {
 		/* The lower write already succeeded; the index is now incomplete until remount. */
@@ -977,6 +1584,7 @@ void moobl_index_remove(struct super_block *sb, u64 ino, const char *name)
 	if (!ix->enabled)
 		return;
 	nofs = ix_write_lock(ix);
+	index_touched(ix, ino);
 	rec = xa_load(&ix->inodes, ino);
 	if (rec) {
 		e = entry_find(rec, name);
@@ -997,6 +1605,7 @@ void moobl_index_drop_inode(struct super_block *sb, u64 ino)
 	if (!ix->enabled)
 		return;
 	nofs = ix_write_lock(ix);
+	index_touched(ix, ino);
 	rec = xa_load(&ix->inodes, ino);
 	if (rec) {
 		list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
@@ -1006,34 +1615,190 @@ void moobl_index_drop_inode(struct super_block *sb, u64 ino)
 	ix_write_unlock(ix, nofs);
 }
 
+/* Whether rec holds every attribute of its file: true once the domain it is in is built. */
+static bool rec_whole(struct moobl_index *ix, const struct moobl_ix_inode *rec)
+{
+	struct moobl_domain *dom = rec->domain ? xa_load(&ix->domains, (unsigned long)rec->domain)
+					       : &ix->outside;
+
+	return dom && dom->state == MOOBL_DOM_BUILT;
+}
+
+/*
+ * A file that arrives in a built domain from one that is not (a rename, a new hard link) has
+ * no record to move: its attributes are read from the lower filesystem. Failure leaves the
+ * index incomplete, as any update that fails after the lower change.
+ */
+static void index_adopt(struct super_block *sb, struct dentry *lower, struct dentry *where,
+			const struct moobl_place *pl)
+{
+	struct moobl_sb *sbi = MOOBL_SB(sb);
+	struct moobl_index *ix = &sbi->index;
+	const struct cred *old;
+	struct attr_buf buf;
+	unsigned int nofs;
+	int err;
+
+	err = attr_buf_init(&buf);
+	if (!err) {
+		old = override_creds(sbi->creds);
+		err = index_load(sb, lower, NULL, pl, NULL, where, &buf);
+		revert_creds(old);
+		attr_buf_free(&buf);
+	}
+	if (err) {
+		nofs = ix_write_lock(ix);
+		if (!ix->incomplete)
+			pr_warn("moobfs_layer: index update failed (%d); QUERY results are incomplete until remount\n", err);
+		ix->incomplete = true;
+		ix_write_unlock(ix, nofs);
+	}
+}
+
+/*
+ * What a build needs to scan a renamed directory again: where it now is (the rename target
+ * where, before the VFS moves the dentries) and how it is placed. *target is the domain whose
+ * build must do it, 0 for the part outside every domain. NULL when it cannot be described;
+ * the caller then makes the build start again.
+ */
+static struct moved_dir *dir_moved_prepare(struct moobl_index *ix, struct dentry *moved,
+					   struct dentry *where, u64 *target)
+{
+	unsigned int n = ix->domain_depth, k;
+	struct moved_dir *md = NULL;
+	struct dentry *domd;
+	char *buf, *p;
+	bool above;
+
+	*target = 0;
+	if (!where_is(where, n, &k, &domd))
+		return NULL;
+	if (n && k > n)
+		*target = moobl_lower_inode(d_inode(domd))->i_ino;
+	buf = (char *)__get_free_page(GFP_KERNEL);
+	md = kzalloc(sizeof(*md), GFP_KERNEL);
+	if (!buf || !md)
+		goto fail;
+	p = dentry_path_raw(where, buf, PAGE_SIZE);
+	if (IS_ERR(p))
+		goto fail;
+	md->path = kstrdup(*p == '/' ? p + 1 : p, GFP_KERNEL);
+	if (!md->path)
+		goto fail;
+	md->depth = k;
+	if (n && k > n) {
+		struct inode *dom = moobl_lower_inode(d_inode(domd));
+
+		place_dentry_above(ix, where, d_inode(moved), &md->self, &above);
+		md->inner_ok = above && reach_ok(moobl_lower_inode(d_inode(moved)), dom, false, NULL);
+	}
+	md->lower = dget(moobl_lower_dentry(moved));
+	free_page((unsigned long)buf);
+	dput(domd);
+	return md;
+fail:
+	if (buf)
+		free_page((unsigned long)buf);
+	kfree(md);
+	dput(domd);
+	return NULL;
+}
+
 /*
  * inode now lives at the name of where (the rename target dentry, called before the VFS
  * moves the dentries, so where already carries the new parent and name).
  */
-void moobl_index_renamed(struct super_block *sb, struct inode *inode, struct dentry *where)
+void moobl_index_renamed(struct super_block *sb, struct dentry *moved, struct dentry *where)
+{
+	unsigned int nofs;
+	struct moobl_index *ix = IX(sb);
+	struct inode *inode = d_inode(moved);
+	struct moobl_ix_inode *rec;
+	struct moobl_ix_entry *e, *tmp;
+	struct moobl_place pl;
+	bool adopt = false;
+
+	if (!ix->enabled)
+		return;
+	if (S_ISDIR(inode->i_mode)) {
+		/*
+		 * Same depth and domain (EXDEV otherwise): the recorded names went stale, and a
+		 * build in progress may miss the subtree, so it is told to scan it again.
+		 */
+		struct moobl_domain *dom;
+		struct moved_dir *md;
+		u64 target;
+
+		md = dir_moved_prepare(ix, moved, where, &target);
+		nofs = ix_write_lock(ix);
+		index_touched(ix, inode->i_ino);
+		ix->move_gen++;
+		ix->paths_stale = true;	/* descendants keep old names; QUERY uses the dentry cache */
+		dom = target ? xa_load(&ix->domains, (unsigned long)target) : &ix->outside;
+		if (!target && ix->domain_depth)
+			ix->top_gen++;	/* a domain directory or one above: every recorded name below */
+		if (dom)
+			dom->paths_stale = true;	/* the next query builds it again (domain_fresh) */
+		if (dom && dom->state == MOOBL_DOM_BUILDING) {
+			if (md) {
+				list_add_tail(&md->list, &dom->moved);
+				md = NULL;
+			} else {
+				dom->restart = true;
+			}
+		}
+		ix_write_unlock(ix, nofs);
+		moved_dir_free(md);
+		return;
+	}
+	place_dentry(ix, where, inode, &pl);	/* a file may change domain: move its entries */
+	nofs = ix_write_lock(ix);
+	index_touched(ix, inode->i_ino);
+	ix->move_gen++;
+	rec = xa_load(&ix->inodes, inode->i_ino);
+	if (!domain_live(ix, pl.domain)) {
+		if (rec) {	/* it left the built part of the index */
+			list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
+				entry_free(ix, e);
+			inode_rec_put_if_empty(ix, rec);
+		}
+	} else if (rec && rec_whole(ix, rec)) {
+		record_dentry_path(ix, rec, where);
+		rec_set_partition(ix, rec, &pl);
+	} else {
+		/*
+		 * No record, or one that may hold only part of the file: in a domain being built
+		 * a write creates the record of a file the scan has not reached, with the one
+		 * attribute written. If such a file is then renamed, the scan no longer finds it
+		 * where it read its name and leaves it to this path, which must read it whole.
+		 */
+		adopt = true;
+	}
+	ix_write_unlock(ix, nofs);
+	if (adopt)
+		index_adopt(sb, moobl_lower_dentry(moved), where, &pl);
+}
+
+/* new_dentry is a new hard link: in a built domain the file may have no record yet. */
+void moobl_index_linked(struct super_block *sb, struct dentry *new_dentry)
 {
 	unsigned int nofs;
 	struct moobl_index *ix = IX(sb);
 	struct moobl_ix_inode *rec;
 	struct moobl_place pl;
+	bool adopt;
 
-	if (!ix->enabled)
+	if (!ix->enabled || d_really_is_negative(new_dentry))
 		return;
-	if (S_ISDIR(inode->i_mode)) {
-		/* Same depth and domain (EXDEV otherwise): only the recorded names went stale. */
-		nofs = ix_write_lock(ix);
-		ix->paths_stale = true;	/* descendants keep old names; QUERY uses the dentry cache */
-		ix_write_unlock(ix, nofs);
-		return;
-	}
-	place_dentry(ix, where, inode, &pl);	/* a file may change domain: move its entries */
+	place_dentry(ix, new_dentry, NULL, &pl);
 	nofs = ix_write_lock(ix);
-	rec = xa_load(&ix->inodes, inode->i_ino);
-	if (rec) {
-		record_dentry_path(ix, rec, where);
-		rec_set_partition(ix, rec, &pl);
-	}
+	index_touched(ix, d_inode(new_dentry)->i_ino);
+	ix->move_gen++;
+	rec = xa_load(&ix->inodes, d_inode(new_dentry)->i_ino);
+	adopt = domain_live(ix, pl.domain) && !(rec && rec_whole(ix, rec));
 	ix_write_unlock(ix, nofs);
+	if (adopt)
+		index_adopt(sb, moobl_lower_dentry(new_dentry), new_dentry, &pl);
 }
 
 /*
@@ -1059,8 +1824,8 @@ void moobl_index_perm_changed(struct super_block *sb, struct dentry *dentry)
 		if (xa_err(xa_store(&ix->fallback, (unsigned long)domain, xa_mk_value(1),
 				    GFP_KERNEL)))
 			WRITE_ONCE(ix->fallback_all, true);	/* no memory to note it: check everywhere */
-	place_dentry(ix, dentry, NULL, &pl);
-	nofs = ix_write_lock(ix);
+	nofs = place_and_lock(ix, dentry, &pl);
+	index_touched(ix, d_inode(dentry)->i_ino);
 	rec = xa_load(&ix->inodes, d_inode(dentry)->i_ino);
 	if (rec)
 		rec_set_partition(ix, rec, &pl);
@@ -1227,6 +1992,19 @@ static bool inode_matches_all(struct moobl_ix_inode *rec, const struct moob_quer
  * reference to drop once the index lock is released: dropping the last reference to an
  * unlinked file evicts its inode, and eviction takes the index lock.
  */
+/*
+ * Whether the names recorded for rec's domain can be trusted. A directory rename leaves the
+ * recorded names of everything below it stale; since ADR-0012 that is known per domain, and a
+ * domain built after the rename has fresh names again.
+ */
+static bool paths_fresh(struct moobl_index *ix, const struct moobl_ix_inode *rec)
+{
+	struct moobl_domain *dom = rec->domain ? xa_load(&ix->domains, (unsigned long)rec->domain)
+					       : &ix->outside;
+
+	return dom && !dom->paths_stale && dom->top_gen == ix->top_gen;
+}
+
 static const char *result_path(struct moobl_index *ix, struct moobl_ix_inode *rec,
 			       char *pathbuf, struct dentry **held)
 {
@@ -1243,7 +2021,7 @@ static const char *result_path(struct moobl_index *ix, struct moobl_ix_inode *re
 				return *p == '/' ? p + 1 : p;
 		}
 	}
-	if (rec->path && !ix->paths_stale)
+	if (rec->path && paths_fresh(ix, rec))
 		return rec->path;
 	return NULL;
 }
@@ -1799,9 +2577,25 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 		return -EOPNOTSUPP;	/* noindex (ENOSYS until journal 0050) */
 	if (ix->domain_depth && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
+	/* this query reads every partition: all built, and none taken down while it runs */
+	for (i = 0;; i++) {
+		u64 gen = READ_ONCE(ix->drop_gen);
+
+		err = domain_ensure_all(sb);
+		if (err)
+			return err;
+		down_read(&ix->query_sem);
+		if (READ_ONCE(ix->drop_gen) == gen)
+			break;
+		up_read(&ix->query_sem);
+		if (i == 8)
+			return -EAGAIN;
+	}
 	q = memdup_user(arg, sizeof(*q));
-	if (IS_ERR(q))
+	if (IS_ERR(q)) {
+		up_read(&ix->query_sem);
 		return PTR_ERR(q);
+	}
 	if (q->version != MOOB_UAPI_VERSION || !q->nterms || q->nterms > MOOB_QUERY_MAX_TERMS ||
 	    !q->limit || q->limit > MOOB_QUERY_MAX_LIMIT || q->flags || q->reserved[0] ||
 	    q->reserved[1]) {
@@ -1817,6 +2611,7 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 	if (!err && copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 out:
+	up_read(&ix->query_sem);
 	kfree(q);
 	return err;
 }
@@ -1969,6 +2764,44 @@ static int order_check(const struct moob_query2 *q)
  * it fall back to them. With order_by the attribute's entries of order_type are walked in
  * the requested direction; a cursor resumes after the last result of a previous call.
  */
+/*
+ * The first query on a domain builds its part of the index (ADR-0012), and so does the first
+ * one after a directory rename made it stale. Returns with ix->query_sem held for reading and
+ * the domain built and fresh: it cannot be taken down until the caller releases the semaphore.
+ */
+static long query2_pin(struct super_block *sb, struct file *file, u64 domain)
+{
+	struct moobl_index *ix = IX(sb);
+	struct moobl_domain *dom;
+	char *buf, *p;
+	long err = 0;
+	int tries;
+
+	for (tries = 0; tries < 8; tries++) {
+		dom = xa_load(&ix->domains, (unsigned long)domain);
+		if (!dom || !domain_fresh(ix, dom)) {
+			buf = (char *)__get_free_page(GFP_KERNEL);
+			if (!buf)
+				return -ENOMEM;
+			p = dentry_path_raw(file->f_path.dentry, buf, PAGE_SIZE);
+			if (IS_ERR(p))
+				err = PTR_ERR(p);
+			else
+				err = domain_ensure(sb, moobl_lower_dentry(file->f_path.dentry),
+						    domain, *p == '/' ? p + 1 : p);
+			free_page((unsigned long)buf);
+			if (err)
+				return err;
+			dom = xa_load(&ix->domains, (unsigned long)domain);
+		}
+		down_read(&ix->query_sem);
+		if (dom && domain_fresh(ix, dom))
+			return 0;
+		up_read(&ix->query_sem);
+	}
+	return -EAGAIN;	/* directories kept being renamed in it */
+}
+
 static long query2_target(struct super_block *sb, struct file *file, u64 *domain,
 			  unsigned int *depth)
 {
@@ -2086,7 +2919,11 @@ static long do_query2(struct super_block *sb, struct file *file, void __user *ar
 		return PTR_ERR(q);
 	err = query2_validate(q);
 	if (!err)
+		err = query2_pin(sb, file, domain);
+	if (!err) {
 		err = query2_exec(sb, file, q, domain, depth);
+		up_read(&IX(sb)->query_sem);
+	}
 	if (!err && copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 	kfree(q);
@@ -2122,8 +2959,13 @@ static long do_query2_batch(struct super_block *sb, struct file *file, void __us
 	}
 	for (i = 0; i < b.nqueries && !err; i++)
 		err = query2_validate(&qs[i]);
-	for (i = 0; i < b.nqueries && !err; i++)
-		err = query2_exec(sb, file, &qs[i], domain, depth);
+	if (!err)
+		err = query2_pin(sb, file, domain);
+	if (!err) {
+		for (i = 0; i < b.nqueries && !err; i++)
+			err = query2_exec(sb, file, &qs[i], domain, depth);
+		up_read(&IX(sb)->query_sem);
+	}
 	if (!err && copy_to_user(uq, qs, b.nqueries * sizeof(*qs)))
 		err = -EFAULT;
 out:
@@ -2166,6 +3008,8 @@ static long do_get_info(struct super_block *sb, void __user *arg)
 		info.flags |= MOOB_FLAG_INDEX_INCOMPLETE;
 	info.index_budget = ix->budget;
 	info.domain_depth = ix->domain_depth;
+	if (ix->enabled)
+		info.flags |= MOOB_FLAG_ON_DEMAND;
 	if (ix->domain_depth)
 		info.flags |= MOOB_FLAG_DOMAINS;
 	/* The counters sum every user's memories: administrators only (ADR-0011, F1). */
@@ -2175,6 +3019,8 @@ static long do_get_info(struct super_block *sb, void __user *arg)
 		info.index_entries = ix->entries;
 		info.index_inodes = ix->inode_count;
 		info.heterogeneous = ix->hetero_count;
+		info.domains_built = ix->domains_built;
+		info.domain_builds = ix->builds;
 	}
 	ix_read_unlock(ix, nofs);
 	if (admin) {

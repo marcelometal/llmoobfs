@@ -12,6 +12,7 @@
 #   ext4 btrfs xfs      everything of run_lower for that lower filesystem
 #   demo clients powerloss ioerror reserve
 #   faults              only under the KASAN harness: the fault-injection block of kasan-guest.sh
+#   buildrace           the first query on a domain racing with writes to it (journal 0098)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -21,7 +22,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -88,6 +89,7 @@ run_lower() {
     $BIN/moobfs-attr set $LAYER/insp/victim rk string victim || fail "insp-attr-$fs"
     $BIN/moobfs-attr set $LAYER/insp/mover rk string mover || fail "insp-attr-$fs"
     # a rename over an indexed file removes the replaced file from the index
+    $BIN/query $LAYER build || fail "insp-build-$fs"   # counters cover built domains only (ADR-0012)
     n0=$($BIN/query $LAYER info | sed -n 's/.* inodes=\([0-9]*\).*/\1/p')
     mv $LAYER/insp/mover $LAYER/insp/victim || fail "insp-rename-$fs"
     n1=$($BIN/query $LAYER info | sed -n 's/.* inodes=\([0-9]*\).*/\1/p')
@@ -161,6 +163,7 @@ run_lower() {
     $BIN/query $LAYER raw exists - - > /tmp/k.txt || fail "query-raw-$fs"
     [ ! -s /tmp/k.txt ] || fail "query-raw-not-indexed-$fs"
     $BIN/query $LAYER invalid || fail "query-invalid-$fs"
+    $BIN/query $LAYER build || fail "query-build-$fs"
     $BIN/query $LAYER info > /tmp/info.txt || fail "query-info-$fs"
     grep -q "lower=$fs" /tmp/info.txt || fail "query-info-lower-$fs"
     grep -q 'entries=1[0-9] inodes=6' /tmp/info.txt || { cat /tmp/info.txt; fail "query-info-counts-$fs"; }
@@ -288,6 +291,7 @@ run_lower() {
     chmod 0755 $LAYER/dshared || fail "q2-shared-$fs"
     umount $LAYER || fail "q2-umount-$fs"
     mount -t moobfs_layer -o lower=$LOWER none $LAYER || fail "q2-mount-$fs"
+    $BIN/query $LAYER build || fail "q2-build-$fs"
     $BIN/query $LAYER info > /tmp/info.txt || fail "q2-info-$fs"
     grep -q 'domain_depth=1 ' /tmp/info.txt || { cat /tmp/info.txt; fail "q2-info-depth-$fs"; }
     grep -q 'fallback_domains=0' /tmp/info.txt || { cat /tmp/info.txt; fail "q2-info-fallback0-$fs"; }
@@ -718,6 +722,7 @@ demo "query --uid 1001 $LAYER kind eq string decision" && fail demo-v1-user-answ
 grep -q 'Operation not permitted' /tmp/demo.out || fail demo-v1-user-errno
 demo "query $LAYER kind eq string decision" || fail demo-v1-root
 [ "$(wc -l < /tmp/demo.out)" -eq 4 ] || fail demo-v1-root-count
+demo "query $LAYER build" || fail demo-build
 demo "query $LAYER info" || fail demo-info
 grep -q 'domain_depth=1 heterogeneous=1 fallback_domains=0' /tmp/demo.out || fail demo-info-counts
 # ADR-0011 F1: the index counters sum every user's memories; root gets them, a user gets zeros
@@ -892,6 +897,70 @@ mount -t ext4 -o resuid=4242 $SCRATCH $LOWER || fail rs-lower-mount
 mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail rs-layer-mount
 $BIN/layer reserve $LAYER $LOWER || fail rs-reserve
 umount $LAYER && umount $LOWER || fail rs-final-umount
+fi
+if want buildrace; then
+# ADR-0012: the index of a domain is built by the first query on it, with the domain still
+# being written. tests/buildrace.c writes, renames and unlinks inside each domain while the
+# first query builds it; whatever the interleaving, every domain must then equal the oracle,
+# and again after the mount-wide query has built what is left.
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t $fs "$dev" $LOWER || fail "br-lower-mount-$fs"
+    rm -rf $LOWER/br && mkdir -m 755 $LOWER/br || fail "br-mkdir-$fs"
+    mount -t moobfs_layer -o lower=$LOWER/br,domain_depth=1 none $LAYER || fail "br-mount-$fs"
+    for d in $(seq 0 23); do
+        dd=$LAYER/$(printf 'r%03d' $d)
+        mkdir -p $dd/s/t $dd/u || fail "br-domain-$fs"
+        for i in $(seq 0 59); do
+            f=$dd/$(printf 'f%04d' $i); : > $f
+            [ $((i % 3)) -eq 0 ] || $BIN/moobfs-attr set $f kind string k$((i % 4)) > /dev/null || fail "br-attr-$fs"
+        done
+        echo t > $dd/s/t/inner && $BIN/moobfs-attr set $dd/s/t/inner kind string k1 > /dev/null || fail "br-inner-$fs"
+    done
+    umount $LAYER || fail "br-umount-$fs"
+    mount -t moobfs_layer -o lower=$LOWER/br,domain_depth=1 none $LAYER || fail "br-remount-$fs"
+    $BIN/query $LAYER info | grep -q 'domains_built=0 ' || { $BIN/query $LAYER info; fail "br-built-at-mount-$fs"; }
+    # the scan sleeps between reading a file and storing it, so that writes do land in the
+    # window the counter check protects; without the delay this test passes with the check
+    # removed. Not longer than this: at 300 us nearly every reading saw a write and no build
+    # ever finished (EAGAIN for ever), which is the starvation journal 0098 records as a limit.
+    r0=$(cat /sys/module/moobfs_layer/parameters/scan_retries)
+    echo 40 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail "br-delay-$fs"
+    $BIN/buildrace $LAYER 24 60 | tee /tmp/br.txt; rc=$?
+    echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
+    [ $rc -eq 0 ] || fail "br-run-$fs"
+    grep -q '^BUILDRACE_DONE' /tmp/br.txt || fail "br-done-$fs"
+    retries=$(( $(cat /sys/module/moobfs_layer/parameters/scan_retries) - r0 ))
+    [ $retries -gt 0 ] || fail "br-no-write-landed-in-the-window-$fs (the test proved nothing)"
+    br_cmp() {
+        for p in $LOWER/br/*; do
+            d=${p##*/}
+            for q in "kind exists - -" "kind eq string k1" "score ge int64 50"; do
+                $BIN/query $LAYER/$d q2 $q | cut -f2 | sort > /tmp/br.k || return 1
+                $BIN/moobfs-index --domain $LOWER/br/$d $q | cut -f2 | sort > /tmp/br.o || return 1
+                cmp -s /tmp/br.k /tmp/br.o || { echo "domain $d, $q: kernel $(wc -l < /tmp/br.k) oracle $(wc -l < /tmp/br.o)"; diff /tmp/br.k /tmp/br.o | grep '^[-+<>][^-+]' | head -6; return 1; }
+            done
+        done
+    }
+    br_cmp || fail "br-index-differs-from-oracle-$fs"
+    # A directory moved below a private one, inside the domain: its files stop being reachable
+    # by whoever can only traverse the domain, and must leave the domain's answers. The rename
+    # makes the domain stale and the next query builds it again with the new placement.
+    mkdir -p $LAYER/r000/open/box $LAYER/r000/priv && chmod 0700 $LAYER/r000/priv || fail "br-priv-mkdir-$fs"
+    echo x > $LAYER/r000/open/box/secret && $BIN/moobfs-attr set $LAYER/r000/open/box/secret kind string moved > /dev/null || fail "br-priv-attr-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/r000 q2 kind eq string moved | wc -l)" -eq 1 ] || fail "br-priv-before-$fs"
+    mv $LAYER/r000/open/box $LAYER/r000/priv/box || fail "br-priv-mv-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER/r000 q2 kind eq string moved | wc -l)" -eq 0 ] || fail "br-moved-under-private-directory-still-answered-$fs"
+    [ "$($BIN/query $LAYER kind eq string moved | wc -l)" -eq 1 ] || fail "br-priv-still-indexed-$fs"   # the mount-wide query sees it
+    rm -rf $LAYER/r000/priv $LAYER/r000/open || fail "br-priv-rm-$fs"
+    $BIN/query $LAYER build || fail "br-build-all-$fs"
+    $BIN/query $LAYER info | grep -q 'domains_built=25 ' || { $BIN/query $LAYER info; fail "br-built-count-$fs"; }
+    br_cmp || fail "br-index-differs-after-build-all-$fs"
+    f=$($BIN/query $LAYER info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
+    [ $(( f & 8 )) -eq 0 ] || fail "br-index-incomplete-$fs"
+    umount $LAYER && rm -rf $LOWER/br && umount $LOWER || fail "br-cleanup-$fs"
+    echo "BUILD_RACE_PASS: $fs, $(cut -d' ' -f2- /tmp/br.txt) readings_repeated=$retries; every domain equal to the oracle"
+done
 fi
 rmmod moobfs_layer || fail layer-unload
 if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
