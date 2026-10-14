@@ -164,6 +164,16 @@ needs the packages of the workflow's install step, virtme-ng from `vm/kasan-requ
 (a virtualenv is fine) and membership in the `kvm` group. A local pass is a faster development
 loop; the workflow on the pull request stays the required check.
 
+### SELinux
+
+`sh vm/selinux-local.sh` (journal 0104) runs, on a Debian host with KVM and the module built,
+a guest of the host's kernel booted with SELinux enforcing: a confined client compared with
+direct access on the lower, file by file, and a `QUERY2`, under the stock policy and with
+`vm/selinux/moobfs_layer.cil`. The script's header lists the host packages and the one change
+to `/etc/selinux/semanage.conf`; SELinux is not activated on the host. Markers:
+`MOOBFS_SELINUX_RESULT: <run> differ=<n> denied_directly=<n>` per run, `MOOBFS_SELINUX_FAIL`
+on any failed check. Not part of `make vm-test` nor of CI.
+
 ## 7. Adding a lower filesystem
 
 Each new lower filesystem widens the tested matrix and needs a journal entry; it
@@ -209,6 +219,7 @@ kernel versions are unverified.
 
 ## 9. What is not covered
 
+- Linux security modules beyond the SELinux run above (AppArmor, Smack, Landlock).
 - xfstests over the layer (only the vendored `fsx`), syzkaller over the ioctls
   and `setxattr`, a hostile lower tree, KMSAN/KCSAN/KFENCE: see
   [security-roadmap.md](security-roadmap.md) S2 to S4 and S7 to S8.

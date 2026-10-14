@@ -360,7 +360,7 @@ KASAN harness runs the layer suite), and no benchmark exists.
   [0078](docs/history/0078-syncfs-reaches-the-lower.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md),
   [0083](docs/history/0083-index-inspection-fixes.md)). `v0.2.0-experimental` carries the
-  defects of the last five; use `v0.3.0-experimental`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md)). The threat model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md); no security module policy (SELinux, AppArmor) was exercised.
+  defects of the last five; use `v0.3.0-experimental`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md)). The threat model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md); SELinux enforcing was exercised once (journal 0104: two defects fixed, a labelling rule needed); AppArmor and Smack were not.
 - `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
   after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower

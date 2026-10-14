@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **SELinux** (journal 0104, security roadmap S12): first run under SELinux enforcing, in a guest
+  of Debian 6.12.111 with the reference policy (`vm/selinux-local.sh`). Two defects fixed:
+  `QUERY2` named files whose label hid them from the caller (finding F6 of ADR-0011; every
+  result is now checked for the caller when an LSM labels inodes), and labels were read with the
+  caller's credentials, which a confined first caller was refused (`security.*` is now read with
+  the mounter's, as overlayfs does). The layer needs the policy rule `fs_use_xattr moobfs_layer`
+  (`vm/selinux/moobfs_layer.cil`). An unused include is removed (correction to journal 0100).
 - Releases measured (journal 0103, `bench/release.sh`, `bench/results/2026-10-14-macmini-release/`):
   a released domain of 7 500 files is rebuilt in about 0.14 s from the page cache and 2.3 s from
   disk; under a budget smaller than the working set, a loop over the domains rebuilds on every

@@ -31,7 +31,6 @@
 #include <linux/fiemap.h>
 #include <linux/fileattr.h>
 #include <linux/magic.h>
-#include <linux/btrfs_tree.h>
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 #include "moobfs_attr.h"
@@ -748,11 +747,26 @@ static ssize_t moobl_listxattr(struct dentry *dentry, char *list, size_t size)
 	return ret;
 }
 
+/*
+ * security.* is read with the mounter's credentials, as overlayfs does (ovl_xattr_get): an LSM
+ * reads an inode's label through this handler when the inode is set up, with the credentials
+ * of whoever reached the file first, and a confined first caller would leave the inode
+ * unlabelled (journal 0104). A caller's own read was checked against this inode by the VFS
+ * before the handler ran. Every other name is read with the caller's credentials.
+ */
 static int moobl_xattr_get(const struct xattr_handler *handler, struct dentry *dentry,
 			   struct inode *inode, const char *name, void *value, size_t size)
 {
-	return vfs_getxattr(&nop_mnt_idmap, moobl_lower_dentry(dentry),
-			    xattr_full_name(handler, name), value, size);
+	const char *full = xattr_full_name(handler, name);
+	const struct cred *old;
+	int ret;
+
+	if (strncmp(full, XATTR_SECURITY_PREFIX, XATTR_SECURITY_PREFIX_LEN))
+		return vfs_getxattr(&nop_mnt_idmap, moobl_lower_dentry(dentry), full, value, size);
+	old = override_creds(MOOBL_SB(inode->i_sb)->creds);
+	ret = vfs_getxattr(&nop_mnt_idmap, moobl_lower_dentry(dentry), full, value, size);
+	revert_creds(old);
+	return ret;
 }
 
 /*

@@ -172,6 +172,26 @@ the caller's credentials; and the layer's inode carries only the lower's `S_SYNC
 `S_APPEND` and `S_IMMUTABLE` flags, which are the ones the VFS enforces before the layer is
 called. Not covered by the review: behaviour under a Linux security module policy.
 
+Added on 2026-10-14, from the first run under SELinux enforcing (security roadmap S12, journal
+0104):
+
+- **F6 — `QUERY2` named files that SELinux hid from the caller.** The homogeneity rule reads
+  mode bits and ACLs only, so a domain's partition could hold a file whose label denies the
+  caller even `getattr`; a confined process learned its name, inode number and that its
+  attributes matched, which it cannot learn on the lower directly. It broke promise 3. **Fixed**
+  in journal 0104: when an LSM keeps labels for the layer's inodes, every `QUERY2` result is
+  checked for the caller (path walk and `inode_permission(MAY_READ)`), as after a permission
+  change. Non-promise 3 (path-based LSMs) is unchanged.
+- **Credentials:** `security.*` attributes are now read from the lower with the mounter's
+  credentials, as overlayfs reads every attribute. An LSM reads a new inode's label through the
+  layer with the credentials of whoever reached the file first; a confined first caller was
+  refused and left the inode unlabelled, logging at every try. A caller's own read of such an
+  attribute is checked by the VFS against the layer's inode first. Other attributes are read
+  with the caller's credentials, as before.
+- Under SELinux the layer needs a labelling rule, `fs_use_xattr moobfs_layer`
+  (`vm/selinux/moobfs_layer.cil`); without it every file through the layer is unlabelled and
+  confined processes are refused everything.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that

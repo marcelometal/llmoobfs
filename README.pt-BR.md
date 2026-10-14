@@ -371,7 +371,7 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   [0078](docs/history/0078-syncfs-reaches-the-lower.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md),
   [0083](docs/history/0083-index-inspection-fixes.md)). A `v0.2.0-experimental` carrega os
-  defeitos dos cinco últimos; use a `v0.3.0-experimental`. O fstests rodou só com o grupo `quick` ([vm/fstests/](vm/fstests/README.md)). O modelo de ameaças é o [ADR-0011](docs/decisions/0011-threat-and-credential-model.md); nenhuma política de módulo de segurança (SELinux, AppArmor) foi exercitada.
+  defeitos dos cinco últimos; use a `v0.3.0-experimental`. O fstests rodou só com o grupo `quick` ([vm/fstests/](vm/fstests/README.md)). O modelo de ameaças é o [ADR-0011](docs/decisions/0011-threat-and-credential-model.md); o SELinux em modo enforcing foi exercitado uma vez (diário 0104: dois defeitos corrigidos, uma regra de rotulagem necessária); AppArmor e Smack não foram.
 - A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU); falsos negativos
   possíveis depois de renomear um diretório, até remontar ([spec-m3](docs/spec-m3.md) §3.1).
 - A atomicidade entre arquivo e metadados é uma convenção do cliente; durabilidade, reflink e

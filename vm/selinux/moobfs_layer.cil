@@ -1,0 +1,5 @@
+; SPDX-License-Identifier: GPL-2.0-only
+; Label rule for the layer (journal 0104): each inode seen through moobfs_layer takes its label
+; from the security.selinux attribute, which the layer reads from the file on the lower
+; filesystem, as the reference policy does for overlay ("fs_use_xattr overlay").
+(fsuse xattr moobfs_layer (system_u object_r fs_t ((s0) (s0))))

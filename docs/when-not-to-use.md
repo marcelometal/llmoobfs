@@ -59,6 +59,13 @@ assessment.
 - **The host is not Linux, or you do not have root.** Mounting requires `CAP_SYS_ADMIN` in
   the initial user namespace; user-namespace and idmapped mounts are refused. Hosted CI,
   rootless containers, serverless, macOS and Windows are out.
+- **The host runs SELinux enforcing and you cannot add a policy rule.** The shipped policies
+  have no rule for `moobfs_layer`, so every file through the layer is unlabelled and confined
+  processes are refused everything. With the rule `fs_use_xattr moobfs_layer`
+  ([vm/selinux/moobfs_layer.cil](../vm/selinux/moobfs_layer.cil)) files keep their labels and
+  the first test agreed with direct access; every `QUERY2` result is then checked for the
+  caller, at a cost not measured ([journal 0104](history/0104-selinux-investigation.md)). One
+  run, one kernel; Smack and AppArmor were not exercised.
 - **Your kernel is outside the tested matrix.** Only Debian 6.12.111 (QEMU) and upstream
   6.12.112 (KASAN) have run the module; other kernels are not promised to compile or behave.
 - **The corpus is large.** The index is non-pageable RAM, bounded by `index_budget`

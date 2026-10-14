@@ -131,6 +131,20 @@ used here and is missing from this list, or is described wrongly, please open an
   The technique of journal 0096 (`tests/failnth.c`, `vm/kasan-guest.sh`), implemented. Read in the
   source tree of the kernel the tests are built with.
 
+### SELinux (security roadmap S12, journal 0104)
+
+- SELinux reference policy, release 2_20250213, `policy/modules/kernel/filesystem.te`
+  (`fs_use_xattr overlay`, line 40).
+  https://github.com/SELinuxProject/refpolicy/blob/RELEASE_2_20250213/policy/modules/kernel/filesystem.te
+- SELinux test suite, `tests/overlay/` and `policy/test_overlayfs.te` (main branch, read on
+  2026-10-14). https://github.com/SELinuxProject/selinux-testsuite
+
+  The labelling rule of `vm/selinux/moobfs_layer.cil` follows the reference policy's rule for
+  overlay; the test domain and file types of `vm/selinux/moobtest.te` follow the test suite's
+  overlay policy. Also read: `security_fs_use()` (`security/selinux/ss/services.c`),
+  `selinux_inode_listsecurity()` (`security/selinux/hooks.c`), `security_inode_listsecurity()`
+  (`security/security.c`) and `ovl_xattr_get()` (`fs/overlayfs/xattrs.c`), Linux 6.12.112.
+
 ### Security roadmap (proposal)
 
 - Wen Xu, Hyungon Moon, Sanidhya Kashyap, et al. "Fuzzing File Systems via Two-Dimensional Input

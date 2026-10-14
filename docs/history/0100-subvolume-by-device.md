@@ -59,3 +59,8 @@ by a build. Not measured.
 ## Next step
 
 Answer the linux-btrfs thread with the commit once it is public. Then ADR-0012, second half.
+
+## Note of 2026-10-14 (correction)
+
+"`<linux/btrfs_tree.h>` ... gone" above was wrong: the include stayed in `layer/main.c`, unused,
+until journal 0104 removed it. Nothing used it.
