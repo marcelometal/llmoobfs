@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * MoobFS memory layer, phase 2a: a minimal stacked filesystem that passes
- * every operation through to a directory of a lower filesystem.
- *
- * This phase implements only the pass-through skeleton (lookup, readdir,
- * create, mkdir, unlink, rmdir, read, write, mmap, fsync, truncate, stat).
- * It exists to validate the stacking approach of ADR-0007 on the pinned
- * kernel. Typed attributes, the index and QUERY arrive in later phases.
+ * MoobFS memory layer: a stacked filesystem over one directory of a lower filesystem (ext4,
+ * btrfs or XFS). This file holds the pass-through (inodes, dentries, name, file and directory
+ * operations, typed attribute validation, mount); index.c holds the attribute index and the
+ * query ioctls. Stacking approach: ADR-0007; credential model: ADR-0011.
  *
  * Patterns follow fs/ecryptfs (one upper inode per lower inode, lower path
  * kept in dentry fsdata) and fs/overlayfs (I/O delegated through
@@ -30,7 +27,6 @@
 #include <linux/xattr.h>
 #include <linux/fiemap.h>
 #include <linux/fileattr.h>
-#include <linux/magic.h>
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 #include "moobfs_attr.h"
@@ -736,7 +732,7 @@ static int moobl_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 	return err;
 }
 
-/* ---- extended attributes: opaque pass-through (typed validation is phase 2c) */
+/* ---- extended attributes: pass-through, with typed user.moob.* validated on write ---- */
 
 static ssize_t moobl_listxattr(struct dentry *dentry, char *list, size_t size)
 {
@@ -1534,4 +1530,4 @@ module_exit(moobl_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Studio Moob");
 MODULE_VERSION("0.3.0");
-MODULE_DESCRIPTION("MoobFS memory layer (phase 2a pass-through)");
+MODULE_DESCRIPTION("MoobFS memory layer: stacked filesystem with a typed attribute index");

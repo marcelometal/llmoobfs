@@ -10,7 +10,6 @@
 #include <linux/list.h>
 #include <linux/path.h>
 #include <linux/cred.h>
-#include <linux/magic.h>
 #include <linux/siphash.h>
 
 #define MOOBL_SUPER_MAGIC 0x4d4f4f42	/* "MOOB" */
@@ -112,9 +111,9 @@ static inline struct dentry *moobl_lower_dentry(struct dentry *dentry)
 
 /* main.c */
 struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower);
+int moobl_other_device(struct super_block *sb, struct dentry *lower);
 
 /* index.c */
-int moobl_other_device(struct super_block *sb, struct dentry *lower);
 void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth,
 		      unsigned int idle);
 int moobl_index_shrinker_start(struct super_block *sb);
