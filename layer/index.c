@@ -33,6 +33,7 @@
 #include <linux/sched/mm.h>
 #include <linux/shrinker.h>
 #include <linux/jiffies.h>
+#include <linux/security.h>
 #include <linux/ktime.h>
 #include <linux/delay.h>
 #include <linux/moduleparam.h>
@@ -3050,6 +3051,18 @@ static long query2_validate(const struct moob_query2 *q)
 	return err;
 }
 
+/*
+ * An LSM that labels inodes (SELinux, Smack) decides access by labels the homogeneity rule
+ * cannot see, so a partition built from mode bits and ACLs may hold files the policy hides from
+ * the caller. With one active, every QUERY2 result is checked for the caller, as after a
+ * permission change (finding F6 of ADR-0011, journal 0104). An LSM that keeps labels for an
+ * inode names them in security_inode_listsecurity(); AppArmor and Landlock keep none.
+ */
+static bool lsm_labels(struct super_block *sb)
+{
+	return security_inode_listsecurity(d_inode(sb->s_root), NULL, 0) > 0;
+}
+
 /* Runs a validated request (kernel copy) and fills its count, truncated and cursor. */
 static long query2_exec(struct super_block *sb, struct file *file, struct moob_query2 *q,
 			u64 domain, unsigned int depth)
@@ -3065,7 +3078,7 @@ static long query2_exec(struct super_block *sb, struct file *file, struct moob_q
 	sc.domain = domain;
 	sc.strip = depth;
 	sc.check = READ_ONCE(ix->fallback_all) ||
-		   xa_load(&ix->fallback, (unsigned long)domain) != NULL;
+		   xa_load(&ix->fallback, (unsigned long)domain) != NULL || lsm_labels(sb);
 	sc.ordered = q->order_by[0] != '\0';
 	sc.desc = q->order == MOOB_ORDER_DESC;
 	sc.otype = q->order_type;
