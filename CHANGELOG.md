@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Releases measured (journal 0103, `bench/release.sh`, `bench/results/2026-10-14-macmini-release/`):
+  a released domain of 7 500 files is rebuilt in about 0.14 s from the page cache and 2.3 s from
+  disk; under a budget smaller than the working set, a loop over the domains rebuilds on every
+  query. Steady-state `QUERY2` with releases equals the module without them; against the module
+  built at mount, three shapes are 8 to 15 % slower at the median, inside the spread. The suite
+  step `release` now checks that a cursor resumes across a release.
 - Tracepoints for the index (journal 0102, security roadmap S13): `moobfs_domain_build`,
   `moobfs_domain_release`, `moobfs_scan_reread`, `moobfs_index_incomplete`, readable by root
   through tracefs. The test-only module parameter `scan_retries` is removed.

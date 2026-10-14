@@ -106,6 +106,21 @@ used here and is missing from this list, or is described wrongly, please open an
   renames.
   Checked on 2026-10-13 (Crossref metadata; the paper itself was not read in full).
 
+- Theodore Johnson, Dennis Shasha. "2Q: A Low Overhead High Performance Buffer Management
+  Replacement Algorithm". VLDB 1994, 439-450. https://www.vldb.org/conf/1994/P439.PDF
+- Song Jiang, Xiaodong Zhang. "LIRS: An Efficient Low Inter-reference Recency Set Replacement
+  Policy to Improve Buffer Cache Performance". ACM SIGMETRICS 2002; Performance Evaluation
+  Review 30(1), 31-42.
+- Nimrod Megiddo, Dharmendra S. Modha. "ARC: A Self-Tuning, Low Overhead Replacement Cache".
+  USENIX FAST 2003.
+  https://www.usenix.org/conference/fast-03/arc-self-tuning-low-overhead-replacement-cache
+
+  Replacement policies designed against the failure of least-recently-used order on a loop
+  larger than the cache, which journal 0103 measured on the release of built domains under
+  `index_budget`. Not adopted. Checked on 2026-10-14: the first page of the 2Q paper and the
+  USENIX page read; for LIRS only the venue was confirmed from secondary sources, and the DOI
+  was left out because two different ones are given for it.
+
 ### Fault injection (journal 0096)
 
 - Linux kernel documentation, "Fault injection capabilities infrastructure"

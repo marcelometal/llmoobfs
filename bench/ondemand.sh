@@ -3,7 +3,8 @@
 # What ADR-0012 changes, measured on one mount with the module that is loaded (journal 0098):
 # mount time, the time of the first query on one domain, the index memory with that one domain
 # in use, the steady-state query latency, and the time and memory of the mount-wide QUERY that
-# needs every domain. Run it once per module on the same data to compare.
+# needs every domain. Run it once per module on the same data to compare; REPS sets the
+# repetitions of the steady-state part (default 3).
 #
 #   sudo env BIN=<built tools> sh bench/ondemand.sh <layer mount> <domain name> <out dir>
 #
@@ -45,7 +46,7 @@ umount "$LAYER"; mount -t moobfs_layer -o "$opts" none "$LAYER"
 printf '%s\n' "namespace eq string $DOM agent eq string a07" "agent eq string a07" "kind eq string note" > "$OUT/q-dom.txt"
 printf '%s\n' "kind eq string note" "agent eq string a07" > "$OUT/q-recent.txt"
 "$BIN/query" "$LAYER/$DOM" q2 kind eq string note > /dev/null
-for r in 1 2 3; do
+for r in $(seq "${REPS:-3}"); do
     d=$OUT/rep$r; mkdir -p "$d/v2-dom" "$d/v2-recent"
     "$BIN/bench-load" --workload W3 --target "$LAYER/$DOM" --root "$LAYER/$DOM" --query2 1 --uid 1001 --queries "$OUT/q-dom.txt" --repeat 50 --out "$d/v2-dom/w3"
     "$BIN/bench-load" --workload W3 --target "$LAYER/$DOM" --root "$LAYER/$DOM" --query2 1 --uid 1001 --order created:time:desc --limit 20 --queries "$OUT/q-recent.txt" --repeat 50 --out "$d/v2-recent/w3"

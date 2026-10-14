@@ -1,0 +1,6 @@
+6.12.111+deb13-amd64
+0.3.0
+9A389B53E026CAA63D2EBAE
+mount options: lower=/srv/moob/ext4/udx-lower
+domains: ns0 ns1 ns2 ns3 ns4 ns5 ns6 ns7 
+domain bytes: 4533207

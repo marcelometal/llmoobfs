@@ -145,3 +145,11 @@ Implemented as decided, with these choices:
   domain; per-domain accounting would make the count exact and was left for later.
 - The counter of releases is in `GET_INFO` (`domain_releases`); `domain_builds` became 32-bit
   to make room, before either was published.
+
+## Note of 2026-10-14: measured (journal 0103)
+
+"Steady-state query latency must not get worse" is still not shown. With ten repetitions, the
+module with releases matches the one without; both have medians 8 to 15 % above the module
+built at mount on three filtered shapes, with ranges that overlap. A budget smaller than the
+working set, queried in a loop, rebuilds a domain on every query (the known weakness of
+least-recently-used order); no other policy was adopted.
