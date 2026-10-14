@@ -53,8 +53,10 @@ inode numbers; the pass-through test checks this (`tests/layer.c`).
 File I/O is delegated through the kernel's backing-file helpers from `fs/backing-file.c`:
 `backing_file_open` in `moobl_open`, `backing_file_read_iter`, `backing_file_write_iter`,
 `backing_file_splice_read`, `backing_file_splice_write` and `backing_file_mmap`
-(`layer/main.c`). Delegated operations on the lower tree run under the mounter's credentials
-with `override_creds(MOOBL_SB(sb)->creds)`, as overlayfs does. Permission decisions are not
+(`layer/main.c`). Data operations on an open file run on the lower tree under the mounter's
+credentials with `override_creds(MOOBL_SB(sb)->creds)`; name operations run with the caller's.
+This split is not overlayfs's, which checks both credentials and runs every real operation as
+the mounter (journal 0099). Permission decisions are not
 re-implemented: `moobl_permission` calls `inode_permission` on the lower inode, which runs
 the lower filesystem's full check including POSIX ACLs. ACLs are read and written through
 `moobl_get_acl`/`moobl_set_acl`, which delegate to `vfs_get_acl`, `vfs_set_acl` and

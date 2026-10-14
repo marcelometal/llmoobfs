@@ -78,3 +78,10 @@ in `fs/read_write.c` calls `security_file_permission()`.
 ## Next step
 
 Send the reply with the correction. Then the remaining items of journal 0098.
+
+## Note of 2026-10-14 (later)
+
+Two more places carried the old wording and are corrected: `docs/architecture-overview.md`
+("as overlayfs does") and `docs/help-wanted.md` ("every operation ... with the mounter's
+credentials"). The body of GitHub issue 16 says "The model is the overlayfs one"; it is to be
+corrected on the issue itself with a dated line.
