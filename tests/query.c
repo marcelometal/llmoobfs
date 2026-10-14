@@ -13,7 +13,7 @@
  *           --cursor-in FILE             start from a cursor saved by --cursor-out
  *           --cursor-out FILE            save the cursor returned by the (first) call
  *           --raw                        print in the kernel's order (no sort by ino)
- *           --bad-results                an unmapped results address (EFAULT path, journal 0111)
+ *           --bad-results                an unmapped results address (EFAULT path, journal 0113)
  *   query [--uid N] <domain-dir> q2batch [--limit N] -- <terms> [-- <terms>]...
  *                                                    one QUERY2_BATCH; prints "q<k>\t<ino>\t<path>"
  *                                                    per request, sorted by ino within each

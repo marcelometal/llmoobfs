@@ -1,6 +1,7 @@
-# 0111 — Regression tests for the fixes of journal 0105
+# 0113 — Regression tests for the fixes of journal 0105
 
-Date: 2026-10-14. Started 18:00, ended 18:40 (calendar time, local). Status: tests added; run
+Date: 2026-10-14 (numbered 0113: the number 0111 is taken by an outside review in progress).
+Started 18:00, ended 18:40 (calendar time, local). Status: tests added; run
 in the local VM. Estimated effort: S.
 
 ## Goal
