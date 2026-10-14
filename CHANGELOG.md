@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Queries no longer copy results to user space with the query semaphore held** (journal 0105,
+  finding F7 of ADR-0011): a caller whose results buffer was slow to fault could hold up the
+  queries of every user of the mount. Results are gathered in a kernel buffer and copied after
+  the semaphore is released; `QUERY2_BATCH` releases it between requests. v1 `QUERY` checks its
+  request before building anything. Stale texts removed (`modinfo` no longer says "phase 2a").
 - **SELinux** (journal 0104, security roadmap S12): first run under SELinux enforcing, in a guest
   of Debian 6.12.111 with the reference policy (`vm/selinux-local.sh`). Two defects fixed:
   `QUERY2` named files whose label hid them from the caller (finding F6 of ADR-0011; every

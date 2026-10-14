@@ -132,3 +132,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0102 — Tracepoints for the index (security roadmap S13)](0102-index-tracepoints.md)
 - [0103 — Releases measured; a cursor tested across a release](0103-releases-measured-and-cursor-test.md)
 - [0104 — SELinux: first investigation (security roadmap S12)](0104-selinux-investigation.md)
+- [0105 — Query results are copied to the caller after the query semaphore is released](0105-query-results-copied-outside-the-lock.md)

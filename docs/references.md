@@ -131,6 +131,19 @@ used here and is missing from this list, or is described wrongly, please open an
   The technique of journal 0096 (`tests/failnth.c`, `vm/kasan-guest.sh`), implemented. Read in the
   source tree of the kernel the tests are built with.
 
+### Copies to user space under a lock (journal 0105)
+
+- Linux kernel, commit `a48b73eca4ce`, "btrfs: fix potential deadlock in the search ioctl"
+  (2020), and the follow-up that probes at sub-page granularity (`fault_in_subpage_writeable()`,
+  discussed on linux-kernel in 2021-2022); `search_ioctl()` and `copy_to_sk()` in
+  `fs/btrfs/ioctl.c`, Linux 6.12.112.
+  https://android-kvm.googlesource.com/linux/+/a48b73eca4ceb9b8a4b97f290a065335dbcd8a04
+- `Documentation/admin-guide/sysctl/vm.rst`, `unprivileged_userfaultfd`, Linux 6.12.112.
+
+  Precedent and reason for copying query results to user space only after `query_sem` is
+  released. Checked on 2026-10-14: the btrfs source and the documentation read at the tag; the
+  commit's description read in a mirror of the repository.
+
 ### SELinux (security roadmap S12, journal 0104)
 
 - SELinux reference policy, release 2_20250213, `policy/modules/kernel/filesystem.te`
