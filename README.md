@@ -30,7 +30,8 @@ directory of ext4, btrfs or XFS and moves those two jobs into the filesystem. It
    extended attributes, each with a type the kernel checks on write. Without the module the
    directory is still a plain tree that `grep`, `getfattr`, `git` and `rsync` read.
 2. **An index in the kernel.** The module indexes those attributes in RAM and updates the index
-   when an attribute is written. It is rebuilt at every mount.
+   when an attribute is written. Nothing is scanned at mount: the first query on a directory
+   builds that directory's part of the index, which then lives until unmount.
 3. **A query scoped by directory and authorized by file permissions.** One `ioctl` (`QUERY2`) on
    a directory answers up to four comparisons joined by AND, optionally ordered by one
    attribute. It returns only files that everyone allowed into that directory may read.
@@ -50,7 +51,7 @@ on that client's own six structured queries, issued by a test tool on both sides
 | **0 differences** | Answers of `QUERY2` against the client's SQLite | Every check, from 150 to 60 000 memories | [report, question 4](docs/history/0088-m4-report.md); journals [0064](docs/history/0064-client-stage2-first-run.md), [0068](docs/history/0068-client-stage2-scale.md) |
 | **5 to 6.5 times faster** | The layer wins on one query shape (a set of kinds); warm, median | 2 000 to 60 000 memories. Part of the gap is this client's schema, which keeps the field in a JSON column | [report, question 4](docs/history/0088-m4-report.md); [journal 0068](docs/history/0068-client-stage2-scale.md) |
 | **0.71 to 0.51 of the speed** | The layer loses on the long ordered traversal; warm, median | Slower at every scale and by more as the answer grows: about half of SQLite's speed at 60 000 memories | [report, question 4](docs/history/0088-m4-report.md); [journal 0068](docs/history/0068-client-stage2-scale.md) |
-| **19 s** | The layer costs a scan of every file at each mount; no query is answered before it ends | 60 000 files, cold cache, on the SSD (0.7 s warm; 126 s cold on a cloud disk). The client's SQLite file opened cold in 17 to 23 ms | [report, question 2](docs/history/0088-m4-report.md); [journal 0055](docs/history/0055-measurement-gaps.md) |
+| **2.7 s** | The first query on a domain costs a scan of that domain's files; the mount itself takes 0.3 s | A domain of 7 459 files out of 60 000, cold cache, on the SSD (0.1 s warm). Before journal 0098 the mount scanned every file: 19 s cold. The client's SQLite file opened cold in 17 to 23 ms | [journal 0098](docs/history/0098-index-on-demand.md); [report, question 2](docs/history/0088-m4-report.md) |
 
 Of the other four shapes, the layer is faster on two and ties on two. The comparison counts
 only the paths returned, not reading the fields of each result, which SQL returns in the same
@@ -114,7 +115,9 @@ production.** Facts as of 2026-10-13:
   them, so use `v0.3.0-experimental` ([changelog](CHANGELOG.md)).
 - **The measurements are pilot-grade**, from one host; the report that gathers them is
   [journal 0088](docs/history/0088-m4-report.md). They are not a general speed claim.
-- The index lives **in RAM only**, cannot be paged out, and is rebuilt at every mount.
+- The index lives **in RAM only** and cannot be paged out. It is built per domain by the first
+  query on it and nothing releases it before unmount yet; a query that needs every domain (the
+  mount-wide `QUERY`) costs what the mount scan used to.
 - Mounting needs **`CAP_SYS_ADMIN` in the initial user namespace**.
 - **The interface may change**, with no compatibility promise.
 
@@ -240,9 +243,12 @@ Where it loses, ties or costs:
   a result costs about 16 µs per file, against about 0.9 µs per result for the query; SQL
   returns columns in the same call, and no comparison above counts this
   ([journal 0072](docs/history/0072-m3-phase-3c.md)).
-- **Mount time.** 0.7 s warm and 18.5 to 19.3 s cold for 60 000 files on the SATA SSD; 126 s
-  cold on a cloud disk (journals [0031](docs/history/0031-remount-time.md),
-  [0055](docs/history/0055-measurement-gaps.md)).
+- **Mount time and first query.** With the index built on demand, 0.31 s cold and 0.004 s warm
+  to mount 60 000 files on the SATA SSD; the first `QUERY2` on a domain of 7 459 of them, 2.7 s
+  cold and 0.10 s warm; the mount-wide `QUERY` right after mounting, 19.7 s cold and 0.74 s warm
+  ([journal 0098](docs/history/0098-index-on-demand.md)). Before, the mount scanned everything:
+  0.7 s warm and 18.5 to 19.3 s cold; 126 s cold on a cloud disk (journals
+  [0031](docs/history/0031-remount-time.md), [0055](docs/history/0055-measurement-gaps.md)).
 - **Memory.** About 0.5 to 0.6 KiB of kernel memory per file that cannot be paged out, by the
   index's own accounting, which undercounts. The 128 MiB default budget was never reached in a
   test.

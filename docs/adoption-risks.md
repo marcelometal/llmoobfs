@@ -22,11 +22,11 @@ list to shrink.
 | --- | --- | --- | --- | --- |
 | 1 | A module defect takes the host down | fix + build + contain | Fix the known crash; fstests, syzkaller, outside review; run in a dedicated VM | S2, S3, S8, action 15 |
 | 2 | A defect in pass-through damages data | build + contain | fstests and fsx on every lower; snapshots of the lower | S2, S4 |
-| 3 | The lower tree as hostile input | build | Test and fuzz the mount scan and the lower's attributes | S4 |
+| 3 | The lower tree as hostile input | build | Test and fuzz the domain scan and the lower's attributes | S4 |
 | 4 | Credential-model gaps found by review | fix | Drop the capability; state the inode-number limit | ADR-0011 |
 | 5 | Linux only, a module and root are required | accept + contain | Clients detect the layer and keep their own path | ADR-0001 |
 | 6 | Out-of-tree module against a moving kernel | build | DKMS, a kernel matrix in CI, a stated support window | S10 |
-| 7 | Index in RAM, rebuilt at every mount | build (conditional) | Measure first; lazy per-domain build before any on-disk format | M4, spec-m3 §1 |
+| 7 | Index in RAM, rebuilt after every mount | build (conditional) | Per-domain build on first query (done, journal 0098); release under memory pressure next | ADR-0012 |
 | 8 | One index budget shared by all users | build | Per-domain accounting and a per-domain "incomplete" state | S9, F2 |
 | 9 | Experimental UAPI | build | A version policy and a frozen UAPI at a stated milestone | S6 |
 | 10 | The query language is small; SQLite stays | accept + build | Keep it small; a client library for unions and paging | ADR-0009 |
@@ -178,6 +178,14 @@ index is unpageable kernel memory.
 
 **Residual.** With 1 and 2 the first query on a domain after mount stays slow. Memory stays
 unpageable by design.
+
+*Note, 2026-10-14 (journal 0098).* Answer 2 is implemented (ADR-0012): nothing is scanned at
+mount, and the first query on a domain builds its partition while the domain stays writable.
+On 60 000 memories in eight domains, a cold mount went from about 20 s to 0.31 s and the index
+memory with one domain in use from 36.4 MB to 4.5 MB; the first query on a domain of 7 459
+files costs 2.7 s cold and 0.10 s warm, and the mount-wide `QUERY` still costs a full scan.
+Answer 1 is not needed for the domain path; releasing built domains under memory pressure is
+the second half of ADR-0012 and is not implemented.
 
 ## 8. One index budget shared by all users
 

@@ -79,7 +79,7 @@ is only a source pre-release tag (`v0.1.0-experimental`).
 
 ## 9. What is not implemented?
 
-A persistent index (it lives in RAM and is rebuilt at mount), user-namespace and idmapped
+A persistent index (it lives in RAM and each domain's part is built by its first query), user-namespace and idmapped
 mounts (both refused), batch reads, a change cursor, revisions, packaging (DKMS, `.deb`),
 a stable UAPI, a CLI, and the full xfstests suite. Performance is not measured.
 [`docs/spec-m3.md`; `docs/distribution-strategy.md`; `ROADMAP.md`]

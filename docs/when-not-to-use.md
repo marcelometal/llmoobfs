@@ -19,7 +19,7 @@ tested in the project's VM at small scale; "not measured" means exactly that.
 | Query authorization | POSIX per file, no query call | In the application | Usually in the daemon | POSIX per result, by the kernel (proven at test scale) |
 | Read latency by path | Reference | Reference (file) | Extra user-space round trip | Reference plus one VFS hop; magnitude unknown |
 | Writing a memory | Reference | File plus row (two writes) | Through the daemon | File plus xattr plus RAM update; amplification not measured |
-| Recovery between sessions | Nothing to rebuild | Opens the file | Depends | Linear scan at mount |
+| Recovery between sessions | Nothing to rebuild | Opens the file | Depends | Linear scan of each domain at its first query |
 | Memory | None | Page cache, pageable | Process memory | Non-pageable index, estimated 0.3 to 2 KiB per inode |
 | Maturity | Maximal | Decades | Varies | Months, one author |
 | Failure domain | Minimal | Process | Process (the kernel survives) | Host (ring 0) |

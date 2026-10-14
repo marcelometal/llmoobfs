@@ -36,8 +36,8 @@ Mount contract (`layer/main.c`, `moobl_fill_super` and `moobl_parse_param`):
 | `index_budget` accepts 1M to 4G; the default is 128 MiB | `MOOBL_INDEX_BUDGET_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
 
 Modifying the lower tree from outside while the layer is mounted is undefined, as in
-overlayfs; changes made while unmounted are picked up by the index rebuild at the next mount
-([spec-m2.md](spec-m2.md) §5).
+overlayfs; changes made while unmounted are picked up when each domain is built after the next
+mount ([spec-m2.md](spec-m2.md) §5).
 
 ## 2. Dentry and inode mapping
 
@@ -93,9 +93,13 @@ conflicts) and `moobfs-index` (oracle for `QUERY`) live in `tools/`; the encoder
 
 ## 4. In-memory index
 
-The index (`layer/index.c`, `struct moobl_index` in `layer/moobl.h`) is built at mount by
-walking the lower tree and reading every `user.moob.*` attribute, kept current by the xattr,
-unlink, rmdir and rename paths of `main.c`, and never written to disk. Structures:
+The index (`layer/index.c`, `struct moobl_index` in `layer/moobl.h`) is built per domain: the
+first query on a domain directory walks that part of the lower tree and reads every
+`user.moob.*` attribute in it, while the domain stays writable; the mount-wide `QUERY` builds
+every domain not yet built (journal 0098, ADR-0012, [spec-query-v2.md](spec-query-v2.md) §9).
+Nothing is scanned at mount. Once built, a domain is kept current by the xattr, unlink, rmdir
+and rename paths of `main.c` until unmount; nothing releases it yet. The index is never written
+to disk. Structures:
 
 - an rbtree of attribute names (`struct moobl_ix_name`), one node per distinct name;
 - under each name, an rbtree of entries (`struct moobl_ix_entry`) ordered by
@@ -105,13 +109,15 @@ unlink, rmdir and rename paths of `main.c`, and never written to disk. Structure
   layer inode when one exists.
 
 Memory is accounted against `index_budget` (`charge()` returns `ENOMEM` when `used + bytes >
-budget`). If the budget is exceeded while building at mount, the mount fails; if an index
+budget`). If the budget is exceeded while building a domain, the query that started the build
+fails with `ENOMEM` and nothing of that domain is kept; if an index
 update fails after a lower write has already succeeded, the layer sets `incomplete`, logs one
 warning and reports `MOOB_FLAG_INDEX_INCOMPLETE` in `GET_INFO` until remount. Renaming a
 directory sets `paths_stale`, because descendants keep their recorded paths; `QUERY` then
-resolves those entries through the dentry cache and reports `MOOB_FLAG_PATHS_STALE`. Rebuild
-cost is linear in the number of files; it has not been measured (M4,
-[benchmark-plan.md](benchmark-plan.md)). Behaviour near a saturated budget on large trees is
+resolves those entries through the dentry cache and reports `MOOB_FLAG_PATHS_STALE`; a
+`QUERY2` on a domain where a directory was renamed builds that domain again first. Build cost is
+linear in the number of files of the domain: 2.7 s cold and 0.10 s warm for 7 459 files on one
+host (journal 0098). Behaviour near a saturated budget on large trees is
 not tested ([testing.md](testing.md) §3).
 
 ## 5. `QUERY` and `GET_INFO` (UAPI version 1)
