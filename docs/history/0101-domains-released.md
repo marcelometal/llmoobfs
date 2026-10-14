@@ -1,7 +1,7 @@
 # 0101 — ADR-0012, second half: built domains are released
 
-Date: 2026-10-14. Status: implemented; run in the local VM (results below). Not yet run under
-KASAN; the KASAN job of the pull request runs it.
+Date: 2026-10-14. Status: implemented; run in the local VM and under KASAN on the benchmark host
+(results below).
 
 ## Goal
 
@@ -87,6 +87,11 @@ Local VM (`make vm-test`, Debian 6.12.111 in QEMU):
 - `sh scripts/checkpatch.sh`: exit 0; shellcheck at the CI's severity: clean.
 - Complete `make vm-test`: `MOOBFS_VM_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`, with
   `BUILD_RACE_PASS` and `RELEASE_PASS` on the three filesystems.
+
+Benchmark host, `sh vm/kasan-local.sh` (upstream 6.12.112 from `vm/kasan.config`), complete
+suite at commit 81a2da1: `MOOBFS_KASAN_PASS: layer suite under KASAN, UBSAN and lockdep with no
+kernel diagnostics`; within it `RELEASE_PASS` and `BUILD_RACE_PASS` on the three filesystems and
+`FAULT_INJECTION_PASS: operations=18 calls=300 faults=282 unexpected=0`.
 
 ## Errors of the test found on the way
 
