@@ -48,6 +48,19 @@ the mounter, the kernel and the lower filesystem's code, the hardware and the bl
   for the caller first.
 - `user.moob.format` on the lower root is reserved to the tools (`EPERM` through the layer).
 
+*Note, 2026-10-14 (journal 0099).* "This is the overlayfs model" is wrong, as an overlayfs
+maintainer pointed out on linux-unionfs. Overlayfs does not split name operations from data
+operations: every access is checked twice, (a) the caller against the overlay inode, DAC and
+MAC, and (b) the mounter against the real inode, DAC and MAC, and the real operation runs with
+the mounter's credentials, name operations included (`Documentation/filesystems/overlayfs.rst`,
+"Permission model"; `ovl_override_creds()` in `fs/overlayfs/dir.c` around create, rename and
+unlink, v6.12.112). The two bullets above describe what MoobFS does, and that stays true; what
+was wrong is the claim that it is what overlayfs does. In MoobFS a name operation is checked
+only against the caller, on the layer and on the lower, and nothing checks the mounter; a data
+operation is checked against the caller when the file is opened and against the mounter on the
+backing file, where the lower's LSM hooks (`security_file_permission()` from
+`rw_verify_area()`) see the mounter.
+
 ## Promises
 
 Against A1:
@@ -171,6 +184,11 @@ built against, so a report can say which contract it was judged by.
 - **Overlayfs-style `override_creds` for name operations too** (mounter's credentials everywhere):
   rejected; it would make every name operation depend on a correct emulation of the lower's
   permission checks, the source of most overlayfs credential bugs.
+  *Note, 2026-10-14 (journal 0099):* this alternative is what overlayfs actually does (see the
+  note under "Credentials (as implemented)"). "The source of most overlayfs credential bugs" was
+  never checked against the overlayfs fixes and is withdrawn as a reason; the decision stands on
+  the other one: a name operation run with the caller's credentials on the lower gets exactly
+  the lower's own answer for that caller, with nothing to emulate.
 - **Enable `FS_USERNS_MOUNT`** for rootless agents: rejected for now; it reopens the CVE class
   above. Rootless use goes through an administrator-mounted layer.
 - **Filter query results by path-based LSMs**: rejected; the kernel has no general hook to ask

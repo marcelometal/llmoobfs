@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Correction (journal 0099): ADR-0011 and `docs/research-stacked-fs-kernel-rules.md` called
+  MoobFS's credential split (name operations with the caller's credentials, data operations
+  with the mounter's) "the overlayfs model". It is not: overlayfs checks every access against
+  both the caller and the mounter and runs the real operation, name operations included, with
+  the mounter's credentials. Dated notes added; the model itself and the code are unchanged.
 - **Index built on demand** (journal 0098, ADR-0012 items 1, 2, 5 and 6): nothing is scanned
   at mount; the first query on a domain builds its part of the index while the domain stays
   writable; the mount-wide `QUERY` builds the rest. On 60 000 memories in eight domains a cold
