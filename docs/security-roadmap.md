@@ -203,6 +203,12 @@ test is replaced (decision in journal 0097).
 - Done when: the result is recorded and one of two things is true: the defects found are
   fixed, or the README and `docs/when-not-to-use.md` say the layer is not supported with
   SELinux enforcing. AppArmor (Debian, Ubuntu) is not covered by this item.
+- **Status, 2026-10-14 (journal 0104):** first run done, on a guest of Debian 6.12.111 with the
+  Debian reference policy. Two defects found and fixed: F6 (`QUERY2` named files the policy hid)
+  and labels read with the caller's credentials. The layer needs the rule
+  `fs_use_xattr moobfs_layer` (`vm/selinux/moobfs_layer.cil`). Left open: mmap, attribute
+  writes, rename and link under a policy, MLS/MCS, a distribution booted with SELinux (Fedora),
+  Smack.
 
 ### S13. Observability: tracepoints for the index (added 2026-10-13)
 

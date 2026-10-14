@@ -131,3 +131,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0101 — ADR-0012, second half: built domains are released](0101-domains-released.md)
 - [0102 — Tracepoints for the index (security roadmap S13)](0102-index-tracepoints.md)
 - [0103 — Releases measured; a cursor tested across a release](0103-releases-measured-and-cursor-test.md)
+- [0104 — SELinux: first investigation (security roadmap S12)](0104-selinux-investigation.md)
