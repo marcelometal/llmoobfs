@@ -97,8 +97,19 @@ pressure or a budget overflow, which programs do not create (the suite covers th
 reached certainly run (`moobl_copy_attr()`, `moobl_get_tree()`, `moobl_inode_test()`): inlined
 into their callers or called through RCU, they have no coverage of their own in the report.
 
+Coverage of the ioctl and attribute handlers named by S3, summed over their functions: 545 of
+699 PCs (78 %); the rest are mostly error paths (the compiler's `.cold` sections) and the
+`QUERY2` cursor in `query2_exec()` (34 of 75).
+
+## Threshold (2026-10-15)
+
+Set in `docs/security-roadmap.md` (S3): those handlers at 85 % of PCs or more, every reachable
+function hit at least once, exceptions listed, no open report, reproducers kept. A description
+that lowers `index_budget` to reach the release paths was considered and dropped: the minimum
+budget is 1 MiB, which a program cannot overflow (about 1 700 files); the suite's `release` step
+and KCSAN cover those paths.
+
 ## Next step
 
-Set the coverage threshold of S3 from these numbers; keep the reproducer of F8 with the tests if
-syzkaller produces one on a later run; consider a description that lowers `index_budget` and a
-pseudo-call that drops caches, to reach the release paths.
+Raise the handlers from 78 % to 85 %: a seed that pages through a `QUERY2` with its cursor, and
+requests that hit the validation errors; keep the reproducer of F8 if a later run produces one.
