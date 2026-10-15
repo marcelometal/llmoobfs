@@ -1215,7 +1215,12 @@ umount $LAYER && rm -rf $LOWER/sx && umount $LOWER || fail "sx-cleanup"
 echo "SQLEXT_PASS: $(grep -c SQLQ_SAME /tmp/sx.txt) statements equal to the ordinary table; MULTI-INDEX OR in $sx_or plans; private file never returned"
 fi
 rmmod moobfs_layer || fail layer-unload
-if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
+# under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
+# the layer; the initramfs harness has no KCSAN and keeps the plain grep
+if command -v kdiag > /dev/null 2>&1; then
+    dmesg > /tmp/kdiag-layer.txt
+    kdiag /tmp/kdiag-layer.txt 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:' || fail kernel-diagnostic-layer
+elif dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
 if [ -n "${MOOB_ONLY:-}" ]; then
     echo "MOOBFS_ONLY_PASS: steps $MOOB_ONLY (not a complete run)"
 else
