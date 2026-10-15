@@ -15,6 +15,7 @@
 #   buildrace           the first query on a domain racing with writes to it (journal 0098)
 #   release             built domains released by the budget and by the shrinker (journal 0101)
 #   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
+#   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -24,7 +25,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|lowerro) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1117,6 +1118,62 @@ for fs in ext4 btrfs xfs; do
     umount $LAYER && rm -rf $LOWER/rl && umount $LOWER || fail "rl-cleanup-$fs"
     echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
+fi
+if want lowerro; then
+# The layer takes write access on the lower mount for every change it makes there (journal 0117):
+# a read-only lower mount refuses them as it would refuse the caller directly, and the freeze of
+# the lower filesystem holds them back instead of reaching ext4 frozen (which warns). An
+# idmapped lower mount is refused at mount.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "lr-lower-mount"
+rm -rf $LOWER/lr && mkdir -m 755 $LOWER/lr $LOWER/lr/d $LOWER/lr/gone || fail "lr-mkdir"
+echo keep > $LOWER/lr/d/f && chmod 644 $LOWER/lr/d/f || fail "lr-file"
+lr_state() { (cd $LOWER/lr && find . | sort && stat -c '%a %s %n' d/f && $BIN/moobfs-attr list d/f); }
+lr_state > /tmp/lr.before 2>&1
+mkdir -p /tmp/moob-ro
+mount --bind $LOWER/lr /tmp/moob-ro && mount -o remount,bind,ro /tmp/moob-ro || fail "lr-ro-bind"
+touch /tmp/moob-ro/x 2>/dev/null && fail "lr-ro-bind-is-writable (the test would prove nothing)"
+mount -t moobfs_layer -o lower=/tmp/moob-ro none $LAYER || fail "lr-ro-layer-mount"
+cat $LAYER/d/f > /dev/null || fail "lr-ro-read"
+for op in "touch $LAYER/d/new" "mkdir $LAYER/d/sub" "ln -s f $LAYER/d/l" "mv $LAYER/d/f $LAYER/d/g" \
+          "rm $LAYER/d/f" "rmdir $LAYER/gone" "chmod 600 $LAYER/d/f" "truncate -s 0 $LAYER/d/f" \
+          "$BIN/moobfs-attr set $LAYER/d/f kind string note"; do
+    # shellcheck disable=SC2086
+    if $op 2> /tmp/lr.err; then fail "lr-ro-accepted: $op"; fi
+    grep -qi 'read-only' /tmp/lr.err || { cat /tmp/lr.err; fail "lr-ro-not-erofs: $op"; }
+done
+umount $LAYER && umount /tmp/moob-ro || fail "lr-ro-umount"
+lr_state > /tmp/lr.after 2>&1
+cmp -s /tmp/lr.before /tmp/lr.after || { diff /tmp/lr.before /tmp/lr.after; fail "lr-ro-lower-changed"; }
+# frozen lower: each change waits for the thaw, with no kernel warning meanwhile
+mount -t moobfs_layer -o lower=$LOWER/lr none $LAYER || fail "lr-fz-layer-mount"
+echo "moobfs-suite: lowerro freeze" > /dev/kmsg
+fsfreeze --freeze $LOWER || fail "lr-fz-freeze"
+rm -f /tmp/lr.done.*
+(touch $LAYER/d/new && echo ok > /tmp/lr.done.create) &
+(chmod 600 $LAYER/d/f && echo ok > /tmp/lr.done.setattr) &
+($BIN/moobfs-attr set $LAYER/gone kind string note > /dev/null && echo ok > /tmp/lr.done.xattr) &
+sleep 2
+lr_early=$(ls /tmp/lr.done.* 2>/dev/null)
+lr_warn=$(dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -E 'WARNING:|BUG:' | head -3)
+fsfreeze --unfreeze $LOWER || fail "lr-fz-thaw"
+wait
+[ -z "$lr_warn" ] || { dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -A15 'WARNING:' | head -40; fail "lr-fz-kernel-warning"; }
+[ -z "$lr_early" ] || fail "lr-fz-change-completed-while-frozen: $lr_early"
+for k in create setattr xattr; do [ -f /tmp/lr.done.$k ] || fail "lr-fz-$k-failed-after-thaw"; done
+[ -f $LOWER/lr/d/new ] && [ "$(stat -c %a $LOWER/lr/d/f)" = 600 ] || fail "lr-fz-lower-not-changed-after-thaw"
+umount $LAYER || fail "lr-fz-umount"
+# idmapped lower: refused (needs util-linux mount with X-mount.idmap, 2.39 or later)
+if mount -V 2>/dev/null | grep -q util-linux && mount --bind -o X-mount.idmap=b:0:10000:65536 $LOWER/lr /tmp/moob-ro 2>/dev/null; then
+    if mount -t moobfs_layer -o lower=/tmp/moob-ro none $LAYER 2> /tmp/lr.err; then umount $LAYER; fail "lr-idmapped-lower-accepted"; fi
+    # the new mount API hands the message to mount(8); mount(2) logs it in the kernel log
+    { cat /tmp/lr.err; dmesg | tail -20; } | grep -q 'lower cannot be an idmapped mount' || { cat /tmp/lr.err; fail "lr-idmapped-no-message"; }
+    umount /tmp/moob-ro || fail "lr-idmap-umount"
+    lr_idmap=refused
+else
+    lr_idmap="not tested (no idmapped bind mount here)"
+fi
+rm -rf $LOWER/lr && umount $LOWER || fail "lr-cleanup"
+echo "LOWERRO_PASS: read-only lower mount refused 9 changes with EROFS, lower unchanged; 3 changes waited for the thaw of a frozen lower, no kernel warning; idmapped lower: $lr_idmap"
 fi
 if want sqlext; then
 # The moobfs SQLite virtual table (ADR-0013, journal 0108): every statement is run on the virtual
