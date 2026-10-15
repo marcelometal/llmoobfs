@@ -21,6 +21,8 @@ fail() {
 # kdiag: diagnostics in a dmesg capture; KCSAN reports fail only with a racing access in the
 # layer (vm/kdiag.sh, journal 0115)
 . "$REPO/vm/kdiag.sh"
+# the detectors of this kernel, named in the final marker: vm/kasan.config or vm/kcsan.config
+if dmesg | grep -q 'kcsan: enabled'; then SAN="KCSAN and lockdep"; else SAN="KASAN, UBSAN and lockdep"; fi
 echo "kernel: $(uname -r); KASAN init lines in dmesg: $(dmesg | grep -c 'KernelAddressSanitizer'); lockdep: $(grep -c . /proc/lockdep_stats 2>/dev/null || echo absent)"
 # A diagnostic emitted before anything of ours is loaded belongs to the boot of the debug
 # kernel under emulation, not to the layer; it also taints the kernel and turns lockdep off,
@@ -104,7 +106,7 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     echo "FAULT_INJECTION_PASS: $(grep '^FAILNTH_DONE' "$OUT/failnth.txt" | cut -d' ' -f2-); no kernel diagnostic; index equal to the oracle"
 fi
 if [ -n "${MOOB_ONLY:-}" ]; then
-    echo "MOOBFS_KASAN_ONLY_PASS: steps $MOOB_ONLY under KASAN, UBSAN and lockdep with no kernel diagnostics (not a complete run)"
+    echo "MOOBFS_KASAN_ONLY_PASS: steps $MOOB_ONLY under $SAN with no kernel diagnostics (not a complete run)"
 else
-    echo "MOOBFS_KASAN_PASS: layer suite under KASAN, UBSAN and lockdep with no kernel diagnostics"
+    echo "MOOBFS_KASAN_PASS: layer suite under $SAN with no kernel diagnostics"
 fi
