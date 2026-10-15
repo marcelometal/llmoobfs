@@ -8,8 +8,9 @@ include <uapi/linux/moobfs_ioctl.h>
 include <uapi/linux/moobfs_attr.h>
 include <uapi/linux/fcntl.h>
 
-resource fd_moobfs_root[fd]
-resource fd_moobfs_dom[fd]
+# directories of the layer, usable wherever a directory descriptor is (getdents64, fchdir)
+resource fd_moobfs_root[fd_dir]
+resource fd_moobfs_dom[fd_dir]
 
 # The executor runs each program in a private root, so the program mounts the layer itself: a
 # directory it created as the lower (relative paths resolve from its working directory), another

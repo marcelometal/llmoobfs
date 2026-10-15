@@ -67,9 +67,15 @@ if want descriptions; then
 fi
 
 if want run; then
+    # seed programs that mount the layer and reach its calls (vm/syzkaller/seeds/); with
+    # KEEP_CORPUS=1 the corpus of the previous run is kept and the seeds are added to it
+    rm -rf "$B/corpus.d" && mkdir -p "$B/corpus.d"
+    if [ "${KEEP_CORPUS:-0}" = 1 ] && [ -f "$B/workdir/corpus.db" ]; then
+        "$SYZ/bin/syz-db" unpack "$B/workdir/corpus.db" "$B/corpus.d" > /dev/null
+    fi
+    cp vm/syzkaller/seeds/* "$B/corpus.d/"
     rm -rf "$B/workdir" && mkdir -p "$B/workdir"
-    # seed programs that mount the layer and reach its calls (vm/syzkaller/seeds/)
-    "$SYZ/bin/syz-db" pack vm/syzkaller/seeds "$B/workdir/corpus.db"
+    "$SYZ/bin/syz-db" pack "$B/corpus.d" "$B/workdir/corpus.db"
     cat > "$B/manager.cfg" <<EOF
 {
 	"target": "linux/amd64",
@@ -94,12 +100,15 @@ if want run; then
 		"symlink", "readlink", "getdents64", "fstat", "newfstatat", "statx", "fchmod", "fchmodat",
 		"fchown", "fchownat", "truncate", "ftruncate", "fallocate", "fsync", "fdatasync",
 		"syncfs", "mmap", "munmap", "copy_file_range", "sendfile", "listxattr", "flistxattr",
-		"ioctl\$FICLONE", "ioctl\$FS_IOC_GETFLAGS", "ioctl\$FS_IOC_SETFLAGS", "utimensat"
+		"ioctl\$FICLONE", "ioctl\$FS_IOC_GETFLAGS", "ioctl\$FS_IOC_SETFLAGS", "utimensat",
+		"ioctl\$FS_IOC_FIEMAP", "statfs", "fstatfs"
 	]
 }
 EOF
     # the manager serves coverage only while it runs: per-function coverage a minute before the end
-    ( sleep $((DUR > 120 ? DUR - 60 : DUR / 2)); curl -fs http://127.0.0.1:56741/funccover > "$B/funccover.csv" ) &
+    # (force=1: one PC of 14 587 had no module of its own in the first run, and without it the
+    # page refuses to answer)
+    ( sleep $((DUR > 120 ? DUR - 60 : DUR / 2)); curl -fs "http://127.0.0.1:56741/funccover?force=1" > "$B/funccover.csv" ) &
     timeout --signal=INT "$DUR" "$SYZ/bin/syz-manager" -config "$B/manager.cfg" > "$B/manager.log" 2>&1 || true
     wait
     {

@@ -1,7 +1,7 @@
 # 0109 — syzkaller over the layer: setup and first runs (security roadmap S3)
 
-Date: 2026-10-14. Status: **in progress**; a six-hour run is going on the benchmark host.
-Updated at each round.
+Date: 2026-10-14 to 2026-10-15. Status: two long runs done; one defect found (finding F8,
+journal 0112) and fixed; the coverage threshold of the roadmap still to be set.
 
 ## Goal
 
@@ -60,12 +60,45 @@ Each a failed attempt first, then the change:
 | 15 min, no seeds, every `openat` variant | 15 736 | 382 | 6 | 3 | 0 |
 | 30 min, seeds, restricted list | 78 055 | 844 | 326 | 109 | 0 |
 
+| 6 h (stopped at 2 h), old module | 162 222 | 968 | | | 1 (8 reports): F8 |
+| 6 h, fixed module, corpus kept, third seed | 567 085 | 1 091 | | | 0 |
+
 In the 30-minute run the corpus reaches every ioctl (`QUERY2` 39 programs, `QUERY2_BATCH` 34,
 `QUERY` 56, `GET_INFO` 24), typed attribute writes and removals (246), renames (69), hard links
 (101) and unmounts (34). No report from KASAN, UBSAN or lockdep. Per-function coverage of
 `layer/` is not measured yet.
 
+## The long runs
+
+**First six-hour run** (from 17:36, old module): after about an hour it reported `BUG: Dentry
+... still in use` at the unmount of the executor's tmpfs, eight times in all: a failed mount kept
+a reference on the lower root (finding F8). The cause was read in the code and reproduced
+without the fuzzer by adding the mount to the fault-injection test (journal 0112); syzkaller's
+own reproducer had not completed when the run was stopped at 19:40 to fuzz the fixed module.
+
+**Per-function coverage**, from the manager's page (`/funccover?force=1`: one PC of 14 587 had no
+module of its own, and without `force` the page refuses to answer):
+
+| File | At 19:33, old module | After the second run |
+| --- | --- | --- |
+| `layer/attr.c` | 5 of 7 functions, 90 % of PCs | 5 of 7, 90 % |
+| `layer/index.c` | 55 of 81, 62 % | 57 of 81, 68 % |
+| `layer/main.c` | 55 of 71, 60 % | 61 of 71, 65 % |
+
+Changes before the second run (from 19:43, 6 h, ended 01:43): the fixed module; the domain
+descriptor usable as a directory (`getdents64`, `fstatfs`); `FS_IOC_FIEMAP` and `statfs`
+enabled; a third seed with two equalities (the equality-intersection plan), a directory read,
+`fallocate` and `sendfile`; the previous corpus kept (`KEEP_CORPUS=1`). Result: 567 085
+executions, 1 091 programs, no report from KASAN, UBSAN or lockdep.
+
+Not reached, and why: domain release, the shrinker and the index marked incomplete need memory
+pressure or a budget overflow, which programs do not create (the suite covers them, journal
+0101); `moobl_show_options()` runs only when `/proc/mounts` is read. Some functions shown as not
+reached certainly run (`moobl_copy_attr()`, `moobl_get_tree()`, `moobl_inode_test()`): inlined
+into their callers or called through RCU, they have no coverage of their own in the report.
+
 ## Next step
 
-The six-hour run, started 17:36; then per-function coverage of `layer/`, any crash reproduced and
-kept in `tests/`, and the threshold the roadmap asks for.
+Set the coverage threshold of S3 from these numbers; keep the reproducer of F8 with the tests if
+syzkaller produces one on a later run; consider a description that lowers `index_budget` and a
+pseudo-call that drops caches, to reach the release paths.

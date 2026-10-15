@@ -101,7 +101,10 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
 - **Status, 2026-10-14 (journal 0109):** set up (`vm/syzkaller/`, `vm/syzkaller-local.sh`); the
   descriptions now also cover the mount and its options and `QUERY2`/`QUERY2_BATCH`, and each
   program mounts the layer itself. A 30-minute run: 78 055 executions, the corpus reaching every
-  ioctl, no report. A six-hour run in progress; coverage threshold not set yet.
+  ioctl, no report. Two six-hour runs followed: the first found finding F8 (a failed mount pinned the lower root,
+  journal 0112); the second, with the fix, 567 085 executions and no report. Coverage of `layer/`:
+  90 % of PCs in `attr.c`, 68 % in `index.c`, 65 % in `main.c`; the release paths are not reached.
+  Threshold still to be set.
 
 ### S4. The lower layer as hostile input
 
