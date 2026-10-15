@@ -103,12 +103,12 @@ static void q2_fill(struct moob_query2 *q, struct moob_query_result *res, __u32 
 
 enum { OP_SET_NEW, OP_SET_REPLACE, OP_SET_RAW_OVER, OP_REMOVE, OP_CREATE, OP_MKDIR, OP_RENAME_OVER,
        OP_UNLINK, OP_QUERY2, OP_QUERY2_ORDER, OP_BATCH, OP_INFO, OP_CHMOD_DIR, OP_READ, OP_LOOKUP,
-       OP_FIEMAP, OP_SYNCFS, OP_BUILD, OP_COUNT };
+       OP_FIEMAP, OP_SYNCFS, OP_BUILD, OP_MOUNT, OP_COUNT };
 static const char *const names[OP_COUNT] = {
 	"setxattr-new", "setxattr-replace", "setxattr-raw-over-typed", "removexattr", "create",
 	"mkdir", "rename-over-indexed", "unlink-indexed", "query2", "query2-ordered", "query2-batch",
 	"get-info", "chmod-directory", "open-read", "lookup-cold", "fiemap", "syncfs",
-	"query2-first-on-a-domain",
+	"query2-first-on-a-domain", "mount",
 };
 
 int main(int argc, char **argv)
@@ -124,6 +124,8 @@ int main(int argc, char **argv)
 	nth_fd = open(path, O_RDWR);
 	if (nth_fd < 0) { perror(path); return 2; }
 	mkdir(up("da"), 0755); mkdir(up("db"), 0755);
+	/* a second mount of the layer over the same lower, for the mount operation (journal 0112) */
+	mkdir("/tmp/failnth-mnt", 0755);
 	/*
 	 * The index of a domain is built by the first query on it (ADR-0012), and a write to a
 	 * domain that is not built does not touch the index: build both, so that the write
@@ -218,9 +220,18 @@ int main(int argc, char **argv)
 				r = ioctl(fd, FS_IOC_FIEMAP, &fm); break;
 			case OP_SYNCFS:
 				r = syncfs(dfd); break;
+			case OP_MOUNT: {
+				char opts[600];
+
+				snprintf(opts, sizeof opts, "lower=%s,domain_depth=1", low);
+				r = mount("none", "/tmp/failnth-mnt", "moobfs_layer", 0, opts);
+				break;
+			}
 			}
 			e = errno;
 			hit = fired();
+			if (op == OP_MOUNT && !r)
+				umount("/tmp/failnth-mnt");	/* disarmed: only the mount is under test */
 			if (fd >= 0) close(fd);
 			if (dfd >= 0) close(dfd);
 			total_calls++;

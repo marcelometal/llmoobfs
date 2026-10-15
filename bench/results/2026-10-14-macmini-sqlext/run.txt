@@ -1,0 +1,17 @@
+6.12.111+deb13-amd64
+9A389B53E026CAA63D2EBAE
+sqlite 3.46.1
+ref: 7459 files loaded from the lower filesystem in 0.3 s
+same rows=1 vt_ms=1.69 ref_ms=0.65 :: SELECT count(*) FROM {T} WHERE kind = 'note' :: SCAN vt VIRTUAL TABLE INDEX 0:kind = ?1; created EXISTS
+same rows=4544 vt_ms=6.27 ref_ms=3.23 :: SELECT path FROM {T} WHERE kind IN ('note', 'decision') :: SCAN vt VIRTUAL TABLE INDEX 0:kind IN ?1; created EXISTS
+same rows=53 vt_ms=0.12 ref_ms=0.70 :: SELECT path FROM {T} WHERE kind = 'decision' AND agent = 'a07' :: SCAN vt VIRTUAL TABLE INDEX 0:kind = ?1; agent = ?2; created EXISTS
+same rows=1714 vt_ms=2.00 ref_ms=1.80 :: SELECT path FROM {T} WHERE kind = 'decision' OR agent = 'a07' :: MULTI-INDEX OR | INDEX 1 | SCAN vt VIRTUAL TABLE INDEX 0:kind = ?1; created EXISTS | INDEX 2 | SCAN vt VIRTUAL TABLE INDEX 0:agent = ?1; kind EXISTS; created EXISTS
+same rows=20 vt_ms=81.83 ref_ms=2.56 :: SELECT path, created FROM {T} ORDER BY created DESC, path LIMIT 20 :: SCAN vt VIRTUAL TABLE INDEX 0:kind EXISTS; created EXISTS; LIMIT ?1 | USE TEMP B-TREE FOR ORDER BY
+same rows=20 vt_ms=0.24 ref_ms=2.59 :: SELECT path, created FROM {T} ORDER BY created DESC LIMIT 20 :: SCAN vt VIRTUAL TABLE INDEX 0:kind EXISTS; created EXISTS; ORDER BY created DESC; LIMIT ?1
+same rows=20 vt_ms=0.26 ref_ms=1.13 :: SELECT path, created FROM {T} WHERE kind = 'decision' ORDER BY created DESC LIMIT 20 :: SCAN vt VIRTUAL TABLE INDEX 0:kind = ?1; created EXISTS; ORDER BY created DESC; LIMIT ?2
+same rows=20 vt_ms=17.16 ref_ms=1.13 :: SELECT path, created FROM {T} WHERE kind = 'decision' ORDER BY created DESC, path LIMIT 20 :: SCAN vt VIRTUAL TABLE INDEX 0:kind = ?1; created EXISTS; LIMIT ?2 | USE TEMP B-TREE FOR ORDER BY
+same rows=20 vt_ms=52.36 ref_ms=2.22 :: SELECT path, created FROM {T} WHERE kind IN ('note', 'decision') ORDER BY created DESC, path LIMIT 20 :: SCAN vt VIRTUAL TABLE INDEX 0:kind IN ?1; created EXISTS; LIMIT ?2 | USE TEMP B-TREE FOR ORDER BY
+same rows=20 vt_ms=2.48 ref_ms=0.72 :: SELECT path, score FROM {T} WHERE agent = 'a07' AND score >= 500 ORDER BY created DESC, path LIMIT 20 :: SCAN vt VIRTUAL TABLE INDEX 0:agent = ?1; score >= ?2; kind EXISTS; created EXISTS; LIMIT ?3 | USE TEMP B-TREE FOR ORDER BY
+same rows=6 vt_ms=73.94 ref_ms=2.73 :: SELECT kind, count(*) FROM {T} GROUP BY kind ORDER BY kind :: SCAN vt VIRTUAL TABLE INDEX 0:kind EXISTS; created EXISTS; ORDER BY kind ASC
+same rows=1 vt_ms=0.15 ref_ms=0.57 :: SELECT count(*) FROM {T} WHERE pinned = 1 AND score < 100 :: SCAN vt VIRTUAL TABLE INDEX 0:pinned = ?1; score < ?2; kind EXISTS; created EXISTS
+SQLEXT_BENCH_DONE

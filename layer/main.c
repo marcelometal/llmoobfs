@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * MoobFS memory layer, phase 2a: a minimal stacked filesystem that passes
- * every operation through to a directory of a lower filesystem.
- *
- * This phase implements only the pass-through skeleton (lookup, readdir,
- * create, mkdir, unlink, rmdir, read, write, mmap, fsync, truncate, stat).
- * It exists to validate the stacking approach of ADR-0007 on the pinned
- * kernel. Typed attributes, the index and QUERY arrive in later phases.
+ * MoobFS memory layer: a stacked filesystem over one directory of a lower filesystem (ext4,
+ * btrfs or XFS). This file holds the pass-through (inodes, dentries, name, file and directory
+ * operations, typed attribute validation, mount); index.c holds the attribute index and the
+ * query ioctls. Stacking approach: ADR-0007; credential model: ADR-0011.
  *
  * Patterns follow fs/ecryptfs (one upper inode per lower inode, lower path
  * kept in dentry fsdata) and fs/overlayfs (I/O delegated through
@@ -30,7 +27,6 @@
 #include <linux/xattr.h>
 #include <linux/fiemap.h>
 #include <linux/fileattr.h>
-#include <linux/magic.h>
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 #include "moobfs_attr.h"
@@ -736,7 +732,7 @@ static int moobl_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 	return err;
 }
 
-/* ---- extended attributes: opaque pass-through (typed validation is phase 2c) */
+/* ---- extended attributes: pass-through, with typed user.moob.* validated on write ---- */
 
 static ssize_t moobl_listxattr(struct dentry *dentry, char *list, size_t size)
 {
@@ -1314,8 +1310,19 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 {
 	struct moobl_fc *ctx = fc->fs_private;
 	struct fs_parse_result result;
-	int opt = fs_parse(fc, moobl_params, param, &result);
+	int opt;
 
+	/*
+	 * No option can change on remount (read-only and read-write are the VFS's). As overlayfs
+	 * does: the old mount(2) API passes the current options again and they are ignored; the
+	 * new API is told, instead of having a change accepted and dropped (journal 0106).
+	 */
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE) {
+		if (fc->oldapi)
+			return 0;
+		return invalfc(fc, "No changes allowed in reconfigure");
+	}
+	opt = fs_parse(fc, moobl_params, param, &result);
 	if (opt < 0)
 		return opt;
 	switch (opt) {
@@ -1358,7 +1365,7 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	struct moobl_fc *ctx = fc->fs_private;
 	struct moobl_sb *sbi;
 	struct inode *root_inode;
-	struct dentry *root;
+	struct dentry *root, *lower_root;
 	struct cred *cred;
 	int err;
 
@@ -1373,8 +1380,11 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth,
 			 ctx->index_idle < 0 ? MOOBL_INDEX_IDLE_DEFAULT : (unsigned int)ctx->index_idle);
 	err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &sbi->lower);
-	if (err)
-		return invalfc(fc, "cannot resolve lower directory");
+	if (err) {
+		/* the walk's own error: ENOENT, ENOTDIR, EACCES, or ENOMEM, not always EINVAL */
+		errorfc(fc, "cannot resolve lower directory");
+		return err;
+	}
 	if (sbi->lower.dentry->d_sb->s_magic == MOOBL_SUPER_MAGIC)
 		return invalfc(fc, "lower cannot be another moobfs_layer mount");
 	sb->s_stack_depth = sbi->lower.dentry->d_sb->s_stack_depth + 1;
@@ -1413,7 +1423,8 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 		} else if (n == -EOPNOTSUPP) {
 			pr_info("moobfs_layer: lower filesystem has no user xattr support; typed attributes unavailable\n");
 		} else if (n != -ENODATA) {
-			return invalfc(fc, "cannot read the moobfs format marker on the lower root");
+			errorfc(fc, "cannot read the moobfs format marker on the lower root");
+			return n;
 		}
 	}
 	sb->s_magic = MOOBL_SUPER_MAGIC;
@@ -1435,9 +1446,17 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	if (!root)
 		return -ENOMEM;
 	sb->s_root = root;
-	err = moobl_set_lower_path(root, sbi->lower.mnt, dget(sbi->lower.dentry));
-	if (err)
+	/*
+	 * moobl_set_lower_path() takes the reference only when it succeeds: on failure it is
+	 * dropped here, or the lower root stays pinned after the mount fails (found by syzkaller
+	 * with an allocation fault, journal 0112).
+	 */
+	lower_root = dget(sbi->lower.dentry);
+	err = moobl_set_lower_path(root, sbi->lower.mnt, lower_root);
+	if (err) {
+		dput(lower_root);
 		return err;
+	}
 	err = moobl_index_shrinker_start(sb);
 	if (err)
 		return err;
@@ -1534,4 +1553,4 @@ module_exit(moobl_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Studio Moob");
 MODULE_VERSION("0.3.0");
-MODULE_DESCRIPTION("MoobFS memory layer (phase 2a pass-through)");
+MODULE_DESCRIPTION("MoobFS memory layer: stacked filesystem with a typed attribute index");

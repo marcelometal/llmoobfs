@@ -14,6 +14,7 @@
 #   faults              only under the KASAN harness: the fault-injection block of kasan-guest.sh
 #   buildrace           the first query on a domain racing with writes to it (journal 0098)
 #   release             built domains released by the budget and by the shrinker (journal 0101)
+#   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -23,7 +24,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -200,6 +201,15 @@ run_lower() {
     same_query score ge int64 10 || fail "query-budget-$fs"
     umount $LAYER || fail "q-umount4-$fs"
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail "q-remount-final-$fs"
+    # remount (journal 0106): read-only refuses writes and read-write restores them; an option
+    # given on remount through mount(2) is ignored, as overlayfs does, and through the new mount
+    # API (fsconfig) refused
+    mount -o remount,ro $LAYER || fail "remount-ro-$fs"
+    touch $LAYER/ro-probe 2> /dev/null && fail "remount-ro-writable-$fs"
+    mount -o remount,rw $LAYER || fail "remount-rw-$fs"
+    touch $LAYER/ro-probe && rm $LAYER/ro-probe || fail "remount-rw-not-writable-$fs"
+    $BIN/reconf $LAYER > /dev/null || fail "remount-fsconfig-change-accepted-$fs"
+    grep " $LAYER " /proc/mounts | grep -q "index_budget" && fail "remount-option-changed-$fs"
     rm -rf $LAYER/r || fail "q-cleanup-$fs"
     # isolation (M3 phase 3b): two users, two namespaces; QUERY as each user must equal the
     # oracle run as that user, and must not reveal the other namespace, not even in counts
@@ -1107,6 +1117,89 @@ for fs in ext4 btrfs xfs; do
     umount $LAYER && rm -rf $LOWER/rl && umount $LOWER || fail "rl-cleanup-$fs"
     echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
+fi
+if want sqlext; then
+# The moobfs SQLite virtual table (ADR-0013, journal 0108): every statement is run on the virtual
+# table over a domain and on an ordinary table filled from the lower filesystem; the rows must be
+# equal. The query plans are printed, to see what SQLite hands to the module.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "sx-lower-mount"
+rm -rf $LOWER/sx && mkdir -m 755 $LOWER/sx || fail "sx-mkdir"
+mount -t moobfs_layer -o lower=$LOWER/sx none $LAYER || fail "sx-mount"
+mkdir -m 755 $LAYER/dm $LAYER/dm/sub $LAYER/dp || fail "sx-domains"
+for i in $(seq 0 119); do
+    if [ $((i % 4)) -eq 0 ]; then f=$LAYER/dm/sub/f$i; else f=$LAYER/dm/f$i; fi
+    : > $f || fail "sx-file"
+    case $((i % 3)) in 0) k=note ;; 1) k=decision ;; *) k=fact ;; esac
+    [ $i -eq 7 ] || $BIN/moobfs-attr set $f kind string $k > /dev/null || fail "sx-kind"
+    $BIN/moobfs-attr set $f agent string a$((i % 5)) > /dev/null || fail "sx-agent"
+    $BIN/moobfs-attr set $f created time $(( (i * 37 % 120) * 1000 )) > /dev/null || fail "sx-created"
+    [ $((i % 10)) -eq 0 ] || $BIN/moobfs-attr set $f score int64 $((i % 17)) > /dev/null || fail "sx-score"
+    $BIN/moobfs-attr set $f weight double "$(( i - 60 )).25" > /dev/null || fail "sx-weight"
+    $BIN/moobfs-attr set $f flag bool $((i % 2)) > /dev/null || fail "sx-flag"
+    if [ $((i % 6)) -eq 0 ]; then t="título $i"; else t="title $i"; fi
+    $BIN/moobfs-attr set $f title string "$t" > /dev/null || fail "sx-title"
+done
+sxcols="kind string|agent string|created time|score int64|weight double|flag bool|title string"
+sx() {  # sx <sql>...: compare vt and ref
+    IFS='|'
+    # shellcheck disable=SC2086
+    set -- $sxcols -- "$@"
+    unset IFS
+    $BIN/sqlq compare $LAYER/dm $LOWER/sx/dm "$@"
+}
+sx "SELECT rowid, path, kind, agent, created, score, weight, flag, title FROM {T}" \
+   "SELECT path FROM {T} WHERE kind = 'note'" \
+   "SELECT path FROM {T} WHERE kind IN ('note', 'decision')" \
+   "SELECT path FROM {T} WHERE kind IN ('note', 'decision') AND agent = 'a1'" \
+   "SELECT path, score FROM {T} WHERE agent IN ('a1', 'a3') AND score >= 5" \
+   "SELECT path FROM {T} WHERE kind = 'fact' OR agent = 'a2'" \
+   "SELECT path FROM {T} WHERE (kind = 'note' AND score > 10) OR (agent = 'a4' AND flag = 1)" \
+   "SELECT path FROM {T} WHERE score IS NULL" \
+   "SELECT path, score FROM {T} WHERE score IS NOT NULL AND score < 3" \
+   "SELECT path FROM {T} WHERE score != 5" \
+   "SELECT path, title FROM {T} WHERE title LIKE 'tí%'" \
+   "SELECT path, title FROM {T} WHERE title >= 'título' AND title < 'títulp'" \
+   "SELECT path, created FROM {T} ORDER BY created DESC LIMIT 7" \
+   "SELECT path, created FROM {T} WHERE kind = 'decision' ORDER BY created LIMIT 5" \
+   "SELECT path, created FROM {T} WHERE kind IN ('note', 'fact') ORDER BY created DESC, path LIMIT 10" \
+   "SELECT path, score FROM {T} ORDER BY score, path LIMIT 12" \
+   "SELECT path, created FROM {T} ORDER BY created LIMIT 50 OFFSET 30" \
+   "SELECT count(*) FROM {T}" \
+   "SELECT kind, count(*) FROM {T} GROUP BY kind ORDER BY kind" \
+   "SELECT agent, max(created), count(score) FROM {T} WHERE score > 3 GROUP BY agent ORDER BY agent" \
+   "SELECT path, weight FROM {T} WHERE weight BETWEEN -2.5 AND 3.5 ORDER BY weight" \
+   "SELECT path FROM {T} WHERE score = '5'" \
+   "SELECT path FROM {T} WHERE score = 5.0" \
+   "SELECT path FROM {T} WHERE kind = 'note' AND kind = 'fact'" \
+   "SELECT path FROM {T} WHERE flag = 1 AND kind = 'note' AND agent = 'a3' AND score >= 2 AND created > 5000" \
+   "SELECT a.path, b.path FROM {T} a JOIN {T} b ON a.agent = b.agent WHERE b.path = 'f1' AND a.kind = 'note'" \
+   > /tmp/sx.txt 2>&1 || { cat /tmp/sx.txt; fail "sx-differs"; }
+grep -q SQLQ_COMPARE_DONE /tmp/sx.txt || { cat /tmp/sx.txt; fail "sx-incomplete"; }
+# with created declared required, the newest N are the kernel's ordered scan with its limit
+sxcols="kind string|created time required|agent string|score int64"
+sx "SELECT path, created FROM {T} ORDER BY created DESC LIMIT 7" \
+   "SELECT path, created FROM {T} WHERE kind = 'decision' ORDER BY created LIMIT 5" \
+   "SELECT path, created FROM {T} WHERE agent = 'a2' AND score >= 4 ORDER BY created DESC LIMIT 3" \
+   "SELECT path, created FROM {T} ORDER BY created LIMIT 50 OFFSET 30" \
+   > /tmp/sx2.txt 2>&1 || { cat /tmp/sx2.txt; fail "sx-required-differs"; }
+grep -E '^(query|  plan):' /tmp/sx2.txt | sed 's/^/  /'
+grep -q 'TEMP B-TREE' /tmp/sx2.txt && { cat /tmp/sx2.txt; fail "sx-required-order-not-the-kernels"; }
+cat /tmp/sx2.txt >> /tmp/sx.txt
+grep -E '^(query|  plan):' /tmp/sx.txt | sed 's/^/  /'
+sx_or=$(grep -c 'MULTI-INDEX OR' /tmp/sx.txt)
+# a file of another user, alone in its domain: not in any answer, neither for its owner's
+# neighbours nor for root (it fails the homogeneity rule of its domain)
+: > $LAYER/dp/secret && $BIN/moobfs-attr set $LAYER/dp/secret kind string note > /dev/null &&
+    : > $LAYER/dp/open && $BIN/moobfs-attr set $LAYER/dp/open kind string note > /dev/null &&
+    chown 1002:1002 $LAYER/dp/secret && chmod 600 $LAYER/dp/secret || fail "sx-private"
+$BIN/sqlq --uid 1001 run $LAYER/dp "kind string" -- "SELECT path FROM vt" > /tmp/sxp.txt || fail "sx-uid-run"
+grep -q secret /tmp/sxp.txt && fail "sx-private-file-returned"
+grep -q open /tmp/sxp.txt || fail "sx-public-file-missing"
+n_root=$($BIN/sqlq run $LAYER/dm "kind string" -- "SELECT count(*) FROM vt")
+n_user=$($BIN/sqlq --uid 1001 run $LAYER/dm "kind string" -- "SELECT count(*) FROM vt")
+[ "$n_root" = "$n_user" ] && [ "$n_root" -eq 119 ] || fail "sx-uid-count ($n_root, $n_user)"
+umount $LAYER && rm -rf $LOWER/sx && umount $LOWER || fail "sx-cleanup"
+echo "SQLEXT_PASS: $(grep -c SQLQ_SAME /tmp/sx.txt) statements equal to the ordinary table; MULTI-INDEX OR in $sx_or plans; private file never returned"
 fi
 rmmod moobfs_layer || fail layer-unload
 if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi

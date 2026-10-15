@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Fixed (journal 0112): a mount that failed on an allocation kept a reference on the lower root
+  (finding F8, found by syzkaller); out of memory while resolving `lower=` was reported as
+  `EINVAL`; the SQLite extension could drop a condition it had declared handled, on an older
+  SQLite. The fault-injection test now covers the mount and checks the log after the lower is
+  unmounted.
+- **SQL over a domain, without a database** (prototype, ADR-0013, journal 0108): `sqlite/`, a
+  SQLite virtual table that turns conditions, IN lists and ordering on a required column into
+  `QUERY2` calls and leaves OR, sorting, counts and grouping to SQLite (`make sqlite-ext`). New
+  suite step `sqlext` (30 statements equal to an ordinary table). Measured: the newest 20 rows in
+  0.24 ms against 2.5 ms on an ordinary SQLite table; a getxattr per row (about 10 µs) where a
+  column of every row is read.
+- Remount (journal 0106): an option change through the new mount API (`fsconfig`) is refused
+  with `EINVAL`, as overlayfs does; through `mount(2)` options are still ignored. The suite now
+  tests `remount,ro` and `remount,rw` of the layer.
+- **Queries no longer copy results to user space with the query semaphore held** (journal 0105,
+  finding F7 of ADR-0011): a caller whose results buffer was slow to fault could hold up the
+  queries of every user of the mount. Results are gathered in a kernel buffer and copied after
+  the semaphore is released; `QUERY2_BATCH` releases it between requests. v1 `QUERY` checks its
+  request before building anything. Stale texts removed (`modinfo` no longer says "phase 2a").
 - **SELinux** (journal 0104, security roadmap S12): first run under SELinux enforcing, in a guest
   of Debian 6.12.111 with the reference policy (`vm/selinux-local.sh`). Two defects fixed:
   `QUERY2` named files whose label hid them from the caller (finding F6 of ADR-0011; every

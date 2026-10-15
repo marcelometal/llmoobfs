@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
- * MoobFS layer ioctl interface (UAPI version 1). Issued on an open descriptor
- * of the mount root directory. Unknown commands return ENOTTY; a request with
+ * MoobFS layer ioctl interface (UAPI version 1). QUERY and GET_INFO are issued on an open
+ * descriptor of the mount root directory, QUERY2 and QUERY2_BATCH on one of a domain
+ * directory. Unknown commands return ENOTTY; a request with
  * reserved fields set, an unknown version or an invalid term returns EINVAL.
  * Layout uses fixed-width little-endian fields and explicit padding; the same
  * header is compiled by the module and by the user-space tools.

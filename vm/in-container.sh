@@ -99,6 +99,8 @@ cp build/linux/bench-gen build/linux/bench-load build/linux/bench-sqlclient "$ST
 cp bench/sqlbase.sh "$STAGE/bench-sqlbase.sh" && cp bench/equiv.sh "$STAGE/bench-equiv.sh" && cp bench/run.sh "$STAGE/bench-run.sh"
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o "$STAGE/query"
 gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o "$STAGE/ipc"
+gcc -static -O2 -Wall -Wextra -Werror tests/reconf.c -o "$STAGE/reconf"
+gcc -static -O2 -Wall -Wextra -Werror -Iinclude -DSQLITE_CORE tests/sqlq.c sqlite/moobfs_vtab.c common/attr.c -lsqlite3 -lm -ldl -lpthread -o "$STAGE/sqlq"
 gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o "$STAGE/idmap"
 gcc -static -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o "$STAGE/fsx"
 MOOB_BUILD_DIR=build/linux python3 tests/test_images.py --fixtures "$STAGE/data"

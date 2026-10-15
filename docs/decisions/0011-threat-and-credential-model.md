@@ -192,6 +192,26 @@ Added on 2026-10-14, from the first run under SELinux enforcing (security roadma
   (`vm/selinux/moobfs_layer.cil`); without it every file through the layer is unlabelled and
   confined processes are refused everything.
 
+Added on 2026-10-14, from the code review of journal 0105:
+
+- **F7 — a query could hold up the queries of every user of the mount.** Results were copied to
+  user space with `query_sem` held; a copy waits on a page fault for as long as whoever backs the
+  caller's buffer decides, and a writer of the semaphore (the rebuild of a stale domain, a
+  release over the budget, both reachable by any user) and every reader behind it waited too. It
+  broke promise 1. Confirmed by a lockdep assertion at the copy site; **fixed** in journal 0105:
+  results are gathered in a kernel buffer and copied after the semaphore is released, as btrfs's
+  search ioctl avoids faulting under its locks. v1 `QUERY` also reads and checks its request
+  before building anything.
+
+Added on 2026-10-14, from syzkaller (journals 0109, 0112):
+
+- **F8 — a failed mount kept a reference on the lower root.** When an allocation failed while
+  the root dentry was set up, the reference taken on the lower root was never dropped; the lower
+  could not then be unmounted cleanly, a leak of the kind that can end in a use-after-free.
+  Reachable only by whoever may mount, but it broke promise 1. **Fixed** in journal 0112, with
+  the mount added to the fault-injection test and the kernel log checked after the lower is
+  unmounted.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that
