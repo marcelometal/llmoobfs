@@ -198,6 +198,8 @@ set. Read on 2026-10-14.
 | overlayfs | https://docs.kernel.org/filesystems/overlayfs.html | model of the stacked layer, `override_creds`, the rule against touching the lower filesystem (ADR-0007) |
 | eCryptfs | https://docs.kernel.org/filesystems/ecryptfs.html | model of a 1:1 stacked filesystem (ADR-0007) |
 | backing_file helpers | [`fs/backing-file.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/backing-file.c?h=v6.12.112) | I/O delegation in `layer/main.c` |
+| overlayfs `ovl_want_write()` | [`fs/overlayfs/util.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/overlayfs/util.c?h=v6.12.112), called from `ovl_create_object()` in `fs/overlayfs/dir.c` | write access on the lower mount around every change (`moobl_want_write()`, journal 0117) |
+| Filesystem freezing, `mnt_want_write()`, idmapped mounts | [`fs/namespace.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/namespace.c?h=v6.12.112), `ext4_journal_check_start()` in `fs/ext4/ext4_jbd2.c`, https://docs.kernel.org/filesystems/idmappings.html, `fsfreeze(8)` and `X-mount.idmap` of `mount(8)` (util-linux) | the freeze and read-only lower tests and the idmapped-lower refusal (journal 0117) |
 | FUSE and FUSE passthrough | https://docs.kernel.org/filesystems/fuse/index.html | the alternative rejected by ADR-0001 |
 | xarray, rbtree | https://docs.kernel.org/core-api/xarray.html, https://docs.kernel.org/core-api/rbtree.html | the in-kernel index (`layer/index.c`) |
 | iomap | https://docs.kernel.org/filesystems/iomap/index.html | the read-only M1 module (`kernel/main.c`) |

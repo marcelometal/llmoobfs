@@ -212,6 +212,30 @@ Added on 2026-10-14, from syzkaller (journals 0109, 0112):
   the mount added to the fault-injection test and the kernel log checked after the lower is
   unmounted.
 
+Added on 2026-10-15, from an independent source review of 5582e06 (journal 0114, published
+later) and its verification (journal 0117):
+
+- **F11 — changes through the layer ignored the lower mount.** The system call takes write
+  access on the layer's mount only, and the layer never took it on the lower's: a lower given as
+  a read-only bind mount was written anyway, which breaks promise 2 (the lower refuses the same
+  caller directly), and with the lower ext4 frozen any user's create, `chmod` or `setxattr`
+  reached ext4 and hit `WARN_ON(... SB_FREEZE_COMPLETE)` in `ext4_journal_check_start()` before
+  waiting for the thaw, which breaks promise 1. Data writes were not affected: the backing file
+  holds write access on the lower mount and `vfs_iter_write()` takes the freeze protection.
+  **Fixed** in journal 0117: every change to the lower takes `mnt_want_write()` on the lower
+  mount first, as overlayfs's `ovl_want_write()`; suite step `lowerro`, with a negative round.
+- **F12 — an idmapped lower mount was accepted and its mapping ignored.** Every delegated call
+  passes `nop_mnt_idmap`, so on an idmapped lower mount the checks used the on-disk ids, not the
+  ones that mount shows: a caller could act on files the lower mount gives to someone else.
+  Reachable only by an administrator's choice of `lower=`, and already noted as R5 of
+  `docs/project-review-2026-10-10.md` without a fix. **Fixed** in journal 0117 by refusing such
+  a lower at mount (compatibility decision below).
+
+*Compatibility decision, 2026-10-15 (journal 0117).* An idmapped mount as `lower=` is refused
+with `EINVAL`. Supporting it would mean passing `mnt_idmap(lower mount)` to every delegated call
+and to the index's permission rule; that is left for a later decision with its own tests. No
+released version accepted it on purpose, and no on-disk format changes.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that
