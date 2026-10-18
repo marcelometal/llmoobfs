@@ -20,6 +20,10 @@ build `permmatrix` and `fusestall`, so its runs of those steps could not have wo
   program costs a few seconds of compilation and changes no test.
 - `docs/development.md`: a new test program is added in `vm/build-tests.sh` and invoked in
   `vm/suite.sh`, two places instead of three.
+- The KASAN workflow's pull-request filter also covers `sqlite/`, `tools/` and `bench/`. The
+  suite runs the SQLite extension (step `sqlext`), the tools (`moobfs-index` is the oracle) and
+  the benchmark tools, but a change only under those directories skipped the run. Found while
+  preparing the negative round of journal 0120's item 9, which touches `sqlite/` only.
 - Not changed: `vm/selinux-local.sh` builds only `query` and `moobfs-attr`, for one guest with
   its own needs.
 

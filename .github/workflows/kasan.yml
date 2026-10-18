@@ -35,11 +35,11 @@ jobs:
           if [ "$EVENT" != pull_request ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           if git diff --name-only "$BASE_SHA" HEAD |
-             grep -qE '^(layer|vm|include|common|tests)/|^Makefile$|^\.github/workflows/kasan\.yml$'; then
+             grep -qE '^(layer|vm|include|common|tests|sqlite|tools|bench)/|^Makefile$|^\.github/workflows/kasan\.yml$'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Nothing under layer/, vm/, include/, common/, tests/, the Makefile or this workflow changed: the suite was not run." >> "$GITHUB_STEP_SUMMARY"
+            echo "Nothing under layer/, vm/, include/, common/, tests/, sqlite/, tools/, bench/, the Makefile or this workflow changed: the suite was not run." >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Install build and guest dependencies
         if: steps.need.outputs.run == 'true'
