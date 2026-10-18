@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed (journal 0132, finding F4 completed): an ordinary user writing through the layer could spend
+  ext4's reserved blocks with the default reserve owner; writes now run with the writer's fsuid
+  and groups.
 - Shell scripts in `vm/` and `scripts/` pass shellcheck at every severity, which `make lint` and CI
   now enforce (issue #5, journal 0128; VM run pending).
 - CI (journal 0127): KCSAN over the stress steps runs on GitHub with KVM (`kcsan.yml`, on demand and

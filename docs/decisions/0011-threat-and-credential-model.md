@@ -143,6 +143,10 @@ Added on 2026-10-12, from the review of journal 0066 (`docs/research-stacked-fs-
   reserve to the reserve owner's uid, 0 by default and the fsuid of the mounter credentials, so
   with the default `resuid` an ordinary user writing through the layer still spends that reserve.
   Promise 2 does not hold for it; the README lists the workaround (another `resuid`).
+  *Note, 2026-10-18:* fixed in journal 0132. Writes, `fallocate`, clones and `copy_file_range`
+  run with the mounter's credentials but with the writer's fsuid, fsgid and groups, so ext4
+  grants its reserve exactly as it would to that writer directly. Promise 2 now holds for
+  the reserve as well.
 
 - **F5 — copy and clone kept set-user-ID, set-group-ID and file capabilities** (found on
   2026-10-13 with fstests, journal 0074). `copy_file_range` and a clone ran on the lower with the

@@ -402,9 +402,8 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   então a camada não entra nele (`EXDEV`) e o deixa fora do índice. Mantenha os snapshots fora do
   diretório que a camada cobre.
 - Os dados são escritos com as credenciais de quem montou, sem `CAP_SYS_RESOURCE`, então os
-  limites de cota valem. No ext4 com o dono padrão da reserva (uid 0), usuários comuns escrevendo
-  pela camada ainda podem usar os blocos reservados ao root; monte o sistema de baixo com outro
-  `resuid`, ou zere a reserva, se isso importar.
+  limites de cota valem, e com o fsuid e os grupos de quem escreve, então os blocos reservados do
+  ext4 só vão para quem o ext4 os daria num acesso direto (achado F4, diário 0132).
 - `noatime`, `relatime` e `strictatime` na montagem da camada não têm efeito; os tempos de acesso
   seguem as opções de montagem do sistema de arquivos de baixo.
 

@@ -385,10 +385,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   snapshot **inside** the lower tree numbers its files from the start again, so the layer does
   not enter it (`EXDEV`) and leaves it out of the index. Keep snapshots outside the directory the
   layer covers.
-- Data is written with the mounter's credentials without `CAP_SYS_RESOURCE`, so quota limits hold.
-  On ext4 with the default reserve owner (uid 0), ordinary users writing through the layer can
-  still use the blocks reserved for root; mount the lower with another `resuid`, or set the
-  reserve to zero, if that matters.
+- Data is written with the mounter's credentials without `CAP_SYS_RESOURCE`, so quota limits hold,
+  and with the writer's fsuid and groups, so ext4's reserved blocks go only to whom ext4 grants
+  them directly (finding F4, journal 0132).
 - `noatime`, `relatime` and `strictatime` on the layer's mount have no effect; access times
   follow the mount options of the lower filesystem.
 
