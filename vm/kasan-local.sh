@@ -54,6 +54,8 @@ gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/buildrace.c -lpthread -o b
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
 gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
 gcc -static -O2 -Wall -Wextra -Werror tests/reconf.c -o build/vng/reconf
+gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/permmatrix.c -o build/vng/permmatrix
+gcc -static -O2 -Wall -Wextra -Werror tests/fusestall.c -o build/vng/fusestall
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude -DSQLITE_CORE tests/sqlq.c sqlite/moobfs_vtab.c common/attr.c -lsqlite3 -lm -ldl -lpthread -o build/vng/sqlq
 gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap
 gcc -static -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o build/vng/fsx

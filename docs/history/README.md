@@ -141,3 +141,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0112 — A lower dentry pinned by a failed mount (syzkaller); ENOMEM reported as EINVAL; a SQL condition dropped on an older SQLite](0112-mount-leak-and-sql-omit.md)
 - [0113 — Regression tests for the fixes of journal 0105](0113-regression-tests-for-the-review-fixes.md)
 - [0115 — KCSAN over the layer: first runs, no data race in the module (security roadmap S8)](0115-kcsan-first-runs.md)
+- [0116 — The homogeneity rule judged every class; per-result checks no longer hold query_sem](0116-homogeneity-classes-and-checks-without-query-sem.md)

@@ -10,6 +10,13 @@
 - syzkaller over the layer (journal 0109, security roadmap S3, in progress): kernel configuration,
   syzlang descriptions of the mount, ioctls and typed attributes, seed programs and a runner
   (`vm/syzkaller/`, `vm/syzkaller-local.sh`). First runs: no report; a six-hour run in progress.
+- **Security fixes** (journal 0116, findings F9 and F10 of ADR-0011, found by an independent source
+  review): `QUERY2` answered members of a file's group, or its owner, a file only others could
+  read (mode `0604`), without a per-result check; the homogeneity rule now asks the bit of every
+  class, in the kernel and in `moobfs-index` and `moobfs-check`. A query with per-result checks
+  that waited on a FUSE mount inside the domain held up every query of the mount; the checks now
+  run with `query_sem` released and do not leave the mount. New suite steps `permmatrix` (QUERY2
+  against the lower's own permission decision) and `stall` (a FUSE daemon that never answers).
 - Fixed (journal 0112): a mount that failed on an allocation kept a reference on the lower root
   (finding F8, found by syzkaller); out of memory while resolving `lower=` was reported as
   `EINVAL`; the SQLite extension could drop a condition it had declared handled, on an older

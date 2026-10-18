@@ -15,6 +15,8 @@
 #   buildrace           the first query on a domain racing with writes to it (journal 0098)
 #   release             built domains released by the budget and by the shrinker (journal 0101)
 #   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
+#   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
+#   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -24,7 +26,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1213,6 +1215,73 @@ n_user=$($BIN/sqlq --uid 1001 run $LAYER/dm "kind string" -- "SELECT count(*) FR
 [ "$n_root" = "$n_user" ] && [ "$n_root" -eq 119 ] || fail "sx-uid-count ($n_root, $n_user)"
 umount $LAYER && rm -rf $LOWER/sx && umount $LOWER || fail "sx-cleanup"
 echo "SQLEXT_PASS: $(grep -c SQLQ_SAME /tmp/sx.txt) statements equal to the ordinary table; MULTI-INDEX OR in $sx_or plans; private file never returned"
+fi
+if want permmatrix; then
+# Journal 0116: a domain answered from its partition (no per-result checks) must return a file
+# only to those who can read it on the lower, whatever the modes, owners and groups. The
+# oracle is the lower kernel (getxattr with the identity's credentials), not a copy of the
+# homogeneity rule; tests/permmatrix.c also counts the cases the rule before 0116 got wrong,
+# so the run proves the matrix reached them.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "pm-lower-mount"
+pm_wrong=0
+for seed in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    rm -rf $LOWER/pmx && mkdir -m 755 $LOWER/pmx || fail "pm-mkdir-$seed"
+    $BIN/permmatrix plant $LOWER/pmx $seed || fail "pm-plant-$seed"
+    mount -t moobfs_layer -o lower=$LOWER/pmx,domain_depth=1 none $LAYER || fail "pm-mount-$seed"
+    $BIN/permmatrix check $LAYER $LOWER/pmx > /tmp/pm.txt; rc=$?
+    cat /tmp/pm.txt
+    $BIN/query $LAYER info | grep -q 'fallback_domains=0' || { $BIN/query $LAYER info; fail "pm-fallback-$seed (the partition was not what answered)"; }
+    [ $rc -eq 0 ] || fail "pm-mismatch-$seed"
+    pm_wrong=$((pm_wrong + $(sed -n 's/.* old_rule_wrong=\([0-9]*\).*/\1/p' /tmp/pm.txt)))
+    umount $LAYER || fail "pm-umount-$seed"
+done
+[ $pm_wrong -gt 0 ] || fail "pm-no-case-of-the-old-rule (the matrix proved nothing)"
+rm -rf $LOWER/pmx && umount $LOWER || fail "pm-cleanup"
+echo "PERMMATRIX_STEP_PASS: 12 seeds, no answer the lower would refuse; $pm_wrong answers the rule before journal 0116 gave wrongly"
+fi
+if want stall && [ ! -c /dev/fuse ]; then
+    echo "STALL_SKIPPED: this kernel has no /dev/fuse (the KASAN harness has FUSE built in)"
+elif want stall; then
+# Journal 0116: in a domain with per-result checks (here after a chmod inside it), a FUSE mount
+# over one of its directories whose daemon never answers (tests/fusestall.c) must neither hold
+# the query of the domain (the check does not leave the mount) nor, through query_sem, the
+# queries of other users once a rebuild queues for writing.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "st-lower-mount"
+rm -rf $LOWER/stx && mkdir -m 755 $LOWER/stx || fail "st-mkdir"
+mount -t moobfs_layer -o lower=$LOWER/stx,domain_depth=1 none $LAYER || fail "st-mount"
+mkdir -p $LAYER/D/a $LAYER/E && : > $LAYER/D/a/f && : > $LAYER/D/top && : > $LAYER/E/g || fail "st-files"
+for f in $LAYER/D/a/f $LAYER/D/top $LAYER/E/g; do $BIN/moobfs-attr set $f kind string st > /dev/null || fail "st-attr"; done
+chown -R 1001:1001 $LAYER/D && chown -R 1002:1002 $LAYER/E || fail "st-chown"
+[ "$($BIN/query --uid 1001 $LAYER/D q2 kind exists - - | wc -l)" -eq 2 ] || fail "st-before"
+[ "$($BIN/query --uid 1002 $LAYER/E q2 kind exists - - | wc -l)" -eq 1 ] || fail "st-before-e"
+chmod 0711 $LAYER/D/a || fail "st-chmod"   # a permission change inside D: D is checked per result
+# (the chown -R above already put D and E in fallback; the chmod makes sure of D)
+$BIN/query $LAYER info | grep -q 'fallback_domains=[1-9]' || { $BIN/query $LAYER info; fail "st-no-fallback"; }
+rm -f /tmp/st.ready
+$BIN/fusestall $LAYER/D/a /tmp/st.ready & st_pid=$!
+for i in 1 2 3 4 5 6 7 8 9 10; do [ -e /tmp/st.ready ] && break; sleep 1; done
+[ -e /tmp/st.ready ] || { kill $st_pid; fail "st-fuse-not-ready"; }
+st_cleanup() { kill $st_pid 2>/dev/null; wait 2>/dev/null; umount -l $LAYER/D/a 2>/dev/null; }
+# Three queries while the FUSE mount is there: (1) one of D, (2) after a directory rename in D,
+# one that rebuilds D and so takes query_sem for writing, (3) one of E by another user. The
+# answer of (3) is checked first: it fails if a query of D waiting on FUSE kept query_sem
+# (the rebuild then waits for it and (3) behind the rebuild); (1) and (2) fail next if the
+# check of a/f entered the FUSE mount at all.
+( timeout 20 $BIN/query --uid 1001 $LAYER/D q2 kind exists - - > /tmp/st1.txt; echo $? > /tmp/st1.rc ) &
+sleep 2
+mkdir $LAYER/D/b && mv $LAYER/D/b $LAYER/D/c || { st_cleanup; fail "st-rename"; }
+( timeout 20 $BIN/query --uid 1001 $LAYER/D q2 kind exists - - > /tmp/st2.txt; echo $? > /tmp/st2.rc ) &
+sleep 2
+( timeout 20 $BIN/query --uid 1002 $LAYER/E q2 kind exists - - > /tmp/st3.txt; echo $? > /tmp/st3.rc ) &
+sleep 3
+[ -s /tmp/st3.rc ] && [ "$(cat /tmp/st3.rc)" = 0 ] && grep -q '	g$' /tmp/st3.txt || { st_cleanup; fail "st-other-user-held-up-by-a-query-waiting-on-fuse"; }
+for k in 1 2; do
+    [ -s /tmp/st$k.rc ] || { st_cleanup; fail "st-domain-query-$k-waits-on-the-fuse-mount"; }
+    [ "$(cat /tmp/st$k.rc)" = 0 ] && grep -q '	top$' /tmp/st$k.txt && ! grep -q 'a/f' /tmp/st$k.txt || { cat /tmp/st$k.txt; st_cleanup; fail "st-domain-answer-$k"; }
+done
+st_cleanup
+umount $LAYER && rm -rf $LOWER/stx && umount $LOWER || fail "st-cleanup"
+echo "STALL_PASS: a FUSE mount that never answers holds neither the checked domain nor the other users"
 fi
 rmmod moobfs_layer || fail layer-unload
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
