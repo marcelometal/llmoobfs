@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
 # Kernel diagnostics in a dmesg capture, for the VM harnesses (sourced, defines kdiag).
 #
 # kdiag FILE REGEX: prints every line of FILE matching the extended REGEX and returns 1 if
