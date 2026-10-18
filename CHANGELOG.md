@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CI (journal 0124): the big-endian run passes (60 encoding checks, 9 image tests); GitHub's arm64
+  runners have no KVM, so the arm64 job runs under emulation and, by default, only the step `ext4`.
 - CI (journal 0123): a big-endian (s390x, QEMU user mode) run of the attribute encoding and image
   tests; an exploratory KASAN job on arm64 runners (`kasan-arm64.yml`). Research on test
   infrastructure in `docs/research-test-infrastructure.md`.
