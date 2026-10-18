@@ -1,7 +1,7 @@
 # 0132 — ext4's reserve is granted as to the writer directly (finding F4 completed)
 
-Date: 2026-10-18. Status: in progress. The change is committed; the KASAN runs (the change, and
-the negative round on `main`) are dispatched. Estimated effort: S.
+Date: 2026-10-18. Status: change and negative round run under KASAN on GitHub's KVM runners;
+pull request opened. Estimated effort: S.
 
 ## Why
 
@@ -46,14 +46,21 @@ sets fsuid and fsgid.
 - `scripts/checkpatch.sh`: no findings.
 - shellcheck at every severity: no findings.
 - The FAQ page matches its source; retired claims: OK.
+- KASAN workflow on the branch (run 39168015610): `MOOBFS_KASAN_PASS`, with `LAYER_RESERVE_PASS`
+  for both reserve owners.
+- Negative round, the test alone on `main` (branch `neg/f4-test-only`, run 39168018061): the
+  run with `resuid=4242` passed, and the one with the default reserve owner failed with
+  `MOOBFS_VM_FAIL: rs-reserve-defaults`, as expected.
+- The same gap was reproduced in overlayfs on kernel 7.0.14: an ordinary user filling an ext4
+  through an overlay mounted by root used about 815 of 1146 reserved blocks, and none when
+  writing directly. Mainline (v7.3-rc7) has the same code.
 
 ## Limitations
 
-- Not run yet; KASAN on the branch and the negative round are pending.
 - A write by a new identity on a file costs one credential allocation. Repeated writes by the
   same identity reuse it.
 - Only ext4 has a reserve owner among the tested lowers. btrfs and XFS were not affected.
 
 ## Next step
 
-Record both runs here, then a pull request.
+Merge after the maintainer's review.
