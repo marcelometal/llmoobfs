@@ -273,7 +273,7 @@ the upstream kernel tarball against kernel.org's `sha256sums.asc` (the Lint job 
 
 | Pin | Copies |
 | --- | --- |
-| Upstream kernel for KASAN (`KERNEL_VERSION`, `KERNEL_SHA256`) | `.github/workflows/kasan.yml`, `.github/workflows/kasan-arm64.yml`, this file's KASAN section; `vm/kasan-local.sh` and `vm/syzkaller-local.sh` read `kasan.yml` |
+| Upstream kernel for KASAN and KCSAN (`KERNEL_VERSION`, `KERNEL_SHA256`) | `.github/workflows/kasan.yml`, `.github/workflows/kasan-arm64.yml`, `.github/workflows/kcsan.yml`, this file's KASAN section; `vm/kasan-local.sh` and `vm/syzkaller-local.sh` read `kasan.yml` |
 | checkpatch.pl tag and file hashes | `scripts/checkpatch.sh` (`TAG` follows the KASAN kernel) |
 | Debian image digest and kernel package of `make vm-test` | `vm/Dockerfile` (image and headers packages at the same version) |
 | virtme-ng and its dependencies | `vm/kasan-requirements.txt` (regenerate the hashes as its header says) |

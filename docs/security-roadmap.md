@@ -183,6 +183,9 @@ turning that rule on, and the build-time check of an unlisted kernel.
   complete.
 - *Progress, 2026-10-15 (journal 0115):* KCSAN over the stress steps `buildrace` and `release`,
   no race in the module; the rest of the suite and the other options are still to run.
+- *Progress, 2026-10-18 (journal 0127):* the KCSAN run moves to CI (`.github/workflows/kcsan.yml`,
+  on demand and weekly, a runner with KVM), with the report filter of journal 0115; it no longer
+  needs the benchmark host.
 
 ### S9. Resource limits and denial of service
 

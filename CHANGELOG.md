@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CI (journal 0127): KCSAN over the stress steps runs on GitHub with KVM (`kcsan.yml`, on demand and
+  weekly), so it no longer needs the benchmark host.
 - Issues #6, #8, #9, #12, #13, #14 and #15 closed (journal 0125): tool --help and exit status
   (docs/tools.md), manual pages, fuzz seeds, site accessibility checks, compiler matrix, pin
   checker, SPDX on every source.
