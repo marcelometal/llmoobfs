@@ -371,26 +371,50 @@ static struct dentry *moobl_lookup(struct inode *dir, struct dentry *dentry,
  * Lock the lower parent and re-lookup the lower child under that lock, as
  * ecryptfs does, so the dentry used for the mutation is current.
  */
+/*
+ * Write access on the lower mount, around every change the layer makes to the lower (journal
+ * 0117). The system call took write access on the layer's mount only; without this a change
+ * through the layer would ignore a read-only lower mount and the freeze of the lower
+ * filesystem (ext4 warns when a transaction starts on a frozen filesystem). Order, as
+ * overlayfs does with ovl_want_write(): the layer's own inode locks (taken by the VFS), then
+ * the lower's freeze protection, then the lower's inode locks.
+ */
+static int moobl_want_write(struct super_block *sb)
+{
+	return mnt_want_write(MOOBL_SB(sb)->lower.mnt);
+}
+
+static void moobl_drop_write(struct super_block *sb)
+{
+	mnt_drop_write(MOOBL_SB(sb)->lower.mnt);
+}
+
 static int moobl_lock_parent(struct dentry *dentry, struct dentry **lower_dentry,
 			     struct inode **lower_dir)
 {
 	struct dentry *lower_parent = moobl_lower_dentry(dentry->d_parent);
+	int err = moobl_want_write(dentry->d_sb);
 
+	if (err)
+		return err;
 	*lower_dir = d_inode(lower_parent);
 	inode_lock_nested(*lower_dir, I_MUTEX_PARENT);
 	*lower_dentry = lookup_one_len(dentry->d_name.name, lower_parent,
 				       dentry->d_name.len);
 	if (IS_ERR(*lower_dentry)) {
 		inode_unlock(*lower_dir);
+		moobl_drop_write(dentry->d_sb);
 		return PTR_ERR(*lower_dentry);
 	}
 	return 0;
 }
 
-static void moobl_unlock_parent(struct dentry *lower_dentry, struct inode *lower_dir)
+static void moobl_unlock_parent(struct dentry *dentry, struct dentry *lower_dentry,
+				struct inode *lower_dir)
 {
 	dput(lower_dentry);
 	inode_unlock(lower_dir);
+	moobl_drop_write(dentry->d_sb);
 }
 
 static int moobl_instantiate(struct inode *dir, struct dentry *dentry,
@@ -439,7 +463,7 @@ static int moobl_create(struct mnt_idmap *idmap, struct inode *dir,
 	err = vfs_create(&nop_mnt_idmap, lower_dir, lower_dentry, mode, excl);
 	if (!err)
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
-	moobl_unlock_parent(lower_dentry, lower_dir);
+	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
 	return err;
 }
 
@@ -458,7 +482,7 @@ static int moobl_mkdir(struct mnt_idmap *idmap, struct inode *dir,
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
 	if (!err)
 		set_nlink(dir, lower_dir->i_nlink);
-	moobl_unlock_parent(lower_dentry, lower_dir);
+	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
 	return err;
 }
 
@@ -483,7 +507,7 @@ static int moobl_unlink(struct inode *dir, struct dentry *dentry)
 		inode_set_ctime_to_ts(inode, inode_get_ctime(dir));
 	}
 	dput(lower_dentry);
-	moobl_unlock_parent(lower_dentry, lower_dir);
+	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
 	if (!err && !inode->i_nlink)
 		moobl_index_drop_inode(dir->i_sb, inode->i_ino);
 	return err;
@@ -509,7 +533,7 @@ static int moobl_rmdir(struct inode *dir, struct dentry *dentry)
 		clear_nlink(d_inode(dentry));
 	}
 	dput(lower_dentry);
-	moobl_unlock_parent(lower_dentry, lower_dir);
+	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
 	if (!err) {
 		moobl_index_drop_inode(dir->i_sb, d_inode(dentry)->i_ino);
 		d_drop(dentry);
@@ -547,10 +571,13 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 		err = -EXDEV;
 		goto out_put;
 	}
+	err = moobl_want_write(old_dir->i_sb);
+	if (err)
+		goto out_put;
 	trap = lock_rename(lower_old_dir, lower_new_dir);
 	if (IS_ERR(trap)) {
 		err = PTR_ERR(trap);
-		goto out_put;
+		goto out_drop;
 	}
 	/*
 	 * Re-look up the target under the parents' locks, as create does (moobl_lock_parent): a
@@ -603,6 +630,8 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 		moobl_index_renamed(old_dir->i_sb, new_dentry, old_dentry);
 out_unlock:
 	unlock_rename(lower_old_dir, lower_new_dir);
+out_drop:
+	moobl_drop_write(old_dir->i_sb);
 out_put:
 	if (lower_new)
 		dput(lower_new);
@@ -628,7 +657,7 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 		err = moobl_instantiate(dir, new_dentry, lower_dentry, lower_dir);
 	if (!err)
 		set_nlink(inode, moobl_lower_inode(inode)->i_nlink);
-	moobl_unlock_parent(lower_dentry, lower_dir);
+	moobl_unlock_parent(new_dentry, lower_dentry, lower_dir);
 	if (!err) {
 		moobl_index_linked(dir->i_sb, new_dentry);
 		moobl_index_perm_changed(dir->i_sb, old_dentry);	/* nlink > 1: heterogeneous */
@@ -651,7 +680,7 @@ static int moobl_symlink(struct mnt_idmap *idmap, struct inode *dir,
 	err = vfs_symlink(&nop_mnt_idmap, lower_dir, lower_dentry, symname);
 	if (!err)
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
-	moobl_unlock_parent(lower_dentry, lower_dir);
+	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
 	return err;
 }
 
@@ -701,7 +730,11 @@ static int moobl_fileattr_set(struct mnt_idmap *idmap, struct dentry *dentry,
 	/* names in this dentry cache are case-sensitive; a lower directory must stay so */
 	if (fa->flags_valid && ((fa->flags ^ old.flags) & FS_CASEFOLD_FL))
 		return -EOPNOTSUPP;
+	err = moobl_want_write(dentry->d_sb);
+	if (err)
+		return err;
 	err = vfs_fileattr_set(&nop_mnt_idmap, lower, fa);
+	moobl_drop_write(dentry->d_sb);
 	if (!err)
 		moobl_copy_attr(d_inode(dentry), d_inode(lower));
 	return err;
@@ -720,10 +753,14 @@ static int moobl_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 	struct dentry *lower = moobl_lower_dentry(dentry);
 	int err;
 
+	err = moobl_want_write(dentry->d_sb);
+	if (err)
+		return err;
 	if (acl)
 		err = vfs_set_acl(&nop_mnt_idmap, lower, posix_acl_xattr_name(type), acl);
 	else
 		err = vfs_remove_acl(&nop_mnt_idmap, lower, posix_acl_xattr_name(type));
+	moobl_drop_write(dentry->d_sb);
 	if (!err) {
 		moobl_copy_attr(d_inode(dentry), d_inode(lower));
 		if (type == ACL_TYPE_ACCESS)
@@ -840,6 +877,9 @@ static int moobl_xattr_set(const struct xattr_handler *handler, struct mnt_idmap
 		if (err)
 			return err;
 	}
+	err = moobl_want_write(dentry->d_sb);
+	if (err)
+		return err;
 	if (value) {
 		err = vfs_setxattr(&nop_mnt_idmap, lower, full, value, size, flags);
 	} else if (!strcmp(full, XATTR_NAME_CAPS)) {
@@ -856,6 +896,7 @@ static int moobl_xattr_set(const struct xattr_handler *handler, struct mnt_idmap
 	} else {
 		err = vfs_removexattr(&nop_mnt_idmap, lower, full);
 	}
+	moobl_drop_write(dentry->d_sb);
 	if (err)
 		return err;
 	moobl_copy_attr(inode, d_inode(lower));
@@ -930,9 +971,13 @@ static int moobl_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
 	 */
 	if (lower_ia.ia_valid & (ATTR_KILL_SUID | ATTR_KILL_SGID))
 		lower_ia.ia_valid &= ~ATTR_MODE;
+	err = moobl_want_write(dentry->d_sb);
+	if (err)
+		return err;
 	inode_lock(lower_inode);
 	err = notify_change(&nop_mnt_idmap, lower_dentry, &lower_ia, NULL);
 	inode_unlock(lower_inode);
+	moobl_drop_write(dentry->d_sb);
 	if (!err) {
 		moobl_copy_attr(inode, lower_inode);
 		if (ia->ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID))
@@ -1306,6 +1351,53 @@ static const struct fs_parameter_spec moobl_params[] = {
 	{}
 };
 
+/*
+ * An option given on remount through the new mount API, already parsed into ctx: accepted when
+ * it equals the mounted value, refused otherwise. libmount sends every option of the mount's
+ * mountinfo line again on "mount -o remount,ro" (fspick, then fsconfig for each), so refusing
+ * them all made every remount fail with util-linux 2.41 (journal 0118); a change is still
+ * never accepted and dropped (journal 0106). NFS compares in the same way
+ * (nfs_compare_remount_data). lower= is compared as the directory it resolves to, since
+ * mountinfo prints it with seq_path.
+ */
+static int moobl_reconf_same(struct fs_context *fc, struct moobl_fc *ctx, int opt,
+			     const char *key)
+{
+	struct moobl_sb *sbi = MOOBL_SB(fc->root->d_sb);
+	struct path p;
+	bool same;
+	int err;
+
+	switch (opt) {
+	case Opt_lower:
+		err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &p);
+		if (err == -ENOMEM)
+			return err;
+		same = !err && path_equal(&p, &sbi->lower);
+		if (!err)
+			path_put(&p);
+		break;
+	case Opt_nolinks:
+		same = sbi->nolinks;
+		break;
+	case Opt_noindex:
+		same = !sbi->index.enabled;
+		break;
+	case Opt_index_budget:
+		same = ctx->index_budget == sbi->index.budget;
+		break;
+	case Opt_domain_depth:
+		same = (unsigned int)ctx->domain_depth == sbi->index.domain_depth;
+		break;
+	case Opt_index_idle:
+		same = (unsigned int)ctx->index_idle == sbi->index.idle;
+		break;
+	default:
+		same = false;
+	}
+	return same ? 0 : invalfc(fc, "%s cannot be changed on remount", key);
+}
+
 static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 {
 	struct moobl_fc *ctx = fc->fs_private;
@@ -1314,14 +1406,12 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 
 	/*
 	 * No option can change on remount (read-only and read-write are the VFS's). As overlayfs
-	 * does: the old mount(2) API passes the current options again and they are ignored; the
-	 * new API is told, instead of having a change accepted and dropped (journal 0106).
+	 * does, the old mount(2) API passes the current options again and they are ignored. The
+	 * new API is told about a change instead of having it accepted and dropped (journal
+	 * 0106), and an option repeated with its current value is accepted (journal 0118).
 	 */
-	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE) {
-		if (fc->oldapi)
-			return 0;
-		return invalfc(fc, "No changes allowed in reconfigure");
-	}
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE && fc->oldapi)
+		return 0;
 	opt = fs_parse(fc, moobl_params, param, &result);
 	if (opt < 0)
 		return opt;
@@ -1357,6 +1447,8 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		ctx->index_idle = (int)result.uint_32;
 		break;
 	}
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE)
+		return moobl_reconf_same(fc, ctx, opt, param->key);
 	return 0;
 }
 
@@ -1387,6 +1479,13 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	}
 	if (sbi->lower.dentry->d_sb->s_magic == MOOBL_SUPER_MAGIC)
 		return invalfc(fc, "lower cannot be another moobfs_layer mount");
+	/*
+	 * The layer passes the lower's ids through unmapped (nop_mnt_idmap): on an idmapped
+	 * lower mount its checks would use the on-disk ids, not the ones that mount shows, and a
+	 * caller could act on files the lower mount gives to someone else (journal 0117).
+	 */
+	if (is_idmapped_mnt(sbi->lower.mnt))
+		return invalfc(fc, "lower cannot be an idmapped mount");
 	sb->s_stack_depth = sbi->lower.dentry->d_sb->s_stack_depth + 1;
 	{
 		struct kstat st;

@@ -100,6 +100,8 @@ cp bench/sqlbase.sh "$STAGE/bench-sqlbase.sh" && cp bench/equiv.sh "$STAGE/bench
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o "$STAGE/query"
 gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o "$STAGE/ipc"
 gcc -static -O2 -Wall -Wextra -Werror tests/reconf.c -o "$STAGE/reconf"
+gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/permmatrix.c -o "$STAGE/permmatrix"
+gcc -static -O2 -Wall -Wextra -Werror tests/fusestall.c -o "$STAGE/fusestall"
 gcc -static -O2 -Wall -Wextra -Werror -Iinclude -DSQLITE_CORE tests/sqlq.c sqlite/moobfs_vtab.c common/attr.c -lsqlite3 -lm -ldl -lpthread -o "$STAGE/sqlq"
 gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o "$STAGE/idmap"
 gcc -static -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o "$STAGE/fsx"

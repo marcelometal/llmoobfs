@@ -170,6 +170,14 @@ loop; the workflow on the pull request stays the required check.
 table (`sqlite/`) with an ordinary SQLite table filled from the lower filesystem, statement by
 statement, and prints each plan. Marker: `SQLEXT_PASS`. It is part of the complete run.
 
+### Read-only, frozen and idmapped lower
+
+`MOOB_ONLY=lowerro make vm-test` (journal 0117) gives the layer a read-only bind mount as lower
+(every change must fail with `EROFS`, the lower unchanged), freezes the lower ext4 (a create, a
+`chmod` and an attribute set must wait for the thaw with no kernel warning) and gives it an
+idmapped bind mount (refused at mount; skipped where `mount` cannot create one, as in the
+busybox initramfs). Marker: `LOWERRO_PASS`. It is part of the complete run.
+
 ### SELinux
 
 `sh vm/selinux-local.sh` (journal 0104) runs, on a Debian host with KVM and the module built,
