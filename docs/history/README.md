@@ -143,3 +143,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0119 — The journey on the site, in English and Portuguese (ADR-0015)](0119-journey-pages.md)
 - [0122 — Every public surface kept in step with the project's state](0122-public-surfaces-rule.md)
 - [0123 — How comparable projects get test hardware; a big-endian run and an arm64 job](0123-test-infrastructure-research.md)
+- [0124 — Big-endian tests pass; GitHub's arm64 runners have no KVM](0124-big-endian-pass-arm64-without-kvm.md)

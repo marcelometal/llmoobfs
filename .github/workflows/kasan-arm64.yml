@@ -2,9 +2,15 @@ name: KASAN and lockdep (arm64, exploratory)
 # The KASAN/lockdep job of kasan.yml on GitHub's arm64 runners, free for public repositories since
 # August 2025: a second architecture for the module (journal 0123). Not a required check; on demand
 # and weekly, until it is known whether these runners give QEMU KVM and how long a run takes. Kept
-# in step with kasan.yml by hand: the build and run steps are the same.
+# in step with kasan.yml by hand: the build and run steps are the same. The first run (2026-10-18,
+# journal 0124) found no /dev/kvm on these runners, so the guest runs under emulation (TCG) and,
+# by default, only the suite step ext4; the weekly run uses that default too.
 on:
   workflow_dispatch:
+    inputs:
+      steps:
+        description: 'MOOB_ONLY steps of vm/suite.sh (empty means ext4; under emulation the whole suite does not fit the time limit)'
+        default: 'ext4'
   schedule:
     - cron: '47 5 * * 1'
 permissions:
@@ -19,7 +25,7 @@ jobs:
   kasan:
     name: Layer suite under KASAN/lockdep (arm64)
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 150
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,7 +48,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          ls -la /dev/kvm
+          ls -la /dev/kvm || true
           if [ -w /dev/kvm ]; then echo "KVM usable"; else echo "no KVM: QEMU will use TCG"; fi
       - name: Fetch and verify the kernel source
         run: |
@@ -79,6 +85,8 @@ jobs:
           truncate -s 300M build/vng/lower-xfs.img && mkfs.xfs -q -f -L moob-lower build/vng/lower-xfs.img
           truncate -s 64M build/vng/scratch.img build/vng/log.img
       - name: Run the layer suite inside the KASAN kernel
+        env:
+          MOOB_ONLY: ${{ github.event.inputs.steps || 'ext4' }}
         run: |
           cd build/linux
           R="$GITHUB_WORKSPACE"
@@ -89,12 +97,12 @@ jobs:
               --rwdir "$R/build" \
               --disk "$R/build/vng/lower-ext4.img" --disk "$R/build/vng/lower-btrfs.img" \
               --disk "$R/build/vng/lower-xfs.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/log.img" \
-              --exec "sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
+              --exec "MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
             cp "$R/build/vng/console-$attempt.log" "$R/build/vng/console.log"
             grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log" || break
             echo "attempt $attempt: boot-time diagnostic of the debug kernel; retrying once"
           done
-          grep -q '^MOOBFS_KASAN_PASS:' "$R/build/vng/console.log"
+          grep -qE '^MOOBFS_KASAN(_ONLY)?_PASS:' "$R/build/vng/console.log"
           # a negated command outside a condition does not stop a bash -e step (SC2251)
           if grep -q '^MOOBFS_VM_FAIL:' "$R/build/vng/console.log"; then exit 1; fi
           if grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log"; then exit 1; fi

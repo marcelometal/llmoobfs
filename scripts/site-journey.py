@@ -80,7 +80,7 @@ T = {
    updated='Atualizado em'),
 }
 
-UPDATED = '2026-10-17'
+UPDATED = '2026-10-18'
 
 STATUS = [
  ('What does it do that existing filesystems do not? Why is FUSE not enough?',
@@ -105,7 +105,7 @@ STATUS = [
  ('Users', 'Usuários',
   f'Test clients only: an agent-memory tool and a LangGraph store, both with answers equal to their own storage ({j("0088")}, {j("0089")}). No production users; it is not ready for them.',
   f'Só clientes de teste: uma ferramenta de memória para agentes e um store do LangGraph, os dois com respostas iguais às do armazenamento deles ({j("0088")}, {j("0089")}). Nenhum usuário em produção; o projeto não está pronto para isso.'),
- ('Kernel versions', 'Versões do kernel', 'One series, 6.12, on x86-64, in virtual machines.', 'Uma série, 6.12, em x86-64, em máquinas virtuais.'),
+ ('Kernel versions and architectures', 'Versões do kernel e arquiteturas', f'One series, 6.12, on x86-64, in virtual machines. The attribute encoding and the image tools also pass their tests on big-endian s390x under emulation, on every pull request; arm64 runs under emulation, without KVM, are being measured ({j("0124")}).', f'Uma série, 6.12, em x86-64, em máquinas virtuais. A codificação de atributos e as ferramentas de imagem também passam nos testes em s390x big-endian, com emulação, em todo pull request; execuções em arm64, com emulação e sem KVM, estão sendo medidas ({j("0124")}).'),
  ('Security', 'Segurança',
   f'A written threat model ({adr("0011")}) with every finding recorded; private reporting through <a href="{GH}SECURITY.md">SECURITY.md</a>.',
   f'Um modelo de ameaças escrito ({adr("0011")}) com cada achado registrado; relato privado pelo <a href="{GH}SECURITY.md">SECURITY.md</a>.'),
