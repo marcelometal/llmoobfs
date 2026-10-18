@@ -20,6 +20,7 @@ accepted but may be only partly implemented, and only the journals and
 | [faq.md](faq.md) | EN | Short sourced answers to common questions |
 | [help-wanted.md](help-wanted.md) | EN | What would help most, by how much kernel knowledge it takes |
 | [development.md](development.md) | EN | Environment setup, `make` targets, devcontainer, lint and checkpatch |
+| [tools.md](tools.md) | EN | `moobfs-attr` and `moobfs-check`: synopsis, diagnostics and exit status |
 | [testing.md](testing.md) | EN | What each test runs, its success markers, and what they do not prove |
 | [research-test-infrastructure.md](research-test-infrastructure.md) | EN | How comparable projects get test hardware; resources open to MoobFS (journal 0123) |
 | [public-surfaces.md](public-surfaces.md) | EN | Every place that states the project's state, and when each must be updated (journal 0122) |
