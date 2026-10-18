@@ -43,7 +43,8 @@ static int reach_ok(const char *path, const struct stat *st, int want_read)
 	mode_t o = want_read ? S_IROTH : S_IXOTH;
 	int acl = has_acl(path);
 
-	if (!acl && (st->st_mode & o))
+	/* every class: the kernel never judges owner or group by the bits of others */
+	if (!acl && (st->st_mode & (u | g | o)) == (u | g | o))
 		return 1;
 	if (acl || dom_acl || st->st_uid != dom_st.st_uid || st->st_gid != dom_st.st_gid)
 		return 0;

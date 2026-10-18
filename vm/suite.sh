@@ -15,6 +15,10 @@
 #   buildrace           the first query on a domain racing with writes to it (journal 0098)
 #   release             built domains released by the budget and by the shrinker (journal 0101)
 #   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
+#   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
+#   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
+#   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
+#   bigdir              a domain built from a directory larger than one read batch (journal 0120)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -24,7 +28,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -205,14 +209,21 @@ run_lower() {
     # (journal 0105): before, with domain_depth=0, it built the whole index first
     [ "$($BIN/query --uid 1001 $LAYER v1bad)" = "q1 22" ] || fail "v1-bad-request-$fs"
     [ "$($BIN/query $LAYER info | sed -n 's/^domains_built=\([0-9]*\) .*/\1/p')" = 0 ] || fail "v1-bad-request-built-$fs"
+    # a typed attribute on a write-only file, set by its owner: the lower accepts it, so must the
+    # layer (review item 7, journal 0120)
+    : > $LAYER/wo.md && chown 1001:1001 $LAYER/wo.md && chmod 0200 $LAYER/wo.md || fail "wo-setup-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER xset $LAYER/wo.md kind decision)" = "xset 0" ] || fail "typed-attr-write-only-refused-$fs"
+    [ "$($BIN/moobfs-attr get $LOWER/wo.md kind)" = "$(printf 'kind\tstring\tdecision')" ] || fail "wo-lower-$fs"
+    rm -f $LAYER/wo.md || fail "wo-cleanup-$fs"
     # remount (journal 0106): read-only refuses writes and read-write restores them; an option
     # given on remount through mount(2) is ignored, as overlayfs does, and through the new mount
-    # API (fsconfig) refused
+    # API (fsconfig) refused when it changes the mount, accepted when it repeats the current
+    # value, as libmount does on every remount (util-linux 2.41, journal 0118)
     mount -o remount,ro $LAYER || fail "remount-ro-$fs"
     touch $LAYER/ro-probe 2> /dev/null && fail "remount-ro-writable-$fs"
     mount -o remount,rw $LAYER || fail "remount-rw-$fs"
     touch $LAYER/ro-probe && rm $LAYER/ro-probe || fail "remount-rw-not-writable-$fs"
-    $BIN/reconf $LAYER > /dev/null || fail "remount-fsconfig-change-accepted-$fs"
+    $BIN/reconf $LAYER $LOWER 0 || fail "remount-fsconfig-$fs"
     grep " $LAYER " /proc/mounts | grep -q "index_budget" && fail "remount-option-changed-$fs"
     rm -rf $LAYER/r || fail "q-cleanup-$fs"
     # isolation (M3 phase 3b): two users, two namespaces; QUERY as each user must equal the
@@ -1131,10 +1142,68 @@ for fs in ext4 btrfs xfs; do
     echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
 fi
+if want lowerro; then
+# The layer takes write access on the lower mount for every change it makes there (journal 0117):
+# a read-only lower mount refuses them as it would refuse the caller directly, and the freeze of
+# the lower filesystem holds them back instead of reaching ext4 frozen (which warns). An
+# idmapped lower mount is refused at mount.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "lr-lower-mount"
+rm -rf $LOWER/lr && mkdir -m 755 $LOWER/lr $LOWER/lr/d $LOWER/lr/gone || fail "lr-mkdir"
+echo keep > $LOWER/lr/d/f && chmod 644 $LOWER/lr/d/f || fail "lr-file"
+lr_state() { (cd $LOWER/lr && find . | sort && stat -c '%a %s %n' d/f && $BIN/moobfs-attr list d/f); }
+lr_state > /tmp/lr.before 2>&1
+mkdir -p /tmp/moob-ro
+mount --bind $LOWER/lr /tmp/moob-ro && mount -o remount,bind,ro /tmp/moob-ro || fail "lr-ro-bind"
+touch /tmp/moob-ro/x 2>/dev/null && fail "lr-ro-bind-is-writable (the test would prove nothing)"
+mount -t moobfs_layer -o lower=/tmp/moob-ro none $LAYER || fail "lr-ro-layer-mount"
+cat $LAYER/d/f > /dev/null || fail "lr-ro-read"
+for op in "touch $LAYER/d/new" "mkdir $LAYER/d/sub" "ln -s f $LAYER/d/l" "mv $LAYER/d/f $LAYER/d/g" \
+          "rm $LAYER/d/f" "rmdir $LAYER/gone" "chmod 600 $LAYER/d/f" "truncate -s 0 $LAYER/d/f" \
+          "$BIN/moobfs-attr set $LAYER/d/f kind string note"; do
+    # shellcheck disable=SC2086
+    if $op 2> /tmp/lr.err; then fail "lr-ro-accepted: $op"; fi
+    grep -qi 'read-only' /tmp/lr.err || { cat /tmp/lr.err; fail "lr-ro-not-erofs: $op"; }
+done
+umount $LAYER && umount /tmp/moob-ro || fail "lr-ro-umount"
+lr_state > /tmp/lr.after 2>&1
+cmp -s /tmp/lr.before /tmp/lr.after || { diff /tmp/lr.before /tmp/lr.after; fail "lr-ro-lower-changed"; }
+# frozen lower: each change waits for the thaw, with no kernel warning meanwhile
+mount -t moobfs_layer -o lower=$LOWER/lr none $LAYER || fail "lr-fz-layer-mount"
+echo "moobfs-suite: lowerro freeze" > /dev/kmsg
+fsfreeze --freeze $LOWER || fail "lr-fz-freeze"
+rm -f /tmp/lr.done.*
+(touch $LAYER/d/new && echo ok > /tmp/lr.done.create) &
+(chmod 600 $LAYER/d/f && echo ok > /tmp/lr.done.setattr) &
+($BIN/moobfs-attr set $LAYER/gone kind string note > /dev/null && echo ok > /tmp/lr.done.xattr) &
+sleep 2
+lr_early=$(ls /tmp/lr.done.* 2>/dev/null)
+lr_warn=$(dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -E '\] WARNING:|^WARNING:|BUG:' | head -3)
+fsfreeze --unfreeze $LOWER || fail "lr-fz-thaw"
+wait
+[ -z "$lr_warn" ] || { dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -E -A15 '\] WARNING:|^WARNING:' | head -40; fail "lr-fz-kernel-warning"; }
+[ -z "$lr_early" ] || fail "lr-fz-change-completed-while-frozen: $lr_early"
+for k in create setattr xattr; do [ -f /tmp/lr.done.$k ] || fail "lr-fz-$k-failed-after-thaw"; done
+[ -f $LOWER/lr/d/new ] && [ "$(stat -c %a $LOWER/lr/d/f)" = 600 ] || fail "lr-fz-lower-not-changed-after-thaw"
+umount $LAYER || fail "lr-fz-umount"
+# idmapped lower: refused (needs util-linux mount with X-mount.idmap, 2.39 or later)
+if mount -V 2>/dev/null | grep -q util-linux && mount --bind -o X-mount.idmap=b:0:10000:65536 $LOWER/lr /tmp/moob-ro 2>/dev/null; then
+    if mount -t moobfs_layer -o lower=/tmp/moob-ro none $LAYER 2> /tmp/lr.err; then umount $LAYER; fail "lr-idmapped-lower-accepted"; fi
+    # the new mount API hands the message to mount(8); mount(2) logs it in the kernel log
+    { cat /tmp/lr.err; dmesg | tail -20; } | grep -q 'lower cannot be an idmapped mount' || { cat /tmp/lr.err; fail "lr-idmapped-no-message"; }
+    umount /tmp/moob-ro || fail "lr-idmap-umount"
+    lr_idmap=refused
+else
+    lr_idmap="not tested (no idmapped bind mount here)"
+fi
+rm -rf $LOWER/lr && umount $LOWER || fail "lr-cleanup"
+echo "LOWERRO_PASS: read-only lower mount refused 9 changes with EROFS, lower unchanged; 3 changes waited for the thaw of a frozen lower, no kernel warning; idmapped lower: $lr_idmap"
+fi
 if want sqlext; then
 # The moobfs SQLite virtual table (ADR-0013, journal 0108): every statement is run on the virtual
 # table over a domain and on an ordinary table filled from the lower filesystem; the rows must be
-# equal. The query plans are printed, to see what SQLite hands to the module.
+# equal. The query plans are printed, to see what SQLite hands to the module. The COLLATE NOCASE
+# statements return rows only when the condition stays SQLite's: the kernel compares bytes
+# (journal 0120).
 mount -t ext4 "$DEV_EXT4" $LOWER || fail "sx-lower-mount"
 rm -rf $LOWER/sx && mkdir -m 755 $LOWER/sx || fail "sx-mkdir"
 mount -t moobfs_layer -o lower=$LOWER/sx none $LAYER || fail "sx-mount"
@@ -1186,6 +1255,9 @@ sx "SELECT rowid, path, kind, agent, created, score, weight, flag, title FROM {T
    "SELECT path FROM {T} WHERE kind = 'note' AND kind = 'fact'" \
    "SELECT path FROM {T} WHERE flag = 1 AND kind = 'note' AND agent = 'a3' AND score >= 2 AND created > 5000" \
    "SELECT a.path, b.path FROM {T} a JOIN {T} b ON a.agent = b.agent WHERE b.path = 'f1' AND a.kind = 'note'" \
+   "SELECT path FROM {T} WHERE kind = 'NOTE' COLLATE NOCASE" \
+   "SELECT path FROM {T} WHERE kind COLLATE NOCASE IN ('Note', 'FACT') AND agent = 'a2'" \
+   "SELECT path, title FROM {T} WHERE title >= 'TITLE 5' COLLATE NOCASE AND title < 'TITLE 6' COLLATE NOCASE" \
    > /tmp/sx.txt 2>&1 || { cat /tmp/sx.txt; fail "sx-differs"; }
 grep -q SQLQ_COMPARE_DONE /tmp/sx.txt || { cat /tmp/sx.txt; fail "sx-incomplete"; }
 # with created declared required, the newest N are the kernel's ordered scan with its limit
@@ -1214,8 +1286,106 @@ n_user=$($BIN/sqlq --uid 1001 run $LAYER/dm "kind string" -- "SELECT count(*) FR
 umount $LAYER && rm -rf $LOWER/sx && umount $LOWER || fail "sx-cleanup"
 echo "SQLEXT_PASS: $(grep -c SQLQ_SAME /tmp/sx.txt) statements equal to the ordinary table; MULTI-INDEX OR in $sx_or plans; private file never returned"
 fi
+if want permmatrix; then
+# Journal 0116: a domain answered from its partition (no per-result checks) must return a file
+# only to those who can read it on the lower, whatever the modes, owners and groups. The
+# oracle is the lower kernel (getxattr with the identity's credentials), not a copy of the
+# homogeneity rule; tests/permmatrix.c also counts the cases the rule before 0116 got wrong,
+# so the run proves the matrix reached them.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "pm-lower-mount"
+pm_wrong=0
+for seed in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    rm -rf $LOWER/pmx && mkdir -m 755 $LOWER/pmx || fail "pm-mkdir-$seed"
+    $BIN/permmatrix plant $LOWER/pmx $seed || fail "pm-plant-$seed"
+    mount -t moobfs_layer -o lower=$LOWER/pmx,domain_depth=1 none $LAYER || fail "pm-mount-$seed"
+    $BIN/permmatrix check $LAYER $LOWER/pmx > /tmp/pm.txt; rc=$?
+    cat /tmp/pm.txt
+    $BIN/query $LAYER info | grep -q 'fallback_domains=0' || { $BIN/query $LAYER info; fail "pm-fallback-$seed (the partition was not what answered)"; }
+    [ $rc -eq 0 ] || fail "pm-mismatch-$seed"
+    pm_wrong=$((pm_wrong + $(sed -n 's/.* old_rule_wrong=\([0-9]*\).*/\1/p' /tmp/pm.txt)))
+    umount $LAYER || fail "pm-umount-$seed"
+done
+[ $pm_wrong -gt 0 ] || fail "pm-no-case-of-the-old-rule (the matrix proved nothing)"
+rm -rf $LOWER/pmx && umount $LOWER || fail "pm-cleanup"
+echo "PERMMATRIX_STEP_PASS: 12 seeds, no answer the lower would refuse; $pm_wrong answers the rule before journal 0116 gave wrongly"
+fi
+if want stall && [ ! -c /dev/fuse ]; then
+    echo "STALL_SKIPPED: this kernel has no /dev/fuse (the KASAN harness has FUSE built in)"
+elif want stall; then
+# Journal 0116: in a domain with per-result checks (here after a chmod inside it), a FUSE mount
+# over one of its directories whose daemon never answers (tests/fusestall.c) must neither hold
+# the query of the domain (the check does not leave the mount) nor, through query_sem, the
+# queries of other users once a rebuild queues for writing.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "st-lower-mount"
+rm -rf $LOWER/stx && mkdir -m 755 $LOWER/stx || fail "st-mkdir"
+mount -t moobfs_layer -o lower=$LOWER/stx,domain_depth=1 none $LAYER || fail "st-mount"
+mkdir -p $LAYER/D/a $LAYER/E && : > $LAYER/D/a/f && : > $LAYER/D/top && : > $LAYER/E/g || fail "st-files"
+for f in $LAYER/D/a/f $LAYER/D/top $LAYER/E/g; do $BIN/moobfs-attr set $f kind string st > /dev/null || fail "st-attr"; done
+chown -R 1001:1001 $LAYER/D && chown -R 1002:1002 $LAYER/E || fail "st-chown"
+[ "$($BIN/query --uid 1001 $LAYER/D q2 kind exists - - | wc -l)" -eq 2 ] || fail "st-before"
+[ "$($BIN/query --uid 1002 $LAYER/E q2 kind exists - - | wc -l)" -eq 1 ] || fail "st-before-e"
+chmod 0711 $LAYER/D/a || fail "st-chmod"   # a permission change inside D: D is checked per result
+# (the chown -R above already put D and E in fallback; the chmod makes sure of D)
+$BIN/query $LAYER info | grep -q 'fallback_domains=[1-9]' || { $BIN/query $LAYER info; fail "st-no-fallback"; }
+rm -f /tmp/st.ready
+$BIN/fusestall $LAYER/D/a /tmp/st.ready & st_pid=$!
+for i in 1 2 3 4 5 6 7 8 9 10; do [ -e /tmp/st.ready ] && break; sleep 1; done
+[ -e /tmp/st.ready ] || { kill $st_pid; fail "st-fuse-not-ready"; }
+st_cleanup() { kill $st_pid 2>/dev/null; wait 2>/dev/null; umount -l $LAYER/D/a 2>/dev/null; }
+# Three queries while the FUSE mount is there: (1) one of D, (2) after a directory rename in D,
+# one that rebuilds D and so takes query_sem for writing, (3) one of E by another user. The
+# answer of (3) is checked first: it fails if a query of D waiting on FUSE kept query_sem
+# (the rebuild then waits for it and (3) behind the rebuild); (1) and (2) fail next if the
+# check of a/f entered the FUSE mount at all.
+( timeout 20 $BIN/query --uid 1001 $LAYER/D q2 kind exists - - > /tmp/st1.txt; echo $? > /tmp/st1.rc ) &
+sleep 2
+mkdir $LAYER/D/b && mv $LAYER/D/b $LAYER/D/c || { st_cleanup; fail "st-rename"; }
+( timeout 20 $BIN/query --uid 1001 $LAYER/D q2 kind exists - - > /tmp/st2.txt; echo $? > /tmp/st2.rc ) &
+sleep 2
+( timeout 20 $BIN/query --uid 1002 $LAYER/E q2 kind exists - - > /tmp/st3.txt; echo $? > /tmp/st3.rc ) &
+sleep 3
+[ -s /tmp/st3.rc ] && [ "$(cat /tmp/st3.rc)" = 0 ] && grep -q '	g$' /tmp/st3.txt || { st_cleanup; fail "st-other-user-held-up-by-a-query-waiting-on-fuse"; }
+for k in 1 2; do
+    [ -s /tmp/st$k.rc ] || { st_cleanup; fail "st-domain-query-$k-waits-on-the-fuse-mount"; }
+    [ "$(cat /tmp/st$k.rc)" = 0 ] && grep -q '	top$' /tmp/st$k.txt && ! grep -q 'a/f' /tmp/st$k.txt || { cat /tmp/st$k.txt; st_cleanup; fail "st-domain-answer-$k"; }
+done
+st_cleanup
+umount $LAYER && rm -rf $LOWER/stx && umount $LOWER || fail "st-cleanup"
+echo "STALL_PASS: a FUSE mount that never answers holds neither the checked domain nor the other users"
+fi
+if want bigdir; then
+# Journal 0120: a build reads a directory in batches of 1024 names (MOOBL_SCAN_BATCH) instead of
+# holding its whole listing. A domain whose one directory holds 3000 entries, planted on the lower
+# and built by the first query, must equal the oracle: no name lost or doubled between batches.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "bd-lower-mount"
+rm -rf $LOWER/bdx && mkdir -m 755 $LOWER/bdx && mkdir -p $LOWER/bdx/big/sub || fail "bd-mkdir"
+i=0
+while [ $i -lt 3000 ]; do
+    f=$LOWER/bdx/big/$(printf 'memory-with-a-long-name-%04d' $i)
+    : > $f || fail "bd-file"
+    [ $((i % 6)) -eq 0 ] || $BIN/moobfs-attr set $f kind string k$((i % 3)) > /dev/null || fail "bd-attr"
+    i=$((i + 1))
+done
+: > $LOWER/bdx/big/sub/inner && $BIN/moobfs-attr set $LOWER/bdx/big/sub/inner kind string k1 > /dev/null || fail "bd-inner"
+mount -t moobfs_layer -o lower=$LOWER/bdx,domain_depth=1 none $LAYER || fail "bd-mount"
+for q in "kind exists - -" "kind eq string k1"; do
+    # shellcheck disable=SC2086
+    $BIN/query $LAYER/big q2 $q | cut -f2 | sort > /tmp/bd.k || fail "bd-query"
+    # shellcheck disable=SC2086
+    $BIN/moobfs-index --domain $LOWER/bdx/big $q | cut -f2 | sort > /tmp/bd.o || fail "bd-oracle"
+    cmp -s /tmp/bd.k /tmp/bd.o || { echo "kernel $(wc -l < /tmp/bd.k) oracle $(wc -l < /tmp/bd.o)"; diff /tmp/bd.k /tmp/bd.o | head -5; fail "bd-differs-from-oracle"; }
+done
+[ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
+umount $LAYER && rm -rf $LOWER/bdx && umount $LOWER || fail "bd-cleanup"
+echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
+fi
 rmmod moobfs_layer || fail layer-unload
-if dmesg | grep -E 'BUG:|Oops:|\] WARNING:|^WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
+# under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
+# the layer; the initramfs harness has no KCSAN and keeps the plain grep
+if command -v kdiag > /dev/null 2>&1; then
+    dmesg > /tmp/kdiag-layer.txt
+    kdiag /tmp/kdiag-layer.txt 'BUG:|Oops:|^WARNING:|Kernel panic|KASAN:' || fail kernel-diagnostic-layer
+elif dmesg | grep -E 'BUG:|Oops:|\] WARNING:|^WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
 if [ -n "${MOOB_ONLY:-}" ]; then
     echo "MOOBFS_ONLY_PASS: steps $MOOB_ONLY (not a complete run)"
 else

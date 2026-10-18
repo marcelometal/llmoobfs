@@ -44,7 +44,8 @@ static const char *reach_why(const char *path, const struct stat *st, const stru
 	mode_t o = want_read ? S_IROTH : S_IXOTH;
 	int acl = has_acl(path);
 
-	if (!acl && (st->st_mode & o))
+	/* every class: the kernel never judges owner or group by the bits of others */
+	if (!acl && (st->st_mode & (u | g | o)) == (u | g | o))
 		return NULL;
 	if (acl)
 		return "has an access ACL";
