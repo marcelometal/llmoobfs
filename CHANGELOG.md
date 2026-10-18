@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed (journal 0130, ADR-0016, not yet run): an index update that failed after the lower
+- Fixed (journal 0130, ADR-0016): an index update that failed after the lower
   write (budget full) left queries answering without the file until remount, flagged only in
   `GET_INFO`; now only that domain is built again by its next query.
 - Shell scripts in `vm/` and `scripts/` pass shellcheck at every severity, which `make lint` and CI

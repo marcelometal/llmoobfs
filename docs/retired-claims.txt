@@ -24,3 +24,4 @@ findings F1 to F8
 sem syzkaller
 ainda sem revisão externa
 QUERY results are incomplete until remount
+of which F2 and part of F4 are open

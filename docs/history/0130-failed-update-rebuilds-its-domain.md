@@ -1,8 +1,7 @@
 # 0130 — A failed index update rebuilds its domain (finding F2, ADR-0016)
 
-Date: 2026-10-18. Status: in progress. The change is committed locally on branch
-`f2-domain-rebuild`; the KASAN runs (the change, and the negative round on `main`) are still to
-be done. Estimated effort: S.
+Date: 2026-10-18. Status: change and negative round run under KASAN on GitHub's KVM runners;
+pull request opened. Estimated effort: S.
 
 ## Why
 
@@ -47,14 +46,20 @@ this with `d_invalidate()`, and the layer already did it for a directory rename 
 - `scripts/checkpatch.sh`: no findings.
 - `scripts/check-retired-claims.sh`: OK.
 
+- KASAN workflow on the branch (run 39165103937): `MOOBFS_KASAN_PASS`, with
+  `RELEASE_FILL: ext4, 491 writes overflowed the budget; d0 built again with all of them`, and
+  the same on btrfs and XFS.
+- Negative round, the test alone on `main` (branch `neg/f2-test-only`, run 39165106169): failed
+  with `fill: kernel 244 oracle 491 written 491`, `MOOBFS_VM_FAIL: rl-fill-answer-differs-ext4`.
+  Before the change, half of the files written after the budget filled were missing from
+  the answers.
+
 ## Limitations
 
-- Not run yet. To do: the `release` step under KASAN with the change, and the same step on
-  `main` (the negative round).
 - F2's fairness part is not addressed: one user can still make other users' domains be released
   and rebuilt (latency). Per-user shares remain under security roadmap S9.
 
 ## Next step
 
-Run both rounds on the benchmark host, record them here, then a pull request with ADR-0016 for
-the maintainer's acceptance.
+Merge after the maintainer's review. SECURITY, the FAQ (and its site page) and the security
+roadmap already say, in this change, that only F2's fairness part remains open.
