@@ -268,8 +268,9 @@ with confidence intervals. Raw results: [bench/results/](bench/results/README.md
 
 ## Try it in a VM
 
-Quick start. With Docker running, from the repository root (on Apple Silicon the VM runs under
-CPU emulation and takes longer):
+Quick start. With Docker running, from the repository root. The full run takes 7 to 8 minutes on
+a GitHub-hosted x86-64 runner (the CI job "Native Linux VM" runs exactly this command); on Apple
+Silicon the VM runs under CPU emulation and takes longer:
 
 ```sh
 git clone https://github.com/studiomoob/llmoobfs.git
