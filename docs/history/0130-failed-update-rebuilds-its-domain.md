@@ -36,7 +36,7 @@ this with `d_invalidate()`, and the layer already did it for a directory rename 
   - The tracepoint must show a failed update (otherwise the test proved nothing), and the next
     query of d0 must equal the oracle with every file written.
   - Expected on `main` before the change: the answer misses files.
-- Documents: ADR-0016; notes in ADR-0011 (F2). Updated: architecture overview, client contract,
+- Documents: ADR-0016 (accepted by the maintainer on 2026-10-18); notes in ADR-0011 (F2). Updated: architecture overview, client contract,
   distribution strategy, spec-query-v2 §9. The old warning text goes to
   `docs/retired-claims.txt`.
 

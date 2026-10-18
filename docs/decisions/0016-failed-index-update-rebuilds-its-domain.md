@@ -1,7 +1,7 @@
 # ADR-0016 — A failed index update rebuilds its domain instead of leaving the index incomplete
 
-Date: 2026-10-18. Status: **proposed**; implemented on branch `f2-domain-rebuild` (journal 0130),
-not yet run. Estimated effort: S.
+Date: 2026-10-18. Status: **accepted** by the maintainer on 2026-10-18; implemented on branch
+`f2-domain-rebuild` (journal 0130). Estimated effort: S.
 Amends ADR-0011 (finding F2) and the update rule of ADR-0012; both otherwise stand.
 
 ## Context
