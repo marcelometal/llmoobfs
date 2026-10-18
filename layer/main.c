@@ -849,7 +849,13 @@ static int moobl_typed_check(struct dentry *lower, const char *full, const void 
 		return 0;	/* removal of a well-named attribute */
 	if (size > MOOB_ATTR_VALUE_MAX || moob_attr_validate(value, size) != MOOB_ATTR_OK)
 		return -EINVAL;
-	err = vfs_getxattr(&nop_mnt_idmap, lower, full, NULL, 0);
+	/*
+	 * Whether the attribute exists already (a replacement does not count toward the limit).
+	 * Read without a permission check: the VFS authorized the write on the layer's inode, and
+	 * vfs_getxattr() would ask read permission, refusing a typed attribute on a write-only
+	 * file the lower itself accepts (review item 7, journal 0120).
+	 */
+	err = __vfs_getxattr(lower, d_inode(lower), full, NULL, 0);
 	if (err == -ENODATA) {
 		err = moobl_count_typed(lower);
 		if (err < 0)

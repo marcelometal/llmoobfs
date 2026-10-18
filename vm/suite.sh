@@ -208,6 +208,12 @@ run_lower() {
     # (journal 0105): before, with domain_depth=0, it built the whole index first
     [ "$($BIN/query --uid 1001 $LAYER v1bad)" = "q1 22" ] || fail "v1-bad-request-$fs"
     [ "$($BIN/query $LAYER info | sed -n 's/^domains_built=\([0-9]*\) .*/\1/p')" = 0 ] || fail "v1-bad-request-built-$fs"
+    # a typed attribute on a write-only file, set by its owner: the lower accepts it, so must the
+    # layer (review item 7, journal 0120)
+    : > $LAYER/wo.md && chown 1001:1001 $LAYER/wo.md && chmod 0200 $LAYER/wo.md || fail "wo-setup-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER xset $LAYER/wo.md kind decision)" = "xset 0" ] || fail "typed-attr-write-only-refused-$fs"
+    [ "$($BIN/moobfs-attr get $LOWER/wo.md kind)" = "$(printf 'kind\tstring\tdecision')" ] || fail "wo-lower-$fs"
+    rm -f $LAYER/wo.md || fail "wo-cleanup-$fs"
     # remount (journal 0106): read-only refuses writes and read-write restores them; an option
     # given on remount through mount(2) is ignored, as overlayfs does, and through the new mount
     # API (fsconfig) refused when it changes the mount, accepted when it repeats the current
