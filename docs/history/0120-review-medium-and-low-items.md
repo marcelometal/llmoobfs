@@ -57,6 +57,16 @@ Not run. Checked only that the user-space files parse (`tests/query.c` and
 `sqlite/moobfs_vtab.c` with stub Linux headers on macOS: no error but the macOS signatures of
 `setxattr`/`getxattr`). The module was not compiled.
 
+*Note, 2026-10-18 (full run).* The batch ran on a GitHub-hosted runner with KVM, in the private
+repository used to test fixes before their coordinated publication (commit 90741c7, on top of the
+batch of journals 0115 to 0118): `MOOBFS_KASAN_PASS` under KASAN, UBSAN and lockdep, with
+`BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle`, `SQLEXT_PASS: 33
+statements equal to the ordinary table` (the three COLLATE NOCASE statements included), the
+write-only typed attribute check, fault injection (291 faults, none unexpected), build races and
+releases on ext4, btrfs and XFS. The CI job failed once on shellcheck (SC2174 in the step
+`bigdir`), fixed in 4b49b05, and then passed: native Linux VM, lint and checkpatch, tools. The
+negative rounds for items 9, 7 and 5 were not run.
+
 ## Limitations
 
 - Everything above waits for the benchmark host: the module build, `scripts/checkpatch.sh`, the
