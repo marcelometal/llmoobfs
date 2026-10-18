@@ -66,11 +66,11 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
         echo 32 > $d/stacktrace-depth
         echo 0 > $d/probability; echo 0 > $d/verbose
     done
-    mount -t ext4 "$DEV_EXT4" $LOWER || fail fi-lower-mount
-    rm -rf $LOWER/fi && mkdir -m 755 $LOWER/fi || fail fi-mkdir
-    mount -t moobfs_layer -o lower=$LOWER/fi,domain_depth=1 none $LAYER || fail fi-layer-mount
+    mount -t ext4 "$DEV_EXT4" "$LOWER" || fail fi-lower-mount
+    rm -rf "$LOWER/fi" && mkdir -m 755 "$LOWER/fi" || fail fi-mkdir
+    mount -t moobfs_layer -o lower="$LOWER/fi",domain_depth=1 none "$LAYER" || fail fi-layer-mount
     dmesg -c > /dev/null
-    $BIN/failnth $LAYER $LOWER/fi > "$OUT/failnth.txt" 2>&1; rc=$?
+    "$BIN/failnth" "$LAYER" "$LOWER/fi" > "$OUT/failnth.txt" 2>&1; rc=$?
     cat "$OUT/failnth.txt"
     [ $rc -eq 0 ] || fail "fi-unexplained-error (see build/vng/failnth.txt)"
     for f in failslab fail_page_alloc; do echo 0 > /sys/kernel/debug/$f/require-start; echo 0 > /sys/kernel/debug/$f/require-end; done
@@ -81,12 +81,12 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     fi_cmp() {   # kernel QUERY2 against the oracle on the domains matching the pattern, by path
         for p in $LOWER/fi/$1; do
             d=${p##*/}
-            $BIN/query $LAYER/$d q2 kind exists - - | cut -f2 | sort > /tmp/fi.k || return 1
-            $BIN/moobfs-index --domain $LOWER/fi/$d kind exists - - | cut -f2 | sort > /tmp/fi.o || return 1
+            "$BIN/query" "$LAYER/$d" q2 kind exists - - | cut -f2 | sort > /tmp/fi.k || return 1
+            "$BIN/moobfs-index" --domain "$LOWER/fi/$d" kind exists - - | cut -f2 | sort > /tmp/fi.o || return 1
             cmp -s /tmp/fi.k /tmp/fi.o || { echo "domain $d: kernel $(wc -l < /tmp/fi.k) oracle $(wc -l < /tmp/fi.o)"; diff /tmp/fi.k /tmp/fi.o | head -5; return 1; }
         done
     }
-    $BIN/query $LAYER info > /tmp/fi.info || fail fi-info
+    "$BIN/query" "$LAYER" info > /tmp/fi.info || fail fi-info
     flags=$(sed -n 's/.* flags=\(0x[0-9a-f]*\).*/\1/p' /tmp/fi.info)
     # The domains failnth only built (e*) were never written while built: whatever the faults
     # did to their builds, what is in the index now must be the whole answer.
@@ -96,10 +96,10 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     else
         fi_cmp '*' || fail "fi-index-differs-from-oracle without the incomplete flag"
     fi
-    umount $LAYER || fail fi-umount
-    mount -t moobfs_layer -o lower=$LOWER/fi,domain_depth=1 none $LAYER || fail fi-remount
+    umount "$LAYER" || fail fi-umount
+    mount -t moobfs_layer -o lower="$LOWER/fi",domain_depth=1 none "$LAYER" || fail fi-remount
     fi_cmp '*' || fail fi-index-differs-after-remount
-    umount $LAYER && rm -rf $LOWER/fi && umount $LOWER || fail fi-cleanup
+    umount "$LAYER" && rm -rf "$LOWER/fi" && umount "$LOWER" || fail fi-cleanup
     # a reference the layer kept on a lower dentry shows only here, when the lower goes
     # ("Dentry still in use", found by syzkaller after a failed mount, journal 0112)
     dmesg > "$OUT/dmesg-lower.txt"
