@@ -37,7 +37,7 @@ community, in English and in Portuguese, as the maintainer asked on 2026-10-17.
 
 ## Limitations
 
-- The status page states facts as of 2026-10-17 and does not mention fixes not yet published.
+- The status page states facts as of 2026-10-17; it is updated with each batch.
 - The Portuguese navigation links to the English documentation pages, marked as English.
 
 ## Next step

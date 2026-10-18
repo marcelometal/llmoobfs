@@ -133,8 +133,8 @@ RESEARCH = [
   'Os artigos de memória para agentes medem a qualidade da recuperação; poucos medem as consultas de armazenamento que um sistema de memória faz. Uma carga reproduzível, tirada de clientes reais, seria útil além deste projeto.',
   'AI systems, benchmarking', 'Sistemas de IA, benchmarks'),
  ('The obligations of a stacked filesystem', 'As obrigações de um sistema de arquivos empilhado',
-  f'Credentials, write access and freeze of the lower mount, idmapped mounts, remount through the new mount API: a stacked filesystem inherits obligations that are scattered across overlayfs\'s history. A checked list, with tests, would help every stacked filesystem ({j("0099")}).',
-  f'Credenciais, acesso de escrita e congelamento da montagem de baixo, montagens com idmap, remount pela API nova de montagem: um sistema de arquivos empilhado herda obrigações espalhadas pela história do overlayfs. Uma lista conferida, com testes, ajudaria todo sistema de arquivos empilhado ({j("0099")}).',
+  f'Credentials, remount through the new mount API, the lower filesystem\'s own rules: a stacked filesystem inherits obligations that are scattered across overlayfs\'s history. A checked list, with tests, would help every stacked filesystem ({j("0099")}).',
+  f'Credenciais, remount pela API nova de montagem, as regras do próprio sistema de arquivos de baixo: um sistema de arquivos empilhado herda obrigações espalhadas pela história do overlayfs. Uma lista conferida, com testes, ajudaria todo sistema de arquivos empilhado ({j("0099")}).',
   'Operating systems, security', 'Sistemas operacionais, segurança'),
 ]
 
