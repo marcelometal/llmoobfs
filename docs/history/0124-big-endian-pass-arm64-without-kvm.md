@@ -42,3 +42,13 @@ KASAN on arm64, not a MoobFS one. The stable changelogs 6.12.105 to 6.12.113 lis
 that retry path, so moving the pin does not help. The job stays exploratory and outside the
 required checks. Options, none taken yet: a root filesystem image instead of the 9p root, or an
 arm64 host with KVM.
+
+*Note, 2026-10-18 (cause of the arm64 panic).* The recursion is a known netfs issue, reported by
+syzbot in October 2024 (the same netfs_rreq_assess → netfs_retry_reads → netfs_rreq_terminated
+cycle through the 9p read path). 6.12.112 carries the upstream workaround, "netfs: Work around
+recursion by abandoning retry if nothing read" (the `NETFS_SREQ_NO_PROGRESS` checks in
+`fs/netfs/read_collect.c`). Its author said in that thread that the workaround still recurses
+when each retry reads a little. That fits a 9p root under TCG with KASAN's larger stack frames.
+Mainline later moved read collection to a work item, so `netfs_retry_reads()` no longer calls
+`netfs_rreq_terminated()` itself; that rework is not in 6.12. Options for the job: a root
+filesystem image instead of the 9p root, or a later kernel series for the arm64 run only.

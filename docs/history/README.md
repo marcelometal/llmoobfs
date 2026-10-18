@@ -156,3 +156,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0127 — KCSAN runs in CI](0127-kcsan-in-ci.md)
 - [0128 — Shell scripts pass shellcheck at every severity (issue #5)](0128-shellcheck-at-every-severity.md)
 - [0129 — One list of test programs for every VM harness (issue #72)](0129-one-list-of-test-programs.md)
+- [0131 — Negative rounds: each test fails without its fix](0131-negative-rounds.md)
