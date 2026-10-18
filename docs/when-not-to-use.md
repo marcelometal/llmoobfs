@@ -70,11 +70,13 @@ assessment.
   6.12.112 (KASAN) have run the module; other kernels are not promised to compile or behave.
 - **The corpus is large.** The index is non-pageable RAM, bounded by `index_budget`
   (default 128 MiB, an estimated order of 10^5 inodes); near the budget, answers can be
-  incomplete; rebuild is a linear scan at every mount.
+  incomplete; each domain's part is rebuilt by a linear scan on its first query after a mount or
+  a release.
 - **You need it in production today, or in any critical setting.** Only a source pre-release tag exists; the
-  module is one author's code with three kernel-side defects found by its own tests, no
-  external audit, no syzkaller, no xfstests run, no threat-model document yet. A module bug
-  can mean a kernel panic or data loss.
+  module is one author's code; its own tests and two source reviews by AI assistants found
+  kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011); there is no
+  outside human review; fstests ran as its `quick` group only and syzkaller for two six-hour
+  rounds. A module bug can mean a kernel panic or data loss.
 - **The team cannot maintain an out-of-tree kernel module** across kernel updates, signing
   and DKMS; none of that tooling exists in the project.
 - **Deduplication, reflink or snapshots are the attraction.** Those come from btrfs or XFS

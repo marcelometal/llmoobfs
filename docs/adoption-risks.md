@@ -1,5 +1,7 @@
 # Adoption risks and what answers each one
 
+*Note, 2026-10-18: an analysis as of 2026-10-12, kept as written. The project's current status is in the README ("Status" and "Limitations") and `docs/security-roadmap.md`; several gaps named below have been closed since (syzkaller, fstests, the threat model, the index built on demand).*
+
 Date: 2026-10-12. Status: **proposal**, written for the maintainer's review (journal
 [0067](history/0067-adoption-risks.md)). It lists the risks any agent-memory system takes by
 putting MoobFS under its data, the evidence for each, what already exists, and a proposed answer.
