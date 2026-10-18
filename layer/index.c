@@ -833,6 +833,13 @@ static void domain_drop(struct moobl_index *ix, u64 domain)
 		bool last = false;
 
 		next = rb_next(n);
+		/*
+		 * The walk covers every name of the mount and can free millions of entries with the
+		 * index lock held for writing; the lock is a semaphore, so give the CPU away between
+		 * names (review item 6, journal 0120). next stays valid: nobody else changes the
+		 * tree while the write lock is held.
+		 */
+		cond_resched();
 		if (nm->domain != domain)
 			continue;
 		while (!last) {		/* freeing its last entry frees nm */
@@ -1713,6 +1720,7 @@ void moobl_index_destroy(struct super_block *sb)
 		list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
 			entry_free(ix, e);
 		inode_rec_put_if_empty(ix, rec);
+		cond_resched();	/* every inode of the mount, at unmount (journal 0120) */
 	}
 	xa_destroy(&ix->inodes);
 	xa_destroy(&ix->fallback);
