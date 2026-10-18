@@ -1358,7 +1358,7 @@ if want bigdir; then
 # holding its whole listing. A domain whose one directory holds 3000 entries, planted on the lower
 # and built by the first query, must equal the oracle: no name lost or doubled between batches.
 mount -t ext4 "$DEV_EXT4" $LOWER || fail "bd-lower-mount"
-rm -rf $LOWER/bdx && mkdir -p -m 755 $LOWER/bdx/big/sub || fail "bd-mkdir"
+rm -rf $LOWER/bdx && mkdir -m 755 $LOWER/bdx && mkdir -p $LOWER/bdx/big/sub || fail "bd-mkdir"
 i=0
 while [ $i -lt 3000 ]; do
     f=$LOWER/bdx/big/$(printf 'memory-with-a-long-name-%04d' $i)
