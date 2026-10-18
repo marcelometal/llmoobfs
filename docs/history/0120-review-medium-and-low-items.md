@@ -83,3 +83,6 @@ negative rounds for items 9, 7 and 5 were not run.
 
 The KASAN run of the stabilization batch (journals 0115 to 0118) and of this one on the benchmark
 host, then one pull request per batch, this one after the first.
+
+*Note, 2026-10-18 (negative rounds).* The negative rounds for items 9, 7 and 5 ran on GitHub's
+KVM runners, and each test failed without its fix. Details in journal 0131.

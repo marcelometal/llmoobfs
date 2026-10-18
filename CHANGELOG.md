@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Negative rounds (journal 0131): the tests of journal 0120's items 9, 7 and 5 and the KCSAN filter
+  each fail with their fix undone (or, for the filter, with a race added to the module).
 - Shell scripts in `vm/` and `scripts/` pass shellcheck at every severity, which `make lint` and CI
   now enforce (issue #5, journal 0128; VM run pending).
 - CI (journal 0127): KCSAN over the stress steps runs on GitHub with KVM (`kcsan.yml`, on demand and

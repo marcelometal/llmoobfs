@@ -37,3 +37,7 @@ report(s) with no racing access in moobfs_layer (10 reached through it)`: the ke
 printed and not judged. The negative round of the filter (an unmarked racy access added to the
 module on branch `neg/kcsan-filter`, which must fail the run) was dispatched the same day; its
 result goes into journal 0131.
+
+*Note, 2026-10-18 (negative round).* With an unmarked racy access added to the module, the
+KCSAN run failed on that race (`kernel-diagnostic-layer`) while still printing the kernel's own
+races without failing on them. Journal 0131.
