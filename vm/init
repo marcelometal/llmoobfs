@@ -33,7 +33,7 @@ for image in /data/bad-*.img; do
 done
 [ "$count" -eq 15 ] || fail "bad fixture count $count"
 rmmod moobfs || fail unload
-if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic; fi
+if dmesg | grep -E 'BUG:|Oops:|\] WARNING:|^WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic; fi
 echo "MOOBFS_VM_PASS: shared extents, independent inodes, reads, readonly, remount, 15 malformed images"
 
 # Layer phases 2a-2e: shared suite, with binaries in the initramfs root and lower

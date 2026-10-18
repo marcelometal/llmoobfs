@@ -22,8 +22,11 @@ echo "kernel: $(uname -r); KASAN init lines in dmesg: $(dmesg | grep -c 'KernelA
 # A diagnostic emitted before anything of ours is loaded belongs to the boot of the debug
 # kernel under emulation, not to the layer; it also taints the kernel and turns lockdep off,
 # so the run would prove nothing. Report it as an environment failure (the workflow retries).
-if dmesg | grep -Eq 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|UBSAN:'; then
-    dmesg | grep -E -A12 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|UBSAN:' | head -40
+# A kernel warning starts its message ("] WARNING: CPU: ...", lockdep's "] WARNING: possible ..."):
+# matched there only, since with KVM the guest sees the host CPU and prints the informational
+# "Speculative Return Stack Overflow: WARNING: See ..." at boot (pull request 74).
+if dmesg | grep -Eq 'BUG: KASAN|KASAN: |BUG:|Oops:|\] WARNING:|^WARNING:|UBSAN:'; then
+    dmesg | grep -E -A12 'BUG: KASAN|KASAN: |BUG:|Oops:|\] WARNING:|^WARNING:|UBSAN:' | head -40
     dmesg > "$OUT/dmesg-boot.txt"
     echo "MOOBFS_VM_ENV_FAIL: kernel diagnostic before the layer was loaded (boot of the debug kernel)"
     exit 2
@@ -34,7 +37,7 @@ export BIN TOOLS MODS LOWER LAYER DEV_EXT4 DEV_BTRFS DEV_XFS DEV_SCRATCH DEV_LOG
 for d in $DEV_EXT4 $DEV_BTRFS $DEV_XFS $DEV_SCRATCH $DEV_LOG; do [ -b "$d" ] || fail "missing disk $d"; done
 . "$REPO/vm/suite.sh"
 dmesg > "$OUT/dmesg.txt"
-if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|possible (circular|recursive) locking|INFO: (task|rcu)|UBSAN:' "$OUT/dmesg.txt"; then
+if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|\] WARNING:|^WARNING:|possible (circular|recursive) locking|INFO: (task|rcu)|UBSAN:' "$OUT/dmesg.txt"; then
     echo "MOOBFS_VM_FAIL: kernel diagnostics under KASAN/lockdep"
     exit 1
 fi
@@ -66,7 +69,7 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     [ $rc -eq 0 ] || fail "fi-unexplained-error (see build/vng/failnth.txt)"
     for f in failslab fail_page_alloc; do echo 0 > /sys/kernel/debug/$f/require-start; echo 0 > /sys/kernel/debug/$f/require-end; done
     dmesg > "$OUT/dmesg-faults.txt"
-    if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|WARNING:|possible (circular|recursive) locking|INFO: (task|rcu)|UBSAN:' "$OUT/dmesg-faults.txt"; then
+    if grep -E 'BUG: KASAN|KASAN: |BUG:|Oops:|\] WARNING:|^WARNING:|possible (circular|recursive) locking|INFO: (task|rcu)|UBSAN:' "$OUT/dmesg-faults.txt"; then
         fail "fi-kernel-diagnostic under fault injection"
     fi
     fi_cmp() {   # kernel QUERY2 against the oracle on the domains matching the pattern, by path
@@ -93,7 +96,7 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     umount $LAYER && rm -rf $LOWER/fi && umount $LOWER || fail fi-cleanup
     # a reference the layer kept on a lower dentry shows only here, when the lower goes
     # ("Dentry still in use", found by syzkaller after a failed mount, journal 0112)
-    if dmesg | grep -E 'BUG: Dentry|still in use|BUG:|WARNING:'; then
+    if dmesg | grep -E 'BUG: Dentry|still in use|BUG:|\] WARNING:|^WARNING:'; then
         fail "fi-lower-pinned after the layer was unmounted"
     fi
     rmmod moobfs_layer || fail fi-rmmod

@@ -1215,7 +1215,7 @@ umount $LAYER && rm -rf $LOWER/sx && umount $LOWER || fail "sx-cleanup"
 echo "SQLEXT_PASS: $(grep -c SQLQ_SAME /tmp/sx.txt) statements equal to the ordinary table; MULTI-INDEX OR in $sx_or plans; private file never returned"
 fi
 rmmod moobfs_layer || fail layer-unload
-if dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
+if dmesg | grep -E 'BUG:|Oops:|\] WARNING:|^WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
 if [ -n "${MOOB_ONLY:-}" ]; then
     echo "MOOBFS_ONLY_PASS: steps $MOOB_ONLY (not a complete run)"
 else
