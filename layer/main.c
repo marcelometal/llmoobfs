@@ -1298,13 +1298,23 @@ static int moobl_dir_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/*
+ * Directory reads are data operations on an open file: like read(2) on a file they run with the
+ * mounter's credentials (ADR-0011), the caller having been checked when it opened the layer's
+ * directory. Without the switch, an LSM saw the caller in iterate_dir()'s
+ * security_file_permission() against the lower directory's label, which ADR-0011 does not say
+ * (review item 8, journal 0120); overlayfs reads directories the same way.
+ */
 static int moobl_iterate(struct file *file, struct dir_context *ctx)
 {
 	struct file *real = file->private_data;
+	const struct cred *old;
 	int err;
 
 	real->f_pos = ctx->pos;
+	old = override_creds(MOOBL_SB(file_inode(file)->i_sb)->creds);
 	err = iterate_dir(real, ctx);
+	revert_creds(old);
 	ctx->pos = real->f_pos;
 	fsstack_copy_attr_atime(file_inode(file), file_inode(real));
 	return err;
