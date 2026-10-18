@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed (journal 0130, ADR-0016 proposed, not yet run): an index update that failed after the lower
+  write (budget full) left queries answering without the file until remount, flagged only in
+  `GET_INFO`; now only that domain is built again by its next query.
 - CI (journal 0127): KCSAN over the stress steps runs on GitHub with KVM (`kcsan.yml`, on demand and
   weekly), so it no longer needs the benchmark host.
 - Issues #6, #8, #9, #12, #13, #14 and #15 closed (journal 0125): tool --help and exit status

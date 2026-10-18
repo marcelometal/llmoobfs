@@ -215,7 +215,8 @@ The lower is the source of truth; the only format of our own is the versioned xa
   rebuilt). Invalid attribute: `moobfs-check` lists path and reason (exit 2), manual
   fix with `moobfs-attr`; it does not repair. Without the module: mount the lower directly
   (`grep`, `getfattr`, `git`, `rsync` work); direct writes do not go through validation,
-  so run `moobfs-check` before remounting. Index overflowed (`MOOB_FLAG_INDEX_INCOMPLETE`):
+  so run `moobfs-check` before remounting. Index overflowed: queries of a
+  domain that does not fit fail with `ENOMEM` (before ADR-0016, `MOOB_FLAG_INDEX_INCOMPLETE`);
   increase `index_budget` or use `noindex`.
 
 ### 2.8 Capability discovery via `GET_INFO`
@@ -228,7 +229,7 @@ A client's first call (ioctl on the root, EXISTS; no command-line tool).
 | `caps` XATTR | the lower accepts xattrs; without it typed attributes do not work |
 | `flags` NOLINKS / INDEX_OFF | do not attempt `ln`; with `noindex`, scan instead of `QUERY` |
 | `flags` PATHS_STALE | expect false negatives in `QUERY` until remount |
-| `flags` INDEX_INCOMPLETE | budget reached; `QUERY` may omit |
+| `flags` INDEX_INCOMPLETE | modules before ADR-0016 only: budget reached, `QUERY` may omit |
 | `index_budget`, `index_used`, `index_entries`, `index_inodes`, `lower_fs` | monitor occupancy (alert near the budget), record the lower |
 
 ### 2.9 What exists, what is missing, what depends on M4

@@ -174,13 +174,27 @@ static int charge(struct moobl_index *ix, size_t bytes)
 	return 0;
 }
 
-/* An update failed after the lower change: answers may miss files until remount. */
-static void index_mark_incomplete(struct moobl_index *ix, int err)
+/*
+ * An update failed after the lower change (F2, ADR-0016): the domain's entries no longer match
+ * the lower filesystem. A built domain is built again by the next query that needs it
+ * (domain_fresh), as after a rename in it; a domain being built starts its build again. Only
+ * that domain is affected, and no answer comes from it until it is built again.
+ */
+static void domain_lost(struct moobl_index *ix, u64 domain, int err)
 {
+	struct moobl_domain *dom = domain ? xa_load(&ix->domains, (unsigned long)domain)
+					  : &ix->outside;
+
 	lockdep_assert_held_write(&ix->lock);
-	if (!ix->incomplete)
-		trace_moobfs_index_incomplete(ix->dev, err);
-	ix->incomplete = true;
+	trace_moobfs_index_incomplete(ix->dev, err);
+	pr_warn_ratelimited("moobfs_layer: index update failed (%d); its domain is built again by the next query\n",
+			    err);
+	if (!dom)
+		return;
+	if (dom->state == MOOBL_DOM_BUILDING)
+		dom->restart = true;
+	else if (dom->state == MOOBL_DOM_BUILT)
+		WRITE_ONCE(dom->lost, true);
 }
 
 static void uncharge(struct moobl_index *ix, size_t bytes)
@@ -372,8 +386,8 @@ static void entry_link(struct moobl_ix_name *nm, struct moobl_ix_entry *e, u64 i
 
 /*
  * Moves every entry of an inode to the partition given by pl. An entry that cannot be
- * moved for lack of memory is dropped and the index marked incomplete, so it can never be
- * answered from a partition it no longer belongs to. Caller holds the write lock.
+ * moved for lack of memory is dropped and the domain of pl is built again (domain_lost), so it
+ * can never be answered from a partition it no longer belongs to. Caller holds the write lock.
  */
 static int rec_set_partition(struct moobl_index *ix, struct moobl_ix_inode *rec,
 			     const struct moobl_place *pl)
@@ -412,7 +426,7 @@ static int rec_set_partition(struct moobl_index *ix, struct moobl_ix_inode *rec,
 	rec->domain = pl->domain;
 	rec->hetero = pl->hetero;
 	if (err)
-		index_mark_incomplete(ix, err);
+		domain_lost(ix, pl->domain, err);
 	return err;
 }
 
@@ -792,7 +806,7 @@ static bool domain_live(struct moobl_index *ix, u64 domain)
 static bool domain_fresh(struct moobl_index *ix, const struct moobl_domain *dom)
 {
 	return READ_ONCE(dom->state) == MOOBL_DOM_BUILT && !READ_ONCE(dom->paths_stale) &&
-	       READ_ONCE(dom->top_gen) == READ_ONCE(ix->top_gen);
+	       !READ_ONCE(dom->lost) && READ_ONCE(dom->top_gen) == READ_ONCE(ix->top_gen);
 }
 
 static struct moobl_domain *domain_get(struct moobl_index *ix, u64 domain)
@@ -1553,6 +1567,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 			WRITE_ONCE(dom->used_at, jiffies);
 			WRITE_ONCE(dom->state, MOOBL_DOM_BUILT);
 			dom->paths_stale = false;	/* every renamed directory was scanned again */
+			WRITE_ONCE(dom->lost, false);	/* every update meanwhile is in the build */
 			ix->domains_built++;
 			ix->builds++;
 		}
@@ -1804,10 +1819,8 @@ int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *n
 	}
 	err = index_put(ix, inode->i_ino, &pl, name, value, size);
 	if (err) {
-		/* The lower write already succeeded; the index is now incomplete until remount. */
-		if (!ix->incomplete)
-			pr_warn("moobfs_layer: index update failed (%d); QUERY results are incomplete until remount\n", err);
-		index_mark_incomplete(ix, err);
+		/* the lower write already succeeded: the domain is built again by the next query */
+		domain_lost(ix, pl.domain, err);
 	} else {
 		rec = xa_load(&ix->inodes, inode->i_ino);
 		if (rec) {
@@ -1871,8 +1884,8 @@ static bool rec_whole(struct moobl_index *ix, const struct moobl_ix_inode *rec)
 
 /*
  * A file that arrives in a built domain from one that is not (a rename, a new hard link) has
- * no record to move: its attributes are read from the lower filesystem. Failure leaves the
- * index incomplete, as any update that fails after the lower change.
+ * no record to move: its attributes are read from the lower filesystem. On failure the domain
+ * is built again by the next query, as after any update that fails after the lower change.
  */
 static void index_adopt(struct super_block *sb, struct dentry *lower, struct dentry *where,
 			const struct moobl_place *pl)
@@ -1893,9 +1906,7 @@ static void index_adopt(struct super_block *sb, struct dentry *lower, struct den
 	}
 	if (err) {
 		nofs = ix_write_lock(ix);
-		if (!ix->incomplete)
-			pr_warn("moobfs_layer: index update failed (%d); QUERY results are incomplete until remount\n", err);
-		index_mark_incomplete(ix, err);
+		domain_lost(ix, pl->domain, err);
 		ix_write_unlock(ix, nofs);
 	}
 }

@@ -140,7 +140,9 @@ Not decided; proposed in `adoption-risks.md` (risk 5) so that a client never req
 1. `statfs` on the data directory: file system type `0x4d4f4f42` means the layer is mounted there.
 2. `MOOB_IOC_GET_INFO` on the mount root gives the UAPI version, `domain_depth` and the state
    flags. Use the layer for queries only when domains are on, the index is not off
-   (`MOOB_FLAG_INDEX_OFF`) and not incomplete (`MOOB_FLAG_INDEX_INCOMPLETE`).
+   (`MOOB_FLAG_INDEX_OFF`) and not incomplete (`MOOB_FLAG_INDEX_INCOMPLETE`; since ADR-0016 the
+   module never sets it, but older modules do, so keep the check). A query that fails with
+   `ENOMEM` means the domain does not fit the index budget: answer from the client's own index.
 3. Otherwise answer from the client's own index, exactly as without the layer.
 
 Open point: step 2 needs a descriptor of the mount root, which a client confined to its domain may
