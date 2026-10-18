@@ -47,7 +47,7 @@ cd "$FST" || fail "cd fstests"
 # shellcheck disable=SC2086  # ARGS is a list of ./check arguments
 ./check $ARGS
 echo "MOOBFS_FSTESTS_CHECK_EXIT: $?"
-if dmesg | grep -E 'BUG:|kernel BUG|Oops:|WARNING:|Kernel panic|KASAN:|possible circular locking'; then
+if dmesg | grep -E 'BUG:|kernel BUG|Oops:|\] WARNING:|^WARNING:|Kernel panic|KASAN:|possible circular locking'; then
     echo "MOOBFS_FSTESTS_KERNEL_DIAGNOSTIC"
 fi
 echo "MOOBFS_FSTESTS_DONE: lower=$LOWERFS args=$ARGS"
