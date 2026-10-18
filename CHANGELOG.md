@@ -5,6 +5,8 @@
 - Fixed (journal 0132, finding F4 completed): an ordinary user writing through the layer could spend
   ext4's reserved blocks with the default reserve owner; writes now run with the writer's fsuid
   and groups.
+- Negative rounds (journal 0131): the tests of journal 0120's items 9, 7 and 5 and the KCSAN filter
+  each fail with their fix undone (or, for the filter, with a race added to the module).
 - `vm/build-tests.sh` is the one list of test programs for every VM harness and workflow; the
   arm64 workflow had drifted and missed two programs (issue #72, journal 0129).
 - Shell scripts in `vm/` and `scripts/` pass shellcheck at every severity, which `make lint` and CI
