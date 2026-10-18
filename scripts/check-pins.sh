@@ -18,6 +18,8 @@ echo "upstream kernel (KASAN workflow):  linux-$kver  sha256 $ksum"
 # copies of the upstream kernel pin
 [ "$(yaml KERNEL_VERSION .github/workflows/kasan-arm64.yml)" = "$kver" ] || bad "kasan-arm64.yml KERNEL_VERSION differs from kasan.yml"
 [ "$(yaml KERNEL_SHA256 .github/workflows/kasan-arm64.yml)" = "$ksum" ] || bad "kasan-arm64.yml KERNEL_SHA256 differs from kasan.yml"
+[ "$(yaml KERNEL_VERSION .github/workflows/kcsan.yml)" = "$kver" ] || bad "kcsan.yml KERNEL_VERSION differs from kasan.yml"
+[ "$(yaml KERNEL_SHA256 .github/workflows/kcsan.yml)" = "$ksum" ] || bad "kcsan.yml KERNEL_SHA256 differs from kasan.yml"
 dver=$(sed -n 's/^KERNEL_VERSION=//p' docs/development.md | head -n 1)
 dsum=$(sed -n 's/^KERNEL_SHA256=//p' docs/development.md | head -n 1)
 [ "$dver" = "$kver" ] || bad "docs/development.md KERNEL_VERSION ($dver) differs from kasan.yml ($kver)"

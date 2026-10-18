@@ -1,0 +1,121 @@
+name: KCSAN and lockdep
+# The data-race detector over the layer's stress steps (security roadmap S8, journal 0115), on a
+# GitHub-hosted runner with KVM, so the run no longer needs the benchmark host (journal 0127).
+# Builds the pinned upstream kernel with vm/kcsan.config instead of vm/kasan.config; KCSAN cannot
+# be built together with KASAN. vm/kdiag.sh fails the run only on a KCSAN report with a racing
+# access in moobfs_layer; the kernel's own races are counted on a KCSAN_OUTSIDE line. Not a
+# required check: on demand and weekly. Kept in step with kasan.yml by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      steps:
+        description: 'MOOB_ONLY steps of vm/suite.sh (empty means buildrace release)'
+        default: 'buildrace release'
+  schedule:
+    - cron: '23 6 * * 2'
+permissions:
+  contents: read
+concurrency:
+  group: kcsan-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  KERNEL_VERSION: 6.12.112
+  KERNEL_SHA256: 164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03
+jobs:
+  kasan:
+    name: Layer stress steps under KCSAN/lockdep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build and guest dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential flex bison libelf-dev libssl-dev bc cpio kmod \
+            qemu-system-x86 qemu-utils python3-pip python3-venv udev \
+            e2fsprogs btrfs-progs xfsprogs sqlite3 libsqlite3-dev git dmsetup acl
+          python3 -m pip install --user --require-hashes -r vm/kasan-requirements.txt   # virtme-ng 1.41 and deps, by hash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Let QEMU use KVM
+        # /dev/kvm exists on the hosted runners but belongs to group kvm, so QEMU fell back to
+        # emulation (TCG), where the debug kernel sometimes reports at boot (issue #18) and the job
+        # takes over an hour. The rule is the one of GitHub's changelog of 2024-04-02
+        # ("Hardware accelerated Android virtualization now available").
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
+          if [ -w /dev/kvm ]; then echo "KVM usable"; else echo "no KVM: QEMU will use TCG"; fi
+      - name: Fetch and verify the kernel source
+        run: |
+          mkdir -p build
+          curl -fsSL -o build/linux.tar.xz "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz"
+          echo "${KERNEL_SHA256}  build/linux.tar.xz" | sha256sum -c -
+          mkdir -p build/linux
+          tar -xJf build/linux.tar.xz -C build/linux --strip-components=1
+      - name: Configure and build the kernel with KCSAN and lockdep
+        run: |
+          cd build/linux
+          vng --kconfig --config ../../vm/kcsan.config
+          grep -E '^CONFIG_(KCSAN|PROVE_LOCKING|EXT4_FS|BTRFS_FS|XFS_FS|DM_LOG_WRITES|DM_FLAKEY|VIRTIO_BLK)=' .config
+          vng --build --verbose
+      - name: Build the layer module and the test binaries against that kernel
+        run: |
+          make layer KDIR="$PWD/build/linux"
+          make attr-tools BUILD=build/vng CFLAGS="-O2 -g -static"
+          make bench-tools BUILD=build/vng CFLAGS="-O2 -g -static" SQLITE_LIBS="-lsqlite3 -ldl -lpthread" && cp bench/queries-w3.txt build/vng/bench-queries-w3.txt && cp bench/sqlbase.sh build/vng/bench-sqlbase.sh && cp bench/equiv.sh build/vng/bench-equiv.sh && cp bench/run.sh build/vng/bench-run.sh
+          gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o build/vng/layer
+          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/failnth.c -o build/vng/failnth
+          gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o build/vng/hostile
+          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/buildrace.c -lpthread -o build/vng/buildrace
+          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
+          gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
+          gcc -static -O2 -Wall -Wextra -Werror tests/reconf.c -o build/vng/reconf
+          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/permmatrix.c -o build/vng/permmatrix
+          gcc -static -O2 -Wall -Wextra -Werror tests/fusestall.c -o build/vng/fusestall
+          gcc -static -O2 -Wall -Wextra -Werror -Iinclude -DSQLITE_CORE tests/sqlq.c sqlite/moobfs_vtab.c common/attr.c -lsqlite3 -lm -ldl -lpthread -o build/vng/sqlq
+          gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap
+          gcc -static -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o build/vng/fsx
+          gcc -static -O2 tests/third_party/log-writes/replay-log.c tests/third_party/log-writes/log-writes.c -o build/vng/replay-log
+          cp layer/moobfs_layer.ko build/vng/
+          truncate -s 64M build/vng/lower-ext4.img && mke2fs -q -F -t ext4 -b 4096 -L moob-lower build/vng/lower-ext4.img
+          truncate -s 256M build/vng/lower-btrfs.img && mkfs.btrfs -q -f -L moob-lower build/vng/lower-btrfs.img
+          truncate -s 300M build/vng/lower-xfs.img && mkfs.xfs -q -f -L moob-lower build/vng/lower-xfs.img
+          truncate -s 64M build/vng/scratch.img build/vng/log.img
+      - name: Run the stress steps inside the KCSAN kernel
+        env:
+          MOOB_ONLY: ${{ github.event.inputs.steps || 'buildrace release' }}
+        run: |
+          cd build/linux
+          R="$GITHUB_WORKSPACE"
+          # one retry when the debug kernel itself reports a diagnostic while booting under
+          # emulation (MOOBFS_VM_ENV_FAIL); a layer failure (MOOBFS_VM_FAIL) is never retried
+          for attempt in 1 2; do
+            vng --user root --cpus 2 --memory 3G --verbose \
+              --rwdir "$R/build" \
+              --disk "$R/build/vng/lower-ext4.img" --disk "$R/build/vng/lower-btrfs.img" \
+              --disk "$R/build/vng/lower-xfs.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/log.img" \
+              --exec "MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
+            cp "$R/build/vng/console-$attempt.log" "$R/build/vng/console.log"
+            grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log" || break
+            echo "attempt $attempt: boot-time diagnostic of the debug kernel; retrying once"
+          done
+          grep -qE '^MOOBFS_KASAN(_ONLY)?_PASS:' "$R/build/vng/console.log"
+          grep -a 'KCSAN_OUTSIDE' "$R/build/vng/console.log" || true
+          # a negated command outside a condition does not stop a bash -e step (SC2251)
+          if grep -q '^MOOBFS_VM_FAIL:' "$R/build/vng/console.log"; then exit 1; fi
+          if grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log"; then exit 1; fi
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kcsan-evidence
+          path: |
+            build/vng/console.log
+            build/vng/dmesg.txt
+            build/linux/.config
+          if-no-files-found: warn
