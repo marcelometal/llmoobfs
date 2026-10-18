@@ -60,8 +60,9 @@ make test BUILD=build/asan CC=clang \
 kernel's headers); they are meant for the VM container, not for your host.
 
 `make help` lists every target with one line each. `make lint` runs the same
-checks as the CI `Lint` job (shellcheck at warning severity on the tracked
-`vm/*.sh` and `scripts/*.sh`, and SPDX headers on C sources through
+checks as the CI `Lint` job (shellcheck at every severity, info included, on the
+tracked `vm/*.sh` and `scripts/*.sh`, with the one repository-wide exception and its reason in
+`.shellcheckrc`; and SPDX headers on C sources through
 `scripts/check-spdx.sh`); it needs `shellcheck` installed (`apt install
 shellcheck` or `brew install shellcheck`). The DCO check runs only in pull
 requests. `make checkpatch` runs the kernel's `checkpatch.pl --no-tree` on the

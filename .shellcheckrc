@@ -1,0 +1,4 @@
+# shellcheck configuration for every shell script in the repository (issue #5).
+# SC2015: the scripts use "A && B || fail ..." to fail when either A or B fails; in every
+# occurrence C is fail, return, exit or an error branch, so the if-then-else warning does not apply.
+disable=SC2015

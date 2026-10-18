@@ -154,4 +154,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0125 — Seven open issues closed: fuzz seeds, compiler matrix, pins, tool diagnostics, man pages, accessibility, SPDX](0125-seven-issues-closed.md)
 - [0126 — Audit of every current-state document; retired claims checked in CI; outreach per published unit](0126-documentation-audit-and-retired-claims.md)
 - [0127 — KCSAN runs in CI](0127-kcsan-in-ci.md)
+- [0128 — Shell scripts pass shellcheck at every severity (issue #5)](0128-shellcheck-at-every-severity.md)
 - [0129 — One list of test programs for every VM harness (issue #72)](0129-one-list-of-test-programs.md)

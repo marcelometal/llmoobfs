@@ -4,6 +4,8 @@
 
 - `vm/build-tests.sh` is the one list of test programs for every VM harness and workflow; the
   arm64 workflow had drifted and missed two programs (issue #72, journal 0129).
+- Shell scripts in `vm/` and `scripts/` pass shellcheck at every severity, which `make lint` and CI
+  now enforce (issue #5, journal 0128; VM run pending).
 - CI (journal 0127): KCSAN over the stress steps runs on GitHub with KVM (`kcsan.yml`, on demand and
   weekly), so it no longer needs the benchmark host.
 - Issues #6, #8, #9, #12, #13, #14 and #15 closed (journal 0125): tool --help and exit status
