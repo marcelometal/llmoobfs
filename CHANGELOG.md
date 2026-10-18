@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- KCSAN (journal 0115, security roadmap S8): the stress steps `buildrace` and `release` ran under
+  the data-race detector with no race in the module; the 35 reports were the kernel's own
+  (timers, virtio, the dcache, the ext4 xattr cache). The KASAN harness now judges KCSAN reports
+  apart (`vm/kdiag.sh`): one fails the run only when one of its racing accesses is in
+  `moobfs_layer`.
 - syzkaller over the layer (journal 0109, security roadmap S3, in progress): kernel configuration,
   syzlang descriptions of the mount, ioctls and typed attributes, seed programs and a runner
   (`vm/syzkaller/`, `vm/syzkaller-local.sh`). First runs: no report; a six-hour run in progress.
