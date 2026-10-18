@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Issues #6, #8, #9, #12, #13, #14 and #15 closed (journal 0125): tool --help and exit status
+  (docs/tools.md), manual pages, fuzz seeds, site accessibility checks, compiler matrix, pin
+  checker, SPDX on every source.
 - CI (journal 0124): the big-endian run passes (60 encoding checks, 9 image tests); GitHub's arm64
   runners have no KVM, so the arm64 job runs under emulation and, by default, only the step `ext4`.
 - CI (journal 0123): a big-endian (s390x, QEMU user mode) run of the attribute encoding and image
