@@ -95,6 +95,13 @@ guest):
 - `sh scripts/checkpatch.sh`: exit 0. `make lint` (shellcheck 0.11.0, `--severity=warning`, and
   the SPDX check): exit 0.
 
+
+*Note, 2026-10-18 (full run).* The whole suite of this batch ran under KASAN, UBSAN and lockdep on
+a GitHub-hosted runner with KVM, in a private repository used only to test fixes before their
+coordinated publication (commit 622ed72: the batch of journals 0115 to 0118 on top of the `main` of
+2026-10-15): `MOOBFS_KASAN_PASS`, with `LOWERRO_PASS` (read-only lower refused 9 changes with EROFS, lower unchanged; 3 changes waited for the thaw of a frozen lower, no kernel warning; idmapped lower refused). The CI job of the same commit passed: native Linux VM,
+lint with shellcheck and `scripts/checkpatch.sh`, tools and sanitizers.
+
 ## Limitations
 
 - Only ext4 was frozen; on btrfs and XFS the change is the same call, not exercised by the step.
