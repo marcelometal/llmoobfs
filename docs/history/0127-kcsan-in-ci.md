@@ -29,3 +29,11 @@ its racing accesses is in `moobfs_layer`; the kernel's own races are printed on 
 ## Next step
 
 Dispatch the workflow after merge and record the result here.
+
+*Note, 2026-10-18 (first run, 39143981872, on `main` after pull request 84).* Passed in 18
+minutes: `MOOBFS_KASAN_ONLY_PASS: steps buildrace release under KCSAN and lockdep with no kernel
+diagnostics`, with `BUILDRACE` and `RELEASE_PASS` on ext4, btrfs and XFS. `KCSAN_OUTSIDE: 32
+report(s) with no racing access in moobfs_layer (10 reached through it)`: the kernel's own races,
+printed and not judged. The negative round of the filter (an unmarked racy access added to the
+module on branch `neg/kcsan-filter`, which must fail the run) was dispatched the same day; its
+result goes into journal 0131.
