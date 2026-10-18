@@ -48,6 +48,10 @@ the mounter, the kernel and the lower filesystem's code, the hardware and the bl
   for the caller first.
 - `user.moob.format` on the lower root is reserved to the tools (`EPERM` through the layer).
 
+*Note, 2026-10-18 (journal 0120).* Until journal 0120, directory reads did not do what the bullet
+above says: `moobl_iterate()` called `iterate_dir()` with the caller's credentials. They now run
+under `override_creds()` with the mounter's, as the bullet states.
+
 *Note, 2026-10-14 (journal 0099).* "This is the overlayfs model" is wrong, as an overlayfs
 maintainer pointed out on linux-unionfs. Overlayfs does not split name operations from data
 operations: every access is checked twice, (a) the caller against the overlay inode, DAC and

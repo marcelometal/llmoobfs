@@ -22,6 +22,8 @@
  *   query <domain-dir> q2invalid                     malformed QUERY2 requests are refused
  *   query [--uid N] <dir> q2errno [opts] <terms...>  prints the errno of QUERY2 (0 on success)
  *   query [--uid N] <x> rename <old> <new>           prints the errno of rename(2) (0 on success)
+ *   query [--uid N] <x> xset <file> <name> <string>  sets user.moob.<name> to a typed string; prints
+ *                                                    the errno of setxattr(2) (0 on success)
  *   query [--uid N] <mount> v1bad                    a v1 QUERY with a bad version; prints its errno
  *   query [--uid N] <domain-dir> race2 <seconds>     QUERY2 under churn (spec test 8): cycles the
  *                                                    plain, equality and ordered plans with small
@@ -39,6 +41,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <inttypes.h>
 #include "../tools/query-common.h"
 
@@ -80,6 +83,18 @@ int main(int argc, char **argv)
 	}
 	if (argc >= 5 && !strcmp(argv[2], "rename")) {
 		printf("rename %d\n", rename(argv[3], argv[4]) ? errno : 0);
+		return 0;
+	}
+	if (argc >= 6 && !strcmp(argv[2], "xset")) {	/* typed string: type byte, then UTF-8 */
+		char name[MOOB_QUERY_NAME_MAX + 16], val[MOOB_QUERY_VALUE_MAX + 1];
+		size_t n = strlen(argv[5]);
+
+		if (n > MOOB_QUERY_VALUE_MAX)
+			return 64;
+		snprintf(name, sizeof(name), "user.moob.%s", argv[4]);
+		val[0] = MOOB_T_STRING;
+		memcpy(val + 1, argv[5], n);
+		printf("xset %d\n", setxattr(argv[3], name, val, n + 1, 0) ? errno : 0);
 		return 0;
 	}
 	if (argc < 3)

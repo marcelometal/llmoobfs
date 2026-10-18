@@ -273,9 +273,25 @@ static int moobl_d_revalidate(struct dentry *dentry, unsigned int flags)
 
 	if (flags & LOOKUP_RCU)
 		return moobl_d_revalidate_rcu(dentry);
-	lower = moobl_lower_dentry(dentry);
-	if (lower->d_flags & DCACHE_OP_REVALIDATE)
+	/*
+	 * Ref-walk runs without the parent's lock, so moobl_instantiate() can swap a negative
+	 * dentry's lower dentry and drop the old one meanwhile. The old one is freed only after a
+	 * grace period: read it under RCU, and hold it only to call the lower's own revalidation
+	 * (review item 3, journal 0120). A lower dentry already dead was replaced: look up again.
+	 */
+	rcu_read_lock();
+	lower = READ_ONCE(((struct moobl_dentry *)dentry->d_fsdata)->lower.dentry);
+	if (READ_ONCE(lower->d_flags) & DCACHE_OP_REVALIDATE) {
+		if (!lockref_get_not_dead(&lower->d_lockref)) {
+			rcu_read_unlock();
+			return 0;
+		}
+		rcu_read_unlock();
 		rc = lower->d_op->d_revalidate(lower, flags);
+		dput(lower);
+	} else {
+		rcu_read_unlock();
+	}
 	if (d_really_is_positive(dentry)) {
 		struct inode *inode = d_inode(dentry);
 
@@ -438,8 +454,8 @@ static int moobl_instantiate(struct inode *dir, struct dentry *dentry,
 		struct dentry *stale = info->lower.dentry;
 
 		/*
-		 * published for RCU-walk readers (moobl_d_revalidate_rcu); the stale
-		 * dentry stays valid for them until the end of the grace period
+		 * published for lockless readers (both paths of moobl_d_revalidate); the
+		 * stale dentry stays valid for them until the end of the grace period
 		 */
 		WRITE_ONCE(info->lower.dentry, dget(lower_dentry));
 		dput(stale);
@@ -849,7 +865,13 @@ static int moobl_typed_check(struct dentry *lower, const char *full, const void 
 		return 0;	/* removal of a well-named attribute */
 	if (size > MOOB_ATTR_VALUE_MAX || moob_attr_validate(value, size) != MOOB_ATTR_OK)
 		return -EINVAL;
-	err = vfs_getxattr(&nop_mnt_idmap, lower, full, NULL, 0);
+	/*
+	 * Whether the attribute exists already (a replacement does not count toward the limit).
+	 * Read without a permission check: the VFS authorized the write on the layer's inode, and
+	 * vfs_getxattr() would ask read permission, refusing a typed attribute on a write-only
+	 * file the lower itself accepts (review item 7, journal 0120).
+	 */
+	err = __vfs_getxattr(lower, d_inode(lower), full, NULL, 0);
 	if (err == -ENODATA) {
 		err = moobl_count_typed(lower);
 		if (err < 0)
@@ -1292,13 +1314,23 @@ static int moobl_dir_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/*
+ * Directory reads are data operations on an open file: like read(2) on a file they run with the
+ * mounter's credentials (ADR-0011), the caller having been checked when it opened the layer's
+ * directory. Without the switch, an LSM saw the caller in iterate_dir()'s
+ * security_file_permission() against the lower directory's label, which ADR-0011 does not say
+ * (review item 8, journal 0120); overlayfs reads directories the same way.
+ */
 static int moobl_iterate(struct file *file, struct dir_context *ctx)
 {
 	struct file *real = file->private_data;
+	const struct cred *old;
 	int err;
 
 	real->f_pos = ctx->pos;
+	old = override_creds(MOOBL_SB(file_inode(file)->i_sb)->creds);
 	err = iterate_dir(real, ctx);
+	revert_creds(old);
 	ctx->pos = real->f_pos;
 	fsstack_copy_attr_atime(file_inode(file), file_inode(real));
 	return err;

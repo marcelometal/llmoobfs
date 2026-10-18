@@ -18,6 +18,7 @@
 #   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
+#   bigdir              a domain built from a directory larger than one read batch (journal 0120)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -27,7 +28,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall|lowerro) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -208,6 +209,12 @@ run_lower() {
     # (journal 0105): before, with domain_depth=0, it built the whole index first
     [ "$($BIN/query --uid 1001 $LAYER v1bad)" = "q1 22" ] || fail "v1-bad-request-$fs"
     [ "$($BIN/query $LAYER info | sed -n 's/^domains_built=\([0-9]*\) .*/\1/p')" = 0 ] || fail "v1-bad-request-built-$fs"
+    # a typed attribute on a write-only file, set by its owner: the lower accepts it, so must the
+    # layer (review item 7, journal 0120)
+    : > $LAYER/wo.md && chown 1001:1001 $LAYER/wo.md && chmod 0200 $LAYER/wo.md || fail "wo-setup-$fs"
+    [ "$($BIN/query --uid 1001 $LAYER xset $LAYER/wo.md kind decision)" = "xset 0" ] || fail "typed-attr-write-only-refused-$fs"
+    [ "$($BIN/moobfs-attr get $LOWER/wo.md kind)" = "$(printf 'kind\tstring\tdecision')" ] || fail "wo-lower-$fs"
+    rm -f $LAYER/wo.md || fail "wo-cleanup-$fs"
     # remount (journal 0106): read-only refuses writes and read-write restores them; an option
     # given on remount through mount(2) is ignored, as overlayfs does, and through the new mount
     # API (fsconfig) refused when it changes the mount, accepted when it repeats the current
@@ -1194,7 +1201,9 @@ fi
 if want sqlext; then
 # The moobfs SQLite virtual table (ADR-0013, journal 0108): every statement is run on the virtual
 # table over a domain and on an ordinary table filled from the lower filesystem; the rows must be
-# equal. The query plans are printed, to see what SQLite hands to the module.
+# equal. The query plans are printed, to see what SQLite hands to the module. The COLLATE NOCASE
+# statements return rows only when the condition stays SQLite's: the kernel compares bytes
+# (journal 0120).
 mount -t ext4 "$DEV_EXT4" $LOWER || fail "sx-lower-mount"
 rm -rf $LOWER/sx && mkdir -m 755 $LOWER/sx || fail "sx-mkdir"
 mount -t moobfs_layer -o lower=$LOWER/sx none $LAYER || fail "sx-mount"
@@ -1246,6 +1255,9 @@ sx "SELECT rowid, path, kind, agent, created, score, weight, flag, title FROM {T
    "SELECT path FROM {T} WHERE kind = 'note' AND kind = 'fact'" \
    "SELECT path FROM {T} WHERE flag = 1 AND kind = 'note' AND agent = 'a3' AND score >= 2 AND created > 5000" \
    "SELECT a.path, b.path FROM {T} a JOIN {T} b ON a.agent = b.agent WHERE b.path = 'f1' AND a.kind = 'note'" \
+   "SELECT path FROM {T} WHERE kind = 'NOTE' COLLATE NOCASE" \
+   "SELECT path FROM {T} WHERE kind COLLATE NOCASE IN ('Note', 'FACT') AND agent = 'a2'" \
+   "SELECT path, title FROM {T} WHERE title >= 'TITLE 5' COLLATE NOCASE AND title < 'TITLE 6' COLLATE NOCASE" \
    > /tmp/sx.txt 2>&1 || { cat /tmp/sx.txt; fail "sx-differs"; }
 grep -q SQLQ_COMPARE_DONE /tmp/sx.txt || { cat /tmp/sx.txt; fail "sx-incomplete"; }
 # with created declared required, the newest N are the kernel's ordered scan with its limit
@@ -1340,6 +1352,32 @@ done
 st_cleanup
 umount $LAYER && rm -rf $LOWER/stx && umount $LOWER || fail "st-cleanup"
 echo "STALL_PASS: a FUSE mount that never answers holds neither the checked domain nor the other users"
+fi
+if want bigdir; then
+# Journal 0120: a build reads a directory in batches of 1024 names (MOOBL_SCAN_BATCH) instead of
+# holding its whole listing. A domain whose one directory holds 3000 entries, planted on the lower
+# and built by the first query, must equal the oracle: no name lost or doubled between batches.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "bd-lower-mount"
+rm -rf $LOWER/bdx && mkdir -m 755 $LOWER/bdx && mkdir -p $LOWER/bdx/big/sub || fail "bd-mkdir"
+i=0
+while [ $i -lt 3000 ]; do
+    f=$LOWER/bdx/big/$(printf 'memory-with-a-long-name-%04d' $i)
+    : > $f || fail "bd-file"
+    [ $((i % 6)) -eq 0 ] || $BIN/moobfs-attr set $f kind string k$((i % 3)) > /dev/null || fail "bd-attr"
+    i=$((i + 1))
+done
+: > $LOWER/bdx/big/sub/inner && $BIN/moobfs-attr set $LOWER/bdx/big/sub/inner kind string k1 > /dev/null || fail "bd-inner"
+mount -t moobfs_layer -o lower=$LOWER/bdx,domain_depth=1 none $LAYER || fail "bd-mount"
+for q in "kind exists - -" "kind eq string k1"; do
+    # shellcheck disable=SC2086
+    $BIN/query $LAYER/big q2 $q | cut -f2 | sort > /tmp/bd.k || fail "bd-query"
+    # shellcheck disable=SC2086
+    $BIN/moobfs-index --domain $LOWER/bdx/big $q | cut -f2 | sort > /tmp/bd.o || fail "bd-oracle"
+    cmp -s /tmp/bd.k /tmp/bd.o || { echo "kernel $(wc -l < /tmp/bd.k) oracle $(wc -l < /tmp/bd.o)"; diff /tmp/bd.k /tmp/bd.o | head -5; fail "bd-differs-from-oracle"; }
+done
+[ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
+umount $LAYER && rm -rf $LOWER/bdx && umount $LOWER || fail "bd-cleanup"
+echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
 fi
 rmmod moobfs_layer || fail layer-unload
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
