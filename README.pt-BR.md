@@ -473,6 +473,7 @@ Os documentos estão em inglês (ADR-0010).
 | Devo usar, comparado com arquivos, SQLite, FUSE e frameworks de memória? | [when-not-to-use.md](docs/when-not-to-use.md), [value-assessment.md](docs/value-assessment.md) |
 | Respostas curtas | [faq.md](docs/faq.md) |
 | Como compilo, testo e leio os logs? | [development.md](docs/development.md), [testing.md](docs/testing.md) |
+| Como uso as ferramentas de linha de comando? | [tools.md](docs/tools.md), páginas de manual em [man/](man/) (`man ./man/moobfs-attr.1`) |
 | O que a camada M2 especifica? | [spec-m2.md](docs/spec-m2.md), [kernel-infrastructure.md](docs/kernel-infrastructure.md), [ADR-0007](docs/decisions/0007-stacked-memory-layer.md) |
 | O que o M3 especifica (identidade, isolamento, proveniência, cursor de mudanças, leituras em lote)? | [spec-m3.md](docs/spec-m3.md) |
 | Como o desempenho será medido? | [benchmark-plan.md](docs/benchmark-plan.md), [benchmark-harness.md](docs/benchmark-harness.md) |

@@ -151,4 +151,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0122 — Every public surface kept in step with the project's state](0122-public-surfaces-rule.md)
 - [0123 — How comparable projects get test hardware; a big-endian run and an arm64 job](0123-test-infrastructure-research.md)
 - [0124 — Big-endian tests pass; GitHub's arm64 runners have no KVM](0124-big-endian-pass-arm64-without-kvm.md)
+- [0125 — Seven open issues closed: fuzz seeds, compiler matrix, pins, tool diagnostics, man pages, accessibility, SPDX](0125-seven-issues-closed.md)
 - [0126 — Audit of every current-state document; retired claims checked in CI; outreach per published unit](0126-documentation-audit-and-retired-claims.md)

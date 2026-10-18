@@ -9,6 +9,11 @@
  *   moobfs-attr rm <file> <name>
  *   moobfs-attr list <file>
  *   moobfs-attr rawset <file> <name> <hex>      (test helper: writes bytes unchecked)
+ *   moobfs-attr --help
+ *
+ * Exit status (docs/tools.md): 0 success; 1 a system call failed; 2 get found an invalid
+ * value (printed as "invalid"); 3 get found no such attribute; 64 usage; 65 set was given a
+ * value that cannot be encoded as the type, or an invalid one.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -19,10 +24,25 @@
 #include <sys/xattr.h>
 #include "moobfs_attr.h"
 
+static const char synopsis[] =
+	"usage: moobfs-attr get <file> <name>\n"
+	"       moobfs-attr set <file> <name> <string|int64|double|bool|time|raw> <value>\n"
+	"       moobfs-attr rm <file> <name>\n"
+	"       moobfs-attr list <file>\n"
+	"       moobfs-attr rawset <file> <name> <hex>   (test helper: writes bytes unchecked)\n"
+	"       moobfs-attr --help\n";
+
 static int usage(void)
 {
-	fprintf(stderr, "usage: moobfs-attr get|rm <file> <name> | set <file> <name> <type> <value> | list <file> | rawset <file> <name> <hex>\n");
+	fputs(synopsis, stderr);
 	return 64;
+}
+
+/* "moobfs-attr: <file>: <reason>", the style of moobfs-check; returns the exit status 1 */
+static int sys_fail(const char *file)
+{
+	fprintf(stderr, "moobfs-attr: %s: %s\n", file, strerror(errno));
+	return 1;
 }
 
 static int full_name(char *out, size_t cap, const char *name)
@@ -110,16 +130,20 @@ int main(int argc, char **argv)
 	ma_u8 value[MOOB_ATTR_VALUE_MAX + 1];
 	ssize_t n;
 
+	if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
+		fputs(synopsis, stdout);
+		return 0;
+	}
 	if (argc < 3)
 		return usage();
 	if (!strcmp(argv[1], "list")) {
 		char *list, *p;
 		ssize_t len = listxattr(argv[2], NULL, 0);
-		if (len < 0) { perror("listxattr"); return 1; }
+		if (len < 0) return sys_fail(argv[2]);
 		list = malloc((size_t)len + 1);
-		if (!list) return 1;
+		if (!list) return sys_fail(argv[2]);
 		len = listxattr(argv[2], list, (size_t)len);
-		if (len < 0) { perror("listxattr"); return 1; }
+		if (len < 0) return sys_fail(argv[2]);
 		for (p = list; p < list + len; p += strlen(p) + 1) {
 			if (strncmp(p, MOOB_ATTR_PREFIX, MOOB_ATTR_PREFIX_LEN))
 				continue;
@@ -134,12 +158,12 @@ int main(int argc, char **argv)
 		return usage();
 	if (!strcmp(argv[1], "get")) {
 		n = getxattr(argv[2], full, value, sizeof value);
-		if (n < 0) { perror("getxattr"); return errno == ENODATA ? 3 : 1; }
+		if (n < 0) { int e = errno; sys_fail(argv[2]); return e == ENODATA ? 3 : 1; }
 		print_value(argv[3], value, (size_t)n);
 		return moob_attr_validate(value, (size_t)n) ? 2 : 0;
 	}
 	if (!strcmp(argv[1], "rm")) {
-		if (removexattr(argv[2], full)) { perror("removexattr"); return 1; }
+		if (removexattr(argv[2], full)) return sys_fail(argv[2]);
 		return 0;
 	}
 	if (!strcmp(argv[1], "set") && argc == 6) {
@@ -151,7 +175,7 @@ int main(int argc, char **argv)
 		}
 		err = moob_attr_validate(value, size);
 		if (err) { fprintf(stderr, "moobfs-attr: %s\n", moob_attr_strerror(err)); return 65; }
-		if (setxattr(argv[2], full, value, size, 0)) { perror("setxattr"); return 1; }
+		if (setxattr(argv[2], full, value, size, 0)) return sys_fail(argv[2]);
 		return 0;
 	}
 	if (!strcmp(argv[1], "rawset") && argc == 5) {
@@ -162,7 +186,7 @@ int main(int argc, char **argv)
 			if (hi < 0 || lo < 0) return usage();
 			value[i] = (ma_u8)(hi * 16 + lo);
 		}
-		if (setxattr(argv[2], full, value, len / 2, 0)) { perror("setxattr"); return 1; }
+		if (setxattr(argv[2], full, value, len / 2, 0)) return sys_fail(argv[2]);
 		return 0;
 	}
 	return usage();

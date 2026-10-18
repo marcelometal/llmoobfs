@@ -53,6 +53,30 @@ jobs:
           make test CC=s390x-linux-gnu-gcc BUILD=build/s390x LDFLAGS=-static
       - name: Validate site links
         run: python3 scripts/check-site.py
+  compilers:
+    # The tools are built with -Wall -Wextra -Wconversion -Wshadow -Werror; other compilers warn
+    # where the default one does not (issue #13).
+    name: Compiler warnings (${{ matrix.cc }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc-12, gcc-14, clang-16, clang-18]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the compiler
+        env:
+          CC_NAME: ${{ matrix.cc }}
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$CC_NAME" libsqlite3-dev
+      - name: Build every host and Linux tool with -Werror
+        env:
+          CC_NAME: ${{ matrix.cc }}
+        run: make tools attr-tools bench-tools CC="$CC_NAME" BUILD="build/$CC_NAME"
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -68,6 +92,12 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends shellcheck
       - name: shellcheck and SPDX headers (same command as locally)
         run: make lint   # info-level shellcheck findings are tracked as issues
+      - name: Manual pages (mandoc lint, issue 8)
+        run: |
+          sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends mandoc
+          make man-lint
+      - name: Pinned versions agree and the kernel tarball matches kernel.org (issue 14)
+        run: sh scripts/check-pins.sh
       - name: No retired claim in a current-state document; the FAQ page matches docs/faq.md (journal 0126)
         run: |
           sh scripts/check-retired-claims.sh

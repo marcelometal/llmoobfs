@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-only
 """Independent format oracle, malformed images, and VM fixture generation."""
 import hashlib
 import json

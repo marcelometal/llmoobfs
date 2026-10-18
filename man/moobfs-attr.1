@@ -1,0 +1,96 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.Dd October 18, 2026
+.Dt MOOBFS-ATTR 1
+.Os
+.Sh NAME
+.Nm moobfs-attr
+.Nd read and write typed MoobFS attributes
+.Sh SYNOPSIS
+.Nm
+.Cm get Ar file name
+.Nm
+.Cm set Ar file name type value
+.Nm
+.Cm rm Ar file name
+.Nm
+.Cm list Ar file
+.Nm
+.Cm rawset Ar file name hex
+.Nm
+.Fl -help
+.Sh DESCRIPTION
+.Nm
+reads and writes the typed attributes of MoobFS, stored as extended attributes under
+.Dq user.moob.
+on ordinary files.
+It works on a mounted MoobFS layer, where the kernel validates every write, and on a plain
+directory, where the tool validates before writing.
+MoobFS is an experimental research project: do not use it for data you cannot lose.
+.Pp
+.Ar name
+is given without the
+.Dq user.moob.
+prefix: lowercase ASCII letters, digits, underscores and dots, at most 64 bytes, neither starting
+nor ending with a dot and without two dots in a row;
+.Dq format
+is reserved for the tools.
+A file holds at most 64 typed attributes.
+.Pp
+.Ar type
+is one of:
+.Bl -tag -width double -compact
+.It Cm string
+valid UTF-8 without NUL, at most 1024 bytes
+.It Cm int64
+signed 64-bit integer
+.It Cm double
+IEEE 754 binary64, not NaN
+.It Cm bool
+.Cm true
+or
+.Cm false
+.It Cm time
+signed nanoseconds since the epoch
+.It Cm raw
+up to 4096 bytes given in hexadecimal, never indexed
+.El
+.Pp
+.Cm get
+and
+.Cm list
+print
+.Dq name<TAB>type<TAB>value ,
+or
+.Dq name<TAB>invalid<TAB>reason
+for a value that does not decode.
+.Cm rawset
+writes bytes unchecked and exists for tests.
+.Sh EXIT STATUS
+.Bl -tag -width 2n -compact
+.It 0
+success
+.It 1
+a system call failed; the reason is printed
+.It 2
+.Cm get :
+the value is invalid
+.It 3
+.Cm get :
+no such attribute
+.It 64
+usage error or invalid name
+.It 65
+.Cm set :
+the value cannot be encoded as the type, or is invalid
+.El
+.Sh EXAMPLES
+.Dl $ moobfs-attr set memory.md kind string decision
+.Dl $ moobfs-attr get memory.md kind
+.Sh SEE ALSO
+.Xr getfattr 1 ,
+.Xr moobfs-check 1 ,
+.Xr moobfs-index 1 ,
+.Xr setfattr 1
+.Pp
+docs/tools.md and docs/spec-m2.md in the MoobFS repository,
+.Lk https://github.com/studiomoob/llmoobfs

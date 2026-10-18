@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
 # MoobFS layer test suite, shared by the Debian initramfs harness (vm/init) and the
 # KASAN/lockdep harness (vm/kasan-guest.sh). The caller sets:
 #   BIN        directory with layer, fsx, query, ipc, moobfs-*, replay-log, moobfs_layer.ko

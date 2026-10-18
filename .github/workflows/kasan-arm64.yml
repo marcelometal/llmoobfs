@@ -45,10 +45,13 @@ jobs:
         # takes over an hour. The rule is the one of GitHub's changelog of 2024-04-02
         # ("Hardware accelerated Android virtualization now available").
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          ls -la /dev/kvm || true
+          # the arm64 runners have no /dev/kvm (journal 0124), and udevadm fails on a missing device
+          if [ -e /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+            ls -la /dev/kvm
+          fi
           if [ -w /dev/kvm ]; then echo "KVM usable"; else echo "no KVM: QEMU will use TCG"; fi
       - name: Fetch and verify the kernel source
         run: |

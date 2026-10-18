@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.Dd October 18, 2026
+.Dt MKFS.MOOBFS 8
+.Os
+.Sh NAME
+.Nm mkfs.moobfs
+.Nd create a read-only MoobFS M1 image
+.Sh SYNOPSIS
+.Nm
+.Ar new_image
+.Ar name Ns = Ns Ar source ...
+.Sh DESCRIPTION
+.Nm
+writes a new read-only image of the first MoobFS milestone (M1), in which separate files can
+reference the same immutable bytes.
+Each
+.Ar name Ns = Ns Ar source
+argument adds a file
+.Ar name
+with the content of the regular file
+.Ar source ;
+sources with identical content share one stored object.
+The tool refuses to overwrite an existing
+.Ar new_image .
+.Pp
+This is the regression milestone of the project, not the stacked layer used for agent memory.
+MoobFS is an experimental research project.
+.Sh EXIT STATUS
+0 on success, 2 on a usage error, non-zero on any other failure.
+.Sh EXAMPLES
+.Dl $ mkfs.moobfs demo.img alpha.txt=memory.txt beta.txt=memory.txt
+.Sh SEE ALSO
+.Xr moobfs-attr 1
+.Pp
+docs/format-m1.md in the MoobFS repository,
+.Lk https://github.com/studiomoob/llmoobfs

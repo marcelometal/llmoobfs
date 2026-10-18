@@ -8,6 +8,12 @@
  * the files that carry typed attributes and that QUERY2 does not return, with the reason:
  * they fail the homogeneity rule of docs/spec-query-v2.md section 3, or sit above every
  * domain. These are not problems and do not change the exit status.
+ *
+ *   moobfs-check [--domain-depth N] <directory>
+ *   moobfs-check --help
+ *
+ * Exit status (docs/tools.md): 0 clean; 2 problems found; 1 the tree could not be walked;
+ * 64 usage.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -256,6 +262,11 @@ int main(int argc, char **argv)
 	unsigned int version = 0;
 	const char *format_state;
 
+	if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
+		fputs("usage: moobfs-check [--domain-depth N] <directory>\n"
+		      "       moobfs-check --help\n", stdout);
+		return 0;
+	}
 	if (argc == 4 && !strcmp(argv[1], "--domain-depth")) {
 		domain_depth = atoi(argv[2]);
 		if (domain_depth < 1 || domain_depth > 32)
@@ -264,7 +275,8 @@ int main(int argc, char **argv)
 		argc -= 2;
 	}
 	if (argc != 2) {
-		fprintf(stderr, "usage: moobfs-check [--domain-depth N] <directory>\n");
+		fputs("usage: moobfs-check [--domain-depth N] <directory>\n"
+		      "       moobfs-check --help\n", stderr);
 		return 64;
 	}
 	root_len = strlen(argv[1]);

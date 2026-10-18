@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Issues #6, #8, #9, #12, #13, #14 and #15 closed (journal 0125): tool --help and exit status
+  (docs/tools.md), manual pages, fuzz seeds, site accessibility checks, compiler matrix, pin
+  checker, SPDX on every source.
 - Documentation audit (journal 0126): every current-state document brought up to date; the FAQ page
   generated from `docs/faq.md`; claims that stopped being true are listed in
   `docs/retired-claims.txt` and checked in CI.

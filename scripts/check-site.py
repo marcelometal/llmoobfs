@@ -13,10 +13,22 @@ class Page(HTMLParser):
         super().__init__()
         self.ids = set()
         self.links = []
+        self.lang = None
+        self.counts = {}
+        self.problems = []
         self.feed(path.read_text())
 
     def handle_starttag(self, tag, attrs):
         data = dict(attrs)
+        self.counts[tag] = self.counts.get(tag, 0) + 1
+        if tag == 'html':
+            self.lang = data.get('lang')
+        # accessibility (issue #12): images need alt text; an SVG is either decorative or named
+        if tag == 'img' and 'alt' not in data:
+            self.problems.append(f"img without alt: {data.get('src')}")
+        if tag == 'svg' and data.get('aria-hidden') != 'true' and not (
+                data.get('role') == 'img' and (data.get('aria-label') or data.get('aria-labelledby'))):
+            self.problems.append('svg neither aria-hidden nor role="img" with a name')
         if 'id' in data:
             assert data['id'] not in self.ids, f"Duplicate ID: {data['id']}"
             self.ids.add(data['id'])
@@ -38,4 +50,12 @@ for source, page in pages.items():
         assert target.exists(), f'{source.name}: missing {link}'
         if parsed.fragment:
             assert target in pages and unquote(parsed.fragment) in pages[target].ids, f'{source.name}: missing anchor {link}'
-print(f'Site links valid: {len(pages)} HTML pages')
+for source, page in pages.items():
+    name = source.relative_to(ROOT)
+    assert page.lang, f'{name}: <html> without lang'
+    assert page.counts.get('h1') == 1, f"{name}: {page.counts.get('h1', 0)} h1 elements, expected 1"
+    for landmark in ('header', 'main', 'nav'):
+        assert page.counts.get(landmark), f'{name}: no <{landmark}>'
+    assert 'class="skip"' in source.read_text(), f'{name}: no skip link'
+    assert not page.problems, f'{name}: ' + '; '.join(page.problems)
+print(f'Site links valid: {len(pages)} HTML pages; lang, one h1, landmarks, skip link, alt text checked')
