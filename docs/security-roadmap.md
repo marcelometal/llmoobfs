@@ -37,6 +37,9 @@ Suggested order by cost-benefit. Each item has a verifiable done-when criterion.
 
 *Status, 2026-10-12 (journal 0060).* Done: [ADR-0011](decisions/0011-threat-and-credential-model.md),
 with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (journal 0084).
+*Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but F2 and part of F4. Two source
+reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
+private advisories published afterwards; no outside human review yet.
 
 > Note from 2026-10-11 (entry 0030), measured on the Azure host: `QUERY` time grows by about
 > 1.15 µs per entry from another owner that matches the query (18 µs with none, 28 ms with
