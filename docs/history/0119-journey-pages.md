@@ -1,7 +1,7 @@
-# 0119 — The journey on the site, in English and Portuguese (ADR-0015, proposed)
+# 0119 — The journey on the site, in English and Portuguese (ADR-0015)
 
 Date: 2026-10-17. Started 18:30, ended 19:40 (calendar time, local). Status: pages written and
-link-checked locally; ADR-0015 proposed, waiting for the maintainer. Estimated effort: S.
+link-checked locally; ADR-0015 accepted by the maintainer the same day. Estimated effort: S.
 
 ## Goal
 
@@ -26,7 +26,7 @@ community, in English and in Portuguese, as the maintainer asked on 2026-10-17.
 - `scripts/site-journey.py` (new): both languages side by side; writes the eight pages.
 - `site/`: the eight pages, styles for them, a "Journey" link on the existing pages, the
   sitemap.
-- `docs/decisions/0015-journey-pages-in-two-languages.md` (proposed).
+- `docs/decisions/0015-journey-pages-in-two-languages.md` (accepted the same day).
 
 ## Results
 
@@ -42,5 +42,5 @@ community, in English and in Portuguese, as the maintainer asked on 2026-10-17.
 
 ## Next step
 
-The maintainer's decision on ADR-0015; then a pull request after the stabilization batch, so
+A pull request after the stabilization batch, so
 the status page can name what that batch tested.

@@ -1,6 +1,6 @@
 # ADR-0015 — The project's journey on the site, in English and Portuguese
 
-Date: 2026-10-17. Status: **proposed**. Estimated effort: S (pages written; upkeep S per batch).
+Date: 2026-10-17. Status: **accepted** by the maintainer on 2026-10-17. Estimated effort: S (pages written; upkeep S per batch).
 Amends ADR-0010 (English everywhere) by one exception; ADR-0010 otherwise stands.
 
 ## Context
@@ -23,7 +23,7 @@ ADR-0010 made the repository English-only, with `README.pt-BR.md` as the one cou
 Brazilian audience (universities, student kernel groups, the local community) is half of the
 people the maintainer wants to reach.
 
-## Decision (proposed)
+## Decision
 
 - Four pages join the site: `site/journey.html`, `site/status.html`, `site/research.html` and
   `site/how.html`, each with a Portuguese counterpart under `site/pt/`, linked both ways and

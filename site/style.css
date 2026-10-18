@@ -150,7 +150,7 @@ footer p { margin: 0; }
 @media (max-width: 800px) { .parts { grid-template-columns: 1fr; gap: 1.5rem; } }
 @media (max-width: 480px) { .numbers { grid-template-columns: 1fr; } .term { font-size: 11.5px; } }
 
-/* Journey pages (journey, status, research, how; English and pt/): ADR-0015 proposal. */
+/* Journey pages (journey, status, research, how; English and pt/): ADR-0015. */
 .journey .timeline { list-style: none; padding: 0; margin: 2.2rem 0; border-left: 2px solid var(--line); }
 .journey .timeline li { position: relative; padding: 0 0 1.6rem 1.6rem; }
 .journey .timeline li::before { content: ""; position: absolute; left: -7px; top: .55rem; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--primary); }
