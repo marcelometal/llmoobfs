@@ -11,7 +11,7 @@ them not implemented yet).
 
 | Version | Supported |
 | --- | --- |
-| `main` | The one to use. Fixes land here only; there are no backports and no maintenance branches. |
+| `main` | Use this. Fixes land here only; there are no backports and no maintenance branches. |
 | `v0.3.0-experimental` | Source snapshot, not supported. It carries defects fixed since, security ones included (findings F6 to F12 of ADR-0011; see `CHANGELOG.md`). |
 | `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported; they carry more of the same defects. |
 

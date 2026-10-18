@@ -3,7 +3,11 @@
 The same facts about MoobFS (what works, what was tested, what was found, who maintains it, what
 help is wanted) are stated in many places. `AGENTS.md` asks that a change of state updates every
 place that states it, in the same unit of work, so that no surface contradicts another. This file
-is the inventory; walk it when closing a batch, a merge, a finding or a publication.
+is the inventory; walk it when closing a batch, a merge, a finding or a publication. Two checks
+in CI enforce part of it: `scripts/check-retired-claims.sh` (no claim listed in
+`docs/retired-claims.txt` may appear in a current-state document) and `scripts/site-faq.py --check`
+(the FAQ page is generated from `docs/faq.md`). Walking it also means closing what is done or
+obsolete: issues whose acceptance is met or whose premise no longer holds, finished calls.
 
 Surfaces outside the repository are listed by kind only; their content (posts, drafts, accounts)
 stays outside, as `AGENTS.md` asks for outreach. A surface left stale on purpose (for instance

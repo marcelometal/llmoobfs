@@ -1,0 +1,25 @@
+# Claims that were true once and are not any more (journal 0126). scripts/check-retired-claims.sh
+# fails when one of them appears in a document that states the project's current state (the
+# files it lists); journals, ADRs and dated research keep them as history. When a fact changes,
+# add the old wording here in the same commit that updates the surfaces (AGENTS.md).
+# One phrase per line, matched case-insensitively as a fixed string.
+no syzkaller
+xfstests has not been run
+SELinux has never been loaded
+never been loaded with SELinux
+no outside review yet
+the current tag is
+the only tag is
+the one to use
+not yet measured
+ainda não medido
+rebuilt at mount
+rebuilt at every mount
+linear scan at every mount
+facts as of 2026-10-13
+as of 2026-10-10
+no threat-model document
+findings F1 to F5
+findings F1 to F8
+sem syzkaller
+ainda sem revisão externa

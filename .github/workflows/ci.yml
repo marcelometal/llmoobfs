@@ -68,6 +68,10 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends shellcheck
       - name: shellcheck and SPDX headers (same command as locally)
         run: make lint   # info-level shellcheck findings are tracked as issues
+      - name: No retired claim in a current-state document; the FAQ page matches docs/faq.md (journal 0126)
+        run: |
+          sh scripts/check-retired-claims.sh
+          python3 scripts/site-faq.py --check
       - name: checkpatch.pl on layer/ and kernel/ (required since journal 0050)
         run: make checkpatch
       - name: DCO sign-off on every commit in the pull request

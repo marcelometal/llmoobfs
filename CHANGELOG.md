@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Documentation audit (journal 0126): every current-state document brought up to date; the FAQ page
+  generated from `docs/faq.md`; claims that stopped being true are listed in
+  `docs/retired-claims.txt` and checked in CI.
 - Published (journals 0111 and 0114): the two independent source reviews of commit 5582e06 that led to
   the security fixes F9 to F12 and to journal 0120, with the verification of each finding. README
   (both languages) states the review status.

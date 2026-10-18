@@ -1,7 +1,7 @@
 # Architecture overview
 
 How the MoobFS memory layer is built, in English, with a pointer to the source file or
-document behind each statement. This page describes the code on `main` as of 2026-10-10
+document behind each statement. This page describes the code on the `main` of 2026-10-10
 (M2 phases 2a to 2e and M3 phase 3b), revised on 2026-10-18 for the index built on demand
 (ADR-0012) and the review status; `QUERY2` and the domains are specified in
 [spec-query-v2.md](spec-query-v2.md), the security findings in ADR-0011. It is a description of an **experimental research
