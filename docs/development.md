@@ -152,11 +152,10 @@ There is no way yet to run a single step in isolation; the suite is sequential
    step name is what a failing run prints after `MOOBFS_VM_FAIL:`, so make it
    searchable.
 2. **A new test binary** lives in `tests/<name>.c` with an SPDX header, builds
-   statically and prints its own marker on success. Add it in three places:
-   - `vm/in-container.sh`: a `gcc -static ... tests/<name>.c -o "$STAGE/<name>"`
-     line next to the other test binaries;
-   - `.github/workflows/kasan.yml`, step "Build the layer module and the test
-     binaries against that kernel": the equivalent `gcc -static ... -o build/vng/<name>`;
+   statically and prints its own marker on success. Add it in two places:
+   - `vm/build-tests.sh`: one `t <name> [flags] tests/<name>.c ...` line. This is the
+     only list of test programs; `vm/in-container.sh`, `vm/kasan-local.sh` and the
+     KASAN, KCSAN and arm64 workflows all build from it;
    - `vm/suite.sh`: the invocation as `$BIN/<name> ...`. The suite header comment
      lists what `BIN` must contain; update it.
 3. **A new client or tool from the distribution** needs `stage_bin /path` in

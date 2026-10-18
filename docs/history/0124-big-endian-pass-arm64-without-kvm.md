@@ -31,3 +31,14 @@ architecture coverage.
 ## Next step
 
 Dispatch the arm64 job; record its duration and result here or in the next journal.
+
+*Note, 2026-10-18 (third arm64 run, 39141437064, after pull request 81).* Without `/dev/kvm`
+the job built the KASAN kernel and booted it under TCG, about 20 minutes in total. The guest
+panicked 9 seconds into boot, before the module was loaded: "kernel stack overflow" in
+`modprobe`. The trace is a recursion in the kernel's netfs read-retry path while reading the 9p
+root of virtme-ng (`netfs_retry_reads` → `netfs_rreq_terminated` → `netfs_rreq_assess` →
+`netfs_retry_reads`, repeating, then `p9_client_read`). It is a kernel issue of 6.12.112 under
+KASAN on arm64, not a MoobFS one. The stable changelogs 6.12.105 to 6.12.113 list no change to
+that retry path, so moving the pin does not help. The job stays exploratory and outside the
+required checks. Options, none taken yet: a root filesystem image instead of the 9p root, or an
+arm64 host with KVM.

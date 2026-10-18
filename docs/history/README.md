@@ -155,4 +155,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0126 — Audit of every current-state document; retired claims checked in CI; outreach per published unit](0126-documentation-audit-and-retired-claims.md)
 - [0127 — KCSAN runs in CI](0127-kcsan-in-ci.md)
 - [0128 — Shell scripts pass shellcheck at every severity (issue #5)](0128-shellcheck-at-every-severity.md)
+- [0129 — One list of test programs for every VM harness (issue #72)](0129-one-list-of-test-programs.md)
 - [0132 — ext4's reserve is granted as to the writer directly (finding F4 completed)](0132-ext4-reserve-follows-the-writer.md)
