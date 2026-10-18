@@ -10,7 +10,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
-> review yet. The current tag is `v0.3.0-experimental`, a source snapshot. Details under
+> human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The current tag is `v0.3.0-experimental`, a source snapshot. Details under
 > [Status](#status).
 
 ## The problem
@@ -106,13 +106,16 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 ## Status
 
 **Experimental. Source pre-release tags only; the current one is `v0.3.0-experimental`. Not for
-production.** Facts as of 2026-10-13:
+production.** Facts as of 2026-10-18:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep; x86-64; lower filesystems ext4, btrfs and XFS only.
-- **No outside review yet.** It was requested on 2026-10-13. Our own tests and reviews found and
-  fixed kernel-side defects, security ones among them; `v0.2.0-experimental` carries eleven of
-  them, so use `v0.3.0-experimental` ([changelog](CHANGELOG.md)).
+- **No outside human review yet.** It was requested on 2026-10-13. Two independent source reviews
+  made by AI assistants ([journal 0111](docs/history/0111-review-5582e06.md),
+  [journal 0114](docs/history/0114-second-inspection-of-5582e06.md)) and verified against the
+  kernel found four security defects (findings F9 to F12 of ADR-0011), reported as private
+  advisories and fixed in journals 0116 and 0117; our own tests and reviews found others before.
+  Tags up to `v0.3.0-experimental` carry defects fixed since ([changelog](CHANGELOG.md)).
 - **The measurements are pilot-grade**, from one host; the report that gathers them is
   [journal 0088](docs/history/0088-m4-report.md). They are not a general speed claim.
 - The index lives **in RAM only** and cannot be paged out. It is built per domain by the first
@@ -128,7 +131,7 @@ For anything beyond a disposable VM, SQLite or plain files remain the recommenda
 
 ## How to help
 
-The project has one maintainer and no outside review yet. What would help most, by how much
+The project has one maintainer and no outside human review yet. What would help most, by how much
 kernel knowledge it takes, is in **[docs/help-wanted.md](docs/help-wanted.md)**: a review of the
 credential model or of the index locking, if you know the VFS; a check of whether your memory
 system fits, if you build one; a run of the tests on your machine or on another kernel; and a

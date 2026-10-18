@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Published (journals 0111 and 0114): the two independent source reviews of commit 5582e06 that led to
+  the security fixes F9 to F12 and to journal 0120, with the verification of each finding. README
+  (both languages) states the review status.
 - CI (journal 0124): the big-endian run passes (60 encoding checks, 9 image tests); GitHub's arm64
   runners have no KVM, so the arm64 job runs under emulation and, by default, only the step `ext4`.
 - CI (journal 0123): a big-endian (s390x, QEMU user mode) run of the attribute encoding and image

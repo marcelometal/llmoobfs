@@ -13,7 +13,8 @@
 > de diferença ([ADR-0010](docs/decisions/0010-english-everywhere.md)).
 
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
-> revisão externa. A tag atual é `v0.3.0-experimental`, um instantâneo do código-fonte. Detalhes
+> revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
+> diários 0111 e 0114). A tag atual é `v0.3.0-experimental`, um instantâneo do código-fonte. Detalhes
 > em [Estado](#estado).
 
 ## O problema
@@ -113,13 +114,17 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 ## Estado
 
 **Experimental. Só tags de pré-lançamento do código-fonte; a atual é `v0.3.0-experimental`. Não é
-para produção.** Fatos em 2026-10-13:
+para produção.** Fatos em 2026-10-18:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep; x86-64; sistemas de arquivos de baixo ext4, btrfs e XFS apenas.
-- **Ainda sem revisão externa.** Foi pedida em 2026-10-13. Nossos próprios testes e revisões
-  acharam e corrigiram defeitos do lado do kernel, alguns de segurança; a `v0.2.0-experimental`
-  carrega onze deles, então use a `v0.3.0-experimental` ([changelog](CHANGELOG.md)).
+- **Ainda sem revisão humana externa.** Foi pedida em 2026-10-13. Duas revisões independentes do
+  código, feitas por assistentes de IA ([diário 0111](docs/history/0111-review-5582e06.md),
+  [diário 0114](docs/history/0114-second-inspection-of-5582e06.md)) e conferidas contra o kernel,
+  acharam quatro defeitos de segurança (achados F9 a F12 do ADR-0011), relatados como avisos de
+  segurança privados e corrigidos nos diários 0116 e 0117; nossos próprios testes e revisões
+  acharam outros antes. As tags até a `v0.3.0-experimental` carregam defeitos corrigidos depois
+  ([changelog](CHANGELOG.md)).
 - **As medições são de nível piloto**, de uma máquina; o relatório que as reúne é o
   [diário 0088](docs/history/0088-m4-report.md). Não são uma afirmação geral de velocidade.
 - O índice vive **só em RAM** e não pode ir para o swap. Ele é construído por domínio na primeira
@@ -135,7 +140,7 @@ recomendação ([when-not-to-use.md](docs/when-not-to-use.md)). A lista completa
 
 ## Como ajudar
 
-O projeto tem um mantenedor e ainda nenhuma revisão externa. O que mais ajudaria, organizado por
+O projeto tem um mantenedor e ainda nenhuma revisão humana externa. O que mais ajudaria, organizado por
 quanto conhecimento de kernel exige, está em **[docs/help-wanted.md](docs/help-wanted.md)**: uma
 revisão do modelo de credenciais ou das travas do índice, se você conhece o VFS; uma verificação
 de se o seu sistema de memória se encaixa, se você constrói um; uma rodada dos testes na sua
