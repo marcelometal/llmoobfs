@@ -13,6 +13,7 @@ Read `README.md`, `docs/history/README.md`, the most recent session journal and 
 - Do not store credentials, tokens, environment dumps or unnecessary personal data. Histories record brief technical justifications, not the assistant's private internal reasoning.
 - Outreach stays outside the repository: drafts of messages, calls for reviewers or contributors, conversations, where something was posted, and research about people. When an outside answer changes the project, the journal records its technical content and the public link to it, with the person described by role, not by name.
 - Before finishing a task, make clear the current state, the tests, the limitations and the next step. Correct factually wrong records with a dated note.
+- Keep every public surface in step: a change of state (status, tests run, findings, reviews, maintainers, calls for help or research topics, publications) updates every place that states it, in the same unit of work and in both languages where a surface has two. The inventory is `docs/public-surfaces.md`; a surface left stale on purpose (for example until a coordinated disclosure) is named, with the reason, in the journal of the change.
 - Give every new ADR and roadmap item an estimated effort: S (hours), M (one to three days) or L (a week or more). Each journal records when its work started and ended, so that estimate and actual time can be compared when the work closes. Calendar time is not effort: say which one is recorded.
 
 ## Technical documentation

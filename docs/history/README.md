@@ -141,3 +141,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0112 — A lower dentry pinned by a failed mount (syzkaller); ENOMEM reported as EINVAL; a SQL condition dropped on an older SQLite](0112-mount-leak-and-sql-omit.md)
 - [0113 — Regression tests for the fixes of journal 0105](0113-regression-tests-for-the-review-fixes.md)
 - [0119 — The journey on the site, in English and Portuguese (ADR-0015)](0119-journey-pages.md)
+- [0122 — Every public surface kept in step with the project's state](0122-public-surfaces-rule.md)
