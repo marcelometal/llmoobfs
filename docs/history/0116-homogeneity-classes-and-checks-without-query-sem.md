@@ -103,6 +103,13 @@ On the benchmark host, upstream 6.12.112 with KASAN, UBSAN and lockdep (`vm/kasa
   remount code are unchanged here; the GitHub runner (util-linux 2.39) and the busybox harness
   pass it. Recorded as a separate investigation (journal 0118).
 
+
+*Note, 2026-10-18 (full run).* The whole suite of this batch ran under KASAN, UBSAN and lockdep on
+a GitHub-hosted runner with KVM, in a private repository used only to test fixes before their
+coordinated publication (commit 622ed72: the batch of journals 0115 to 0118 on top of the `main` of
+2026-10-15): `MOOBFS_KASAN_PASS`, with `PERMMATRIX_STEP_PASS: 12 seeds, no answer the lower would refuse; 307 answers the rule before journal 0116 gave wrongly` and `STALL_PASS`. The CI job of the same commit passed: native Linux VM,
+lint with shellcheck and `scripts/checkpatch.sh`, tools and sanitizers.
+
 ## Limitations
 
 - Not yet run: `scripts/checkpatch.sh` (the benchmark host stopped answering before it ran) and

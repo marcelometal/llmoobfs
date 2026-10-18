@@ -45,6 +45,12 @@ jobs:
             LDFLAGS='-fsanitize=address,undefined' 2>&1 | tee /tmp/hostile-asan.log
           grep -q '^HOSTILE_USER_PASS' /tmp/hostile-asan.log
           if grep -qE 'runtime error|ERROR: AddressSanitizer' /tmp/hostile-asan.log; then exit 1; fi
+      - name: Big-endian run of the attribute encoding and image tools (s390x, QEMU user mode)
+        # The encoding is little-endian on disk and the code assembles it byte by byte; this runs
+        # the same unit and image tests on a big-endian target to keep it so (journal 0123).
+        run: |
+          sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user-static
+          make test CC=s390x-linux-gnu-gcc BUILD=build/s390x LDFLAGS=-static
       - name: Validate site links
         run: python3 scripts/check-site.py
   lint:

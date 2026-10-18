@@ -277,8 +277,9 @@ repetições com intervalos de confiança. Resultados brutos: [bench/results/](b
 
 ## Experimente numa VM
 
-Início rápido. Com o Docker rodando, a partir da raiz do repositório (no Apple Silicon a VM roda
-com emulação de CPU e demora mais):
+Início rápido. Com o Docker rodando, a partir da raiz do repositório. A execução completa leva de 7
+a 8 minutos num runner x86-64 do GitHub (o job "Native Linux VM" do CI roda exatamente este
+comando); no Apple Silicon a VM roda com emulação de CPU e demora mais:
 
 ```sh
 git clone https://github.com/studiomoob/llmoobfs.git

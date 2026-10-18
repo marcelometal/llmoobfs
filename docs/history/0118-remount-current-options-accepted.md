@@ -66,6 +66,13 @@ every option again. `lower=` is compared as the directory it resolves to (`kern_
   `sh scripts/checkpatch.sh` and shellcheck on this change; the work stopped before them and the
   benchmark host was not reachable when it resumed. They run with the batch.
 
+
+*Note, 2026-10-18 (full run).* The whole suite of this batch ran under KASAN, UBSAN and lockdep on
+a GitHub-hosted runner with KVM, in a private repository used only to test fixes before their
+coordinated publication (commit 622ed72: the batch of journals 0115 to 0118 on top of the `main` of
+2026-10-15): `MOOBFS_KASAN_PASS`, with the step `ext4` and its remount checks and `reconf`, on the runner's util-linux (2.39; the 2.41 path was checked by hand, above). The CI job of the same commit passed: native Linux VM,
+lint with shellcheck and `scripts/checkpatch.sh`, tools and sanitizers.
+
 ## Limitations
 
 - A `lower=` that mountinfo prints unreachable from the caller's namespace (a lower outside the
