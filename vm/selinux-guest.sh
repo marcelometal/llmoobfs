@@ -50,12 +50,12 @@ done
 # the reference
 echo "labels through the layer after the client went first ($TAG):"
 for f in rw ro none; do
-    echo "  $f: lower=$(ls -Z $L/t/$f | cut -d' ' -f1) layer=$(ls -Z $S/layer/t/$f | cut -d' ' -f1)"
+    echo "  $f: lower=$(stat -c %C $L/t/$f) layer=$(stat -c %C $S/layer/t/$f)"
 done
 # the client must also create through the layer what it may create directly
 d=$(c touch $L/t/new-direct); l=$(c touch $S/layer/t/new-layer)
 echo "  $TAG create: direct=$d layer=$l"
-ls -Z $L/t/new-direct $L/t/new-layer 2>&1 | sed 's/^/  /'
+stat -c '%C %n' $L/t/new-direct $L/t/new-layer 2>&1 | sed 's/^/  /'
 dmesg | grep -c 'avc:  denied' | sed "s/^/  $TAG avc denials: /"
 dmesg | grep -i "inode_doinit\|getxattr returned" | sed "s/^/  $TAG dmesg: /"
 # QUERY2 under the policy: the three files carry the same attribute; the client may getattr

@@ -8,6 +8,7 @@
 #   ARGS     arguments of ./check (for instance "-g quick")
 set -u
 PATH=$PATH:/usr/sbin:/sbin; export PATH
+# shellcheck source=/dev/null   # written by the fstests build, not tracked
 . "$(dirname "$0")/../build/fstests/env.sh"
 fail() { echo "MOOBFS_FSTESTS_ENV_FAIL: $1"; exit 1; }
 B=/tmp/moob
