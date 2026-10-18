@@ -1,0 +1,52 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.Dd October 18, 2026
+.Dt MOOBFS-CHECK 1
+.Os
+.Sh NAME
+.Nm moobfs-check
+.Nd validate the typed MoobFS attributes of a tree
+.Sh SYNOPSIS
+.Nm
+.Op Fl -domain-depth Ar N
+.Ar directory
+.Nm
+.Fl -help
+.Sh DESCRIPTION
+.Nm
+walks
+.Ar directory ,
+a plain directory or a mounted MoobFS layer, validates every typed attribute and the format
+marker on its root, and prints one JSON object with a
+.Dq format
+member and a list of
+.Dq problems .
+It diagnoses only and never repairs.
+MoobFS is an experimental research project.
+.Pp
+With
+.Fl -domain-depth Ar N ,
+the depth of domain directories given to the layer as a mount option,
+it also lists under
+.Dq left_out
+the files carrying typed attributes that QUERY2 does not return, with the reason: they fail the
+homogeneity rule, or sit above every domain.
+These are not problems and do not change the exit status.
+.Sh EXIT STATUS
+.Bl -tag -width 2n -compact
+.It 0
+clean
+.It 1
+the tree could not be walked; the reason is printed
+.It 2
+problems found
+.It 64
+usage error, or
+.Ar N
+outside 1 to 32
+.El
+.Sh SEE ALSO
+.Xr moobfs-attr 1 ,
+.Xr moobfs-index 1
+.Pp
+docs/tools.md and docs/spec-query-v2.md in the MoobFS repository,
+.Lk https://github.com/studiomoob/llmoobfs

@@ -1,0 +1,69 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.Dd October 18, 2026
+.Dt MOOBFS-INDEX 1
+.Os
+.Sh NAME
+.Nm moobfs-index
+.Nd answer MoobFS attribute queries in user space
+.Sh SYNOPSIS
+.Nm
+.Op Fl -uid Ar N
+.Op Fl -domain
+.Op Fl -order Ar name type Cm asc | desc
+.Op Fl -limit Ar N
+.Ar directory
+.Op Ar term ...
+.Sh DESCRIPTION
+.Nm
+walks
+.Ar directory ,
+reads every typed attribute with the encoding the kernel uses and answers the same conjunctive
+queries as the MoobFS layer's QUERY and QUERY2, printing
+.Dq ino<TAB>path
+lines.
+It is the oracle the test suite compares the kernel with.
+MoobFS is an experimental research project.
+.Pp
+A
+.Ar term
+is four words,
+.Dq name op type value ,
+up to four terms joined by AND; op is one of
+.Cm eq , lt , le , gt , ge , prefix
+or
+.Cm exists ,
+whose type and value are given as
+.Dq - .
+An operator ending in
+.Sq \&?
+(for example
+.Cm gt? )
+also matches files without the attribute.
+.Bl -tag -width Ds
+.It Fl -uid Ar N
+drop privileges to that user first, so the walk sees only what the user may reach
+.It Fl -domain
+treat
+.Ar directory
+as a domain directory: its own attributes are left out and an entry is listed only when it
+passes the homogeneity rule, evaluated independently of the kernel
+.It Fl -order Ar name type Cm asc | desc
+list only entries whose
+.Ar name
+attribute has
+.Ar type ,
+sorted by value and inode number; terms may then be empty
+.It Fl -limit Ar N
+keep the first
+.Ar N
+.El
+.Sh EXIT STATUS
+0 on success, non-zero on a usage error or a failed walk.
+.Sh EXAMPLES
+.Dl $ moobfs-index --domain /srv/memories/alice kind eq string decision
+.Sh SEE ALSO
+.Xr moobfs-attr 1 ,
+.Xr moobfs-check 1
+.Pp
+docs/spec-query-v2.md in the MoobFS repository,
+.Lk https://github.com/studiomoob/llmoobfs
