@@ -91,7 +91,7 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends shellcheck
       - name: shellcheck and SPDX headers (same command as locally)
-        run: make lint   # info-level shellcheck findings are tracked as issues
+        run: make lint
       - name: Manual pages (mandoc lint, issue 8)
         run: |
           sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends mandoc

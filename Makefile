@@ -85,7 +85,7 @@ fuzz: | $(BUILD)
 	$(BUILD)/fuzz_attr -max_total_time=$(FUZZ_TIME) -max_len=4200 tests/fuzz-corpus/attr $(BUILD)/fuzz-corpus
 lint:
 	@command -v shellcheck >/dev/null 2>&1 || { echo 'shellcheck not found: apt install shellcheck, or brew install shellcheck'; exit 1; }
-	shellcheck --shell=sh --severity=warning $$(git ls-files 'vm/*.sh' 'scripts/*.sh')
+	shellcheck --shell=sh $$(git ls-files 'vm/*.sh' 'scripts/*.sh')
 	sh scripts/check-spdx.sh
 # Manual pages of the tools (issue #8): mandoc must report nothing at warning level.
 man-lint:

@@ -123,7 +123,7 @@ AI-assisted:
   the `Makefile`.
 - Every new `.c`, `.h`, `.py` and `.sh` file starts with an
   `SPDX-License-Identifier: GPL-2.0-only` line (CI checks the C sources).
-- Shell scripts in `vm/` must pass `shellcheck` (CI runs it).
+- Shell scripts in `vm/` and `scripts/` must pass `shellcheck` at every severity (`make lint`, as CI runs it). A finding left on purpose gets a `# shellcheck disable=` line with its reason.
 
 ## Testing requirements
 
