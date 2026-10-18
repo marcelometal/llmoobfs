@@ -1,6 +1,7 @@
 # How to help
 
-MoobFS is an experimental kernel module with one maintainer and no outside review yet. This
+MoobFS is an experimental kernel module with one maintainer and no outside human review yet (two
+source reviews by AI assistants, journals 0111 and 0114). This
 page says what would help most, by how much kernel knowledge it takes. Read the status block at
 the top of the [README](../README.md) first: nothing here is ready for production, and the
 project says where it loses as readily as where it wins.
@@ -14,8 +15,8 @@ project's journal with credit, if the person wants it.
 | --- | --- |
 | Review the credential model: name operations with the caller's credentials, data operations on an open file with the mounter's, checked against a table. Not the overlayfs model, which checks both and runs every real operation as the mounter ([journal 0099](history/0099-credential-model-corrected.md)) | [issue 16](https://github.com/studiomoob/llmoobfs/issues/16) |
 | Review the locking of the attribute index against rename, unlink, eviction and memory reclaim | [issue 17](https://github.com/studiomoob/llmoobfs/issues/17) |
-| Tell us what a stacked filesystem usually gets wrong that our tests have not caught. This week's own list is in journals [0069](history/0069-setattr-crash-and-mounter-capability.md), [0074](history/0074-privileges-kept-on-copy.md), [0078](history/0078-syncfs-reaches-the-lower.md), [0082](history/0082-index-lock-and-reclaim.md) and [0083](history/0083-index-inspection-fixes.md) | open an issue |
-| Run the suite under a Linux security module policy (SELinux has never been loaded in a test) | [testing.md](testing.md) |
+| Tell us what a stacked filesystem usually gets wrong that our tests have not caught. What was found so far is in [ADR-0011](decisions/0011-threat-and-credential-model.md) (findings F1 to F12) and journals [0082](history/0082-index-lock-and-reclaim.md), [0083](history/0083-index-inspection-fixes.md), [0112](history/0112-mount-leak-and-sql-omit.md) and [0120](history/0120-review-medium-and-low-items.md) | open an issue |
+| Run the suite under AppArmor or Smack (SELinux enforcing was exercised once, journal [0104](history/0104-selinux-investigation.md)) | [testing.md](testing.md) |
 
 ## If you build memory for agents
 

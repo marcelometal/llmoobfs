@@ -2,7 +2,9 @@
 
 How the MoobFS memory layer is built, in English, with a pointer to the source file or
 document behind each statement. This page describes the code on `main` as of 2026-10-10
-(M2 phases 2a to 2e and M3 phase 3b). It is a description of an **experimental research
+(M2 phases 2a to 2e and M3 phase 3b), revised on 2026-10-18 for the index built on demand
+(ADR-0012) and the review status; `QUERY2` and the domains are specified in
+[spec-query-v2.md](spec-query-v2.md), the security findings in ADR-0011. It is a description of an **experimental research
 module**, not a compatibility promise: the UAPI is version 1 and may change, and the module
 has been tested on one kernel series only (Debian 6.12.111 in QEMU; upstream 6.12.112 under
 KASAN/UBSAN/lockdep). The specifications are [spec-m2.md](spec-m2.md) and
@@ -169,7 +171,8 @@ may be missing from answers until the next mount (a documented false negative, n
 Evidence: two uids, two namespaces, mode bits and POSIX ACLs, remount, a five-second race of
 `chmod`/`rename`/`unlink` against `QUERY`, over the three lower filesystems, in the Debian VM
 and under KASAN on 6.12.112 ([journal 0020](history/0020-phase-3b-query-authorization.md)).
-No external audit and no timing-channel analysis exist.
+The timing channel was measured (`QUERY2` against v1, journal
+[0043](history/0043-timing-channel-query2.md)); no outside human review exists.
 
 `MOOB_IOC_GET_INFO` returns `struct moob_info`: UAPI and format versions, the attribute
 limits above, capabilities advertised from the lower filesystem type (`MOOB_CAP_REFLINK`,
@@ -213,12 +216,14 @@ backup tools read it without the module, and `moobfs-check` validates it from us
 ([ADR-0007](decisions/0007-stacked-memory-layer.md) item 3). The acceptance tests run git and
 WAL-mode SQLite unchanged on the mount and compare `fsx` results against the lower copy
 ([testing.md](testing.md) §3). The index is the only state that exists solely in the layer,
-and it is rebuilt from the xattrs at every mount.
+and each domain's part is rebuilt from the xattrs by the first query on that domain after a
+mount or a release (ADR-0012).
 
 ## 9. What this page does not claim
 
-No performance, latency or memory figure exists (M4 pending); no kernel beyond the two above
-has been tried; xfstests has not been run (only the vendored `fsx`); the code is one author's,
-with three kernel-side defects found by its own tests ([0015](history/0015-phase-2e-investigation.md),
-[0016](history/0016-kasan-lockdep-harness.md)) and no external review. See
+Only pilot-grade figures exist, from one host ([report](history/0088-m4-report.md)); no kernel
+beyond the two above has been tried; fstests ran as its `quick` group only; the code is one
+author's, with the defects found by its own tests and by two source reviews by AI assistants
+listed in [ADR-0011](decisions/0011-threat-and-credential-model.md) (F1 to F12), and no outside
+human review. See
 [when-not-to-use.md](when-not-to-use.md) and [faq.md](faq.md).
