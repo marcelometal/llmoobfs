@@ -481,6 +481,15 @@ static int mv_best_index(sqlite3_vtab *vt, sqlite3_index_info *ix)
 				continue;
 			if (t->col[c->iColumn].type == MOOB_T_BOOL && op != MOOB_OP_EQ && op != MOOB_OP_EXISTS)
 				continue;
+			/*
+			 * The kernel compares bytes, which is SQLite's BINARY collation. Under another one
+			 * (kind = 'Note' COLLATE NOCASE) it would leave out rows SQLite counts as equal,
+			 * and checking again on each row cannot bring them back, so the condition stays
+			 * SQLite's alone (journal 0120). ORDER BY needs no such test: SQLite does not
+			 * offer a vtab an ORDER BY term whose collation differs from the column's.
+			 */
+			if (op != MOOB_OP_EXISTS && sqlite3_stricmp(sqlite3_vtab_collation(ix, i), "BINARY"))
+				continue;
 			/* the EXISTS of required columns not covered keep their slots */
 			if (plan.nterm + uncovered -
 			    (t->col[c->iColumn].required && !covered[c->iColumn]) >= (int)MOOB_QUERY_MAX_TERMS)

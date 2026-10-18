@@ -513,9 +513,12 @@ static bool ext_acl(struct inode *inode, int *err)
 /*
  * Sufficient condition for "everyone who can traverse the domain directory dom can also
  * reach in": read it (want_read, a file or a directory carrying attributes) or traverse it
- * (an intermediate directory). Either in grants the class bit to others and has no
- * extended ACL, or in and dom share owner and group, neither has an extended ACL, and in
- * grants the bit to every class that dom lets traverse. Lower inodes: permissions are the
+ * (an intermediate directory). Either in grants the class bit to owner, group and others
+ * and has no extended ACL, or in and dom share owner and group, neither has an extended
+ * ACL, and in grants the bit to every class that dom lets traverse. The bit of others alone
+ * is not enough: the kernel judges the owner by the owner bits and a member of the group by
+ * the group bits, never by those of others (acl_permission_check), so a file 0604 is not
+ * readable by its group (journal 0116). Lower inodes: permissions are the
  * lower filesystem's. An ACL that could not be read counts as restrictive; a caller that
  * must not take that for an answer (a build) passes err and gets the error there.
  */
@@ -526,7 +529,7 @@ static bool reach_ok(struct inode *in, struct inode *dom, bool want_read, int *e
 	umode_t o = want_read ? 0004 : 0001;
 	bool acl = ext_acl(in, err);
 
-	if (!acl && (in->i_mode & o))
+	if (!acl && (in->i_mode & (u | g | o)) == (u | g | o))
 		return true;
 	if (acl || ext_acl(dom, err))
 		return false;
@@ -830,6 +833,13 @@ static void domain_drop(struct moobl_index *ix, u64 domain)
 		bool last = false;
 
 		next = rb_next(n);
+		/*
+		 * The walk covers every name of the mount and can free millions of entries with the
+		 * index lock held for writing; the lock is a semaphore, so give the CPU away between
+		 * names (review item 6, journal 0120). next stays valid: nobody else changes the
+		 * tree while the write lock is held.
+		 */
+		cond_resched();
 		if (nm->domain != domain)
 			continue;
 		while (!last) {		/* freeing its last entry frees nm */
@@ -1140,9 +1150,17 @@ struct scan_name {
 	char name[];
 };
 
+/*
+ * Names read from one directory before they are handled. A directory is read in batches of this
+ * many names, as getdents(2) reads it, instead of whole: a user could otherwise make a build hold
+ * a listing as large as the directory, outside the index budget (review item 5, journal 0120).
+ */
+#define MOOBL_SCAN_BATCH 1024U
+
 struct scan_ctx {
 	struct dir_context ctx;
 	struct list_head names;
+	unsigned int count;	/* names in this batch */
 	int err;
 };
 
@@ -1154,6 +1172,8 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 
 	if ((len == 1 && name[0] == '.') || (len == 2 && name[0] == '.' && name[1] == '.'))
 		return true;
+	if (sc->count == MOOBL_SCAN_BATCH)
+		return false;	/* not consumed: the next iterate_dir() starts with it */
 	sn = kmalloc(sizeof(*sn) + len, GFP_KERNEL);
 	if (!sn) {
 		sc->err = -ENOMEM;
@@ -1162,6 +1182,7 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 	sn->len = len;
 	memcpy(sn->name, name, len);
 	list_add_tail(&sn->list, &sc->names);
+	sc->count++;
 	return true;
 }
 
@@ -1336,18 +1357,31 @@ static int scan_run(struct scan_job *job)
 			err = PTR_ERR(dir) == -ENOENT && !IS_ROOT(cur->dentry) ? 0 : PTR_ERR(dir);
 			goto drop;
 		}
-		err = iterate_dir(dir, &sc.ctx);
-		fput(dir);
-		if (err == -ENOENT && !IS_ROOT(cur->dentry))
-			err = 0;
-		if (!err)
-			err = sc.err;
-		list_for_each_entry_safe(sn, tmp, &sc.names, list) {
+		for (;;) {	/* one batch of names at a time; the file keeps the position */
+			bool full;
+
+			sc.count = 0;
+			err = iterate_dir(dir, &sc.ctx);
+			if (err == -ENOENT && !IS_ROOT(cur->dentry))
+				err = 0;
 			if (!err)
-				err = scan_child(job, cur, sn);
-			list_del(&sn->list);
-			kfree(sn);
+				err = sc.err;
+			full = sc.count == MOOBL_SCAN_BATCH;
+			list_for_each_entry_safe(sn, tmp, &sc.names, list) {
+				if (!err)
+					err = scan_child(job, cur, sn);
+				list_del(&sn->list);
+				kfree(sn);
+			}
+			if (err || !full)
+				break;
+			if (fatal_signal_pending(current)) {
+				err = -EINTR;
+				break;
+			}
+			cond_resched();
 		}
+		fput(dir);
 drop:
 		scan_dir_free(cur);
 	}
@@ -1710,6 +1744,7 @@ void moobl_index_destroy(struct super_block *sb)
 		list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
 			entry_free(ix, e);
 		inode_rec_put_if_empty(ix, rec);
+		cond_resched();	/* every inode of the mount, at unmount (journal 0120) */
 	}
 	xa_destroy(&ix->inodes);
 	xa_destroy(&ix->fallback);
@@ -2258,6 +2293,7 @@ struct moobl_candidate {
 	u8 type;	/* scan key of the entry that produced it (QUERY2 cursors) */
 	u16 len;
 	u8 *value;
+	bool ok;	/* a result: the caller may read it, or no check is asked */
 };
 
 struct moobl_resume {
@@ -2271,14 +2307,24 @@ struct moobl_resume {
 	u8 value[MOOB_QUERY_VALUE_MAX];
 };
 
+/*
+ * The walk runs in the caller's mount namespace and can wait for as long as something the
+ * caller controls decides: a FUSE filesystem mounted over a directory of the domain whose
+ * daemon never answers (request_wait_answer, fs/fuse/dev.c, cannot be interrupted once the
+ * request is read). So it runs with query_sem released (query_run, journal 0116), and it does
+ * not leave this mount nor follow symbolic links: a result is on this mount under its
+ * recorded name, and anything else would be refused below anyway.
+ */
 static bool caller_may_read(struct file *file, struct super_block *sb, const char *path, u64 ino)
 {
 	struct path p;
 	bool ok = false;
 
+	lockdep_assert_not_held(&IX(sb)->query_sem);
 	if (!path || !*path)
 		return false;
-	if (vfs_path_lookup(file->f_path.dentry, file->f_path.mnt, path, 0, &p))
+	if (vfs_path_lookup(file->f_path.dentry, file->f_path.mnt, path,
+			    LOOKUP_NO_XDEV | LOOKUP_NO_SYMLINKS, &p))
 		return false;
 	if (p.mnt == file->f_path.mnt && p.dentry->d_sb == sb && d_inode(p.dentry) &&
 	    d_inode(p.dentry)->i_ino == ino &&
@@ -2624,9 +2670,45 @@ static int results_to_user(struct moobl_index *ix, u64 uptr, const struct moob_q
 	return 0;
 }
 
+static long query2_pin(struct super_block *sb, struct file *file, u64 domain);
+
 /*
- * Runs one query. start (may be NULL) resumes strictly after (or, descending, before) a
- * scan key; last (may be NULL) receives the key of the last result returned.
+ * Takes query_sem for reading again after the per-result checks of a chunk ran without it,
+ * and makes sure what the query reads is still there. QUERY2: its domain may have been taken
+ * down meanwhile (a rebuild after a directory rename, a release over the budget); it is built
+ * and pinned again, and the scan resumes from its key as after any concurrent change. v1
+ * reads every partition: if any was taken down, the answer could silently lack it, so the
+ * query fails with EAGAIN as when its first pin did not hold (do_query). Returns with
+ * query_sem held for reading in every case, as its callers expect.
+ */
+static long query_repin(struct super_block *sb, struct file *file, const struct moobl_qscope *sc,
+			u64 gen)
+{
+	struct moobl_index *ix = IX(sb);
+	struct moobl_domain *dom;
+	long err;
+
+	down_read(&ix->query_sem);
+	if (sc->all)
+		return READ_ONCE(ix->drop_gen) == gen ? 0 : -EAGAIN;
+	dom = xa_load(&ix->domains, (unsigned long)sc->domain);
+	if (dom && domain_fresh(ix, dom))
+		return 0;
+	up_read(&ix->query_sem);
+	err = query2_pin(sb, file, sc->domain);
+	if (err)
+		down_read(&ix->query_sem);
+	return err;
+}
+
+/*
+ * Runs one query, with query_sem held for reading by the caller. start (may be NULL) resumes
+ * strictly after (or, descending, before) a scan key; last (may be NULL) receives the key of
+ * the last result returned. With per-result checks, query_sem is released while a chunk is
+ * checked and taken again before the next one (query_repin): a check walks paths with the
+ * caller's credentials and can wait on anything the caller mounted, and a wait with
+ * query_sem held would stop every query of the mount once a writer queues behind it
+ * (rwsem_down_read_slowpath), the class of finding F7 (journal 0116).
  */
 static long query_run(struct super_block *sb, struct file *file,
 		      const struct moob_query_term *terms, u32 nterms, u32 limit,
@@ -2746,8 +2828,24 @@ chunk_done:
 			exhausted = true;
 		ix_read_unlock(ix, nofs);
 		for (i = 0; i < ncand; i++) {
-			bool ok = !err && (!sc->check ||
-					   caller_may_read(file, sb, cand[i].path, cand[i].ino));
+			dput(cand[i].held);
+			cand[i].held = NULL;
+			cand[i].ok = !err && !sc->check;
+		}
+		if (!err && sc->check && ncand) {
+			/* stable here: a takedown holds query_sem for writing */
+			u64 gen = READ_ONCE(ix->drop_gen);
+			long rerr;
+
+			up_read(&ix->query_sem);
+			for (i = 0; i < ncand; i++)
+				cand[i].ok = caller_may_read(file, sb, cand[i].path, cand[i].ino);
+			rerr = query_repin(sb, file, sc, gen);
+			if (rerr)
+				err = rerr;
+		}
+		for (i = 0; i < ncand; i++) {
+			bool ok = !err && cand[i].ok;
 
 			if (ok && count == limit) {
 				truncated = 1;
@@ -2756,8 +2854,6 @@ chunk_done:
 				put_result(&kres[count], &cand[i], last);
 				count++;
 			}
-			dput(cand[i].held);
-			cand[i].held = NULL;
 			kfree(cand[i].path);
 			cand[i].path = NULL;
 			kfree(cand[i].value);

@@ -1,0 +1,274 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * permmatrix: QUERY2 against the kernel's own permission decision (journal 0116).
+ *
+ *   permmatrix plant <lower dir> <seed>       as root: <lower dir>/pm, a domain directory with
+ *                                              files of random modes, owners and groups, some
+ *                                              under an intermediate directory, each carrying
+ *                                              user.moob.pm
+ *   permmatrix check <layer dir> <lower dir>   for every identity of the matrix: QUERY2
+ *                                              "pm exists" on <layer dir>/pm must return only
+ *                                              files that identity can getxattr on the lower
+ *                                              (and open the domain there), and every such
+ *                                              file the rule calls homogeneous
+ *
+ * The domain is planted on the lower and the layer mounted after, so no permission changes
+ * through the layer and the domain is answered from its partition, without per-result checks
+ * (the check step verifies fallback_domains=0 on the caller's side through the shell). The
+ * oracle is the lower kernel itself, not a copy of the rule. check also counts the cases the
+ * rule before journal 0116 ("others" bit alone) would have answered wrongly, so a run proves
+ * the matrix reached them. Prints PERMMATRIX_PASS with the counts; exits 1 on a mismatch.
+ */
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/xattr.h>
+#include <unistd.h>
+#include "moobfs_attr.h"
+#include "moobfs_ioctl.h"
+
+#define NFILES 48
+#define NSUB 4
+static const mode_t file_modes[] = { 0644, 0604, 0640, 0600, 0444, 0404, 0440, 0004, 0040, 0400,
+				     0664, 0606 };
+static const mode_t dir_modes[] = { 0755, 0705, 0750, 0711, 0701, 0710, 0700, 0751, 0715 };
+static const uid_t uids[] = { 1001, 1002, 1003 };
+static const gid_t gids[] = { 2001, 2002 };
+
+struct ident { uid_t uid; gid_t gid; int ngroups; gid_t groups[2]; };
+static const struct ident idents[] = {
+	{ 1001, 2001, 0, { 0 } }, { 1001, 2002, 0, { 0 } }, { 1001, 2001, 1, { 2002 } },
+	{ 1002, 2001, 0, { 0 } }, { 1002, 2002, 0, { 0 } }, { 1003, 2002, 1, { 2001 } },
+	{ 1004, 3000, 0, { 0 } }, { 1004, 3000, 1, { 2001 } }, { 1004, 3000, 1, { 2002 } },
+};
+
+static unsigned long long rng;
+static unsigned int pick(unsigned int n)
+{
+	rng = rng * 6364136223846793005ULL + 1442695040888963407ULL;
+	return (unsigned int)(rng >> 33) % n;
+}
+
+static int plant(const char *lower, unsigned long long seed)
+{
+	char path[4096];
+	const char val[] = { MOOB_T_STRING, 'v' };
+	int i;
+
+	rng = seed;
+	snprintf(path, sizeof path, "%s/pm", lower);
+	if (mkdir(path, 0755) || chown(path, uids[pick(3)], gids[pick(2)]) ||
+	    chmod(path, dir_modes[pick(sizeof dir_modes / sizeof dir_modes[0])])) {
+		perror(path);
+		return 1;
+	}
+	for (i = 0; i < NSUB; i++) {
+		snprintf(path, sizeof path, "%s/pm/s%d", lower, i);
+		if (mkdir(path, 0755) || chown(path, uids[pick(3)], gids[pick(2)]) ||
+		    chmod(path, dir_modes[pick(sizeof dir_modes / sizeof dir_modes[0])])) {
+			perror(path);
+			return 1;
+		}
+	}
+	for (i = 0; i < NFILES; i++) {
+		int fd, sub = (int)pick(NSUB + 2) - 2;	/* about a third directly in the domain */
+
+		if (sub < 0)
+			snprintf(path, sizeof path, "%s/pm/f%d", lower, i);
+		else
+			snprintf(path, sizeof path, "%s/pm/s%d/f%d", lower, sub, i);
+		fd = open(path, O_CREAT | O_EXCL | O_WRONLY, 0600);
+		if (fd < 0 || close(fd) || setxattr(path, MOOB_ATTR_PREFIX "pm", val, sizeof val, 0) ||
+		    chown(path, uids[pick(3)], gids[pick(2)]) ||
+		    chmod(path, file_modes[pick(sizeof file_modes / sizeof file_modes[0])])) {
+			perror(path);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * The homogeneity rule of docs/spec-query-v2.md §3 over lower modes (no ACLs are planted):
+ * read for files, search for directories. others_only is the condition 1 before journal
+ * 0116, where the bit of others alone admitted the inode.
+ */
+static int rule(const struct stat *in, const struct stat *dom, int want_read, int others_only)
+{
+	mode_t u = want_read ? 0400 : 0100, g = want_read ? 0040 : 0010, o = want_read ? 0004 : 0001;
+
+	if (others_only ? (in->st_mode & o) : (in->st_mode & (u | g | o)) == (u | g | o))
+		return 1;
+	if (in->st_uid != dom->st_uid || in->st_gid != dom->st_gid)
+		return 0;
+	return !((dom->st_mode & 0100) && !(in->st_mode & u)) &&
+	       !((dom->st_mode & 0010) && !(in->st_mode & g)) &&
+	       !((dom->st_mode & 0001) && !(in->st_mode & o));
+}
+
+struct expect { char rel[64]; ino_t ino; int old_in, new_in; };
+
+static int collect(const char *lower, struct expect *ex)
+{
+	char path[4096];
+	struct stat dom, st, sub;
+	int n = 0, i, s;
+
+	snprintf(path, sizeof path, "%s/pm", lower);
+	if (stat(path, &dom))
+		return -1;
+	for (i = 0; i < NFILES; i++) {
+		for (s = -1; s < NSUB; s++) {
+			if (s < 0)
+				snprintf(ex[n].rel, sizeof ex[n].rel, "f%d", i);
+			else
+				snprintf(ex[n].rel, sizeof ex[n].rel, "s%d/f%d", s, i);
+			snprintf(path, sizeof path, "%s/pm/%s", lower, ex[n].rel);
+			if (stat(path, &st))
+				continue;
+			ex[n].ino = st.st_ino;
+			ex[n].old_in = rule(&st, &dom, 1, 1);
+			ex[n].new_in = rule(&st, &dom, 1, 0);
+			if (s >= 0) {
+				snprintf(path, sizeof path, "%s/pm/s%d", lower, s);
+				if (stat(path, &sub))
+					return -1;
+				ex[n].old_in = ex[n].old_in && rule(&sub, &dom, 0, 1);
+				ex[n].new_in = ex[n].new_in && rule(&sub, &dom, 0, 0);
+			}
+			n++;
+			break;
+		}
+	}
+	return n;
+}
+
+/* In a child with the identity's credentials: 0 all equal, 1 mismatch, 2 error. */
+static int check_one(const struct ident *id, const char *layer, const char *lower,
+		     const struct expect *ex, int n, int *old_wrong, int *returned)
+{
+	static struct moob_query_result res[MOOB_QUERY_MAX_LIMIT];
+	struct moob_query2 q;
+	char path[4096];
+	int fd, i, j, bad = 0, dom_ok;
+
+	if (setgroups((size_t)id->ngroups, id->groups) || setresgid(id->gid, id->gid, id->gid) ||
+	    setresuid(id->uid, id->uid, id->uid)) {
+		perror("credentials");
+		return 2;
+	}
+	/* QUERY2 asks read and search on the domain directory (spec §4): the lower decides */
+	snprintf(path, sizeof path, "%s/pm", lower);
+	dom_ok = !faccessat(AT_FDCWD, path, R_OK | X_OK, AT_EACCESS);
+	snprintf(path, sizeof path, "%s/pm", layer);
+	fd = open(path, O_RDONLY | O_DIRECTORY);
+	memset(&q, 0, sizeof q);
+	q.version = MOOB_QUERY2_VERSION;
+	q.nterms = 1;
+	q.limit = MOOB_QUERY_MAX_LIMIT;
+	q.results = (unsigned long)res;
+	strcpy(q.terms[0].name, "pm");
+	q.terms[0].op = MOOB_OP_EXISTS;
+	if (fd < 0 || ioctl(fd, MOOB_IOC_QUERY2, &q)) {
+		/* a domain the identity cannot open or list answers nothing: every file must be
+		 * unreadable for it through the domain, which the oracle below confirms */
+		if (errno != EACCES) {
+			perror("QUERY2");
+			return 2;
+		}
+		q.count = 0;
+	}
+	if (q.truncated) {
+		fprintf(stderr, "truncated answer\n");
+		return 2;
+	}
+	*returned += (int)q.count;
+	for (i = 0; i < n; i++) {
+		int got = 0, can;
+
+		for (j = 0; j < (int)q.count; j++)
+			if (res[j].ino == ex[i].ino)
+				got = 1;
+		snprintf(path, sizeof path, "%s/pm/%s", lower, ex[i].rel);
+		can = getxattr(path, MOOB_ATTR_PREFIX "pm", NULL, 0) >= 0;
+		if (!can && errno != EACCES) {
+			perror(path);
+			return 2;
+		}
+		can = can && dom_ok;
+		/*
+		 * Returned and not readable is the leak (ADR-0011 promise 3), judged by the lower
+		 * kernel alone. Readable, homogeneous and not returned is a missing answer; a
+		 * readable file the rule leaves out (heterogeneous) is absent by design.
+		 */
+		if ((got && !can) || (!got && can && ex[i].new_in)) {
+			printf("MISMATCH uid=%u gid=%u group=%d: %s returned=%d readable=%d homogeneous=%d\n",
+			       id->uid, id->gid, id->ngroups ? (int)id->groups[0] : -1, ex[i].rel,
+			       got, can, ex[i].new_in);
+			bad = 1;
+		}
+		/* the old rule placed it in the partition and the domain opened, but the file is
+		 * not readable: the kernel before journal 0116 returned it */
+		if (ex[i].old_in && dom_ok && !can)
+			(*old_wrong)++;
+	}
+	return bad;
+}
+
+static int check(const char *layer, const char *lower)
+{
+	static struct expect ex[NFILES];
+	int n = collect(lower, ex), k, mismatches = 0, old_wrong = 0, returned = 0;
+	int shared[2];
+
+	if (n <= 0) {
+		fprintf(stderr, "nothing planted under %s/pm\n", lower);
+		return 2;
+	}
+	for (k = 0; k < (int)(sizeof idents / sizeof idents[0]); k++) {
+		pid_t pid;
+		int st, counts[2] = { 0, 0 };
+
+		if (pipe(shared))
+			return 2;
+		pid = fork();
+		if (pid == 0) {
+			int r = check_one(&idents[k], layer, lower, ex, n, &counts[0], &counts[1]);
+
+			if (write(shared[1], counts, sizeof counts) != sizeof counts)
+				r = 2;
+			_exit(r);
+		}
+		close(shared[1]);
+		if (read(shared[0], counts, sizeof counts) != sizeof counts)
+			counts[0] = counts[1] = 0;
+		close(shared[0]);
+		if (pid < 0 || waitpid(pid, &st, 0) < 0 || !WIFEXITED(st) || WEXITSTATUS(st) == 2)
+			return 2;
+		mismatches += WEXITSTATUS(st);
+		old_wrong += counts[0];
+		returned += counts[1];
+	}
+	printf("PERMMATRIX%s identities=%zu files=%d returned=%d old_rule_wrong=%d mismatches=%d\n",
+	       mismatches ? "_FAIL" : "_PASS", sizeof idents / sizeof idents[0], n, returned,
+	       old_wrong, mismatches);
+	return mismatches ? 1 : 0;
+}
+
+int main(int argc, char **argv)
+{
+	if (argc == 4 && !strcmp(argv[1], "plant"))
+		return plant(argv[2], strtoull(argv[3], NULL, 10));
+	if (argc == 4 && !strcmp(argv[1], "check"))
+		return check(argv[2], argv[3]);
+	fprintf(stderr, "usage: permmatrix plant <lower> <seed> | check <layer> <lower>\n");
+	return 2;
+}

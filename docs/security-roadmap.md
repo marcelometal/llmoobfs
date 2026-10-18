@@ -178,6 +178,8 @@ turning that rule on, and the build-time check of an unlisted kernel.
 - Rate limiting on every user-triggerable `dmesg` message (`pr_warn_ratelimited`).
 - Done when: the suite passes with the options enabled and the `WARN_ON`/`pr_*` review is
   complete.
+- *Progress, 2026-10-15 (journal 0115):* KCSAN over the stress steps `buildrace` and `release`,
+  no race in the module; the rest of the suite and the other options are still to run.
 
 ### S9. Resource limits and denial of service
 

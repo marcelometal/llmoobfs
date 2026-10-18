@@ -48,6 +48,10 @@ the mounter, the kernel and the lower filesystem's code, the hardware and the bl
   for the caller first.
 - `user.moob.format` on the lower root is reserved to the tools (`EPERM` through the layer).
 
+*Note, 2026-10-18 (journal 0120).* Until journal 0120, directory reads did not do what the bullet
+above says: `moobl_iterate()` called `iterate_dir()` with the caller's credentials. They now run
+under `override_creds()` with the mounter's, as the bullet states.
+
 *Note, 2026-10-14 (journal 0099).* "This is the overlayfs model" is wrong, as an overlayfs
 maintainer pointed out on linux-unionfs. Overlayfs does not split name operations from data
 operations: every access is checked twice, (a) the caller against the overlay inode, DAC and
@@ -211,6 +215,46 @@ Added on 2026-10-14, from syzkaller (journals 0109, 0112):
   Reachable only by whoever may mount, but it broke promise 1. **Fixed** in journal 0112, with
   the mount added to the fault-injection test and the kernel log checked after the lower is
   unmounted.
+
+Added on 2026-10-15, from an independent source review of 5582e06 (journal 0114, published
+later) and its verification against Linux 6.12.112 (journals 0116 and 0117):
+
+- **F9 — `QUERY2` answered group members a file only "others" could read.** Condition 1 of the
+  homogeneity rule (spec-query-v2 §3) admitted a file whose bit for others was set, but the
+  kernel judges the owner by the owner bits and a group member by the group bits, never by
+  those of others (`acl_permission_check`). A file 0604 of group `staff` was answered, without
+  a per-result check, to members of `staff` who cannot read it: its name, inode number and,
+  through probes, its values. Same for intermediate directories 0701. It broke promise 3; the
+  user-space oracle carried the same rule, so the tests comparing with it could not see it.
+  **Fixed** in journal 0116: condition 1 asks the bit of all three classes, in the kernel and in
+  both tools, and a new test compares answers with the lower's own decision.
+- **F10 — a query waiting on a FUSE mount held up every query of the mount.** Per-result checks
+  (a domain after a permission change inside it, every domain under an LSM with labels) walked
+  each candidate's path with `query_sem` held, in the caller's mount namespace. A FUSE mount
+  over a directory of the domain whose daemon never answers made the walk wait without end
+  (`request_wait_answer`); a rebuild then queued for writing and every later query behind it
+  (`rwsem_down_read_slowpath`). It broke promise 1, the class of F7. **Fixed** in journal 0116:
+  the checks of a chunk run with `query_sem` released and the domain is pinned again before the
+  next chunk; the walk does not leave the mount nor follow symbolic links.
+- **F11 — changes through the layer ignored the lower mount.** The system call takes write
+  access on the layer's mount only, and the layer never took it on the lower's: a lower given as
+  a read-only bind mount was written anyway, which breaks promise 2 (the lower refuses the same
+  caller directly), and with the lower ext4 frozen any user's create, `chmod` or `setxattr`
+  reached ext4 and hit `WARN_ON(... SB_FREEZE_COMPLETE)` in `ext4_journal_check_start()` before
+  waiting for the thaw, which breaks promise 1. Data writes were not affected: the backing file
+  holds write access on the lower mount and `vfs_iter_write()` takes the freeze protection.
+  **Fixed** in journal 0117: every change to the lower takes `mnt_want_write()` on the lower
+  mount first, as overlayfs's `ovl_want_write()`; suite step `lowerro`, with a negative round.
+- **F12 — an idmapped lower mount was accepted and its mapping ignored.** Every delegated call
+  passes `nop_mnt_idmap`, so on an idmapped lower mount the checks used the on-disk ids, not the
+  ones that mount shows: a caller could act on files the lower mount gives to someone else.
+  Reachable only by an administrator's choice of `lower=`, and already noted as R5 of
+  `docs/project-review-2026-10-10.md` without a fix. **Fixed** in journal 0117 by refusing such
+  a lower at mount (compatibility decision below).
+*Compatibility decision, 2026-10-15 (journal 0117).* An idmapped mount as `lower=` is refused
+with `EINVAL`. Supporting it would mean passing `mnt_idmap(lower mount)` to every delegated call
+and to the index's permission rule; that is left for a later decision with its own tests. No
+released version accepted it on purpose, and no on-disk format changes.
 
 ## Decision
 
