@@ -240,6 +240,8 @@ set. Read on 2026-10-14.
 | fanotify, inotify | https://man7.org/linux/man-pages/man7/fanotify.7.html | change-feed experiment (journal 0030); inotify follows changes in the user-space baseline (`bench/userspace/udx-watch.c`, journal 0092) |
 | Landlock | https://docs.kernel.org/userspace-api/landlock.html | confinement experiment (journal 0030), ADR-0008 and ADR-0009 |
 | idmapped mounts | https://docs.kernel.org/filesystems/idmappings.html | refused by the layer and tested |
+| libmount (util-linux) | [`libmount/src/hook_mount.c`](https://github.com/util-linux/util-linux/blob/v2.41.2/libmount/src/hook_mount.c) (`hook_reconfigure_mount`, `configure_superblock`) and `libmount/src/context.c` (`mnt_context_apply_fstab`), v2.39.3 and v2.41.2 | what `mount -o remount` sends through the new mount API: every option of the mount's mountinfo line again (journal 0118) |
+| NFS remount comparison | `nfs_compare_remount_data()` and `nfs_reconfigure()` in `fs/nfs/super.c`, Linux 6.12.112 | precedent for accepting an option repeated on remount with its current value and refusing a change (journal 0118) |
 | SQLite | https://www.sqlite.org (public domain) | the benchmark baseline (`bench/sqlite-baseline.sh`, journal 0047), the WAL acceptance tests, the cost of a side index at write time (`bench/synccost.c`, journal 0088) and the user-space baseline of the index (`bench/userspace/`, journals 0092 and 0094; 3.46.1 on the benchmark host) |
 | Be File System query engine (Haiku) | [`Query.cpp`](https://github.com/haiku/haiku/blob/master/src/add-ons/kernel/file_systems/bfs/Query.cpp), MIT | how BFS chooses an index (ADR-0009 C') |
 | GUFI | https://github.com/mar-file-system/GUFI, BSD-3-Clause | per-permission-domain index model (ADR-0009) |

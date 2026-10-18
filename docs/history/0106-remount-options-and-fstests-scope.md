@@ -41,6 +41,11 @@ vendored `fsx` or `replay-log` goes upstream as a patch.
 
 - What libmount sends on `mount -o remount,ro` was not traced; the remount checks pass with the
   guest's `mount`.
+  *Note, 2026-10-15 (journal 0118):* traced since. libmount (util-linux 2.41.5) reads the
+  mount's mountinfo line and sends every option of it again (`lower=`, `domain_depth=`) through
+  `fspick` and `fsconfig`, so the refusal of every option made `mount -o remount,ro` fail on the
+  benchmark host. Options repeated with their current value are now accepted; a change is still
+  refused.
 - The suite runs the new checks on the three lower filesystems in a complete run; only ext4 was
   run for this journal. KASAN: with the next batch. Note of 2026-10-14: the complete run of journal
   0108 passed them on ext4, btrfs and XFS.
