@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
 # Runs the layer suite inside a virtme-ng guest booted from a kernel built with
 # vm/kasan.config (KASAN, UBSAN, lockdep). The host checkout is the guest's root,
 # so this runs from the repository directory with build/ writable.

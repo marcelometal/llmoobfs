@@ -13,7 +13,7 @@ help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
 	@echo '  make / make tools  build mkfs.moobfs, fsck.moobfs and attr_test into $$(BUILD)'
 	@echo '  make test          attr_test unit tests and malformed-image tests'
-	@echo '  make lint          shellcheck on vm/ and scripts/ shell scripts, SPDX headers on C sources (same as CI)'
+	@echo '  make lint          shellcheck on vm/ and scripts/ shell scripts, SPDX headers on C, shell and Python sources (same as CI)'
 	@echo '  make checkpatch    kernel checkpatch.pl --no-tree on layer/ and kernel/ (required in CI; needs curl, perl)'
 	@echo '  make man-lint      lint the manual pages in man/ with mandoc'
 	@echo '  make fuzz          libFuzzer over the attribute encoding (LLVM clang with libFuzzer)'
