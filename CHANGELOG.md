@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fixed (journal 0120, written, not yet run): six medium and low items of the source review of
+  journal 0114. SQL conditions under a collation other than BINARY stay SQLite's (rows were lost
+  with COLLATE NOCASE); a typed attribute can be set on a write-only file; the walks that free a
+  domain or the index yield the CPU; directory reads run with the mounter's credentials, as
+  ADR-0011 says; ref-walk revalidation reads the lower dentry under RCU; a build reads directories
+  in batches of 1024 names. New suite step `bigdir`.
 - KCSAN (journal 0115, security roadmap S8): the stress steps `buildrace` and `release` ran under
   the data-race detector with no race in the module; the 35 reports were the kernel's own
   (timers, virtio, the dcache, the ext4 xattr cache). The KASAN harness now judges KCSAN reports
