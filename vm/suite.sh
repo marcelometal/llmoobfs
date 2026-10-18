@@ -1170,10 +1170,10 @@ rm -f /tmp/lr.done.*
 ($BIN/moobfs-attr set $LAYER/gone kind string note > /dev/null && echo ok > /tmp/lr.done.xattr) &
 sleep 2
 lr_early=$(ls /tmp/lr.done.* 2>/dev/null)
-lr_warn=$(dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -E 'WARNING:|BUG:' | head -3)
+lr_warn=$(dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -E '\] WARNING:|^WARNING:|BUG:' | head -3)
 fsfreeze --unfreeze $LOWER || fail "lr-fz-thaw"
 wait
-[ -z "$lr_warn" ] || { dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -A15 'WARNING:' | head -40; fail "lr-fz-kernel-warning"; }
+[ -z "$lr_warn" ] || { dmesg | sed -n '/moobfs-suite: lowerro freeze/,$p' | grep -E -A15 '\] WARNING:|^WARNING:' | head -40; fail "lr-fz-kernel-warning"; }
 [ -z "$lr_early" ] || fail "lr-fz-change-completed-while-frozen: $lr_early"
 for k in create setattr xattr; do [ -f /tmp/lr.done.$k ] || fail "lr-fz-$k-failed-after-thaw"; done
 [ -f $LOWER/lr/d/new ] && [ "$(stat -c %a $LOWER/lr/d/f)" = 600 ] || fail "lr-fz-lower-not-changed-after-thaw"
@@ -1346,8 +1346,8 @@ rmmod moobfs_layer || fail layer-unload
 # the layer; the initramfs harness has no KCSAN and keeps the plain grep
 if command -v kdiag > /dev/null 2>&1; then
     dmesg > /tmp/kdiag-layer.txt
-    kdiag /tmp/kdiag-layer.txt 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:' || fail kernel-diagnostic-layer
-elif dmesg | grep -E 'BUG:|Oops:|WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
+    kdiag /tmp/kdiag-layer.txt 'BUG:|Oops:|^WARNING:|Kernel panic|KASAN:' || fail kernel-diagnostic-layer
+elif dmesg | grep -E 'BUG:|Oops:|\] WARNING:|^WARNING:|Kernel panic|KASAN:'; then fail kernel-diagnostic-layer; fi
 if [ -n "${MOOB_ONLY:-}" ]; then
     echo "MOOBFS_ONLY_PASS: steps $MOOB_ONLY (not a complete run)"
 else

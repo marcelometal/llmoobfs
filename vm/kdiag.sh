@@ -8,6 +8,8 @@
 # the kernel itself (virtio, timers, the dcache, the ext4 xattr cache), reached through the
 # layer or not; they are counted on one KCSAN_OUTSIDE line and do not fail. Without KCSAN in
 # the kernel there are no such reports and this is the plain grep.
+# The timestamp is removed before REGEX is tried, so a kernel warning is matched as ^WARNING:
+# (with KVM the boot prints "Speculative Return Stack Overflow: WARNING: ...", not a warning).
 kdiag() {
     awk -v re="$2" '
     { sub(/\r$/, ""); sub(/^\[ *[0-9.]+\] /, "") }

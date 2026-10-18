@@ -25,6 +25,13 @@
   sends every option of the mount again through the new mount API; the layer refused them all.
   An option repeated with its current value is now accepted, and a real change is still refused
   with `EINVAL` (journal 0106). `tests/reconf.c` covers both.
+- CI: the KASAN workflow opens `/dev/kvm` to the runner user (the udev rule of GitHub's
+  2024-04-02 changelog), so QEMU can use KVM instead of emulation; aimed at the boot reports of
+  issue #18 and the job's length. Confirmed on the first run of pull request 74: `KVM usable`,
+  the debug kernel boots in under a second. With KVM the guest sees the host CPU and prints
+  `Speculative Return Stack Overflow: WARNING: See ...` at boot, which the harnesses took for a
+  kernel warning; they now match `WARNING:` only where a kernel warning puts it, at the start of
+  the message.
 - Fixed (journal 0112): a mount that failed on an allocation kept a reference on the lower root
   (finding F8, found by syzkaller); out of memory while resolving `lower=` was reported as
   `EINVAL`; the SQLite extension could drop a condition it had declared handled, on an older
