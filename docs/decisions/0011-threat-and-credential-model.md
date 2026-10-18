@@ -212,6 +212,27 @@ Added on 2026-10-14, from syzkaller (journals 0109, 0112):
   the mount added to the fault-injection test and the kernel log checked after the lower is
   unmounted.
 
+Added on 2026-10-15, from an independent source review of 5582e06 (journal 0114) and its
+verification against Linux 6.12.112:
+
+- **F9 — `QUERY2` answered group members a file only "others" could read.** Condition 1 of the
+  homogeneity rule (spec-query-v2 §3) admitted a file whose bit for others was set, but the
+  kernel judges the owner by the owner bits and a group member by the group bits, never by
+  those of others (`acl_permission_check`). A file 0604 of group `staff` was answered, without
+  a per-result check, to members of `staff` who cannot read it: its name, inode number and,
+  through probes, its values. Same for intermediate directories 0701. It broke promise 3; the
+  user-space oracle carried the same rule, so the tests comparing with it could not see it.
+  **Fixed** in journal 0116: condition 1 asks the bit of all three classes, in the kernel and in
+  both tools, and a new test compares answers with the lower's own decision.
+- **F10 — a query waiting on a FUSE mount held up every query of the mount.** Per-result checks
+  (a domain after a permission change inside it, every domain under an LSM with labels) walked
+  each candidate's path with `query_sem` held, in the caller's mount namespace. A FUSE mount
+  over a directory of the domain whose daemon never answers made the walk wait without end
+  (`request_wait_answer`); a rebuild then queued for writing and every later query behind it
+  (`rwsem_down_read_slowpath`). It broke promise 1, the class of F7. **Fixed** in journal 0116:
+  the checks of a chunk run with `query_sem` released and the domain is pinned again before the
+  next chunk; the walk does not leave the mount nor follow symbolic links.
+
 ## Decision
 
 Adopt the adversaries, credentials, promises and non-promises above as the contract that

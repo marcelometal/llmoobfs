@@ -33,10 +33,21 @@ A file only enters the partition of its domain if every process able to traverse
 directory can also read it. Since the kernel does not enumerate processes, the rule is checked by
 sufficient conditions, evaluated over the inode of the file `f` and that of the domain directory `D`:
 
-1. `f` grants read to "others" (`o+r`) and has no access ACL; **or**
+1. `f` grants read to every class (`a+r`: owner, group and others) and has no access ACL beyond the
+   minimal one; **or**
 2. `f` and `D` have the same owner and the same group, neither has an access ACL beyond the minimal one,
    and, for each class (owner, group, others), if `D` grants execute to that class, `f` grants
    read to it.
+
+*Note, 2026-10-15 (journal 0116, finding F9 of ADR-0011):* condition 1 read "`f` grants read to
+others (`o+r`)" until this date, and the kernel and the tools implemented it so. It was not a
+sufficient condition: the kernel judges the owner by the owner bits and a member of the group by
+the group bits, never by those of others (`acl_permission_check`, fs/namei.c), so a file `0604`
+of group `staff` is unreadable by the members of `staff` who could traverse `D`. For
+intermediate directories the same holds with execute in place of read. Compatibility: no format
+changes; a file the old condition admitted and the new one does not becomes heterogeneous (left
+out of `QUERY2`, counted and listed by `moobfs-check`) unless condition 2 admits it, which keeps
+the common `0644` and `0640`-in-a-group-domain cases in the partition.
 
 Files with an extended access ACL stay outside the partition in this version, except through condition 1.
 **[accepted decision]** Handling ACLs would require comparing named entries; it is left for a revision with its own
