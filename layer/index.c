@@ -1150,9 +1150,17 @@ struct scan_name {
 	char name[];
 };
 
+/*
+ * Names read from one directory before they are handled. A directory is read in batches of this
+ * many names, as getdents(2) reads it, instead of whole: a user could otherwise make a build hold
+ * a listing as large as the directory, outside the index budget (review item 5, journal 0120).
+ */
+#define MOOBL_SCAN_BATCH 1024U
+
 struct scan_ctx {
 	struct dir_context ctx;
 	struct list_head names;
+	unsigned int count;	/* names in this batch */
 	int err;
 };
 
@@ -1164,6 +1172,8 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 
 	if ((len == 1 && name[0] == '.') || (len == 2 && name[0] == '.' && name[1] == '.'))
 		return true;
+	if (sc->count == MOOBL_SCAN_BATCH)
+		return false;	/* not consumed: the next iterate_dir() starts with it */
 	sn = kmalloc(sizeof(*sn) + len, GFP_KERNEL);
 	if (!sn) {
 		sc->err = -ENOMEM;
@@ -1172,6 +1182,7 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 	sn->len = len;
 	memcpy(sn->name, name, len);
 	list_add_tail(&sn->list, &sc->names);
+	sc->count++;
 	return true;
 }
 
@@ -1346,18 +1357,31 @@ static int scan_run(struct scan_job *job)
 			err = PTR_ERR(dir) == -ENOENT && !IS_ROOT(cur->dentry) ? 0 : PTR_ERR(dir);
 			goto drop;
 		}
-		err = iterate_dir(dir, &sc.ctx);
-		fput(dir);
-		if (err == -ENOENT && !IS_ROOT(cur->dentry))
-			err = 0;
-		if (!err)
-			err = sc.err;
-		list_for_each_entry_safe(sn, tmp, &sc.names, list) {
+		for (;;) {	/* one batch of names at a time; the file keeps the position */
+			bool full;
+
+			sc.count = 0;
+			err = iterate_dir(dir, &sc.ctx);
+			if (err == -ENOENT && !IS_ROOT(cur->dentry))
+				err = 0;
 			if (!err)
-				err = scan_child(job, cur, sn);
-			list_del(&sn->list);
-			kfree(sn);
+				err = sc.err;
+			full = sc.count == MOOBL_SCAN_BATCH;
+			list_for_each_entry_safe(sn, tmp, &sc.names, list) {
+				if (!err)
+					err = scan_child(job, cur, sn);
+				list_del(&sn->list);
+				kfree(sn);
+			}
+			if (err || !full)
+				break;
+			if (fatal_signal_pending(current)) {
+				err = -EINTR;
+				break;
+			}
+			cond_resched();
 		}
+		fput(dir);
 drop:
 		scan_dir_free(cur);
 	}

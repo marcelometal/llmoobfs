@@ -18,6 +18,7 @@
 #   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
+#   bigdir              a domain built from a directory larger than one read batch (journal 0120)
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -27,7 +28,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall|lowerro) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1351,6 +1352,32 @@ done
 st_cleanup
 umount $LAYER && rm -rf $LOWER/stx && umount $LOWER || fail "st-cleanup"
 echo "STALL_PASS: a FUSE mount that never answers holds neither the checked domain nor the other users"
+fi
+if want bigdir; then
+# Journal 0120: a build reads a directory in batches of 1024 names (MOOBL_SCAN_BATCH) instead of
+# holding its whole listing. A domain whose one directory holds 3000 entries, planted on the lower
+# and built by the first query, must equal the oracle: no name lost or doubled between batches.
+mount -t ext4 "$DEV_EXT4" $LOWER || fail "bd-lower-mount"
+rm -rf $LOWER/bdx && mkdir -p -m 755 $LOWER/bdx/big/sub || fail "bd-mkdir"
+i=0
+while [ $i -lt 3000 ]; do
+    f=$LOWER/bdx/big/$(printf 'memory-with-a-long-name-%04d' $i)
+    : > $f || fail "bd-file"
+    [ $((i % 6)) -eq 0 ] || $BIN/moobfs-attr set $f kind string k$((i % 3)) > /dev/null || fail "bd-attr"
+    i=$((i + 1))
+done
+: > $LOWER/bdx/big/sub/inner && $BIN/moobfs-attr set $LOWER/bdx/big/sub/inner kind string k1 > /dev/null || fail "bd-inner"
+mount -t moobfs_layer -o lower=$LOWER/bdx,domain_depth=1 none $LAYER || fail "bd-mount"
+for q in "kind exists - -" "kind eq string k1"; do
+    # shellcheck disable=SC2086
+    $BIN/query $LAYER/big q2 $q | cut -f2 | sort > /tmp/bd.k || fail "bd-query"
+    # shellcheck disable=SC2086
+    $BIN/moobfs-index --domain $LOWER/bdx/big $q | cut -f2 | sort > /tmp/bd.o || fail "bd-oracle"
+    cmp -s /tmp/bd.k /tmp/bd.o || { echo "kernel $(wc -l < /tmp/bd.k) oracle $(wc -l < /tmp/bd.o)"; diff /tmp/bd.k /tmp/bd.o | head -5; fail "bd-differs-from-oracle"; }
+done
+[ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
+umount $LAYER && rm -rf $LOWER/bdx && umount $LOWER || fail "bd-cleanup"
+echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
 fi
 rmmod moobfs_layer || fail layer-unload
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
