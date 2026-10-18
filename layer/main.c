@@ -273,9 +273,25 @@ static int moobl_d_revalidate(struct dentry *dentry, unsigned int flags)
 
 	if (flags & LOOKUP_RCU)
 		return moobl_d_revalidate_rcu(dentry);
-	lower = moobl_lower_dentry(dentry);
-	if (lower->d_flags & DCACHE_OP_REVALIDATE)
+	/*
+	 * Ref-walk runs without the parent's lock, so moobl_instantiate() can swap a negative
+	 * dentry's lower dentry and drop the old one meanwhile. The old one is freed only after a
+	 * grace period: read it under RCU, and hold it only to call the lower's own revalidation
+	 * (review item 3, journal 0120). A lower dentry already dead was replaced: look up again.
+	 */
+	rcu_read_lock();
+	lower = READ_ONCE(((struct moobl_dentry *)dentry->d_fsdata)->lower.dentry);
+	if (READ_ONCE(lower->d_flags) & DCACHE_OP_REVALIDATE) {
+		if (!lockref_get_not_dead(&lower->d_lockref)) {
+			rcu_read_unlock();
+			return 0;
+		}
+		rcu_read_unlock();
 		rc = lower->d_op->d_revalidate(lower, flags);
+		dput(lower);
+	} else {
+		rcu_read_unlock();
+	}
 	if (d_really_is_positive(dentry)) {
 		struct inode *inode = d_inode(dentry);
 
@@ -438,8 +454,8 @@ static int moobl_instantiate(struct inode *dir, struct dentry *dentry,
 		struct dentry *stale = info->lower.dentry;
 
 		/*
-		 * published for RCU-walk readers (moobl_d_revalidate_rcu); the stale
-		 * dentry stays valid for them until the end of the grace period
+		 * published for lockless readers (both paths of moobl_d_revalidate); the
+		 * stale dentry stays valid for them until the end of the grace period
 		 */
 		WRITE_ONCE(info->lower.dentry, dget(lower_dentry));
 		dput(stale);
