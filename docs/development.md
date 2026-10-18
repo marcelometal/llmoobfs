@@ -263,3 +263,21 @@ and by any other Linux container used for host-side builds (for example `gcc:13`
 container keeps them and the initramfs ends up with dynamically linked tools that cannot run
 there; the first symptom is an early `MOOBFS_VM_FAIL` such as `attr-set-ext4`. Run
 `rm -rf build/linux` before `make vm-test` after building in another container (journal 0025).
+
+## Pinned versions
+
+The builds and tests depend on pinned versions, each stated in more than one place.
+`sh scripts/check-pins.sh` prints them all, fails when two copies of a pin disagree, and checks
+the upstream kernel tarball against kernel.org's `sha256sums.asc` (the Lint job runs it; add
+`--offline` to skip that last check). To move to another version, change every copy in one commit:
+
+| Pin | Copies |
+| --- | --- |
+| Upstream kernel for KASAN (`KERNEL_VERSION`, `KERNEL_SHA256`) | `.github/workflows/kasan.yml`, `.github/workflows/kasan-arm64.yml`, this file's KASAN section; `vm/kasan-local.sh` and `vm/syzkaller-local.sh` read `kasan.yml` |
+| checkpatch.pl tag and file hashes | `scripts/checkpatch.sh` (`TAG` follows the KASAN kernel) |
+| Debian image digest and kernel package of `make vm-test` | `vm/Dockerfile` (image and headers packages at the same version) |
+| virtme-ng and its dependencies | `vm/kasan-requirements.txt` (regenerate the hashes as its header says) |
+
+Take the new kernel SHA-256 from kernel.org's `sha256sums.asc` (whose signature can be checked
+with the kernel.org signing keys), then run the script.
+
