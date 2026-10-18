@@ -10,7 +10,8 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
-> human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The current tag is `v0.3.0-experimental`, a source snapshot. Details under
+> human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
+> tag, `v0.3.0-experimental`, predates security fixes: build from `main`. Details under
 > [Status](#status).
 
 ## The problem
@@ -105,11 +106,16 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 
 ## Status
 
-**Experimental. Source pre-release tags only; the current one is `v0.3.0-experimental`. Not for
-production.** Facts as of 2026-10-18:
+**Experimental. Source pre-release tags only; the last one, `v0.3.0-experimental`, predates the fixes
+of findings F6 to F12, so build from `main`. Not for production.** Facts as of 2026-10-18:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
-  KASAN/UBSAN/lockdep; x86-64; lower filesystems ext4, btrfs and XFS only.
+  KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
+  filesystems ext4, btrfs and XFS only. The attribute encoding's tests also pass on big-endian
+  s390x under emulation; arm64 runs are being measured ([journal 0124](docs/history/0124-big-endian-pass-arm64-without-kvm.md)).
+- **Tested with** fault injection inside the module, fstests' `quick` group on the three lower
+  filesystems, syzkaller (two six-hour runs; one defect found and fixed), a first KCSAN run (no
+  race in the module) and SELinux enforcing (journals 0091, 0096, 0104, 0109, 0112, 0115).
 - **No outside human review yet.** It was requested on 2026-10-13. Two independent source reviews
   made by AI assistants ([journal 0111](docs/history/0111-review-5582e06.md),
   [journal 0114](docs/history/0114-second-inspection-of-5582e06.md)) and verified against the
@@ -345,28 +351,32 @@ KASAN harness runs the layer suite), and no benchmark exists.
 ## Limitations
 
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
-  kernel APIs are version-specific and the pinned test target is not a compatibility promise.
+  kernel APIs are version-specific and the pinned test target is not a compatibility promise. The
+  module has not run on another architecture; only the user-space encoding tests ran on big-endian.
 - The index is RAM only, non-pageable and bounded by `index_budget` (default 128 MiB). Each
   domain is built by a linear scan on its first query after mount, and again after it was
   released or a directory in it was renamed; the budget and the shrinker were tested on small
   trees only (journal 0101).
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
-  mounts are refused; no rootless containers.
+  mounts are refused, and so is an idmapped mount as `lower=`; no rootless containers.
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
 - Only pilot-grade figures exist: two hosts, one data-set seed, three repetitions at most
   (journals 0025 to 0085). No speed or efficiency claim beyond the conditions stated in
   [What was measured](#what-was-measured) may be made from them; no comparison with FUSE
   exists, and the comparison with the bare lower filesystem on the current module is pending.
-- No external audit and no syzkaller. Our own tests and reviews found and fixed kernel-side
-  defects (journals [0015](docs/history/0015-phase-2e-investigation.md),
+- No outside human review. Two independent source reviews by AI assistants (journals
+  [0111](docs/history/0111-review-5582e06.md) and [0114](docs/history/0114-second-inspection-of-5582e06.md))
+  and the project's own tests found and fixed kernel-side defects, security ones among them; the
+  findings are listed in [ADR-0011](docs/decisions/0011-threat-and-credential-model.md) (F1 to F12),
+  the earlier defects in journals [0015](docs/history/0015-phase-2e-investigation.md),
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
-  [0069](docs/history/0069-setattr-crash-and-mounter-capability.md),
-  [0074](docs/history/0074-privileges-kept-on-copy.md),
-  [0078](docs/history/0078-syncfs-reaches-the-lower.md),
-  [0082](docs/history/0082-index-lock-and-reclaim.md),
-  [0083](docs/history/0083-index-inspection-fixes.md)). `v0.2.0-experimental` carries the
-  defects of the last five; use `v0.3.0-experimental`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md)). The threat model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md); SELinux enforcing was exercised once (journal 0104: two defects fixed, a labelling rule needed); AppArmor and Smack were not.
+  [0082](docs/history/0082-index-lock-and-reclaim.md) and
+  [0083](docs/history/0083-index-inspection-fixes.md). Every tag so far carries defects fixed
+  later: build from `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
+  syzkaller ran for two six-hour rounds, below the coverage threshold of
+  [security roadmap](docs/security-roadmap.md) S3. SELinux enforcing was exercised once (journal
+  0104); AppArmor and Smack were not.
 - `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
   after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower
@@ -398,10 +408,16 @@ as a regression in the same VM.
 | Phase 2e: acceptance with git, concurrent WAL-mode SQLite, own memory client; power-loss replay with `dm-log-writes`; I/O errors with `dm-flakey`; two layer bugs found and fixed | [0015](docs/history/0015-phase-2e-investigation.md) | Debian 6.12.111; ext4 only |
 | KASAN/UBSAN/lockdep harness running the same suite; a third defect found and fixed | [0016](docs/history/0016-kasan-lockdep-harness.md) | Upstream 6.12.112, virtme-ng |
 | M3 phase 3b: per-result POSIX authorization in `QUERY`; two uids, two namespaces, chmod and ACLs, remount, idmapped and user-namespace mounts refused, 5-second race of chmod/rename/unlink against `QUERY` | [0020](docs/history/0020-phase-3b-query-authorization.md), [spec-m3](docs/spec-m3.md) §3 | Debian 6.12.111 and KASAN 6.12.112; ext4, btrfs, XFS |
-| Phase Q2a: domain-scoped `QUERY2` (UAPI v2) on a domain directory, index partitioned by domain and a homogeneity rule, v1 restricted to administrators while `domain_depth` is on, `EXDEV` for directories across domains; equal to `moobfs-index --domain` (performance and timing-channel test not yet measured) | [0035](docs/history/0035-phase-q2a-domain-query.md), [spec-query-v2](docs/spec-query-v2.md) | Debian 6.12.111; ext4, btrfs, XFS |
-| Phase Q2b: `QUERY2` ordered by an attribute, ascending or descending, and paged by an authenticated cursor; equal to `moobfs-index --domain --order` (not yet measured) | [0036](docs/history/0036-phase-q2b-order-cursor.md) | Debian 6.12.111; ext4, btrfs, XFS |
-| Phase Q2c: leapfrog intersection of equality terms in `QUERY2`; equal to the oracle, plan checked by result order (not yet measured) | [0037](docs/history/0037-phase-q2c-leapfrog.md) | Debian 6.12.111; ext4, btrfs, XFS |
-| Phase Q2d: "missing or ..." terms and batches of up to 8 `QUERY2` requests per call; equal to the oracle (not yet measured) | [0038](docs/history/0038-phase-q2d-missing-batch.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Phase Q2a: domain-scoped `QUERY2` (UAPI v2) on a domain directory, index partitioned by domain and a homogeneity rule, v1 restricted to administrators while `domain_depth` is on, `EXDEV` for directories across domains; equal to `moobfs-index --domain` (measured: journals [0043](docs/history/0043-timing-channel-query2.md), [0044](docs/history/0044-q2-measured-equality-plan.md), [0047](docs/history/0047-sqlite-baseline-macmini.md)) | [0035](docs/history/0035-phase-q2a-domain-query.md), [spec-query-v2](docs/spec-query-v2.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Phase Q2b: `QUERY2` ordered by an attribute, ascending or descending, and paged by an authenticated cursor; equal to `moobfs-index --domain --order`; "N most recent" measured and optimized ([0048](docs/history/0048-recent-optimization.md)) | [0036](docs/history/0036-phase-q2b-order-cursor.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Phase Q2c: leapfrog intersection of equality terms in `QUERY2`; equal to the oracle, plan checked by result order, measured in [0044](docs/history/0044-q2-measured-equality-plan.md) | [0037](docs/history/0037-phase-q2c-leapfrog.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Phase Q2d: "missing or ..." terms and batches of up to 8 `QUERY2` requests per call; equal to the oracle | [0038](docs/history/0038-phase-q2d-missing-batch.md) | Debian 6.12.111; ext4, btrfs, XFS |
+| Testing under the module: fstests `quick` group with an exclusion list, systematic allocation-failure injection inside the module | [0091](docs/history/0091-s2-fstests-clean-with-exclusions.md), [0096](docs/history/0096-fault-injection.md) | Debian 6.12.111; KASAN 6.12.112; ext4, btrfs, XFS |
+| Index built per domain by the first query, released under memory pressure or over its budget (shrinker); tracepoints | [0098](docs/history/0098-index-on-demand.md), [0101](docs/history/0101-domains-released.md), [0102](docs/history/0102-index-tracepoints.md), [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md) | KASAN 6.12.112; ext4, btrfs, XFS |
+| SELinux enforcing; per-result checks when an LSM labels the layer's inodes | [0104](docs/history/0104-selinux-investigation.md) | 6.12.112 with the Debian reference policy |
+| SQL over a domain through a SQLite virtual table (prototype) | [0108](docs/history/0108-sqlite-virtual-table-prototype.md), [ADR-0013](docs/decisions/0013-user-space-query-library.md) | KASAN 6.12.112; ext4 |
+| syzkaller descriptions of the mount, ioctls and attributes; two six-hour runs | [0109](docs/history/0109-syzkaller-first-runs.md), [0112](docs/history/0112-mount-leak-and-sql-omit.md) | upstream 6.12.112 with KCOV |
+| Security fixes of findings F9 to F12 (homogeneity rule, checks without the query semaphore, write access on the lower mount, idmapped lower refused), each with a test and a negative round | [0116](docs/history/0116-homogeneity-classes-and-checks-without-query-sem.md), [0117](docs/history/0117-lower-mount-write-access.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 
 Not implemented: a persistent index, user-namespace or idmapped mounts, batch reads, a change
 cursor, revisions, packaging, a stable UAPI, a CLI, the full xfstests suite, and the complete
