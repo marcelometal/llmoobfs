@@ -1194,7 +1194,9 @@ fi
 if want sqlext; then
 # The moobfs SQLite virtual table (ADR-0013, journal 0108): every statement is run on the virtual
 # table over a domain and on an ordinary table filled from the lower filesystem; the rows must be
-# equal. The query plans are printed, to see what SQLite hands to the module.
+# equal. The query plans are printed, to see what SQLite hands to the module. The COLLATE NOCASE
+# statements return rows only when the condition stays SQLite's: the kernel compares bytes
+# (journal 0120).
 mount -t ext4 "$DEV_EXT4" $LOWER || fail "sx-lower-mount"
 rm -rf $LOWER/sx && mkdir -m 755 $LOWER/sx || fail "sx-mkdir"
 mount -t moobfs_layer -o lower=$LOWER/sx none $LAYER || fail "sx-mount"
@@ -1246,6 +1248,9 @@ sx "SELECT rowid, path, kind, agent, created, score, weight, flag, title FROM {T
    "SELECT path FROM {T} WHERE kind = 'note' AND kind = 'fact'" \
    "SELECT path FROM {T} WHERE flag = 1 AND kind = 'note' AND agent = 'a3' AND score >= 2 AND created > 5000" \
    "SELECT a.path, b.path FROM {T} a JOIN {T} b ON a.agent = b.agent WHERE b.path = 'f1' AND a.kind = 'note'" \
+   "SELECT path FROM {T} WHERE kind = 'NOTE' COLLATE NOCASE" \
+   "SELECT path FROM {T} WHERE kind COLLATE NOCASE IN ('Note', 'FACT') AND agent = 'a2'" \
+   "SELECT path, title FROM {T} WHERE title >= 'TITLE 5' COLLATE NOCASE AND title < 'TITLE 6' COLLATE NOCASE" \
    > /tmp/sx.txt 2>&1 || { cat /tmp/sx.txt; fail "sx-differs"; }
 grep -q SQLQ_COMPARE_DONE /tmp/sx.txt || { cat /tmp/sx.txt; fail "sx-incomplete"; }
 # with created declared required, the newest N are the kernel's ordered scan with its limit
