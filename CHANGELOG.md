@@ -17,6 +17,10 @@
   that waited on a FUSE mount inside the domain held up every query of the mount; the checks now
   run with `query_sem` released and do not leave the mount. New suite steps `permmatrix` (QUERY2
   against the lower's own permission decision) and `stall` (a FUSE daemon that never answers).
+- Fixed (journal 0117, findings F11 and F12 of ADR-0011): changes through the layer now take
+  write access on the lower mount, so a read-only lower mount refuses them with `EROFS` and a
+  frozen lower filesystem holds them until the thaw (ext4 used to warn); an idmapped mount is
+  refused as `lower=` (compatibility decision in ADR-0011). New suite step `lowerro`.
 - Fixed (journal 0112): a mount that failed on an allocation kept a reference on the lower root
   (finding F8, found by syzkaller); out of memory while resolving `lower=` was reported as
   `EINVAL`; the SQLite extension could drop a condition it had declared handled, on an older

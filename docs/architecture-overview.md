@@ -31,6 +31,8 @@ Mount contract (`layer/main.c`, `moobl_fill_super` and `moobl_parse_param`):
 | The lower cannot itself be a `moobfs_layer` mount; the kernel's stacking depth limit applies | `s_magic == MOOBL_SUPER_MAGIC` check; `s_stack_depth` |
 | Mounting requires `CAP_SYS_ADMIN` in the initial user namespace; the type does not set `FS_USERNS_MOUNT`, so a mount from an unprivileged user namespace fails with `EPERM` | `moobl_fs_type`; tested by `tests/idmap.c userns` |
 | Idmapped mounts are refused with `EINVAL` because the type does not set `FS_ALLOW_IDMAP` | `moobl_fs_type`; tested by `tests/idmap.c idmap` |
+| An idmapped mount given as `lower=` is refused with `EINVAL` ("lower cannot be an idmapped mount"): the layer passes the lower's ids through unmapped (journal 0117) | `is_idmapped_mnt()` in `moobl_fill_super`; suite step `lowerro` |
+| Every change the layer makes to the lower takes write access on the lower mount: a read-only lower mount refuses it with `EROFS`, a frozen lower filesystem holds it until the thaw (journal 0117) | `moobl_want_write()` in `layer/main.c`; suite step `lowerro` |
 | `nolinks` refuses `link` and `symlink` creation | `moobl_link`, `moobl_symlink` |
 | `noindex` disables the index; `QUERY` and `QUERY2` then return `EOPNOTSUPP` (`ENOSYS` until journal 0050) | `layer/index.c` (`if (!ix->enabled) return -EOPNOTSUPP`) |
 | `index_budget` accepts 1M to 4G; the default is 128 MiB | `MOOBL_INDEX_BUDGET_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
