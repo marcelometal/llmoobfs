@@ -1,5 +1,7 @@
 # Critical assessment of usefulness and technical value proposition of MoobFS
 
+*Note, 2026-10-18: an analysis as of 2026-10-10, kept as written. The project's current status is in the README ("Status" and "Limitations") and `docs/security-roadmap.md`; several gaps named below have been closed since (syzkaller, fstests, the threat model, the index built on demand).*
+
 Status: analysis (2026-10-10, branch `m3/3b-query-authz`). It does not change ADRs, format, UAPI or
 code. Basis: README, ROADMAP, ADR-0005/0006/0007, `docs/spec-m2.md`, `docs/spec-m3.md`,
 `docs/benchmark-plan.md`, `docs/benchmark-harness.md`, `docs/security-roadmap.md`,

@@ -11,9 +11,9 @@ them not implemented yet).
 
 | Version | Supported |
 | --- | --- |
-| `v0.3.0-experimental` | Source snapshot, not supported; the one to use. |
-| `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported. They carry defects fixed in `v0.3.0-experimental`, security ones included (see `CHANGELOG.md`). |
-| `main` | Fixes land here only. There are no backports and no maintenance branches. |
+| `main` | The one to use. Fixes land here only; there are no backports and no maintenance branches. |
+| `v0.3.0-experimental` | Source snapshot, not supported. It carries defects fixed since, security ones included (findings F6 to F12 of ADR-0011; see `CHANGELOG.md`). |
+| `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported; they carry more of the same defects. |
 
 ## How to report a vulnerability
 
@@ -113,8 +113,9 @@ access is provided. `QUERY2` answers from the partition of a domain directory th
 caller can traverse and read, holding only files every traverser can read; with
 domains on, the v1 `QUERY` is limited to `CAP_SYS_ADMIN` (`docs/spec-query-v2.md`).
 The VM suite, the KASAN/lockdep workflow and the attribute fuzzer are not a
-security audit; no external audit has taken place. The threat and credential
+security audit; no outside human audit has taken place. Two independent source reviews by AI
+assistants (journals 0111 and 0114) found findings F9 to F12, fixed through private advisories. The threat and credential
 model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
 (accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and the
-findings F1 to F5, of which F2 and part of F4 are open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
+findings F1 to F12, of which F2 and part of F4 are open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
 fstests, syzkaller, hostile-lower handling and the other open items.
