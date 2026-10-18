@@ -53,6 +53,30 @@ jobs:
           make test CC=s390x-linux-gnu-gcc BUILD=build/s390x LDFLAGS=-static
       - name: Validate site links
         run: python3 scripts/check-site.py
+  compilers:
+    # The tools are built with -Wall -Wextra -Wconversion -Wshadow -Werror; other compilers warn
+    # where the default one does not (issue #13).
+    name: Compiler warnings (${{ matrix.cc }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc-12, gcc-14, clang-16, clang-18]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the compiler
+        env:
+          CC_NAME: ${{ matrix.cc }}
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$CC_NAME" libsqlite3-dev
+      - name: Build every host and Linux tool with -Werror
+        env:
+          CC_NAME: ${{ matrix.cc }}
+        run: make tools attr-tools bench-tools CC="$CC_NAME" BUILD="build/$CC_NAME"
   lint:
     name: Lint
     runs-on: ubuntu-24.04
