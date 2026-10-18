@@ -81,7 +81,7 @@ stage_bin /usr/bin/setfacl
 stage_bin /usr/bin/getfacl
 mkdir -p "$STAGE/usr/lib/git-core"
 ln -s /tools/git "$STAGE/usr/lib/git-core/git"
-gcc -static -O2 tests/third_party/log-writes/replay-log.c tests/third_party/log-writes/log-writes.c -o "$STAGE/replay-log"
+sh vm/build-tests.sh "$STAGE"
 python3 - "$KERNEL" "$STAGE/loop.ko" <<'PY'
 import lzma
 from pathlib import Path
@@ -89,23 +89,11 @@ import sys
 source = Path('/lib/modules') / sys.argv[1] / 'kernel/drivers/block/loop.ko.xz'
 Path(sys.argv[2]).write_bytes(lzma.decompress(source.read_bytes()))
 PY
-gcc -static -O2 -Wall -Wextra -Werror tests/mounted.c -o "$STAGE/mounted"
-gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o "$STAGE/layer"
-gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o "$STAGE/hostile"
-gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/buildrace.c -lpthread -o "$STAGE/buildrace"
 make attr-tools BUILD=build/linux CFLAGS="-O2 -g -static"
 cp build/linux/moobfs-attr build/linux/moobfs-check build/linux/moobfs-index "$STAGE/"
 make bench-tools BUILD=build/linux CFLAGS="-O2 -g -static" SQLITE_LIBS="-lsqlite3 -ldl -lpthread"
 cp build/linux/bench-gen build/linux/bench-load build/linux/bench-sqlclient "$STAGE/" && cp bench/queries-w3.txt "$STAGE/bench-queries-w3.txt"
 cp bench/sqlbase.sh "$STAGE/bench-sqlbase.sh" && cp bench/equiv.sh "$STAGE/bench-equiv.sh" && cp bench/run.sh "$STAGE/bench-run.sh"
-gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o "$STAGE/query"
-gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o "$STAGE/ipc"
-gcc -static -O2 -Wall -Wextra -Werror tests/reconf.c -o "$STAGE/reconf"
-gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/permmatrix.c -o "$STAGE/permmatrix"
-gcc -static -O2 -Wall -Wextra -Werror tests/fusestall.c -o "$STAGE/fusestall"
-gcc -static -O2 -Wall -Wextra -Werror -Iinclude -DSQLITE_CORE tests/sqlq.c sqlite/moobfs_vtab.c common/attr.c -lsqlite3 -lm -ldl -lpthread -o "$STAGE/sqlq"
-gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o "$STAGE/idmap"
-gcc -static -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o "$STAGE/fsx"
 MOOB_BUILD_DIR=build/linux python3 tests/test_images.py --fixtures "$STAGE/data"
 build/linux/fsck.moobfs "$STAGE/data/shared.img" > build/vm/image-report.json
 cp "$STAGE/data/shared.img" build/vm/shared.img

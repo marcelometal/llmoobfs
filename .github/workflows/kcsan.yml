@@ -68,19 +68,7 @@ jobs:
           make layer KDIR="$PWD/build/linux"
           make attr-tools BUILD=build/vng CFLAGS="-O2 -g -static"
           make bench-tools BUILD=build/vng CFLAGS="-O2 -g -static" SQLITE_LIBS="-lsqlite3 -ldl -lpthread" && cp bench/queries-w3.txt build/vng/bench-queries-w3.txt && cp bench/sqlbase.sh build/vng/bench-sqlbase.sh && cp bench/equiv.sh build/vng/bench-equiv.sh && cp bench/run.sh build/vng/bench-run.sh
-          gcc -static -O2 -Wall -Wextra -Werror tests/layer.c -o build/vng/layer
-          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/failnth.c -o build/vng/failnth
-          gcc -static -O2 -Wall -Wextra -Werror tests/hostile.c -o build/vng/hostile
-          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/buildrace.c -lpthread -o build/vng/buildrace
-          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/query.c common/attr.c -o build/vng/query
-          gcc -static -O2 -Wall -Wextra -Werror tests/ipc.c -o build/vng/ipc
-          gcc -static -O2 -Wall -Wextra -Werror tests/reconf.c -o build/vng/reconf
-          gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/permmatrix.c -o build/vng/permmatrix
-          gcc -static -O2 -Wall -Wextra -Werror tests/fusestall.c -o build/vng/fusestall
-          gcc -static -O2 -Wall -Wextra -Werror -Iinclude -DSQLITE_CORE tests/sqlq.c sqlite/moobfs_vtab.c common/attr.c -lsqlite3 -lm -ldl -lpthread -o build/vng/sqlq
-          gcc -static -O2 -Wall -Wextra -Werror tests/idmap.c -o build/vng/idmap
-          gcc -static -O2 -Itests/third_party/fsx tests/third_party/fsx/fsx.c -o build/vng/fsx
-          gcc -static -O2 tests/third_party/log-writes/replay-log.c tests/third_party/log-writes/log-writes.c -o build/vng/replay-log
+          sh vm/build-tests.sh build/vng
           cp layer/moobfs_layer.ko build/vng/
           truncate -s 64M build/vng/lower-ext4.img && mke2fs -q -F -t ext4 -b 4096 -L moob-lower build/vng/lower-ext4.img
           truncate -s 256M build/vng/lower-btrfs.img && mkfs.btrfs -q -f -L moob-lower build/vng/lower-btrfs.img
