@@ -203,12 +203,13 @@ run_lower() {
     mount -t moobfs_layer -o lower=$LOWER,domain_depth=0 none $LAYER || fail "q-remount-final-$fs"
     # remount (journal 0106): read-only refuses writes and read-write restores them; an option
     # given on remount through mount(2) is ignored, as overlayfs does, and through the new mount
-    # API (fsconfig) refused
+    # API (fsconfig) refused when it changes the mount, accepted when it repeats the current
+    # value, as libmount does on every remount (util-linux 2.41, journal 0118)
     mount -o remount,ro $LAYER || fail "remount-ro-$fs"
     touch $LAYER/ro-probe 2> /dev/null && fail "remount-ro-writable-$fs"
     mount -o remount,rw $LAYER || fail "remount-rw-$fs"
     touch $LAYER/ro-probe && rm $LAYER/ro-probe || fail "remount-rw-not-writable-$fs"
-    $BIN/reconf $LAYER > /dev/null || fail "remount-fsconfig-change-accepted-$fs"
+    $BIN/reconf $LAYER $LOWER 0 || fail "remount-fsconfig-$fs"
     grep " $LAYER " /proc/mounts | grep -q "index_budget" && fail "remount-option-changed-$fs"
     rm -rf $LAYER/r || fail "q-cleanup-$fs"
     # isolation (M3 phase 3b): two users, two namespaces; QUERY as each user must equal the

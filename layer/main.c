@@ -1306,6 +1306,53 @@ static const struct fs_parameter_spec moobl_params[] = {
 	{}
 };
 
+/*
+ * An option given on remount through the new mount API, already parsed into ctx: accepted when
+ * it equals the mounted value, refused otherwise. libmount sends every option of the mount's
+ * mountinfo line again on "mount -o remount,ro" (fspick, then fsconfig for each), so refusing
+ * them all made every remount fail with util-linux 2.41 (journal 0118); a change is still
+ * never accepted and dropped (journal 0106). NFS compares in the same way
+ * (nfs_compare_remount_data). lower= is compared as the directory it resolves to, since
+ * mountinfo prints it with seq_path.
+ */
+static int moobl_reconf_same(struct fs_context *fc, struct moobl_fc *ctx, int opt,
+			     const char *key)
+{
+	struct moobl_sb *sbi = MOOBL_SB(fc->root->d_sb);
+	struct path p;
+	bool same;
+	int err;
+
+	switch (opt) {
+	case Opt_lower:
+		err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &p);
+		if (err == -ENOMEM)
+			return err;
+		same = !err && path_equal(&p, &sbi->lower);
+		if (!err)
+			path_put(&p);
+		break;
+	case Opt_nolinks:
+		same = sbi->nolinks;
+		break;
+	case Opt_noindex:
+		same = !sbi->index.enabled;
+		break;
+	case Opt_index_budget:
+		same = ctx->index_budget == sbi->index.budget;
+		break;
+	case Opt_domain_depth:
+		same = (unsigned int)ctx->domain_depth == sbi->index.domain_depth;
+		break;
+	case Opt_index_idle:
+		same = (unsigned int)ctx->index_idle == sbi->index.idle;
+		break;
+	default:
+		same = false;
+	}
+	return same ? 0 : invalfc(fc, "%s cannot be changed on remount", key);
+}
+
 static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 {
 	struct moobl_fc *ctx = fc->fs_private;
@@ -1314,14 +1361,12 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 
 	/*
 	 * No option can change on remount (read-only and read-write are the VFS's). As overlayfs
-	 * does: the old mount(2) API passes the current options again and they are ignored; the
-	 * new API is told, instead of having a change accepted and dropped (journal 0106).
+	 * does, the old mount(2) API passes the current options again and they are ignored. The
+	 * new API is told about a change instead of having it accepted and dropped (journal
+	 * 0106), and an option repeated with its current value is accepted (journal 0118).
 	 */
-	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE) {
-		if (fc->oldapi)
-			return 0;
-		return invalfc(fc, "No changes allowed in reconfigure");
-	}
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE && fc->oldapi)
+		return 0;
 	opt = fs_parse(fc, moobl_params, param, &result);
 	if (opt < 0)
 		return opt;
@@ -1357,6 +1402,8 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		ctx->index_idle = (int)result.uint_32;
 		break;
 	}
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE)
+		return moobl_reconf_same(fc, ctx, opt, param->key);
 	return 0;
 }
 
