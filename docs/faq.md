@@ -1,14 +1,15 @@
 # Frequently asked questions
 
-Short, factual answers about MoobFS as of 2026-10-10. Each answer names the file it is taken
+Short, factual answers about MoobFS as of 2026-10-18. Each answer names the file it is taken
 from; when a file and this page disagree, the file wins and this page needs a correction.
 Rendered copy: [studiomoob.github.io/llmoobfs/faq.html](https://studiomoob.github.io/llmoobfs/faq.html).
 
 ## 1. What is MoobFS?
-
 MoobFS is an experimental GPL-2.0 Linux kernel module, stacked over ext4, btrfs or XFS, that
 passes POSIX operations to the lower filesystem and adds typed `user.moob.*` attributes, an
-in-memory attribute index and a `QUERY` ioctl. It is a research project; the only tag is the `v0.1.0-experimental` source pre-release.
+in-memory attribute index and query ioctls. It is a research project: the tags are source
+pre-releases, and the last one, `v0.3.0-experimental`, predates security fixes, so build from
+`main`.
 [`README.md`; `docs/research-originality.md` §9]
 
 ## 2. What problem does it target?
@@ -30,58 +31,60 @@ the lower inode numbers.
 [`docs/decisions/0007-stacked-memory-layer.md`; `layer/main.c`; `docs/architecture-overview.md` §1-2]
 
 ## 4. What does `QUERY` do?
-
-`QUERY` is an ioctl on the mount root that returns the inode number and mount-relative path
-of files matching up to four attribute predicates joined by AND, with the operators `=`, `<`,
-`<=`, `>`, `>=`, string prefix and "attribute exists", and a result limit of 1 to 4096.
-Answers were checked against a user-space oracle (`moobfs-index`) on ext4, btrfs and XFS.
-[`include/moobfs_ioctl.h`; `docs/history/0014-phase-2d-index-query.md`]
+`QUERY2` is an ioctl on an open descriptor of a domain directory (a directory at a fixed depth
+of the mount, `domain_depth=1` by default). It returns the inode number and the path relative
+to that directory of files matching up to four attribute predicates joined by AND (`=`, `<`,
+`<=`, `>`, `>=`, string prefix, "exists", and "missing or ..."), optionally ordered by one
+attribute and paged by an authenticated cursor; `QUERY2_BATCH` sends up to eight requests in
+one call. The first `QUERY` on the mount root is kept for administrators. Answers are checked
+against a user-space oracle (`moobfs-index`) on ext4, btrfs and XFS.
+[`include/moobfs_ioctl.h`; `docs/spec-query-v2.md`; journals 0035 to 0038]
 
 ## 5. What does `QUERY` not do?
-
-It has no OR, no sorting or aggregation, no full-text search and no vector or semantic
-search. The agent application selects relevant memories and builds the model's context; the
-filesystem does not extend a context window.
-[`docs/value-assessment.md`; `docs/research-originality.md` §7]
+In the kernel: no OR, no aggregation, no full-text, vector or semantic search, and at most one
+ordering attribute. OR, `IN` lists, counts and grouping are available in user space through the
+optional SQLite virtual table over `QUERY2` (a prototype, ADR-0013). The agent application
+selects relevant memories and builds the model's context; the filesystem does not extend a
+context window.
+[`docs/spec-query-v2.md`; `docs/decisions/0013-user-space-query-library.md`; `docs/research-originality.md` §7]
 
 ## 6. How is `QUERY` authorized?
-
-For each candidate, the kernel resolves the recorded path with the caller's credentials and
-requires `inode_permission(MAY_READ)` on the resolved inode, so mode bits and the POSIX ACLs
-of the lower filesystem apply per result. Unauthorized results are omitted silently, and
-`count`/`truncated` refer only to visible results. This was tested with two uids, two
-namespaces, chmod and ACLs on three lower filesystems, in the Debian VM and under KASAN; no
-external audit exists. Two known limits, measured on 2026-10-11: response time grows with the
-number of matching entries the caller cannot see (about 1.15 µs each), so a caller can estimate
-how many exist; and processes confined by Landlock still see results whose files Landlock would
-not let them open (the names and attribute values are ones such a process can already list and
-read, because Landlock does not cover xattr reads).
-[`docs/spec-m3.md` §3.1; `docs/history/0020-phase-3b-query-authorization.md`]
+`QUERY2` first requires read and search permission on the domain directory. A file enters its
+domain's partition of the index only if everyone who can traverse the directory can also read
+it (the homogeneity rule, judged from mode bits, owner, group and ACLs); such a partition is
+answered without a check per result. When a permission changes inside the domain, or when a
+security module labels the files (SELinux, Smack), every result is checked for the caller
+instead: the path is resolved with the caller's credentials and `inode_permission(MAY_READ)` is
+required. Results the caller cannot read are omitted silently, and `count`/`truncated` refer only
+to visible results. A test compares answers with the lower kernel's own decision for random
+modes, owners and groups (journal 0116). Path-based LSMs (AppArmor, Landlock) do not filter
+results; no outside human review has taken place.
+[`docs/spec-query-v2.md` §3; `docs/decisions/0011-threat-and-credential-model.md`; journals 0104, 0116]
 
 ## 7. What is the TOCTOU contract?
 
 A result is not a grant of access. Authorization is checked when the query runs; permissions
 or names may change afterwards, so a client must call `open()` normally and accept `EACCES`
-or `ENOENT`. There is no guarantee of the absence of a time-of-check/time-of-use window in
-UAPI v1. A known limitation is possible false negatives after a directory rename until the
+or `ENOENT`. There is no guarantee of the absence of a time-of-check/time-of-use window. A known limitation is possible false negatives after a directory rename until the
 next mount.
 [`docs/spec-m3.md` §3.1]
 
 ## 8. What is implemented today?
-
-A stacked pass-through layer validated over ext4, btrfs and XFS with `fsx`, typed attributes,
-the in-memory index, the `QUERY` and `GET_INFO` ioctls, delegated reflink and dedupe
-(provided by the lower filesystem), and acceptance runs with git, concurrent WAL-mode SQLite,
-`dm-log-writes` power-loss replay and `dm-flakey` error injection. Phase 3b (authorization in
-`QUERY`) closed with a KASAN run and is merged in `main`. Everything is tested in a VM; there
-is only a source pre-release tag (`v0.1.0-experimental`).
-[`README.md`; `ROADMAP.md`; `CHANGELOG.md`]
+A stacked pass-through layer over ext4, btrfs and XFS (`fsx`, fstests' `quick` group), typed
+attributes validated in the kernel, an index built per domain by the first query and released
+under memory pressure, `QUERY2` with ordering, cursors and batches, the first `QUERY` for
+administrators, `GET_INFO`, delegated reflink and dedupe, tracepoints, and acceptance runs with
+git, concurrent WAL-mode SQLite, `dm-log-writes` power-loss replay and `dm-flakey` error
+injection. A SQLite virtual table over `QUERY2` exists as a prototype. Everything is tested in a
+VM, under KASAN, UBSAN and lockdep on every pull request, with fault injection and syzkaller.
+[`README.md` "What is implemented"; `ROADMAP.md`; `CHANGELOG.md`]
 
 ## 9. What is not implemented?
-
-A persistent index (it lives in RAM and each domain's part is built by its first query), user-namespace and idmapped
-mounts (both refused), batch reads, a change cursor, revisions, packaging (DKMS, `.deb`),
-a stable UAPI, a CLI, and the full xfstests suite. Performance is not measured.
+A persistent index (it lives in RAM and each domain's part is built by its first query),
+user-namespace and idmapped mounts (both refused, as is an idmapped mount as `lower=`), batch
+reads of results, a change cursor, revisions, values returned with the results (specified by
+ADR-0014, not implemented), packaging (DKMS, `.deb`), a stable UAPI, a CLI, and the full
+xfstests suite.
 [`docs/spec-m3.md`; `docs/distribution-strategy.md`; `ROADMAP.md`]
 
 ## 10. How does it differ from SQLite next to plain files?
@@ -94,11 +97,10 @@ outside a lab.
 [`docs/value-assessment.md` "Comparação honesta"; `docs/when-not-to-use.md` §1]
 
 ## 11. How does it differ from plain files and from FUSE-based systems?
-
 Plain files need `find` plus `getfattr`, a linear scan, with no query call. FUSE systems run
 filesystem logic in a user-space process; MoobFS is a native kernel module, which gives
-different trade-offs (a kernel bug can crash the host). No speed comparison has been
-measured.
+different trade-offs (a kernel bug can crash the host). No comparison with FUSE has been
+measured; the comparison with SQLite is in question 13.
 [`AGENTS.md`; `docs/value-assessment.md`; `docs/benchmark-plan.md`]
 
 ## 12. Is it a competitor to mem0, Letta or ai-memory?
@@ -109,27 +111,30 @@ Prior art in agent filesystems such as YoloFS (2026) is acknowledged.
 [`docs/benchmark-plan.md`; `docs/research-originality.md` §3, §9]
 
 ## 13. What is proven and what is still a hypothesis?
-
-Proven in the author's VM runs: answer correctness against the oracle, two-uid isolation on
-three lower filesystems, git/SQLite acceptance, and a KASAN/UBSAN/lockdep run on kernel
-6.12.112. Hypotheses pending M4: any speed or efficiency advantage, behaviour near the index
-budget, scale and long-running operation. There is no independent reproduction yet.
-[`docs/research-originality.md` §5; `docs/value-assessment.md` "Medições do M4"; `docs/benchmark-plan.md`]
+Shown in the author's VM runs: answers equal to the oracle, isolation between users and domains
+on three lower filesystems, git and SQLite acceptance, and the suite under KASAN, UBSAN and
+lockdep on kernel 6.12.112. Measured, pilot-grade, on one host: against SQLite with composite
+indexes, `QUERY2` was 1.1 to 5.8 times faster on filtered conjunctions and SQLite 4 to 6 times
+faster on "the N most recent" ordered traversals; against a real memory client's database, equal
+answers from 150 to 60 000 memories. Still hypotheses: any advantage on other hardware or
+workloads, behaviour near the index budget, long-running operation. There is no independent
+reproduction yet (issue #68 asks for one).
+[`README.md` "What was measured"; journals 0047, 0088; `docs/benchmark-plan.md`]
 
 ## 14. Which kernels are supported?
-
-One test target: Debian kernel 6.12.111 in a QEMU VM, plus an upstream 6.12.112 KASAN debug
-kernel in the weekly and pull-request workflow. Kernel APIs change between versions;
-compatibility with other kernels is not promised.
-[`README.md`; `docs/testing.md` §1; `docs/community-plan.md` §9]
+One series: Debian kernel 6.12.111 in a QEMU VM, and upstream 6.12.112 with KASAN, UBSAN and
+lockdep on every pull request that touches the module and weekly. x86-64 only for the module;
+the attribute encoding's user-space tests also run on big-endian s390x under emulation. Kernel
+APIs change between versions; compatibility with other kernels is not promised.
+[`README.md`; `docs/testing.md` §1; journal 0124]
 
 ## 15. Is it production-ready? Is there a release?
-
-No, and no. It is a research project whose only tag is the `v0.1.0-experimental` source pre-release; a module bug can cause a
-kernel panic or data loss, and the project's own tests found three kernel-side defects during
-development (two in journal 0015, one in journal 0016). Run it only in a disposable VM with
-synthetic data.
-[`docs/value-assessment.md` §9; `docs/history/0015-phase-2e-investigation.md`; `docs/history/0016-kasan-lockdep-harness.md`; `SECURITY.md`]
+No, and no. It is a research project with source pre-release tags only, the last of which,
+`v0.3.0-experimental`, predates security fixes: build from `main`. A module bug can cause a
+kernel panic or data loss; the project's tests and two source reviews by AI assistants found
+kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but F2 and
+part of F4 fixed). Run it only in a disposable VM with synthetic data.
+[`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`]
 
 ## 16. How can I try it?
 
