@@ -5,6 +5,10 @@ name: KASAN and lockdep (arm64, exploratory)
 # in step with kasan.yml by hand: the build and run steps are the same. The first run (2026-10-18,
 # journal 0124) found no /dev/kvm on these runners, so the guest runs under emulation (TCG) and,
 # by default, only the suite step ext4; the weekly run uses that default too.
+# Unlike kasan.yml (journal 0137): the guest's init is virtme-ng's bash script, since the wheel's
+# virtme-ng-init is x86-64 only; the root is virtio-fs, not 9p, with build/ reached through it
+# (--rw, no --rwdir); the disks are passed in reverse (virtio-mmio order); the test programs are
+# copied to a guest tmpfs and run from there.
 on:
   workflow_dispatch:
     inputs:
@@ -36,7 +40,11 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential flex bison libelf-dev libssl-dev bc cpio kmod \
             qemu-system-arm qemu-efi-aarch64 qemu-utils python3-pip python3-venv udev \
-            e2fsprogs btrfs-progs xfsprogs sqlite3 libsqlite3-dev git dmsetup acl
+            e2fsprogs btrfs-progs xfsprogs sqlite3 libsqlite3-dev git dmsetup acl virtiofsd
+          # virtme-ng shares the root over virtio-fs when it finds the Rust virtiofsd, and over 9p
+          # otherwise; under emulation the 9p read path of 6.12 overflows the kernel stack at boot
+          # (netfs read-retry recursion, journal 0137), so this job needs virtio-fs
+          /usr/libexec/virtiofsd --version
           python3 -m pip install --user --require-hashes -r vm/kasan-requirements.txt   # virtme-ng 1.41 and deps, by hash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Let QEMU use KVM
@@ -64,7 +72,7 @@ jobs:
         run: |
           cd build/linux
           vng --kconfig --config ../../vm/kasan.config
-          grep -E '^CONFIG_(KASAN|PROVE_LOCKING|UBSAN|EXT4_FS|BTRFS_FS|XFS_FS|DM_LOG_WRITES|DM_FLAKEY|VIRTIO_BLK)=' .config
+          grep -E '^CONFIG_(KASAN|PROVE_LOCKING|UBSAN|EXT4_FS|BTRFS_FS|XFS_FS|DM_LOG_WRITES|DM_FLAKEY|VIRTIO_BLK|VIRTIO_FS)=' .config
           vng --build --verbose
       - name: Build the layer module and the test binaries against that kernel
         run: |
@@ -85,13 +93,33 @@ jobs:
           R="$GITHUB_WORKSPACE"
           # one retry when the debug kernel itself reports a diagnostic while booting under
           # emulation (MOOBFS_VM_ENV_FAIL); a layer failure (MOOBFS_VM_FAIL) is never retried
+          # a user program killed by a signal is logged with its registers (run 39241490729: an
+          # unexplained "Segmentation fault" of moobfs-attr, with nothing in dmesg)
+          DIAG='echo 1 > /proc/sys/kernel/print-fatal-signals; echo 1 > /proc/sys/debug/exception-trace;'
+          # The test programs run from a guest tmpfs, not from the virtio-fs root (journal 0137): run
+          # from virtio-fs under emulation they died at random (SIGSEGV, SIGILL) at addresses whose
+          # instruction in the file cannot fault, three runs out of three; from tmpfs the ext4 step
+          # passed (run 39265856488). The disk images stay out (they are the guest's virtio disks);
+          # what the guest writes in build/vng (dmesg.txt) is not written back to the host.
+          # The host's checksums tell a bad copy over virtio-fs from a crash with good bytes in memory.
+          (cd "$R/build/vng" && find . -maxdepth 1 -type f ! -name '*.img' ! -name '*.log' -exec sha256sum {} + > "$R/build/vng-bin.sha256")
+          DIAG="$DIAG mkdir /run/moob-bin && for f in $R/build/vng/*; do case \$f in *.img) ;; *) cp -a \$f /run/moob-bin/ ;; esac; done && (cd /run/moob-bin && sha256sum -c --quiet $R/build/vng-bin.sha256 && echo 'ARM64_BIN_COPY: checksums equal to the host') && mount --bind /run/moob-bin $R/build/vng &&"
           for attempt in 1 2; do
-            vng --user root --cpus 2 --memory 3G --verbose \
-              --rwdir "$R/build" \
-              --disk "$R/build/vng/lower-ext4.img" --disk "$R/build/vng/lower-btrfs.img" \
-              --disk "$R/build/vng/lower-xfs.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/log.img" \
-              --exec "MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
+            # --rw instead of --rwdir "$R/build": a --rwdir is always 9p in virtme-ng 1.41, and the
+            # module and the test binaries are read from build/; with --rw the guest writes build/
+            # through the virtio-fs root (as the runner user; /tmp stays a guest-only overlay)
+            # --no-virtme-ng-init: the virtme-ng 1.41 wheel ships virtme-ng-init built for x86-64
+            # only, so on arm64 the kernel cannot run it (error -8) and asks modprobe for a binfmt
+            # handler; the bash virtme-init of the same package works on any architecture
+            # Disks in reverse: QEMU's arm virt machine gives virtio-mmio devices to the guest in the
+            # reverse order of the command line (run 39238405300: lower-ext4.img became vde), and
+            # kasan-guest.sh expects vda ext4, vdb btrfs, vdc xfs, vdd scratch, vde log as on x86
+            vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init \
+              --disk "$R/build/vng/log.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/lower-xfs.img" \
+              --disk "$R/build/vng/lower-btrfs.img" --disk "$R/build/vng/lower-ext4.img" \
+              --exec "$DIAG MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
             cp "$R/build/vng/console-$attempt.log" "$R/build/vng/console.log"
+            grep -q 'Mounted root (virtiofs filesystem)' "$R/build/vng/console.log" || echo "warning: the guest root was not virtio-fs"
             grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log" || break
             echo "attempt $attempt: boot-time diagnostic of the debug kernel; retrying once"
           done

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CI, arm64 (exploratory, journal 0137): the guest boots under emulation and the suite step ext4
+  passed under KASAN twice, and btrfs and XFS once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
+  `virtme-ng-init`; the job now uses the bash init, a virtio-fs root, the disks in reverse order,
+  and runs the test programs from a guest tmpfs (from virtio-fs they crashed at random).
 - syzkaller (journal 0138): a fourth six-hour run with F2 and F4, no report; handler coverage
   78.6 % (threshold 85 %). The attribute calls now take a file opened in the layer and
   `getxattr` by path is fuzzed (`moobl_xattr_get` had never been reached); the per-function
