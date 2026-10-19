@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- syzkaller: a third six-hour run on `main` at bf1a34b (the layer code of `main` before F2), 720 747
+  executions, no report (journal 0133).
 - Fixed (journal 0132, finding F4 completed): an ordinary user writing through the layer could spend
   ext4's reserved blocks with the default reserve owner; writes now run with the writer's fsuid
   and groups.
