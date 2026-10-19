@@ -4,6 +4,9 @@
 
 - syzkaller: a third six-hour run on `main` at bf1a34b (the layer code of `main` before F2), 720 747
   executions, no report (journal 0133).
+- Fixed (journal 0132, finding F4 completed): an ordinary user writing through the layer could spend
+  ext4's reserved blocks with the default reserve owner; writes now run with the writer's fsuid
+  and groups.
 - Fixed (journal 0130, ADR-0016): an index update that failed after the lower
   write (budget full) left queries answering without the file until remount, flagged only in
   `GET_INFO`; now only that domain is built again by its next query.

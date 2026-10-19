@@ -11,8 +11,8 @@ on the benchmark host, while the F2 and F4 branches waited for review (journals 
 
 - Commit: `main` at bf1a34b (pull request 84). The layer, `common/`, `include/` and
   `vm/syzkaller/` are identical on `main` at 3df77b1 (`git diff --stat bf1a34b 3df77b1` on those
-  paths is empty), so the result holds for `main` up to 3df77b1. F2 (pull request 89, merged on
-  2026-10-19 after the run) and F4 were not fuzzed.
+  paths is empty), so the result holds for `main` up to 3df77b1. F2 and F4 (pull requests 89
+  and 92, merged on 2026-10-19 after the run) were not fuzzed.
 - Kernel: the pinned 6.12.112 of the KASAN job with the options of `vm/syzkaller/kernel.config`
   (KCOV with comparisons), as in journal 0109.
 - Command, on the benchmark host:

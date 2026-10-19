@@ -133,7 +133,7 @@ No, and no. It is a research project with source pre-release tags only, the last
 `v0.3.0-experimental`, predates security fixes: build from `main`. A module bug can cause a
 kernel panic or data loss; the project's tests and two source reviews by AI assistants found
 kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but the fairness
-part of F2 and part of F4 fixed). Run it only in a disposable VM with synthetic data.
+part of F2 fixed). Run it only in a disposable VM with synthetic data.
 [`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`]
 
 ## 16. How can I try it?

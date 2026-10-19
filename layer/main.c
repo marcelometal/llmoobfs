@@ -79,6 +79,19 @@ static const struct inode_operations moobl_special_iops;
 static const struct inode_operations moobl_symlink_iops;
 static const struct file_operations moobl_dir_fops;
 static const struct file_operations moobl_file_fops;
+
+/* An open file of the layer: the lower file, and the credentials of its writes (moobl_wcred_get) */
+struct moobl_file {
+	struct file *real;
+	spinlock_t lock;
+	const struct cred *wcred;	/* last write credentials built, or NULL */
+};
+
+static struct file *moobl_real(const struct file *file)
+{
+	return ((struct moobl_file *)file->private_data)->real;
+}
+
 static const struct address_space_operations moobl_aops = {
 	/* Data never lives in this mapping; mmap is delegated to the lower file. */
 	.direct_IO = noop_direct_IO,
@@ -985,7 +998,7 @@ static int moobl_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
 	if (err)
 		return err;
 	if (ia->ia_valid & ATTR_FILE)
-		lower_ia.ia_file = ia->ia_file->private_data;
+		lower_ia.ia_file = moobl_real(ia->ia_file);
 	/*
 	 * A write or truncate of a set-user-ID or set-group-ID file arrives with
 	 * ATTR_KILL_S*ID and the ATTR_MODE the VFS derived from it. notify_change()
@@ -1079,6 +1092,68 @@ static void moobl_file_end_write(struct file *file, loff_t pos, ssize_t ret)
 	moobl_file_modified(file);
 }
 
+/*
+ * Write credentials (finding F4, journal 0132). Writes run with the mounter's credentials but
+ * with the writer's fsuid, fsgid and groups: ext4 grants its reserved blocks by the fsuid and
+ * groups of the task that allocates (ext4_has_free_clusters(), the reserve owner being uid 0 by
+ * default), so with the mounter's own a write by an ordinary user could spend the reserve. They
+ * are built as overlayfs builds the credentials of a creation (ovl_create_or_link()) and kept
+ * while the same identity writes.
+ */
+static bool moobl_same_id(const struct cred *a, const struct cred *b)
+{
+	return uid_eq(a->fsuid, b->fsuid) && gid_eq(a->fsgid, b->fsgid) &&
+	       a->group_info == b->group_info;
+}
+
+/* The credentials a write of the current task runs with; put_cred() them after the call. */
+static const struct cred *moobl_wcred_get(struct file *file)
+{
+	const struct cred *mnt = MOOBL_SB(file_inode(file)->i_sb)->creds;
+	const struct cred *cur = current_cred(), *old, *c;
+	struct moobl_file *mf = file->private_data;
+	struct cred *wc;
+
+	if (moobl_same_id(cur, mnt))
+		return get_cred(mnt);
+	spin_lock(&mf->lock);
+	c = mf->wcred;
+	if (c && moobl_same_id(c, cur)) {
+		get_cred(c);
+		spin_unlock(&mf->lock);
+		return c;
+	}
+	spin_unlock(&mf->lock);
+	old = override_creds(mnt);
+	wc = prepare_creds();
+	revert_creds(old);
+	if (!wc)
+		return ERR_PTR(-ENOMEM);
+	wc->fsuid = cur->fsuid;
+	wc->fsgid = cur->fsgid;
+	set_groups(wc, cur->group_info);
+	spin_lock(&mf->lock);
+	old = mf->wcred;
+	mf->wcred = get_cred(wc);
+	spin_unlock(&mf->lock);
+	if (old)
+		put_cred(old);
+	return wc;
+}
+
+static int moobl_file_init(struct file *file, struct file *real)
+{
+	struct moobl_file *mf = kmalloc(sizeof(*mf), GFP_KERNEL);
+
+	if (!mf)
+		return -ENOMEM;
+	mf->real = real;
+	spin_lock_init(&mf->lock);
+	mf->wcred = NULL;
+	file->private_data = mf;
+	return 0;
+}
+
 #define MOOBL_CTX(file) {						\
 	.cred = MOOBL_SB(file_inode(file)->i_sb)->creds,		\
 	.user_file = (file),						\
@@ -1090,6 +1165,7 @@ static int moobl_open(struct inode *inode, struct file *file)
 {
 	struct path *lower = moobl_lower_path(file->f_path.dentry);
 	struct file *realfile;
+	int err;
 
 	/* Creation and truncation were handled by the VFS before open. */
 	file->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
@@ -1097,13 +1173,20 @@ static int moobl_open(struct inode *inode, struct file *file)
 				     MOOBL_SB(inode->i_sb)->creds);
 	if (IS_ERR(realfile))
 		return PTR_ERR(realfile);
-	file->private_data = realfile;
-	return 0;
+	err = moobl_file_init(file, realfile);
+	if (err)
+		fput(realfile);
+	return err;
 }
 
 static int moobl_release(struct inode *inode, struct file *file)
 {
-	fput(file->private_data);
+	struct moobl_file *mf = file->private_data;
+
+	fput(mf->real);
+	if (mf->wcred)
+		put_cred(mf->wcred);
+	kfree(mf);
 	return 0;
 }
 
@@ -1114,7 +1197,7 @@ static ssize_t moobl_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	if (!iov_iter_count(iter))
 		return 0;
-	return backing_file_read_iter(file->private_data, iter, iocb,
+	return backing_file_read_iter(moobl_real(file), iter, iocb,
 				      iocb->ki_flags, &ctx);
 }
 
@@ -1127,12 +1210,16 @@ static ssize_t moobl_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	if (!iov_iter_count(iter))
 		return 0;
+	ctx.cred = moobl_wcred_get(file);
+	if (IS_ERR(ctx.cred))
+		return PTR_ERR(ctx.cred);
 	inode_lock(inode);
 	ret = file_remove_privs(file);
 	if (!ret)
-		ret = backing_file_write_iter(file->private_data, iter, iocb,
+		ret = backing_file_write_iter(moobl_real(file), iter, iocb,
 					      iocb->ki_flags, &ctx);
 	inode_unlock(inode);
+	put_cred(ctx.cred);
 	return ret;
 }
 
@@ -1142,7 +1229,7 @@ static ssize_t moobl_splice_read(struct file *in, loff_t *ppos,
 {
 	struct backing_file_ctx ctx = MOOBL_CTX(in);
 
-	return backing_file_splice_read(in->private_data, ppos, pipe, len, flags, &ctx);
+	return backing_file_splice_read(moobl_real(in), ppos, pipe, len, flags, &ctx);
 }
 
 static ssize_t moobl_splice_write(struct pipe_inode_info *pipe, struct file *out,
@@ -1152,12 +1239,16 @@ static ssize_t moobl_splice_write(struct pipe_inode_info *pipe, struct file *out
 	struct inode *inode = file_inode(out);
 	ssize_t ret;
 
+	ctx.cred = moobl_wcred_get(out);
+	if (IS_ERR(ctx.cred))
+		return PTR_ERR(ctx.cred);
 	inode_lock(inode);
 	ret = file_remove_privs(out);
 	if (!ret)
-		ret = backing_file_splice_write(pipe, out->private_data, ppos, len,
+		ret = backing_file_splice_write(pipe, moobl_real(out), ppos, len,
 						flags, &ctx);
 	inode_unlock(inode);
+	put_cred(ctx.cred);
 	return ret;
 }
 
@@ -1165,13 +1256,13 @@ static int moobl_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct backing_file_ctx ctx = MOOBL_CTX(file);
 
-	return backing_file_mmap(file->private_data, vma, &ctx);
+	return backing_file_mmap(moobl_real(file), vma, &ctx);
 }
 
 static int moobl_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 {
 	const struct cred *old = override_creds(MOOBL_SB(file_inode(file)->i_sb)->creds);
-	int err = vfs_fsync_range(file->private_data, start, end, datasync);
+	int err = vfs_fsync_range(moobl_real(file), start, end, datasync);
 
 	revert_creds(old);
 	return err;
@@ -1179,7 +1270,7 @@ static int moobl_fsync(struct file *file, loff_t start, loff_t end, int datasync
 
 static loff_t moobl_llseek(struct file *file, loff_t offset, int whence)
 {
-	struct file *real = file->private_data;
+	struct file *real = moobl_real(file);
 	struct inode *inode = file_inode(file);
 	loff_t ret;
 
@@ -1200,18 +1291,22 @@ static loff_t moobl_llseek(struct file *file, loff_t offset, int whence)
 static long moobl_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 {
 	struct inode *inode = file_inode(file);
-	const struct cred *old;
+	const struct cred *old, *wc;
 	long ret;
 
+	wc = moobl_wcred_get(file);
+	if (IS_ERR(wc))
+		return PTR_ERR(wc);
 	inode_lock(inode);
 	ret = file_remove_privs(file);
 	if (!ret) {
-		old = override_creds(MOOBL_SB(inode->i_sb)->creds);
-		ret = vfs_fallocate(file->private_data, mode, offset, len);
+		old = override_creds(wc);
+		ret = vfs_fallocate(moobl_real(file), mode, offset, len);
 		revert_creds(old);
 		moobl_file_modified(file);
 	}
 	inode_unlock(inode);
+	put_cred(wc);
 	return ret;
 }
 
@@ -1219,11 +1314,14 @@ static loff_t moobl_remap_file_range(struct file *in, loff_t pos_in, struct file
 				     loff_t pos_out, loff_t len, unsigned int flags)
 {
 	struct inode *inode_out = file_inode(out);
-	const struct cred *old;
+	const struct cred *old, *wc;
 	loff_t ret;
 
 	if (file_inode(in)->i_sb != inode_out->i_sb)
 		return -EXDEV;
+	wc = moobl_wcred_get(out);
+	if (IS_ERR(wc))
+		return PTR_ERR(wc);
 	if (!(flags & REMAP_FILE_DEDUP)) {
 		/*
 		 * A clone changes the content. The lower call runs with the mounter's
@@ -1237,47 +1335,52 @@ static loff_t moobl_remap_file_range(struct file *in, loff_t pos_in, struct file
 		if (ret)
 			goto unlock;
 	}
-	old = override_creds(MOOBL_SB(inode_out->i_sb)->creds);
+	old = override_creds(wc);
 	if (flags & REMAP_FILE_DEDUP)
-		ret = vfs_dedupe_file_range_one(in->private_data, pos_in, out->private_data,
+		ret = vfs_dedupe_file_range_one(moobl_real(in), pos_in, moobl_real(out),
 						pos_out, len, flags);
 	else
-		ret = vfs_clone_file_range(in->private_data, pos_in, out->private_data,
+		ret = vfs_clone_file_range(moobl_real(in), pos_in, moobl_real(out),
 					   pos_out, len, flags);
 	revert_creds(old);
 	moobl_file_modified(out);
 unlock:
 	if (!(flags & REMAP_FILE_DEDUP))
 		inode_unlock(inode_out);
+	put_cred(wc);
 	return ret;
 }
 
 static ssize_t moobl_copy_file_range(struct file *in, loff_t pos_in, struct file *out,
 				     loff_t pos_out, size_t len, unsigned int flags)
 {
-	const struct cred *old;
+	const struct cred *old, *wc;
 	ssize_t ret;
 
 	if (file_inode(in)->i_sb != file_inode(out)->i_sb)
 		return -EXDEV;
+	wc = moobl_wcred_get(out);
+	if (IS_ERR(wc))
+		return PTR_ERR(wc);
 	/* as for a clone: drop the privileges of the target with the caller's credentials */
 	inode_lock(file_inode(out));
 	ret = file_remove_privs(out);
 	if (ret)
 		goto unlock;
-	old = override_creds(MOOBL_SB(file_inode(out)->i_sb)->creds);
-	ret = vfs_copy_file_range(in->private_data, pos_in, out->private_data, pos_out,
+	old = override_creds(wc);
+	ret = vfs_copy_file_range(moobl_real(in), pos_in, moobl_real(out), pos_out,
 				  len, flags);
 	revert_creds(old);
 	moobl_file_modified(out);
 unlock:
 	inode_unlock(file_inode(out));
+	put_cred(wc);
 	return ret;
 }
 
 static int moobl_flush(struct file *file, fl_owner_t id)
 {
-	struct file *real = file->private_data;
+	struct file *real = moobl_real(file);
 
 	if (real->f_op->flush)
 		return real->f_op->flush(real, id);
@@ -1307,11 +1410,14 @@ static int moobl_dir_open(struct inode *inode, struct file *file)
 	struct file *real = dentry_open(moobl_lower_path(file->f_path.dentry),
 					O_RDONLY | O_DIRECTORY,
 					MOOBL_SB(inode->i_sb)->creds);
+	int err;
 
 	if (IS_ERR(real))
 		return PTR_ERR(real);
-	file->private_data = real;
-	return 0;
+	err = moobl_file_init(file, real);
+	if (err)
+		fput(real);
+	return err;
 }
 
 /*
@@ -1323,7 +1429,7 @@ static int moobl_dir_open(struct inode *inode, struct file *file)
  */
 static int moobl_iterate(struct file *file, struct dir_context *ctx)
 {
-	struct file *real = file->private_data;
+	struct file *real = moobl_real(file);
 	const struct cred *old;
 	int err;
 
@@ -1338,7 +1444,7 @@ static int moobl_iterate(struct file *file, struct dir_context *ctx)
 
 static loff_t moobl_dir_llseek(struct file *file, loff_t offset, int whence)
 {
-	struct file *real = file->private_data;
+	struct file *real = moobl_real(file);
 	loff_t ret;
 
 	inode_lock(file_inode(file));

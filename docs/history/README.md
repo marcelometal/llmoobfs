@@ -158,4 +158,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0129 — One list of test programs for every VM harness (issue #72)](0129-one-list-of-test-programs.md)
 - [0130 — A failed index update rebuilds its domain (finding F2, ADR-0016)](0130-failed-update-rebuilds-its-domain.md)
 - [0131 — Negative rounds: each test fails without its fix](0131-negative-rounds.md)
+- [0132 — ext4's reserve is granted as to the writer directly (finding F4 completed)](0132-ext4-reserve-follows-the-writer.md)
 - [0133 — syzkaller: a third six-hour run, no report](0133-syzkaller-third-run.md)
