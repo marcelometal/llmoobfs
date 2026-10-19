@@ -109,6 +109,9 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
   90 % of PCs in `attr.c`, 68 % in `index.c`, 65 % in `main.c`; the release paths are not reached.
   A third six-hour run on 2026-10-18, on `main` at bf1a34b, before F2 (journal 0133): 720 747 executions, no
   report; its per-function coverage was not collected, so the 78 % below is still the last measure.
+  A fourth, on 2026-10-19 with F2 and F4 (journal 0138): 625 124 executions, no report; the
+  handlers at 78.6 % of their PCs; two harness gaps fixed (attribute calls on a layer file,
+  coverage fetched in time).
 - **Threshold, set on 2026-10-15** (journal 0109): the ioctl and attribute handlers (from
   `moobl_root_ioctl()` through `query_run()`, `results_to_user()`, `moobl_xattr_get/set()` and the
   validation in `common/attr.c`) at 85 % of their PCs or more, measured by the manager's
