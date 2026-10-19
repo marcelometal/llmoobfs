@@ -162,3 +162,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0133 — syzkaller: a third six-hour run, no report](0133-syzkaller-third-run.md)
 - [0134 — Measurement method reviewed: a difference needs a test and an interval](0134-measurement-method-review.md)
 - [0135 — Fourth pre-release tag: v0.4.0-experimental](0135-fourth-prerelease-tag.md)
+- [0136 — A casefolded lower directory is refused (issue #95)](0136-casefolded-lower-refused.md)

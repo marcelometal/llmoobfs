@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fixed (issue #95, journal 0136): a lower directory already casefolded (ext4 `-O casefold`) was
+  not refused, though the layer's names are case-sensitive; it is now refused, with every name in
+  it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
+  `casefold`.
+
 ## v0.4.0-experimental — 2026-10-19
 
 Fourth source pre-release, the one to use instead of `v0.3.0-experimental`, which predates the

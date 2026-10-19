@@ -7,6 +7,9 @@
  *   layer syncfs <path>             syncfs(2) on the filesystem that holds <path>
  *   layer reserve <mount> <lower>   an ordinary user fills the layer; the blocks the lower
  *                                   reserves for its administrator must stay free
+ *   layer cfsetup <lower>           on a lower made with -O casefold: a casefolded directory ci
+ *                                   holding Note.md, and an ordinary directory plain
+ *   layer cfcheck <mount>           the layer refuses the casefolded directory and every name in it
  */
 #define _GNU_SOURCE
 #include <sys/types.h>
@@ -174,6 +177,39 @@ int main(int argc, char **argv)
 		close(fd);
 		CHECK(!unlink(up("fill")));
 		puts("LAYER_RESERVE_PASS");
+		return 0;
+	}
+	if (argc == 3 && !strcmp(argv[1], "cfsetup")) {
+		int f;
+
+		snprintf(low, sizeof low, "%s", argv[2]);
+		CHECK(!mkdir(lo("ci"), 0755) && !mkdir(lo("plain"), 0755));
+		fd = open(lo("ci"), O_RDONLY | O_DIRECTORY); CHECK(fd >= 0);
+		CHECK(!ioctl(fd, FS_IOC_GETFLAGS, &f));
+		f |= FS_CASEFOLD_FL;
+		CHECK(!ioctl(fd, FS_IOC_SETFLAGS, &f));
+		close(fd);
+		fd = open(lo("ci/Note.md"), O_WRONLY | O_CREAT | O_EXCL, 0644); CHECK(fd >= 0); close(fd);
+		/* the lower answers in any case: that is what the layer's dentry cache cannot follow */
+		CHECK(!stat(lo("ci/note.md"), &st));
+		fd = open(lo("plain/a.md"), O_WRONLY | O_CREAT | O_EXCL, 0644); CHECK(fd >= 0); close(fd);
+		return 0;
+	}
+	if (argc == 3 && !strcmp(argv[1], "cfcheck")) {
+		/* issue #95: the layer's names are case-sensitive, so a casefolded lower directory is
+		 * refused, the directory itself and every name in it, as overlayfs refuses a layer
+		 * whose casefolding differs (vm/suite.sh, step casefold) */
+		snprintf(mnt, sizeof mnt, "%s", argv[2]);
+		CHECK(!stat(up("plain/a.md"), &st));
+		errno = 0;
+		CHECK(stat(up("ci"), &st) == -1 && errno == EOPNOTSUPP);
+		errno = 0;
+		CHECK(stat(up("ci/note.md"), &st) == -1 && errno == EOPNOTSUPP);
+		errno = 0;
+		CHECK(stat(up("ci/Note.md"), &st) == -1 && errno == EOPNOTSUPP);
+		errno = 0;
+		CHECK(open(up("ci/new.md"), O_WRONLY | O_CREAT, 0644) == -1 && errno == EOPNOTSUPP);
+		puts("LAYER_CASEFOLD_PASS");
 		return 0;
 	}
 	CHECK(argc == 5);
