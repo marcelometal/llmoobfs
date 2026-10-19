@@ -95,6 +95,13 @@ jobs:
           # a user program killed by a signal is logged with its registers (run 39241490729: an
           # unexplained "Segmentation fault" of moobfs-attr, with nothing in dmesg)
           DIAG='echo 1 > /proc/sys/kernel/print-fatal-signals; echo 1 > /proc/sys/debug/exception-trace;'
+          # Experiment (journal 0137): the test programs run from a guest tmpfs, not from the
+          # virtio-fs root. Under emulation they died at random (SIGSEGV, SIGILL) at addresses whose
+          # instruction in the file cannot fault (kpti=0 changed nothing, run 39262287911). The
+          # disk images stay out (they are the guest's virtio disks); build/vng is not written back.
+          # The host's checksums tell a bad copy over virtio-fs from a crash with good bytes in memory.
+          (cd "$R/build/vng" && find . -maxdepth 1 -type f ! -name '*.img' ! -name '*.log' -exec sha256sum {} + > "$R/build/vng-bin.sha256")
+          DIAG="$DIAG mkdir /run/moob-bin && for f in $R/build/vng/*; do case \$f in *.img) ;; *) cp -a \$f /run/moob-bin/ ;; esac; done && (cd /run/moob-bin && sha256sum -c --quiet $R/build/vng-bin.sha256 && echo 'ARM64_BIN_COPY: checksums equal to the host') && mount --bind /run/moob-bin $R/build/vng &&"
           for attempt in 1 2; do
             # --rw instead of --rwdir "$R/build": a --rwdir is always 9p in virtme-ng 1.41, and the
             # module and the test binaries are read from build/; with --rw the guest writes build/
@@ -105,10 +112,7 @@ jobs:
             # Disks in reverse: QEMU's arm virt machine gives virtio-mmio devices to the guest in the
             # reverse order of the command line (run 39238405300: lower-ext4.img became vde), and
             # kasan-guest.sh expects vda ext4, vdb btrfs, vdc xfs, vdd scratch, vde log as on x86
-            # kpti=0: experiment (journal 0137). Under emulation the static test programs, all mapped
-            # at 0x400000, died at random with SIGSEGV or SIGILL (an SVE store of glibc's A64FX
-            # memset on a Cortex-A57 guest); KPTI is on only because of KASLR, the A57 does not need it
-            vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init --append kpti=0 \
+            vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init \
               --disk "$R/build/vng/log.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/lower-xfs.img" \
               --disk "$R/build/vng/lower-btrfs.img" --disk "$R/build/vng/lower-ext4.img" \
               --exec "$DIAG MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
