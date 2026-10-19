@@ -6,7 +6,8 @@ name: KASAN and lockdep (arm64, exploratory)
 # journal 0124) found no /dev/kvm on these runners, so the guest runs under emulation (TCG) and,
 # by default, only the suite step ext4; the weekly run uses that default too.
 # Unlike kasan.yml the guest root is virtio-fs, not 9p, and build/ is reached through it (--rw,
-# no --rwdir): the 9p root panicked the emulated guest at boot (journal 0135).
+# no --rwdir), and the guest's init is virtme-ng's bash script (--no-virtme-ng-init): the wheel's
+# init binary is x86-64 only (journal 0137).
 on:
   workflow_dispatch:
     inputs:
@@ -41,7 +42,7 @@ jobs:
             e2fsprogs btrfs-progs xfsprogs sqlite3 libsqlite3-dev git dmsetup acl virtiofsd
           # virtme-ng shares the root over virtio-fs when it finds the Rust virtiofsd, and over 9p
           # otherwise; under emulation the 9p read path of 6.12 overflows the kernel stack at boot
-          # (netfs read-retry recursion, journal 0135), so this job needs virtio-fs
+          # (netfs read-retry recursion, journal 0137), so this job needs virtio-fs
           /usr/libexec/virtiofsd --version
           python3 -m pip install --user --require-hashes -r vm/kasan-requirements.txt   # virtme-ng 1.41 and deps, by hash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -95,7 +96,10 @@ jobs:
             # --rw instead of --rwdir "$R/build": a --rwdir is always 9p in virtme-ng 1.41, and the
             # module and the test binaries are read from build/; with --rw the guest writes build/
             # through the virtio-fs root (as the runner user; /tmp stays a guest-only overlay)
-            vng --user root --cpus 2 --memory 3G --verbose --rw \
+            # --no-virtme-ng-init: the virtme-ng 1.41 wheel ships virtme-ng-init built for x86-64
+            # only, so on arm64 the kernel cannot run it (error -8) and asks modprobe for a binfmt
+            # handler; the bash virtme-init of the same package works on any architecture
+            vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init \
               --disk "$R/build/vng/lower-ext4.img" --disk "$R/build/vng/lower-btrfs.img" \
               --disk "$R/build/vng/lower-xfs.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/log.img" \
               --exec "MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
