@@ -102,6 +102,34 @@ time, time until the index answers, integrity after a crash.
 - No estimated number is published as measured; each table cites the commit, the command and the
   evidence file.
 
+*Revision, 2026-10-19 (journal 0134), after a methodology review by a researcher in file-system
+trace capture and replay.* The items above stay; these are added or replace them where they
+conflict:
+
+- A difference between two systems or two builds is reported only with a statistical test and
+  a confidence interval: `bench/compare.py` gives, per workload, operation and percentile, the
+  relative difference of the medians across repetitions, its 95 % bootstrap interval and the
+  Mann-Whitney U p-value. The 20 % spread rule stays as a stability flag; it is not evidence of
+  a difference, and a percentage difference of medians alone is not a result.
+- At least 30 repetitions for a comparison that will be reported. The minimum of 7 stays for
+  exploratory runs, which are labelled as such and claim no difference.
+- Latency is shown as an empirical distribution (ECDF, `ecdf.csv` of `bench/compare.py`) per
+  operation, not only as p50 and p99: latency has a tail that a summary hides.
+- CPU frequency held still: `sudo sh bench/cpu-freq.sh fix` (governor `performance`, turbo off)
+  before the run and `restore` after; `environment.txt` records the state, and a run where it
+  could not be fixed says so.
+- Warm-up discarded and caches dropped between repetitions where the scenario is cold: already
+  in the method; every report states which applies.
+- SQLite baselines: every SQLite number is stated together with the fact that SQLite performs
+  no POSIX permission check, while the layer queries as an ordinary user with one. SQLite's
+  `cache_size` and `mmap_size` are declared (the defaults so far) and varied: default, a cache
+  that holds the whole database, and the database mapped with `mmap_size`.
+- A number is generalized only after more than one machine and kernel.
+- The strongest evidence is an end-to-end test of a real client with that client's own
+  metrics. Micro and macro benchmarks, and trace replay, serve to catch regressions between
+  versions. MoobFS has no production deployment; the staged test of the first client
+  (`bench/client/`) is the closest.
+
 ## Tools
 
 Detailed design of the programs, the dataset, the SQLite schema of the baselines and the tests of the
@@ -110,6 +138,8 @@ harness itself: [benchmark-harness.md](benchmark-harness.md).
 - Our own harness in C for the loads (deterministic, no dependencies), reusing
   `tests/query.c` and `tools/moobfs-index`.
 - `fio` only to calibrate the VM device before the loads.
+- `bench/compare.py` for the comparison of two systems (test, interval, ECDF) and
+  `bench/cpu-freq.sh` to hold the CPU frequency (revision of 2026-10-19).
 - `dm-log-writes` for write amplification and recovery; `duperemove` for dedup.
 - `perf` and `/proc/lock_stat` (kernel with `LOCK_STAT`) to locate bottlenecks.
 - The ai-memory benchmark harness (`evals/`) for the real-client scenario.

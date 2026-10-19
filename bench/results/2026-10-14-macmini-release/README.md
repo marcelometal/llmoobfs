@@ -52,5 +52,10 @@ repetitions and, in brackets, its p5 to p95 range (µs):
   row inconclusive (spread above 20 % in some percentile). The two modules differ by every
   commit from journal 0085 to 0098, not only by the on-demand build.
 
+*Note, 2026-10-19 (journal 0134).* Ten repetitions and a spread rule cannot show or exclude a
+difference of 8 to 15 %. Under the revised method (`docs/benchmark-plan.md`), this comparison
+needs at least 30 repetitions, `bench/compare.py` (confidence interval and test) and the CPU
+frequency held still; until then no difference, in either direction, is claimed.
+
 Files: `release/times.txt`, `steady-*/times.txt` (each script's own log), `*/environment.txt`,
 `steady-*/results.csv` (from `bench/report.py`). The raw per-call records stay on the host.

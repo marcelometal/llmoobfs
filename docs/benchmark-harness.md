@@ -6,7 +6,9 @@ defines the programs, formats and tests that make the plan executable and reprod
 third parties.
 
 Implemented in `bench/` (entry 0025): `gen` (deterministic manifest), `load` (W1, W2, W3, W4
-with per-call latency recording), `report.py` (percentiles, dispersion, CSV and JSON) and
+with per-call latency recording), `report.py` (percentiles, dispersion, CSV and JSON), `compare.py` (two systems compared:
+bootstrap confidence interval, Mann-Whitney U test, ECDF; revision of 2026-10-19, journal 0134),
+`cpu-freq.sh` (CPU governor and turbo held still and recorded) and
 `smoke.sh` (`make bench-smoke`, harness self-check in a common directory, in CI),
 `sqlbase.sh` (schema and composite indexes of §4, load from the manifest, SQL of the Q1–Q9
 forms, `EXPLAIN QUERY PLAN`) and `equiv.sh` (equal inode sets across `QUERY`, SQLite and the

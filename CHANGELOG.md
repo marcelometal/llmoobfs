@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Measurement method (journal 0134, after an outside review): a difference is reported only with
+  a test and a confidence interval (`bench/compare.py`: bootstrap interval, Mann-Whitney U, ECDF),
+  30 repetitions, the CPU frequency held still (`bench/cpu-freq.sh`), SQLite's missing permission
+  check and its cache settings stated. The 8 to 15 % of 2026-10-14 is not claimed.
 - Fixed (journal 0130, ADR-0016): an index update that failed after the lower
   write (budget full) left queries answering without the file until remount, flagged only in
   `GET_INFO`; now only that domain is built again by its next query.

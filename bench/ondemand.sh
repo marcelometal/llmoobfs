@@ -20,7 +20,7 @@ now() { date +%s%N; }
 ms() { echo $(( ($(now) - $1) / 1000000 )); }
 used() { "$BIN/query" "$LAYER" info | sed -n 's/.* used=\([0-9]*\) entries=\([0-9]*\) inodes=\([0-9]*\)$/used=\1 entries=\2 inodes=\3/p'; }
 built() { "$BIN/query" "$LAYER" info | sed -n 's/^domains_built=\([0-9]*\) .*/\1/p'; }
-{ uname -r; cat /sys/module/moobfs_layer/version; cat /sys/module/moobfs_layer/srcversion; echo "mount options: $opts"; } > "$OUT/environment.txt"
+{ uname -r; cat /sys/module/moobfs_layer/version; cat /sys/module/moobfs_layer/srcversion; echo "mount options: $opts"; sh "$(dirname "$0")/cpu-freq.sh" show; } > "$OUT/environment.txt"
 : > "$OUT/times.txt"
 for mode in cold warm cold warm; do
     umount "$LAYER"
