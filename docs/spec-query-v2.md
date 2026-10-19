@@ -319,7 +319,8 @@ query answers does not change.
   domain's build lock, which is only tried, and waits for running queries to finish. The
   mount-wide `QUERY` never releases: it needs every domain at once, and fails with `ENOMEM`
   when they do not all fit. An attribute write to a domain already built that does not fit
-  still marks the index incomplete, as before.
+  makes that domain be built again by its next query (ADR-0016; before it, the write marked
+  the whole index incomplete until remount).
 - **Release by the shrinker** (journal 0101). Each mount registers a shrinker. Under memory
   pressure the kernel asks it for memory, and it releases built domains, least recently queried
   first, skipping any used in the last `index_idle` seconds (mount option, 0 to 86400, default

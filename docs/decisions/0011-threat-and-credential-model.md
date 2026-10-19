@@ -129,6 +129,10 @@ and S7 (fuzzing).
   until remount (`MOOB_FLAG_INDEX_INCOMPLETE`, one `pr_warn`). Not a crash, but a cross-user
   degradation of the query service. Kept as a known limitation under S9 (per-uid or per-domain
   accounting is the candidate); `GET_INFO` and `moobfs-check` make it visible.
+  *Note, 2026-10-18:* the flag reached only `GET_INFO`, so queries kept answering from the
+  stale domain. [ADR-0016](0016-failed-index-update-rebuilds-its-domain.md) confines a failed
+  update to its own domain, which is built again by its next query. Fair shares of the budget
+  remain under S9.
 
 Added on 2026-10-12, from the review of journal 0066 (`docs/research-stacked-fs-kernel-rules.md`):
 

@@ -54,3 +54,10 @@ Following journal 0125, issues are closed by the project itself.
 Run `make vm-test` (`MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS`), open the pull request (the
 KASAN workflow runs because `vm/` changed) and close issue #5. Then issue #72 (one list of test
 programs).
+
+*Note, 2026-10-18 (VM run).* The full suite of this change ran under KASAN, UBSAN and lockdep
+on the benchmark host (`vm/kasan-local.sh`, native KVM): `MOOBFS_LAYER_PASS`,
+`MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_KASAN_PASS`, no kernel diagnostics. The KASAN workflow of
+pull request 85 passed too, and the pull request was merged (c3c73e4). The edits in
+`vm/selinux-guest.sh`, `vm/fstests-guest.sh` and `vm/syzkaller-local.sh` remain unexercised
+until their next runs.

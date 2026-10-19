@@ -121,8 +121,10 @@ recently are released until it fits; a domain that does not fit alone fails its 
 `ENOMEM` and nothing of it is kept. A shrinker also releases built domains under memory
 pressure, except those queried in the last `index_idle` seconds (journal 0101,
 [spec-query-v2.md](spec-query-v2.md) §9). If an index
-update fails after a lower write has already succeeded, the layer sets `incomplete`, logs one
-warning and reports `MOOB_FLAG_INDEX_INCOMPLETE` in `GET_INFO` until remount. Renaming a
+update fails after a lower write has already succeeded, only that domain is affected: it is
+built again by its next query, or that query fails with `ENOMEM` if the domain does not fit
+the budget alone ([ADR-0016](decisions/0016-failed-index-update-rebuilds-its-domain.md);
+before it, the whole index was marked incomplete until remount). Renaming a
 directory sets `paths_stale`, because descendants keep their recorded paths; `QUERY` then
 resolves those entries through the dentry cache and reports `MOOB_FLAG_PATHS_STALE`; a
 `QUERY2` on a domain where a directory was renamed builds that domain again first. Build cost is

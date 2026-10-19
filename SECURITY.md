@@ -117,5 +117,5 @@ security audit; no outside human audit has taken place. Two independent source r
 assistants (journals 0111 and 0114) found findings F9 to F12, fixed through private advisories. The threat and credential
 model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
 (accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and the
-findings F1 to F12, of which F2 is open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
+findings F1 to F12, of which part of F2 (fair shares of the index budget) is open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
 fstests, syzkaller, hostile-lower handling and the other open items.

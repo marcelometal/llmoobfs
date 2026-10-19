@@ -79,7 +79,7 @@ struct moob_query {
 #define MOOB_FLAG_NOLINKS 0x1U
 #define MOOB_FLAG_INDEX_OFF 0x2U
 #define MOOB_FLAG_PATHS_STALE 0x4U
-#define MOOB_FLAG_INDEX_INCOMPLETE 0x8U
+#define MOOB_FLAG_INDEX_INCOMPLETE 0x8U	/* reserved: not set since ADR-0016 (older kernels set it) */
 #define MOOB_FLAG_DOMAINS 0x10U			/* domain_depth > 0: QUERY2 on domain directories */
 #define MOOB_FLAG_COUNTERS 0x20U		/* the index counters below are filled (CAP_SYS_ADMIN) */
 /*
