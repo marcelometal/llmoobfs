@@ -120,7 +120,8 @@ de cotas justas do F2. Não é para produção.** Fatos em 2026-10-19:
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
   arquivos de baixo ext4, btrfs e XFS apenas. Os testes da codificação de atributos também passam em
-  s390x big-endian, com emulação; execuções em arm64 estão sendo medidas ([diário 0124](docs/history/0124-big-endian-pass-arm64-without-kvm.md)).
+  s390x big-endian, com emulação. O módulo também roda em arm64 com emulação, sem KVM, num job
+  exploratório: os passos de ext4, btrfs e XFS passaram sob KASAN ([diário 0137](docs/history/0137-arm64-guest-boots-under-emulation.md)).
 - **Testado com** injeção de falhas dentro do módulo, o grupo `quick` do fstests nos três sistemas
   de arquivos de baixo, syzkaller (quatro rodadas de seis horas; um defeito achado e corrigido), uma
   primeira rodada do KCSAN (nenhuma corrida no módulo) e SELinux em modo enforcing (diários 0091,
@@ -364,9 +365,10 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
 ## Limitações
 
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
-  APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. O
-  módulo não rodou em outra arquitetura; só os testes da codificação, em espaço de usuário, rodaram
-  em big-endian.
+  APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em
+  outra arquitetura, o módulo só rodou no job exploratório de arm64 (com emulação, três sistemas de
+  arquivos de baixo, diário 0137); os testes da codificação, em espaço de usuário, também rodaram em
+  big-endian.
 - O índice é só em RAM, não vai para o swap e é limitado por `index_budget` (padrão 128 MiB). Cada
   domínio é construído por uma varredura linear na primeira consulta depois da montagem, e de novo
   depois de ser liberado ou de ter um diretório renomeado dentro dele; o orçamento e o shrinker só
