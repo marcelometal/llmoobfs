@@ -52,3 +52,8 @@ when each retry reads a little. That fits a 9p root under TCG with KASAN's large
 Mainline later moved read collection to a work item, so `netfs_retry_reads()` no longer calls
 `netfs_rreq_terminated()` itself; that rework is not in 6.12. Options for the job: a root
 filesystem image instead of the 9p root, or a later kernel series for the arm64 run only.
+
+*Note, 2026-10-19 (correction).* The stack overflow was not the cause of the boot failure but a
+consequence: virtme-ng 1.41's `virtme-ng-init` is built for x86-64 only, the arm64 kernel could
+not execute it (error -8, run 39235747683), and the `modprobe` that overflowed on the 9p root is,
+by its timing, the one the kernel starts to look for a binfmt handler. See journal 0137.
