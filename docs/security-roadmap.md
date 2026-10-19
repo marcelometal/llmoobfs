@@ -37,7 +37,7 @@ Suggested order by cost-benefit. Each item has a verifiable done-when criterion.
 
 *Status, 2026-10-12 (journal 0060).* Done: [ADR-0011](decisions/0011-threat-and-credential-model.md),
 with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (journal 0084).
-*Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130) and part of F4. Two source
+*Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.
 
@@ -107,6 +107,8 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
   ioctl, no report. Two six-hour runs followed: the first found finding F8 (a failed mount pinned the lower root,
   journal 0112); the second, with the fix, 567 085 executions and no report. Coverage of `layer/`:
   90 % of PCs in `attr.c`, 68 % in `index.c`, 65 % in `main.c`; the release paths are not reached.
+  A third six-hour run on 2026-10-18, on `main` at bf1a34b, before F2 (journal 0133): 720 747 executions, no
+  report; its per-function coverage was not collected, so the 78 % below is still the last measure.
 - **Threshold, set on 2026-10-15** (journal 0109): the ioctl and attribute handlers (from
   `moobl_root_ioctl()` through `query_run()`, `results_to_user()`, `moobl_xattr_get/set()` and the
   validation in `common/attr.c`) at 85 % of their PCs or more, measured by the manager's
