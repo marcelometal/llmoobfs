@@ -113,6 +113,9 @@ static inline struct dentry *moobl_lower_dentry(struct dentry *dentry)
 /* main.c */
 struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower);
 int moobl_other_device(struct super_block *sb, struct dentry *lower);
+struct moob_query_result;
+struct moob_query_result *moobl_qbuf_get(struct file *file, u32 n);
+void moobl_qbuf_put(struct file *file, struct moob_query_result *buf);
 bool moobl_casefolded(struct dentry *lower);
 
 /* index.c */

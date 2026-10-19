@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fixed (journal 0139): since pull request 71 every `QUERY`/`QUERY2` allocated a buffer for the
+  requested limit (about 1.1 MB at the maximum), which made filtered queries 1.3 to 2.5 times
+  slower; the buffer is now kept with the open file and reused. Measured with the method of
+  journal 0134 (40 repetitions, frequency held, bootstrap interval): the on-demand index costs
+  7 to 12 % against the index built at mount, which the 2026-10-14 report could not show.
 - Fixed (issue #95, journal 0136): a lower directory already casefolded (ext4 `-O casefold`) was
   not refused, though the layer's names are case-sensitive; it is now refused, with every name in
   it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
