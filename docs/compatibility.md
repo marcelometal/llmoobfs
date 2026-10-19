@@ -86,3 +86,5 @@ advisory when it is a vulnerability under `SECURITY.md`; older versions are not 
   code change not made yet.
 - Decided on 2026-10-13, later the same day: instead of a patch release of `v0.2.0-experimental`,
   a new pre-release `v0.3.0-experimental` carries every fix (journal 0087).
+- 2026-10-19: `v0.4.0-experimental` carries the fixes made since, F2 (ADR-0016) and F4 among them
+  (journal 0135).

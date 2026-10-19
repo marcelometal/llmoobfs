@@ -29,3 +29,10 @@ QUERY results are incomplete until remount
 of which F2 and part of F4 are open
 of which F2 is open
 and part of F4 are open
+predates security fixes
+predates the fixes
+predates fixes made since
+é anterior a correções de segurança
+`v0.3.0-experimental`, é anterior
+Every tag so far carries defects
+Todas as tags até agora carregam defeitos
