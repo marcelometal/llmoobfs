@@ -92,6 +92,9 @@ jobs:
           R="$GITHUB_WORKSPACE"
           # one retry when the debug kernel itself reports a diagnostic while booting under
           # emulation (MOOBFS_VM_ENV_FAIL); a layer failure (MOOBFS_VM_FAIL) is never retried
+          # a user program killed by a signal is logged with its registers (run 39241490729: an
+          # unexplained "Segmentation fault" of moobfs-attr, with nothing in dmesg)
+          DIAG='echo 1 > /proc/sys/kernel/print-fatal-signals; echo 1 > /proc/sys/debug/exception-trace;'
           for attempt in 1 2; do
             # --rw instead of --rwdir "$R/build": a --rwdir is always 9p in virtme-ng 1.41, and the
             # module and the test binaries are read from build/; with --rw the guest writes build/
@@ -105,7 +108,7 @@ jobs:
             vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init \
               --disk "$R/build/vng/log.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/lower-xfs.img" \
               --disk "$R/build/vng/lower-btrfs.img" --disk "$R/build/vng/lower-ext4.img" \
-              --exec "MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
+              --exec "$DIAG MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
             cp "$R/build/vng/console-$attempt.log" "$R/build/vng/console.log"
             grep -q 'rootfstype=virtiofs' "$R/build/vng/console.log" || echo "warning: the guest root was not virtio-fs"
             grep -q '^MOOBFS_VM_ENV_FAIL:' "$R/build/vng/console.log" || break
