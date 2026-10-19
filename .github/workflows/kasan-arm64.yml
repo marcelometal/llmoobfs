@@ -105,7 +105,10 @@ jobs:
             # Disks in reverse: QEMU's arm virt machine gives virtio-mmio devices to the guest in the
             # reverse order of the command line (run 39238405300: lower-ext4.img became vde), and
             # kasan-guest.sh expects vda ext4, vdb btrfs, vdc xfs, vdd scratch, vde log as on x86
-            vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init \
+            # kpti=0: experiment (journal 0137). Under emulation the static test programs, all mapped
+            # at 0x400000, died at random with SIGSEGV or SIGILL (an SVE store of glibc's A64FX
+            # memset on a Cortex-A57 guest); KPTI is on only because of KASLR, the A57 does not need it
+            vng --user root --cpus 2 --memory 3G --verbose --rw --no-virtme-ng-init --append kpti=0 \
               --disk "$R/build/vng/log.img" --disk "$R/build/vng/scratch.img" --disk "$R/build/vng/lower-xfs.img" \
               --disk "$R/build/vng/lower-btrfs.img" --disk "$R/build/vng/lower-ext4.img" \
               --exec "$DIAG MOOB_ONLY='$MOOB_ONLY' sh $R/vm/kasan-guest.sh" 2>&1 | tee "$R/build/vng/console-$attempt.log"
