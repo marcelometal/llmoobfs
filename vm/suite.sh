@@ -12,6 +12,7 @@
 # MOOB_ONLY (optional) runs only the named steps, for development:
 #   ext4 btrfs xfs      everything of run_lower for that lower filesystem
 #   demo clients powerloss ioerror reserve
+#   casefold            a casefolded lower directory and lower root are refused (issue #95)
 #   faults              only under the KASAN harness: the fault-injection block of kasan-guest.sh
 #   buildrace           the first query on a domain racing with writes to it (journal 0098)
 #   release             built domains released by the budget and by the shrinker (journal 0101)
@@ -29,7 +30,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -939,6 +940,26 @@ for opts in resuid=4242 defaults; do
     "$BIN/layer" reserve "$LAYER" "$LOWER" || fail "rs-reserve-$opts"
     umount "$LAYER" && umount "$LOWER" || fail "rs-final-umount-$opts"
 done
+fi
+if want casefold; then
+# A casefolded lower directory (issue #95, journal 0136): the layer's names are case-sensitive, so
+# it refuses a casefolded directory and every name in it, and a casefolded lower root, as overlayfs
+# refuses layers whose casefolding differs. Skipped when the kernel has no casefolding.
+if "$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -O casefold "$SCRATCH" 2>/dev/null &&
+   mount -t ext4 "$SCRATCH" "$LOWER" 2>/dev/null; then
+    "$BIN/layer" cfsetup "$LOWER" || fail cf-setup
+    mount -t moobfs_layer -o lower="$LOWER",domain_depth=0 none "$LAYER" || fail cf-layer-mount
+    "$BIN/layer" cfcheck "$LAYER" || fail cf-check
+    "$BIN/query" "$LAYER" build > /dev/null || fail cf-build
+    umount "$LAYER" || fail cf-layer-umount
+    if mount -t moobfs_layer -o lower="$LOWER/ci" none "$LAYER" 2>/dev/null; then
+        umount "$LAYER"; fail cf-root-accepted
+    fi
+    umount "$LOWER" || fail cf-umount
+    echo "CASEFOLD_REFUSED_PASS"
+else
+    echo "CASEFOLD_SKIPPED: no casefolding in this kernel or mke2fs"
+fi
 fi
 # Tracepoints of the index (journal 0102): tr_on clears the buffer and enables the named events
 # of the moobfs system, tr_count counts one event in the buffer.

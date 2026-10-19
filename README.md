@@ -11,8 +11,8 @@
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
-> tag, `v0.3.0-experimental`, predates security fixes: build from `main`. Details under
-> [Status](#status).
+> tag, `v0.4.0-experimental` (2026-10-19), has every fix made up to that date; later ones land on
+> `main`. Details under [Status](#status).
 
 ## The problem
 
@@ -106,8 +106,9 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 
 ## Status
 
-**Experimental. Source pre-release tags only; the last one, `v0.3.0-experimental`, predates the fixes
-of findings F6 to F12, so build from `main`. Not for production.** Facts as of 2026-10-18:
+**Experimental. Source pre-release tags only; the last one, `v0.4.0-experimental` (2026-10-19), has
+every fix up to that date: findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
+production.** Facts as of 2026-10-19:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
@@ -372,8 +373,8 @@ KASAN harness runs the layer suite), and no benchmark exists.
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md) and
-  [0083](docs/history/0083-index-inspection-fixes.md). Every tag so far carries defects fixed
-  later: build from `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
+  [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.3.0-experimental` carry
+  defects fixed later; fixes after `v0.4.0-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
   syzkaller ran for three six-hour rounds, last measured below the coverage threshold of
   [security roadmap](docs/security-roadmap.md) S3. SELinux enforcing was exercised once (journal
   0104); AppArmor and Smack were not.

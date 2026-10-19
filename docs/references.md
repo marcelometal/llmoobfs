@@ -216,6 +216,14 @@ set. Read on 2026-10-14.
   the normal approximation and tie correction, checked against SciPy's `mannwhitneyu` on three
   samples) and `bench/cpu-freq.sh`, implemented.
 
+### Casefolded lower directories (issue #95, journal 0136)
+
+- overlayfs, Linux v7.3-rc7: one casefold state for every layer, checked when a layer is added
+  (`fs/overlayfs/params.c`, `ovl_dentry_casefolded()`) and on lookup for parent and child
+  (`fs/overlayfs/namei.c`, "parent wrong casefold", "child wrong casefold").
+
+  The rule `moobl_casefolded()` follows (refuse, do not propagate), implemented.
+
 ### Security roadmap (proposal)
 
 - Wen Xu, Hyungon Moon, Sanidhya Kashyap, et al. "Fuzzing File Systems via Two-Dimensional Input
