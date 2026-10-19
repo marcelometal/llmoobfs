@@ -160,3 +160,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0131 — Negative rounds: each test fails without its fix](0131-negative-rounds.md)
 - [0132 — ext4's reserve is granted as to the writer directly (finding F4 completed)](0132-ext4-reserve-follows-the-writer.md)
 - [0133 — syzkaller: a third six-hour run, no report](0133-syzkaller-third-run.md)
+- [0134 — Measurement method reviewed: a difference needs a test and an interval](0134-measurement-method-review.md)

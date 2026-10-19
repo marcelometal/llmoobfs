@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Measurement method (journal 0134, after an outside review): a difference is reported only with
+  a test and a confidence interval (`bench/compare.py`: bootstrap interval, Mann-Whitney U, ECDF),
+  30 repetitions, the CPU frequency held still (`bench/cpu-freq.sh`), SQLite's missing permission
+  check and its cache settings stated. The 8 to 15 % of 2026-10-14 is not claimed.
 - syzkaller: a third six-hour run on `main` at bf1a34b (the layer code of `main` before F2), 720 747
   executions, no report (journal 0133).
 - Fixed (journal 0132, finding F4 completed): an ordinary user writing through the layer could spend

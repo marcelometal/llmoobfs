@@ -62,4 +62,7 @@ grep -q '^plain W4 attr_rm: n=300 err=0' "$OUT/report.txt" || fail "report W4 ro
 [ "$(grep -c '^sqlite W3 query:Q[1-9]: n=2 err=0' "$OUT/report.txt")" -eq 9 ] || { cat "$OUT/report.txt"; fail "report sqlite W3 rows per shape"; }
 python3 bench/report.py --out "$OUT/report-err" "$OUT/err" | grep -q 'W2 read: n=0 err=300' || fail "errors not reported"
 [ -s "$OUT/report/results.csv" ] && [ -s "$OUT/report/results.json" ] || fail "report files"
-echo "BENCH_SMOKE_PASS: gen deterministic; W1/W2/W4/W8 on a plain directory; moobfs-check clean; SQLite baseline equal to the oracle on 9 shapes; SQLite W3 client recorded; report with 2 repetitions"
+python3 bench/compare.py --out "$OUT/compare" --a plain "$OUT/rep1" "$OUT/rep2" --b plain "$OUT/rep1" "$OUT/rep2" > "$OUT/compare.txt"
+grep -q '^W1 create p50_us: n=2/2: too few repetitions' "$OUT/compare.txt" || { cat "$OUT/compare.txt"; fail "compare with 2 repetitions"; }
+[ -s "$OUT/compare/compare.csv" ] && [ -s "$OUT/compare/ecdf.csv" ] || fail "compare files"
+echo "BENCH_SMOKE_PASS: gen deterministic; W1/W2/W4/W8 on a plain directory; moobfs-check clean; SQLite baseline equal to the oracle on 9 shapes; SQLite W3 client recorded; report with 2 repetitions; compare refuses a verdict on 2"

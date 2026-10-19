@@ -201,6 +201,21 @@ set. Read on 2026-10-14.
   `selinux_inode_listsecurity()` (`security/selinux/hooks.c`), `security_inode_listsecurity()`
   (`security/security.c`) and `ovl_xattr_get()` (`fs/overlayfs/xattrs.c`), Linux 6.12.112.
 
+### Comparing two measurements (journal 0134)
+
+- Bradley Efron. "Bootstrap Methods: Another Look at the Jackknife". The Annals of Statistics
+  7(1), 1979, 1-26. https://doi.org/10.1214/aos/1176344552
+- H. B. Mann, D. R. Whitney. "On a Test of Whether one of Two Random Variables is Stochastically
+  Larger than the Other". The Annals of Mathematical Statistics 18(1), 1947, 50-60.
+  https://doi.org/10.1214/aoms/1177730491
+- Linux kernel documentation, "CPU Performance Scaling" (`Documentation/admin-guide/pm/cpufreq.rst`)
+  and "intel_pstate CPU Performance Scaling Driver" (`Documentation/admin-guide/pm/intel_pstate.rst`):
+  `scaling_governor`, `no_turbo`, `boost`.
+
+  `bench/compare.py` (percentile bootstrap interval of the difference of medians; the U test with
+  the normal approximation and tie correction, checked against SciPy's `mannwhitneyu` on three
+  samples) and `bench/cpu-freq.sh`, implemented.
+
 ### Security roadmap (proposal)
 
 - Wen Xu, Hyungon Moon, Sanidhya Kashyap, et al. "Fuzzing File Systems via Two-Dimensional Input

@@ -62,6 +62,7 @@ gcc -O2 tests/third_party/log-writes/replay-log.c tests/third_party/log-writes/l
 cp layer/moobfs_layer.ko $BUILD/
 cp bench/queries-w3.txt $BUILD/bench-queries-w3.txt
 for f in sqlbase equiv run; do cp bench/$f.sh "$BUILD/bench-$f.sh"; done
+cp bench/cpu-freq.sh "$BUILD/cpu-freq.sh"   # bench-run.sh records the CPU frequency state with it
 # the suite finds host tools under $TOOLS; on a distro host they live in the usual places
 mkdir -p $BUILD/tools
 for t in git sqlite3 dmsetup mke2fs e2fsck setfacl getfacl; do ln -sf "$(command -v $t)" "$BUILD/tools/$t"; done
