@@ -233,10 +233,10 @@ run_lower() {
     mkdir -p "$LAYER/ns/a" "$LAYER/ns/b" "$LAYER/ns/shared" || fail "iso-mkdir-$fs"
     for d in a b shared; do
         for i in 1 2 3; do
-            echo "secret $d $i" > "$LAYER/ns/$d"/m$i.md
-            chmod 0600 "$LAYER/ns/$d"/m$i.md || fail "iso-mode-$fs"
-            "$BIN/moobfs-attr" set "$LAYER/ns/$d"/m$i.md kind string note || fail "iso-attr-$fs"
-            "$BIN/moobfs-attr" set "$LAYER/ns/$d"/m$i.md namespace string $d || fail "iso-ns-$fs"
+            echo "secret $d $i" > "$LAYER/ns/$d/m"$i.md
+            chmod 0600 "$LAYER/ns/$d/m"$i.md || fail "iso-mode-$fs"
+            "$BIN/moobfs-attr" set "$LAYER/ns/$d/m"$i.md kind string note || fail "iso-attr-$fs"
+            "$BIN/moobfs-attr" set "$LAYER/ns/$d/m"$i.md namespace string $d || fail "iso-ns-$fs"
         done
     done
     chown -R 1001:1001 "$LAYER/ns/a" && chmod 0700 "$LAYER/ns/a" || fail "iso-chown-a-$fs"
@@ -309,8 +309,8 @@ run_lower() {
     for d in da db dshared da/sub; do
         for i in 1 2 3; do
             [ $d = da/sub ] && [ $i -gt 1 ] && continue
-            echo "q2 $d $i" > "$LAYER/$d"/m$i.md
-            "$BIN/moobfs-attr" set "$LAYER/$d"/m$i.md kind string note >/dev/null || fail "q2-attr-$fs"
+            echo "q2 $d $i" > "$LAYER/$d/m"$i.md
+            "$BIN/moobfs-attr" set "$LAYER/$d/m"$i.md kind string note >/dev/null || fail "q2-attr-$fs"
         done
     done
     chmod 0600 "$LAYER/da/m"*.md "$LAYER/da/sub/m"*.md "$LAYER/db/m"*.md && chmod 0644 "$LAYER/dshared/m"*.md || fail "q2-mode-$fs"
@@ -983,7 +983,7 @@ for fs in ext4 btrfs xfs; do
     tr_off moobfs_scan_reread
     [ "$retries" -gt 0 ] || fail "br-no-write-landed-in-the-window-$fs (the test proved nothing)"
     br_cmp() {
-        for p in "$LOWER"/br/*; do
+        for p in "$LOWER/br/"*; do
             d=${p##*/}
             for q in "kind exists - -" "kind eq string k1" "score ge int64 50"; do
                 # $q holds one condition as four words; it is split on purpose
@@ -1072,6 +1072,24 @@ for fs in ext4 btrfs xfs; do
     b0=$(rl_info domain_builds)
     rl_cmp d0 d1 || fail "rl-budget-lru-again-$fs"
     [ "$(rl_info domain_builds)" -eq "$b0" ] || fail "rl-budget-recent-domain-was-released-$fs"
+    # F2 (ADR-0016): with d0 and d1 built, writes into d0 overflow the budget. A failed update
+    # makes d0 be built again by its next query, which must answer with every file, never
+    # without the ones whose update failed; the room comes from releasing d1.
+    tr_on moobfs_index_incomplete || fail "rl-fill-trace-on-$fs"
+    n=$(( one * 9 / 10 / 1000 ))
+    long=$(head -c 1000 /dev/zero | tr '\0' y)
+    mkdir -m 755 "$LAYER/d0/fill" || fail "rl-fill-dir-$fs"
+    for i in $(seq 1 $n); do
+        f=$LAYER/d0/fill/f$i; : > "$f" && "$BIN/moobfs-attr" set "$f" rlfill string "$long" > /dev/null || fail "rl-fill-attr-$fs"
+    done
+    grep -q ' moobfs_index_incomplete: ' $TR/trace || fail "rl-fill-never-overflowed-$fs (the test proved nothing)"
+    "$BIN/query" "$LAYER/d0" q2 rlfill exists - - | cut -f2 | sort > /tmp/rl.k || fail "rl-fill-query-$fs"
+    "$BIN/moobfs-index" --domain "$LOWER/rl/d0" rlfill exists - - | cut -f2 | sort > /tmp/rl.o || fail "rl-fill-oracle-$fs"
+    [ "$(wc -l < /tmp/rl.o)" -eq $n ] && cmp -s /tmp/rl.k /tmp/rl.o ||
+        { echo "fill: kernel $(wc -l < /tmp/rl.k) oracle $(wc -l < /tmp/rl.o) written $n"; fail "rl-fill-answer-differs-$fs"; }
+    [ "$(rl_info used)" -le $budget ] || fail "rl-fill-budget-exceeded-$fs"
+    rm -r "$LAYER/d0/fill" || fail "rl-fill-rm-$fs"
+    echo "RELEASE_FILL: $fs, $n writes overflowed the budget; d0 built again with all of them"
     # the mount-wide query needs every domain at once and does not release any: it fails
     "$BIN/query" "$LAYER" build 2> /dev/null && fail "rl-budget-mount-wide-query-did-not-fail-$fs"
     f=$("$BIN/query" "$LAYER" info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')

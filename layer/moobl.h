@@ -30,6 +30,7 @@ struct moobl_domain {
 	struct list_head moved;		/* directories renamed in it during its build (index lock) */
 	bool restart;			/* one of them could not be recorded: build again */
 	bool paths_stale;		/* a directory was renamed in it since it was built */
+	bool lost;			/* an update of it failed since it was built (F2) */
 	u64 top_gen;			/* ix->top_gen when its build began */
 	unsigned long used_at;		/* jiffies of the last query that used it */
 };
@@ -44,7 +45,7 @@ struct moobl_index {
 	bool paths_stale;		/* a directory was renamed since mount (GET_INFO) */
 	u64 top_gen;			/* bumped when a domain directory, or one above, is renamed */
 	bool xattr_ok;			/* lower root answered listxattr */
-	bool incomplete;		/* an index update failed after a lower write */
+	bool incomplete;		/* not set since ADR-0016: a failed update rebuilds its domain */
 	bool initialized;		/* moobl_index_init() ran for this superblock */
 	unsigned int domain_depth;	/* depth of domain directories below the root; 0: off */
 	struct xarray fallback;		/* domain ino -> value: answer with per-result checks */
