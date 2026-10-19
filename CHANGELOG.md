@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- syzkaller (journal 0138): a fourth six-hour run with F2 and F4, no report; handler coverage
+  78.6 % (threshold 85 %). The attribute calls now take a file opened in the layer and
+  `getxattr` by path is fuzzed (`moobl_xattr_get` had never been reached); the per-function
+  coverage is fetched 20 minutes before the end, since the page takes minutes to answer.
 - Fixed (issue #95, journal 0136): a lower directory already casefolded (ext4 `-O casefold`) was
   not refused, though the layer's names are case-sensitive; it is now refused, with every name in
   it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
