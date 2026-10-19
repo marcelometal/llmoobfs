@@ -25,6 +25,10 @@ used here and is missing from this list, or is described wrongly, please open an
 | checkpatch.pl | [Linux stable](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git) `scripts/` ([docs](https://docs.kernel.org/dev-tools/checkpatch.html)) | GPL-2.0 | tag `v6.12.112`, SHA-256 per file | style check of `layer/` and `kernel/` (`scripts/checkpatch.sh`) |
 | virtme-ng | [arighi/virtme-ng](https://github.com/arighi/virtme-ng) | GPL-2.0-only | `1.41`, hashes in `vm/kasan-requirements.txt` | KASAN/UBSAN/lockdep kernel runs (`.github/workflows/kasan.yml`) |
 | Linux 6.12.112 | [kernel.org](https://cdn.kernel.org/pub/linux/kernel/v6.x/) | GPL-2.0 | tarball SHA-256 | the KASAN kernel and the benchmark kernel (`bench/kernel-build.sh`) |
+| fselect | [jhspetersson/fselect](https://github.com/jhspetersson/fselect), release asset `fselect-x86_64-linux-musl.gz` | Apache-2.0 (per its repository) | `0.10.3`, SHA-256 as listed by GitHub for the asset | SQL-like file search with `has_xattr`/`xattr()` through the layer (`vm/interop-guest.sh`, `.github/workflows/interop.yml`, journal 0140); not vendored |
+| cshatag | [rfjakob/cshatag](https://github.com/rfjakob/cshatag), release asset `cshatag_v2.2.1_linux-static_amd64.tar.gz` | MIT | `v2.2.1`, SHA-256 computed from the official tarball (the project publishes a GPG signature only) | checksums in `user.shatag.*`, outdated and corrupt files detected through the layer (journal 0140); not vendored |
+| Recoll | [recoll.org](https://www.recoll.org/), Ubuntu 24.04 package `recollcmd` | GPL-2.0-or-later | `1.36.1-1build2` (CI); 1.43.0 in the local run | `[xattrtofields]` indexing of `user.moob.*` and `user.xdg.*` through the layer (journal 0140); not vendored |
+| KDE KFileMetaData | [KDE/kfilemetadata](https://invent.kde.org/frameworks/kfilemetadata), Ubuntu 24.04 package `libkf5filemetadata-dev`; `KFileMetaData::UserMetaData` | LGPL-2.1-or-later | `5.115.0-0ubuntu4` (CI); 5.116.0 in the local run | the tag, rating and comment attributes Dolphin and Baloo use, through `vm/interop-kfmd.cpp` (journal 0140); not vendored |
 
 ## 2. Research that shaped decisions
 
