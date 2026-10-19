@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- syzkaller descriptions for the weak handlers (journal 0138, not yet run): the `QUERY2` cursor
+  as resources with a continuing call `ioctl$MOOB_IOC_QUERY2_NEXT`, typed query terms and
+  attribute values from short lists, and six new seeds (cursor pages, long keys, value types,
+  the equality plan, per-result checks, attribute flags).
 - syzkaller (journal 0138): a fourth six-hour run with F2 and F4, no report; handler coverage
   78.6 % (threshold 85 %). The attribute calls now take a file opened in the layer and
   `getxattr` by path is fuzzed (`moobl_xattr_get` had never been reached); the per-function
