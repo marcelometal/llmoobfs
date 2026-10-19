@@ -106,3 +106,12 @@ arm64 host with KVM was used.
 A pull request from `arm64-boot`, then dispatches with more steps (`btrfs xfs`, `faults`) to
 learn what fits the 300-minute limit; update the site's status row on architectures when a
 result is merged (rule of journal 0122).
+
+*Note, 2026-10-19 (later).* Two more dispatches on this branch: run 39271760023 on 1dd2aa6
+repeated the ext4 step with the same markers (`ARM64_BIN_COPY: checksums equal to the host`,
+`MOOBFS_KASAN_ONLY_PASS: steps ext4`); run 39300702939 with `steps="btrfs xfs"` passed both
+lower filesystems under KASAN, UBSAN and lockdep (`LAYER_LOWER_PASS: btrfs reflink=yes`,
+`LAYER_LOWER_PASS: xfs reflink=yes`, `HOSTILE_LOWER_PASS` and `BENCH_LAYER_PASS` for each,
+`MOOBFS_KASAN_ONLY_PASS: steps btrfs xfs ... with no kernel diagnostics`) in 52 minutes. Still not
+run on arm64: the fault-injection step and the acceptance steps.
+
