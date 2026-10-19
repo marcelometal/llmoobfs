@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Interoperability probe helper (vm/interop-guest.sh): reads and writes a file's user metadata
+// Interoperability test helper (vm/interop-guest.sh): reads and writes a file's user metadata
 // through KDE's KFileMetaData::UserMetaData (KF5), the class Dolphin and Baloo use for tags,
 // rating and comment. Control characters are printed as \xNN so a type byte shows.
 //   kfmd show <file>

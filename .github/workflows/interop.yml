@@ -1,8 +1,11 @@
-name: Interoperability probe
-# On demand only, never a required check. Boots a plain (non-debug) build of the pinned kernel
-# of kasan.yml with virtme-ng and runs vm/interop-guest.sh: what getfattr/setfattr, fselect,
-# cshatag, Recoll and KDE KFileMetaData see and do through a layer mount over ext4. The guest
-# shares the runner's root filesystem, so the tools installed here are the ones it runs.
+name: Interoperability test
+# On demand only, never a required check (journal 0140). Boots a plain (non-debug) build of the
+# pinned kernel of kasan.yml with virtme-ng and runs vm/interop-guest.sh: getfattr/setfattr,
+# fselect, cshatag, Recoll and KDE KFileMetaData through a layer mount over ext4, with a
+# verdict of INTEROP_PASS or INTEROP_FAIL: <steps>. The guest shares the runner's root
+# filesystem, so the tools installed here are the ones it runs. No schedule: the tools are
+# pinned, so a weekly run would repeat the same versions; dispatch it after a change to the
+# layer's xattr handling or to a pinned version.
 on:
   workflow_dispatch:
 permissions:
@@ -13,12 +16,15 @@ concurrency:
 env:
   KERNEL_VERSION: 6.12.112
   KERNEL_SHA256: 164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03
-  # release assets; the fselect digest is the one GitHub lists for the asset, the cshatag
-  # one was computed from the downloaded release tarball (it publishes a GPG signature only)
+  # Release assets, amd64. The fselect digest is the one GitHub lists for the asset; cshatag
+  # publishes a GPG signature only and GitHub lists no digest for its asset, so its SHA-256
+  # was computed here from the official release tarball (2026-10-19, journal 0140).
   FSELECT_VERSION: 0.10.3
   FSELECT_SHA256: 01e25f362c04e41e565216b70b4859e8bfe27038fa3a240810ca954247364864
   CSHATAG_VERSION: v2.2.1
   CSHATAG_SHA256: c6814f831c63122beccf5cafdf47139ea63bb9be488c792da52d4cf13bd9ceed
+  RECOLL_DEB: 1.36.1-1build2
+  KFMD_DEB: 5.115.0-0ubuntu4
 jobs:
   interop:
     name: xattr tools through the layer
@@ -40,11 +46,13 @@ jobs:
       - name: Install the tools under test
         run: |
           mkdir -p build/interop/bin
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends recollcmd ||
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends recoll ||
-            echo "recoll: not installable"
+          # Recoll and KFileMetaData from the ubuntu-24.04 release pocket, pinned; attr is
+          # preinstalled and its version is printed by the test. Recoll is required; the
+          # KFileMetaData helper is optional (INTEROP_SKIP: kfmd).
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            libkf5filemetadata-dev qtbase5-dev cmake g++ || echo "KFileMetaData: not installable"
+            "recollcmd=$RECOLL_DEB"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            "libkf5filemetadata-dev=$KFMD_DEB" qtbase5-dev cmake g++ || echo "KFileMetaData: not installable"
           curl -fsSL -o build/fselect.gz \
             "https://github.com/jhspetersson/fselect/releases/download/${FSELECT_VERSION}/fselect-x86_64-linux-musl.gz"
           echo "${FSELECT_SHA256}  build/fselect.gz" | sha256sum -c -
@@ -53,7 +61,7 @@ jobs:
             "https://github.com/rfjakob/cshatag/releases/download/${CSHATAG_VERSION}/cshatag_${CSHATAG_VERSION}_linux-static_amd64.tar.gz"
           echo "${CSHATAG_SHA256}  build/cshatag.tar.gz" | sha256sum -c -
           tar -xzf build/cshatag.tar.gz -C build/interop/bin cshatag
-          dpkg-query -W -f '${Package} ${Version}\n' attr recollcmd recoll libkf5filemetadata3 libkf5filemetadata-dev 2>/dev/null || true
+          dpkg-query -W -f '${Package} ${Version}\n' attr recollcmd libkf5filemetadata-dev 2>/dev/null || true
           build/interop/bin/fselect --version || true
       - name: Build the KFileMetaData helper
         continue-on-error: true
@@ -93,15 +101,17 @@ jobs:
           make layer KDIR="$PWD/build/linux"
           make attr-tools BUILD=build/interop/bin CFLAGS="-O2 -g -static"
           cp layer/moobfs_layer.ko build/interop/bin/
-          truncate -s 64M build/interop/lower-ext4.img && mke2fs -q -F -t ext4 -b 4096 -L moob-lower build/interop/lower-ext4.img
-      - name: Run the probe inside the guest
+          truncate -s 64M build/interop/lower-ext4.img && mke2fs -q -F -t ext4 -b 4096 -I 256 -L moob-lower build/interop/lower-ext4.img
+      - name: Run the test inside the guest
         run: |
           cd build/linux
           R="$GITHUB_WORKSPACE"
           vng --user root --cpus 2 --memory 2G --verbose \
             --rwdir "$R/build" --disk "$R/build/interop/lower-ext4.img" \
             --exec "sh $R/vm/interop-guest.sh" 2>&1 | tee "$R/build/interop/console.log"
-          grep -q '^INTEROP_DONE' "$R/build/interop/console.log"
+          # the console carries raw attribute bytes, hence -a; carriage returns are dropped
+          tr -d '\r' < "$R/build/interop/console.log" | grep -a -E '^INTEROP_(OK|CHECK_FAIL|SKIP|PASS|FAIL)' || true
+          tr -d '\r' < "$R/build/interop/console.log" | grep -a -qx 'INTEROP_PASS'
       - name: Preserve the outputs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
