@@ -123,8 +123,10 @@ reproduction yet (issue #68 asks for one).
 
 ## 14. Which kernels are supported?
 One series: Debian kernel 6.12.111 in a QEMU VM, and upstream 6.12.112 with KASAN, UBSAN and
-lockdep on every pull request that touches the module and weekly. x86-64 only for the module;
-the attribute encoding's user-space tests also run on big-endian s390x under emulation. Kernel
+lockdep on every pull request that touches the module and weekly. x86-64 for the module, plus an
+exploratory arm64 job under emulation where the ext4, btrfs and XFS steps pass under KASAN
+(journal 0137); the attribute encoding's user-space tests also run on big-endian s390x under
+emulation. Kernel
 APIs change between versions; compatibility with other kernels is not promised.
 [`README.md`; `docs/testing.md` §1; journal 0124]
 

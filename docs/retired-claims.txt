@@ -38,3 +38,8 @@ Every tag so far carries defects
 Todas as tags até agora carregam defeitos
 syzkaller (three six-hour runs
 three six-hour runs, the second and third
+arm64 runs are being measured
+em arm64 estão sendo medidas
+module has not run on another architecture
+x86-64 only for the module
+módulo não rodou em outra arquitetura
