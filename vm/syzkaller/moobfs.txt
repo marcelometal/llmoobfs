@@ -11,6 +11,10 @@ include <uapi/linux/fcntl.h>
 # directories of the layer, usable wherever a directory descriptor is (getdents64, fchdir)
 resource fd_moobfs_root[fd_dir]
 resource fd_moobfs_dom[fd_dir]
+# a file opened inside the layer: the attribute calls take it, so they reach the layer's xattr
+# handlers instead of whatever descriptor the program holds (journal 0138: moobl_xattr_get was
+# never reached with a plain fd); still usable wherever any fd is
+resource fd_moobfs_file[fd]
 
 # The executor runs each program in a private root, so the program mounts the layer itself: a
 # directory it created as the lower (relative paths resolve from its working directory), another
@@ -37,7 +41,7 @@ moobfs_options [
 # a layer's root (QUERY, GET_INFO) and its domain directories (QUERY2), by any name
 openat$moobfs_root(fd const[AT_FDCWD], file ptr[in, filename], flags const[O_RDONLY], mode const[0]) fd_moobfs_root
 openat$moobfs_dom(fd const[AT_FDCWD], file ptr[in, filename], flags const[O_RDONLY], mode const[0]) fd_moobfs_dom
-openat$moobfs_file(fd const[AT_FDCWD], file ptr[in, filename], flags flags[open_flags], mode flags[open_mode]) fd
+openat$moobfs_file(fd const[AT_FDCWD], file ptr[in, filename], flags flags[open_flags], mode flags[open_mode]) fd_moobfs_file
 
 ioctl$MOOB_IOC_QUERY(fd fd_moobfs_root, cmd const[MOOB_IOC_QUERY], arg ptr[inout, moob_query])
 ioctl$MOOB_IOC_GET_INFO(fd fd_moobfs_root, cmd const[MOOB_IOC_GET_INFO], arg ptr[out, moob_info])
@@ -48,10 +52,11 @@ ioctl$MOOB_IOC_QUERY2_BATCH(fd fd_moobfs_dom, cmd const[MOOB_IOC_QUERY2_BATCH], 
 moob_xattr_names = "user.moob.kind", "user.moob.score", "user.moob.created", "user.moob.title", "user.moob.flag", "user.moob.weight", "user.moob.format", "user.moob.Bad", "user.moob.", "user.moob.a..b", "user.other", "security.selinux", "system.posix_acl_access"
 moob_attr_names = "kind", "score", "created", "title", "flag", "weight", "format", "", "Bad", "a..b"
 
-fsetxattr$moob(fd fd, name ptr[in, string[moob_xattr_names]], val ptr[in, moob_value], size bytesize[val], flags flags[setxattr_flags])
+fsetxattr$moob(fd fd_moobfs_file, name ptr[in, string[moob_xattr_names]], val ptr[in, moob_value], size bytesize[val], flags flags[setxattr_flags])
 setxattr$moob(path ptr[in, filename], name ptr[in, string[moob_xattr_names]], val ptr[in, moob_value], size bytesize[val], flags flags[setxattr_flags])
-fremovexattr$moob(fd fd, name ptr[in, string[moob_xattr_names]])
-fgetxattr$moob(fd fd, name ptr[in, string[moob_xattr_names]], val buffer[out], size len[val])
+fremovexattr$moob(fd fd_moobfs_file, name ptr[in, string[moob_xattr_names]])
+fgetxattr$moob(fd fd_moobfs_file, name ptr[in, string[moob_xattr_names]], val buffer[out], size len[val])
+getxattr$moob(path ptr[in, filename], name ptr[in, string[moob_xattr_names]], val buffer[out], size len[val])
 
 moob_value [
 	str	moob_val_str

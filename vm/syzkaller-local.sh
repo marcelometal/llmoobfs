@@ -94,7 +94,7 @@ if want run; then
 		"openat\$moobfs_root", "openat\$moobfs_dom", "openat\$moobfs_file",
 		"mount\$moobfs_layer", "umount2\$moobfs", "ioctl\$MOOB_IOC_QUERY", "ioctl\$MOOB_IOC_GET_INFO",
 		"ioctl\$MOOB_IOC_QUERY2", "ioctl\$MOOB_IOC_QUERY2_BATCH",
-		"fsetxattr\$moob", "setxattr\$moob", "fremovexattr\$moob", "fgetxattr\$moob",
+		"fsetxattr\$moob", "setxattr\$moob", "fremovexattr\$moob", "fgetxattr\$moob", "getxattr\$moob",
 		"creat", "close", "read", "pread64", "write", "pwrite64", "lseek", "chdir", "fchdir",
 		"mkdir", "mkdirat", "rmdir", "unlink", "unlinkat", "rename", "renameat2", "link", "linkat",
 		"symlink", "readlink", "getdents64", "fstat", "newfstatat", "statx", "fchmod", "fchmodat",
@@ -105,10 +105,11 @@ if want run; then
 	]
 }
 EOF
-    # the manager serves coverage only while it runs: per-function coverage a minute before the end
-    # (force=1: one PC of 14 587 had no module of its own in the first run, and without it the
-    # page refuses to answer)
-    ( sleep $((DUR > 120 ? DUR - 60 : DUR / 2)); curl -fs "http://127.0.0.1:56741/funccover?force=1" > "$B/funccover.csv" ) &
+    # the manager serves coverage only while it runs: per-function coverage 20 minutes before the
+    # end, since the page took 8 minutes to answer on a six-hour corpus (journal 0138; a minute
+    # was not enough, so earlier runs saved an empty file); force=1: one PC of 14 587 had no
+    # module of its own in the first run, and without it the page refuses to answer
+    ( sleep $((DUR > 2400 ? DUR - 1200 : DUR / 2)); curl -fs --max-time 1100 "http://127.0.0.1:56741/funccover?force=1" > "$B/funccover.csv" ) &
     timeout --signal=INT "$DUR" "$SYZ/bin/syz-manager" -config "$B/manager.cfg" > "$B/manager.log" 2>&1 || true
     wait
     {
