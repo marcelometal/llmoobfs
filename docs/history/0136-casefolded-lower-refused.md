@@ -1,7 +1,6 @@
 # 0136 — A casefolded lower directory is refused (issue #95)
 
-Date: 2026-10-19. Status: written; the test and the fix wait for the KASAN job and a negative
-round.
+Date: 2026-10-19. Status: done; KASAN passed and the negative round failed where it should.
 
 ## Goal
 
@@ -39,8 +38,14 @@ taken.
 
 ## Tests
 
-To run: the KASAN job of the pull request, and a negative round with the layer change undone and
-the test kept, which must fail at `cf-check`.
+- Pull request 97: the KASAN/UBSAN/lockdep job and the native VM job both ran the step and printed
+  `LAYER_CASEFOLD_PASS` and `CASEFOLD_REFUSED_PASS` (not skipped: `CONFIG_UNICODE` was in effect),
+  with `MOOBFS_KASAN_PASS` and `MOOBFS_ACCEPTANCE_PASS`.
+- Negative round, branch `neg/casefold-test-only` (the three layer files as on `main`, the test
+  kept), KASAN run 39233865226: fails with `MOOBFS_VM_FAIL: cf-check`, at
+  `CHECK(stat(up("ci"), &st) == -1 && errno == EOPNOTSUPP)`: without the change the layer accepts
+  the casefolded directory.
+- Released in no tag yet: `v0.4.0-experimental` lists issue #95 as open.
 
 ## Limitations
 

@@ -6,6 +6,35 @@
   not refused, though the layer's names are case-sensitive; it is now refused, with every name in
   it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
   `casefold`.
+
+## v0.4.0-experimental — 2026-10-19
+
+Fourth source pre-release, the one to use instead of `v0.3.0-experimental`, which predates the
+fixes below. Every finding of ADR-0011 (F1 to F12) is fixed in it except the fair-shares part of
+F2 (security roadmap S9, not started). No binaries, no packaging, no support; no outside human
+review. Journal 0135.
+
+- **Security fixes** (private advisories, journals 0116 and 0117): F9, a query could return a
+  file to members of its group when only "others" could read it; F10, a query waiting on a FUSE
+  mount could stall every other user's queries; F11, changes through the layer ignored a
+  read-only or frozen lower; F12, an idmapped lower mount was accepted and its mapping ignored.
+- **F2 (ADR-0016):** a failed index update now rebuilds its domain on the next query instead of
+  leaving answers silently incomplete until remount.
+- **F4 completed:** writes carry the writer's fsuid and groups, so ext4's reserved blocks go only
+  to whom ext4 would grant them directly, with the default reserve owner too.
+- **Index on demand (ADR-0012):** built per domain by its first query, released under the budget
+  and memory pressure. UAPI: `struct moob_info` keeps its size; three counters take reserved
+  space and `MOOB_FLAG_ON_DEMAND` is new; older binaries keep working.
+- Six medium and low items of the second source review (journal 0120).
+- **Testing:** KASAN, UBSAN and lockdep on every module change, with KVM; KCSAN weekly and on
+  demand; three six-hour syzkaller runs; negative rounds showing each fix's test fails without
+  the fix (journal 0131); a measurement method with tests and intervals (journal 0134).
+- Still open: fair shares of the index budget (S9); issue #95 (a lower directory already
+  casefolded is not refused; not reproduced yet); arm64 is exploratory (its guest panics in
+  the kernel's 9p read path before the module loads); one kernel series (6.12), x86-64, in a VM.
+
+The entries below are the detail.
+
 - Measurement method (journal 0134, after an outside review): a difference is reported only with
   a test and a confidence interval (`bench/compare.py`: bootstrap interval, Mann-Whitney U, ECDF),
   30 repetitions, the CPU frequency held still (`bench/cpu-freq.sh`), SQLite's missing permission
