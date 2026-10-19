@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed (issue #95, journal 0136): a lower directory already casefolded (ext4 `-O casefold`) was
+  not refused, though the layer's names are case-sensitive; it is now refused, with every name in
+  it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
+  `casefold`.
 - Measurement method (journal 0134, after an outside review): a difference is reported only with
   a test and a confidence interval (`bench/compare.py`: bootstrap interval, Mann-Whitney U, ECDF),
   30 repetitions, the CPU frequency held still (`bench/cpu-freq.sh`), SQLite's missing permission
