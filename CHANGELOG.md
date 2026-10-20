@@ -12,6 +12,10 @@
 - **Review finding (journal 0151, exact target `d110d4e`):** a chmod during a domain's first
   index build can leave a stale homogeneous entry, allowing later `QUERY2` results for a file
   whose read permission has been revoked. Reproduced in the disposable VM; no fix is included.
+- **Fixed (journal 0152):** the finding above. The file's own homogeneity is now checked inside
+  the index load, after the loader is registered and again at every repeated reading. New suite
+  step in `buildrace` (`tests/chmodrace.c`) on ext4, btrfs and XFS; the negative round fails
+  without the fix.
 
 ## v0.4.1-experimental — 2026-10-20
 

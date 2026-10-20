@@ -171,3 +171,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0142 — Fifth pre-release tag: v0.4.1-experimental](0142-fifth-prerelease-tag.md)
 - [0143 — syzkaller: a fifth six-hour run reaches the S3 coverage threshold; the 40-repetition confirmation](0143-syzkaller-fifth-run-threshold-met.md)
 - [0151 — Independent security review of d110d4e: stale homogeneity after chmod during index build](0151-review-d110d4e.md)
+- [0152 — A chmod during the first build of a domain no longer leaves the file in its answers](0152-chmod-during-build-fixed.md)
