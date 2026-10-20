@@ -174,3 +174,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0145 — Investigating the missing xattr-get coverage](0145-xattr-get-coverage-investigation.md)
 - [0146 — Public documentation reconciled with code and recorded measurements](0146-public-documentation-audit.md)
 - [0147 — The QUERY2 residual survives first-cycle removal; the tail has a startup effect](0147-query-residual-investigation.md)
+- [0148 — Make the shared project rules visible at the right entry points](0148-agent-rules-entrypoints.md)

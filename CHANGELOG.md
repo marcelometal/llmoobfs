@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Process (journal 0148): add the agreed batch cadence, issue ownership,
+  client-neutral scope and reference practice to `AGENTS.md`. Keep the full
+  continuity and outreach rules in the local MoobFS rules file.
+
 - Review (0144): two open correctness findings, not fixes. Clearing `O_APPEND`
   with `F_SETFL` still appends through the layer (reproduced in an ext4 VM);
   operational `getxattr` errors can be silently omitted from an index build
