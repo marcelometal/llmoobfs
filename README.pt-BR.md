@@ -115,7 +115,11 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 
 **Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
 (2026-10-20), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
-de cotas justas do F2. Não é para produção.** Fatos em 2026-10-19:
+de cotas justas do F2. Não é para produção.** Uma revisão posterior achou nela um defeito, corrigido
+só na `main`: um chmod durante a primeira construção de um domínio podia deixar o arquivo nas
+respostas do `QUERY2` para usuários que já não conseguem lê-lo (diários
+[0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Fatos em 2026-10-19:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
