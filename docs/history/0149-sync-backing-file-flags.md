@@ -1,7 +1,7 @@
 # 0149 — Synchronize mutable status flags on the backing file
 
-Date: 2026-10-20. Status: correction integrated locally; complete VM suite passed;
-batch KASAN/lockdep pending.
+Date: 2026-10-20. Status: correction integrated locally; complete VM suite and
+local batch KASAN/UBSAN/lockdep passed; publication pending.
 
 Work started on 2026-10-20 (the start minute was not captured). The first
 full-VM attempt log ended at 06:42 BRT, the correction commit was made at
@@ -97,3 +97,18 @@ not every mutable flag or concurrent `F_SETFL` race. Because the change uses
 the lower file's `f_lock`, the dedicated ext4 KASAN/lockdep check was run
 promptly; the full batch KASAN/lockdep gate is in progress and is not yet
 counted as passed. This correction was integrated with R2 before that gate.
+
+## Batch sanitizer result — 2026-10-20
+
+The full `sh vm/kasan-local.sh` run on the integrated source archive at
+`49098aa` exited zero on the dedicated KVM host. Its Linux 6.12.112-virtme
+guest reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`,
+`MOOBFS_LAYER_PASS`, `FAULT_INJECTION_PASS` and `MOOBFS_KASAN_PASS` under
+KASAN, UBSAN and lockdep, with no kernel diagnostics according to `vm/kdiag.sh`.
+The captured console includes the clear/set-append success lines; virtme's
+interleaved console stream does not preserve a separate complete per-lower
+marker list for this run. The non-instrumented integrated VM log does show
+`FCNTL_FLAGS_PASS` for all three lowers. The build, console and dmesg logs are
+retained outside Git in `MoobFS-local/revisao/` with the batch prefix
+`batch-0149-0150-kasan-`. This dated result supersedes the pending-gate
+statement above. Pull-request CI has not run.

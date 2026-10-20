@@ -45,7 +45,8 @@ private advisories published afterwards; no outside human review yet.
 two file/index correctness defects outside the F1–F12 list. Corrections
 ([0149](history/0149-sync-backing-file-flags.md),
 [0150](history/0150-propagate-index-xattr-read-errors.md)) passed the integrated
-full VM suite; their batch KASAN/lockdep gate is pending. The S9 fair-share
+full VM suite and local KASAN/UBSAN/lockdep gate at `49098aa`.
+Pull-request CI is still a separate pre-merge gate. The S9 fair-share
 gap and outside-human-review gap remain unchanged.
 
 > Note from 2026-10-11 (entry 0030), measured on the Azure host: `QUERY` time grows by about

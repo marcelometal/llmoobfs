@@ -151,7 +151,8 @@ Both defects remain in `v0.4.1-experimental`; corrections are implemented in the
 R1 synchronizes mutable flags before delegated I/O, and R2 propagates operational read errors.
 The full integrated VM suite at `49098aa` passed: clearing and setting append on ext4, btrfs
 and XFS, R2 injected-error regression, and acceptance/layer suites. Negative rounds detected
-both original defects. Batch KASAN/lockdep remains pending. An injected value-read error does
+both original defects. The local batch KASAN/UBSAN/lockdep suite also passed on Linux 6.12.112;
+pull-request CI is a separate pre-merge gate. An injected value-read error does
 not establish behavior under a real lower-filesystem I/O fault.
 See [R1 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0149-sync-backing-file-flags.md)
 and [R2 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0150-propagate-index-xattr-read-errors.md).

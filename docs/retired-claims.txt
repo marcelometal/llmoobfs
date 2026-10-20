@@ -78,3 +78,11 @@ integrated validation and publication are pending
 validação integrada e a publicação estão pendentes
 still awaits the integrated run
 ativa append aguarda a rodada integrada
+
+# Local review-batch KASAN run at 49098aa completed on 2026-10-20.
+Batch KASAN/lockdep remains pending
+batch KASAN/lockdep is pending
+KASAN/lockdep do lote continua pendente
+KASAN/lockdep está pendente
+sanitizer gate remains pending
+verificação separada do lote com sanitizers continua pendente

@@ -14,7 +14,7 @@
 > tag, `v0.4.1-experimental` (2026-10-20), is a source snapshot before this review batch.
 > The two findings of the [current review](docs/history/0144-independent-review.md)
 > have corrections in the review batch, which passed the full integrated VM suite.
-> Batch KASAN/lockdep remains pending.
+> The local batch KASAN/UBSAN/lockdep suite also passed; pull-request CI is a separate pre-merge gate.
 > `v0.4.1-experimental` still contains both defects. See [Limitations](#limitations).
 
 ## The problem
@@ -364,7 +364,7 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 ## Limitations
 
-- **The review batch passed the full integrated VM suite; batch KASAN/lockdep is pending.**
+- **The review batch passed the full integrated VM suite and local KASAN/UBSAN/lockdep.**
   `v0.4.1-experimental` contains both defects identified in
   [review 0144](docs/history/0144-independent-review.md): stale backing-file flags after
   `F_SETFL`, and lower `getxattr` errors silently skipped during indexing. R1 synchronizes
@@ -374,7 +374,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   missing, oversized and malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
   the same full VM run passed its injected-error regression and the acceptance/layer suites.
   Negative rounds detected both original defects. Injecting the read result does not reproduce
-  an actual lower-filesystem I/O failure; the separate batch sanitizer gate is still pending.
+  an actual lower-filesystem I/O failure. The full local sanitizer run at `49098aa`
+  reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` and
+  `MOOBFS_KASAN_PASS` on Linux 6.12.112. Pull-request CI remains a separate pre-merge gate.
 
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
   kernel APIs are version-specific and the pinned test target is not a compatibility promise. On

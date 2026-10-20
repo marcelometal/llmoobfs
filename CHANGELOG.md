@@ -9,7 +9,8 @@
 - Fix (0150): propagate operational lower `getxattr` read errors while building
   or updating the index. Injected `EIO`/`ENOMEM` tests and the full VM suite
   pass on the correction branch; the negative branch confirms the old silent
-  omission. The integrated full VM suite passes; batch KASAN/lockdep is pending.
+  omission. The integrated full VM suite and local KASAN/UBSAN/lockdep run pass
+  at `49098aa`; pull-request CI remains a separate pre-merge gate.
 - Documentation: correct stale `MOOB_ONLY` instructions in `docs/testing.md`
   and `docs/development.md` with dated notes (journal 0149).
 

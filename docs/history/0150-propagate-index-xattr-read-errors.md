@@ -1,9 +1,9 @@
 # 0150 — Propagate attribute-read errors while building the index
 
-Date: 2026-10-20. Status: integrated locally; complete batch VM suite passed,
-KASAN/lockdep pending. Work started at approximately 06:37 and ended at 06:57 BRT on
-2026-10-20 (20 minutes of calendar time, including VM wait; hands-on effort was
-not separately metered).
+Date: 2026-10-20. Status: integrated locally; complete batch VM suite and local
+KASAN/UBSAN/lockdep passed; publication pending. Work started at approximately
+06:37 and ended at 06:57 BRT on 2026-10-20 (20 minutes of calendar time,
+including VM wait; hands-on effort was not separately metered).
 
 ## Goal
 
@@ -89,3 +89,17 @@ reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS`.
 The batch KASAN/lockdep gate is running; its result is not established here.
 This note supersedes the pending-integration next step above without removing
 the original per-correction record.
+
+## Batch sanitizer result — 2026-10-20
+
+The integrated archive at `49098aa` completed the full
+`sh vm/kasan-local.sh` run on the dedicated KVM host, exit zero. The Linux
+6.12.112-virtme console contains `XATTRREAD_PASS` for injected `EIO`,
+`ENOMEM`, retry, adoption rebuild and `ENODATA`, followed by
+`MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS`,
+`FAULT_INJECTION_PASS` and `MOOBFS_KASAN_PASS`. The harness found no
+KASAN, UBSAN or lockdep diagnostic in the captured dmesg. Logs remain
+outside Git in `MoobFS-local/revisao/` under `batch-0149-0150-kasan-`.
+This result supersedes the earlier pending-gate notes; it does not turn the
+injected value-read error into evidence of a physical lower-filesystem fault.
+Pull-request CI has not run.

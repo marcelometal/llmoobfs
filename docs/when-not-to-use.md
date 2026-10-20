@@ -53,7 +53,9 @@ errors ([0150](history/0150-propagate-index-xattr-read-errors.md)). Positive and
 evidence exists for clearing append and for injected value-read errors, respectively.
 The full integrated VM suite at `49098aa` passed, including clearing and setting append on
 ext4, btrfs and XFS, the R2 injected-error regression, and the acceptance/layer suites.
-Batch KASAN/lockdep remains pending; injecting a value-read result is not a reproduction of
+The local batch KASAN/UBSAN/lockdep suite passed on Linux 6.12.112; pull-request CI is a
+separate pre-merge gate.
+Injecting a value-read result is not a reproduction of
 an actual lower-filesystem I/O fault. Keep using disposable test environments. The released
 tag does not contain these corrections.
 

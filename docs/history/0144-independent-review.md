@@ -152,3 +152,13 @@ Next: a local R1/R2 correction batch with regression tests, negative rounds,
 per-correction checks and final batch KASAN (immediate lockdep validation for
 lock/lifetime changes). Resolve the blocked coverage execution through the
 normal approval path. Feature decisions and outside human review remain separate.
+
+## Follow-up status — 2026-10-20
+
+The “unfixed” status and next step above describe this review at completion.
+The subsequent local correction batch is recorded in journals
+[0149](0149-sync-backing-file-flags.md) and
+[0150](0150-propagate-index-xattr-read-errors.md). Its full integrated VM suite
+and local KASAN/UBSAN/lockdep run passed on the source archive at `49098aa`.
+The `v0.4.1-experimental` tag reviewed here remains affected. Pull-request CI
+and publication have not occurred; no outside human review has been reported.

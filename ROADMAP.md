@@ -49,7 +49,9 @@ Stabilization update, 2026-10-20: the two correctness findings of the
 [independent review](docs/history/0144-independent-review.md) have corrections
 in [0149](docs/history/0149-sync-backing-file-flags.md) and
 [0150](docs/history/0150-propagate-index-xattr-read-errors.md). Their integrated
-full VM suite passed; batch KASAN/lockdep and publication are pending. This
+full VM suite and local KASAN/UBSAN/lockdep run passed at `49098aa`;
+pull-request CI is still a separate pre-merge gate, and publication awaits the
+maintainer's approval. This
 does not close the S3 per-function coverage gap or the performance residual.
 
 ## Depends on validation

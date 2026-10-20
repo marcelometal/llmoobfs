@@ -110,8 +110,9 @@ These are targets for a single volunteer maintainer, not guarantees:
 The [review of 2026-10-20](docs/history/0144-independent-review.md) found two defects beyond
 ADR-0011: stale backing-file flags after `F_SETFL` (R1), and operational lower `getxattr`
 errors skipped during indexing (R2). Both affect `v0.4.1-experimental`. Corrections are
-implemented in the review batch. The full integrated VM suite at `49098aa` passed; batch
-KASAN/lockdep remains pending. R1 synchronizes mutable lower flags before delegated I/O
+implemented in the review batch. The full integrated VM suite and local
+KASAN/UBSAN/lockdep run at `49098aa` passed; pull-request CI is a separate
+pre-merge gate. R1 synchronizes mutable lower flags before delegated I/O
 ([0149](docs/history/0149-sync-backing-file-flags.md)). R2 propagates operational read errors
 through the existing build/adoption failure paths, while preserving the exclusions for
 missing, oversized or malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)).
@@ -119,7 +120,7 @@ R1 has a VM reproduction and negative evidence, and both clearing and setting ap
 on ext4, btrfs and XFS in the integrated run. R2 has positive and negative tests injecting the
 value-read result; its regression also passed in that full run together with the acceptance
 and layer suites. The R2 test does not induce an actual lower-filesystem I/O fault. Consult
-those journals for validation scope; the separate batch sanitizer gate remains pending.
+those journals for validation scope. The local batch sanitizer gate passed on Linux 6.12.112.
 
 The parser checks image structure and hashes, but checksums are not
 authentication. The module validates at mount, not continuously against external

@@ -174,3 +174,17 @@ wording was ambiguous and could falsely imply they were in the tag. Current
 surfaces now describe the tag as a source snapshot before this review batch,
 and the old phrases were added to `docs/retired-claims.txt`. The FAQ page was
 regenerated from its Markdown source. The tag itself was not changed.
+
+## Local sanitizer result — 2026-10-20
+
+The earlier notes about a pending batch KASAN run record the state when those
+notes were written. The complete local `sh vm/kasan-local.sh` run on the
+integrated archive at `49098aa` later exited zero. Its Linux 6.12.112-virtme
+console reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`,
+`MOOBFS_LAYER_PASS`, `FAULT_INJECTION_PASS` and `MOOBFS_KASAN_PASS` under
+KASAN, UBSAN and lockdep, with no kernel diagnostic found by the harness.
+The current README EN/PT, SECURITY, FAQ and generated site pages,
+when-not-to-use and roadmap now distinguish this local result from the
+pull-request CI that has not run. The affected tag and physical-I/O-fault
+limits remain as before. Logs are retained outside Git under
+`MoobFS-local/revisao/batch-0149-0150-kasan-`.

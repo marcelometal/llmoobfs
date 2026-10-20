@@ -17,7 +17,8 @@
 > diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
 > código anterior a este lote de revisão. Os dois achados da
 > [revisão atual](docs/history/0144-independent-review.md) têm correções no lote de revisão,
-> que passou na suíte completa integrada em VM. A KASAN/lockdep do lote continua pendente.
+> que passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.
+> A CI do pull request é uma etapa separada e obrigatória antes do merge.
 > A `v0.4.1-experimental` ainda contém
 > ambos os defeitos. Veja [Limitações](#limitações).
 
@@ -382,7 +383,7 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
 
 ## Limitações
 
-- **O lote de revisão passou na suíte completa integrada em VM; KASAN/lockdep está pendente.**
+- **O lote de revisão passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.**
   A `v0.4.1-experimental` contém ambos os defeitos da
   [revisão 0144](docs/history/0144-independent-review.md): flags desatualizadas no arquivo de baixo
   após `F_SETFL` e erros de `getxattr` ignorados silenciosamente durante a indexação. R1
@@ -392,8 +393,10 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   ausentes, grandes demais ou malformados ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
   a mesma rodada completa em VM passou na regressão com erros injetados e nas suítes de
   aceitação e da camada. As negativas detectaram ambos os defeitos originais. Injetar o
-  resultado de leitura não reproduz uma falha real de E/S do sistema de baixo; a verificação
-  separada do lote com sanitizers continua pendente.
+  resultado de leitura não reproduz uma falha real de E/S do sistema de baixo. A rodada local
+  completa sob sanitizers no commit `49098aa` registrou `XATTRREAD_PASS`,
+  `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` e `MOOBFS_KASAN_PASS` no Linux 6.12.112.
+  A CI do pull request é uma etapa separada e obrigatória antes do merge.
 
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
   APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em
