@@ -123,8 +123,8 @@ indexes, `QUERY2` was 1.1 to 6 times faster on the five synthetic shapes after t
 of journal 0048 (the low end is a tie). Earlier, SQLite was 4 to 6 times faster on "N most
 recent"; that result predates the optimization. The real client's long ordered traversal still
 lost, while answers matched from 150 to 60 000 memories. A later 40-repetition module comparison
-with confidence intervals found and fixed a roughly 2x regression; a residual 1 to 3 % against
-module 0102 remains unexplained. It did not repeat the SQLite comparison. Small-budget recovery
+with confidence intervals found and fixed a roughly 2x regression; a residual 1 to 3 % in p50
+against module 0102 remains unexplained, with larger differences in some p99 results. It did not repeat the SQLite comparison. Small-budget recovery
 is tested, but default-budget saturation at scale, long-running operation and performance on
 other hardware remain open. There is no independent reproduction yet (issue #68 asks for one).
 [`README.md` "What was measured"; journals 0047, 0048, 0088, 0130, 0139, 0143; `docs/benchmark-plan.md`]

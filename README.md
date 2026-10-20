@@ -220,10 +220,12 @@ The later module-to-module comparison uses 40 repetitions, held CPU frequency, r
 order and 95 % bootstrap intervals ([method](docs/history/0134-measurement-method-review.md),
 [journal 0139](docs/history/0139-query-buffer-regression.md),
 [confirmation](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). It found and fixed a
-roughly 2x query regression. The fixed module remains 1 to 3 % slower than module 0102 on three
+roughly 2x query regression. The fixed module remains 1 to 3 % slower in median latency (p50) than module 0102 on three
 filtered shapes; the on-demand design in 0102 costs 7.6 to 12.5 % against the earlier module
 that built its index at mount. The cause of the remaining 1 to 3 % is unresolved. This is one
 host and one data set; it does not rerun the comparisons with SQLite or the real client.
+Tail latency differs more on some shapes: the median of per-run p99 for the two-equality
+query is 54 % above module 0102 in that confirmation (95 % interval: +51 to +55 %).
 
 What the layer added per operation in the M4 report's campaign (10 000 memories, medians, bare
 lower against the layer): a read by path went from 8.5 to 11.0 µs on ext4 (10.1 to 12.0 on btrfs,

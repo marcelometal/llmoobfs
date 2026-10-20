@@ -234,10 +234,12 @@ módulos alternada e intervalos bootstrap de 95 %
 [diário 0139](docs/history/0139-query-buffer-regression.md),
 [confirmação](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). Ela encontrou e corrigiu
 uma regressão de aproximadamente 2x nas consultas. O módulo corrigido continua 1 a 3 % mais
-lento que o módulo 0102 em três formatos filtrados; o desenho sob demanda do 0102 custa 7,6 a
+lento na latência mediana (p50) que o módulo 0102 em três formatos filtrados; o desenho sob demanda do 0102 custa 7,6 a
 12,5 % contra o módulo anterior, que construía o índice na montagem. A causa dos 1 a 3 % restantes
 segue sem explicação. É uma máquina e um conjunto de dados; essa comparação não repete as
-medições contra SQLite nem com o cliente real.
+medições contra SQLite nem com o cliente real. A latência de cauda difere mais em alguns
+formatos: a mediana dos p99 de cada rodada na consulta de duas igualdades ficou 54 % acima do
+módulo 0102 nessa confirmação (intervalo de 95 %: +51 a +55 %).
 
 O que a camada acrescentou por operação na campanha do relatório M4 (10 000 memórias, medianas,
 sistema de baixo puro contra a camada): uma leitura por caminho passou de 8,5 para 11,0 µs no

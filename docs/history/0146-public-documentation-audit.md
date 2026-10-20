@@ -14,7 +14,7 @@ an isolated worktree. No module, UAPI, format, test harness or benchmark logic c
 
 | Finding | Evidence checked | Correction |
 | --- | --- | --- |
-| README and landing page say no repetitions with intervals exist and call older per-operation results measurements of the current module | Journals 0088, 0134, 0139 and 0143; stored `confirm40` results | Distinguish historical SQLite/client pilots from the later 40-repetition module comparison; state the unresolved 1–3 % residual and the measured on-demand cost, without treating this as a fresh SQLite result |
+| README and landing page say no repetitions with intervals exist and call older per-operation results measurements of the current module | Journals 0088, 0134, 0139 and 0143; stored `confirm40` results | Distinguish historical SQLite/client pilots from the later 40-repetition module comparison; state the unresolved 1–3 % p50 residual and the measured on-demand cost, without treating this as a fresh SQLite result |
 | FAQ and research page say SQLite still wins short "N most recent" queries by 4–6x | Journal 0048, its before/after table; journal 0088, question 1 | Identify that result as pre-optimization; keep the separate, still-losing long traversal from the real client |
 | `when-not-to-use` says speed and operation overhead are unmeasured; says near-budget answers can be incomplete | Journal 0088; ADR-0016; `layer/index.c`: `domain_lost`, `domain_fresh`, `domain_ensure`; journal 0130 | State measured pilots and missing measurements separately; failed updates trigger rebuilding or an explicit error, while fair sharing and full-scale saturation remain gaps |
 | FAQ says a directory rename leaves false negatives until remount | `layer/index.c`: `moobl_index_renamed` marks `paths_stale`, `domain_fresh` rejects it, `domain_pin`/`domain_ensure_all` rebuild before queries; journal 0098 | Describe rebuild on the next query, retaining TOCTOU and direct-lower-write limitations; add a dated correction to spec-m3 rather than rewriting the original specification |
@@ -27,6 +27,11 @@ The memory limit descriptions also distinguish `index_budget` from the per-open-
 buffer in `moobl_qbuf_get` (`layer/main.c`): up to 4096 records of 272 bytes are retained until
 close, outside the index accounting. This is an existing implementation detail documented in
 journal 0139, not a newly measured memory result.
+
+The `confirm40/cmp-m0102-fix40-v2-dom.csv` table also shows why the residual must be called
+**p50**, not all latency: Q1 p99 increases by 54.03 % (95 % interval +51.12 to +55.21 %).
+README and landing page now state this tail result alongside the p50 summary. It is a stored
+result inspected here, not a new measurement or a causal explanation.
 
 ## Decisions and alternatives
 

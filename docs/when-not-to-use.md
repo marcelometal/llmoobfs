@@ -105,7 +105,8 @@ The [M4 report](history/0088-m4-report.md) is complete as a pilot, including los
 SQLite and client comparisons used few repetitions and are not fresh results for every later
 tag. The [40-repetition confirmation](history/0143-syzkaller-fifth-run-threshold-met.md)
 compares modules, with confidence intervals: it confirms the query-buffer regression is fixed
-and leaves a 1 to 3 % residual against module 0102 on filtered queries. It does not update the
+and leaves a 1 to 3 % residual in p50 against module 0102 on filtered queries, with larger
+differences in some p99 results. It does not update the
 SQLite comparison. See the [measurement plan](benchmark-plan.md) for the remaining methodology.
 
 | Measurement | Evidence and remaining gap |
