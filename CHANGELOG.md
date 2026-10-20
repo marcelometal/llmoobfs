@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Coverage (journal 0154): `moobl_xattr_get` at 0 of 4 PCs in the fifth syzkaller run is explained
+  by its corpus, which kept almost no attribute read inside a mounted layer. Replayed with
+  per-call coverage, every such read reaches 3 of the 4 PCs. Three new seeds
+  (`vm/syzkaller/seeds/xattr-get-*`) end in that read.
 - Integration (journal 0153): the correction batch of review 0144 (R1, R2) and the fix of
   review 0151 (journal 0152) in one tree; every public surface states the three findings. The
   complete `make vm-test` passes. Its QEMU guard is now 1200 s; one complete run had reached

@@ -415,7 +415,8 @@ KASAN harness runs the layer suite), and no benchmark exists.
   [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.4.0-experimental` carry
   defects fixed later; fixes after `v0.4.1-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
   syzkaller ran for five six-hour rounds, above the aggregate PC threshold of
-  [security roadmap](docs/security-roadmap.md) S3; `moobl_xattr_get` still lacks coverage evidence. SELinux enforcing was exercised once (journal
+  [security roadmap](docs/security-roadmap.md) S3; `moobl_xattr_get` was at 0 PCs in that run's report, because the corpus kept almost no
+  attribute read inside a mounted layer; replayed with per-call coverage, its seeds reach it (journal 0154). SELinux enforcing was exercised once (journal
   0104); AppArmor and Smack were not.
 - `QUERY` authorization holds at query time only (TOCTOU contract). A directory rename through
   the layer makes its domain stale and the next query rebuilds it; direct lower-tree changes
