@@ -40,6 +40,7 @@
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
 #include <inttypes.h>
@@ -354,7 +355,11 @@ int main(int argc, char **argv)
 		unsigned long stale = 0, closed = 0, closed_tries = 0;
 		int was_closed = 0;
 		double secs = atof(argv[3]);
+		/* MOOB_RACE2_FORK: a second process queries the same open file at the same time, so
+		 * one of them finds the file's result buffer lent (moobl_qbuf_get, journal 0139) */
+		pid_t child = getenv("MOOB_RACE2_FORK") ? fork() : -1;
 
+		CHECK(child != -1 || !getenv("MOOB_RACE2_FORK"));
 		clock_gettime(CLOCK_MONOTONIC, &t0);
 		for (;;) {
 			struct moob_query2 q2;
@@ -424,6 +429,15 @@ int main(int argc, char **argv)
 		}
 		printf("race2: %lu complete paginations, %lu pages, %lu openable, %lu replaced, %lu vanished, %lu denied, %lu stale restarts, %lu domain-closed episodes (%lu refused calls)\n",
 		       iters, pages, hits, replaced, gone, denied, stale, closed, closed_tries);
+		fflush(stdout);
+		if (child == 0)
+			_exit(pages ? 0 : 1);
+		if (child > 0) {
+			int st;
+
+			CHECK(waitpid(child, &st, 0) == child);
+			CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0);
+		}
 		return pages ? 0 : 1;
 	}
 	if (argc >= 4 && !strcmp(argv[2], "race")) {
