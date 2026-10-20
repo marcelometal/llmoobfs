@@ -294,7 +294,11 @@ query answers does not change.
   or between 8 attempts to start; the caller may retry), `EINTR`, and any error
   the lower filesystem returned to the scan. After a failed build nothing of the domain is left
   in the index, and the next query tries again. A build never answers with part of a domain: an
-  ACL or a name that could not be read fails it.
+  ACL or a name that could not be read fails it. One exception, by decision (journal 0156): a file
+  whose attribute list is longer than `XATTR_LIST_MAX` (64 KiB, reachable on btrfs with many
+  non-typed `user.*` names) is left out of the index, and `moobfs-check` reports it. Failing the
+  build would let any user who can write such a file in a shared domain make the domain
+  unanswerable for everyone.
 - **`GET_INFO`.** New flag `MOOB_FLAG_ON_DEMAND` (0x40), set whenever the index is on. New
   fields in space that was reserved or padding: `domains_built` (`__u32`, "outside" included),
   `domain_builds` (`__u32`, builds completed since mount) and `domain_releases` (`__u32`, built

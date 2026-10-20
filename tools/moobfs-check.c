@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <linux/limits.h>
 #include <ftw.h>
 #include <sys/xattr.h>
 #include <sys/stat.h>
@@ -162,6 +163,8 @@ static int visit(const char *path, const struct stat *sb, int flag, struct FTW *
 	}
 	if (!len)
 		return 0;
+	if (len > XATTR_LIST_MAX)	/* the kernel's index reads at most this much (R2-12, journal 0156) */
+		report(path, NULL, "attribute list larger than 64 KiB: left out of the layer's index");
 	list = malloc((size_t)len);
 	if (!list)
 		return 1;
