@@ -108,7 +108,10 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 
 **Experimental. Source pre-release tags only; the last one, `v0.4.1-experimental` (2026-10-20), has
 every fix up to that date: findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
-production.** Facts as of 2026-10-19:
+production.** A later review found a defect in it, fixed on `main` only: a chmod during the first
+build of a domain could leave the file in `QUERY2` answers to users who can no longer read it
+(journals [0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Facts as of 2026-10-19:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower

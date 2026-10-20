@@ -1,6 +1,6 @@
 # 0152 — A chmod during the first build of a domain no longer leaves the file in its answers
 
-Date: 2026-10-20. Status: done locally; not yet in a pull request.
+Date: 2026-10-20. Status: fix done and tested locally; pull request open, merge awaits KASAN in CI and the maintainer.
 
 ## Goal
 
@@ -74,11 +74,19 @@ missed the window fails instead of passing vacuously. `tests/review-d110d4e-vm.s
 - A chmod of a directory inside a domain is still handled as before: the domain falls back to
   per-result checks until the next mount (journal 0035). This fix concerns the file's own
   check.
-- The public surfaces (`SECURITY.md`, ADR-0011 findings, README status) are not updated in
-  this branch. The correction batch on `codex/review-corrections-batch` stages them, and this
-  fix joins that batch.
+- Public surfaces updated here: `README.md` and `README.pt-BR.md` (status), `SECURITY.md`
+  (supported versions, current boundaries), `CHANGELOG.md`. Left as they are on purpose: the
+  site pages, `docs/when-not-to-use.md`, `docs/faq.md` and `docs/security-roadmap.md`. A local
+  correction batch for review 0144 (R1, R2) rewrites those same pages, and it will add this
+  finding when it is merged with `main`. The finding is named as in that batch, by review and
+  journal, not as a new ADR-0011 number.
+
+## Publication
+
+On the maintainer's approval (2026-10-20), a private GitHub security advisory is opened first,
+then the pull request. The advisory is published after the merge, as in journals 0114 and 0116.
 
 ## Next step
 
-Merge into the correction batch. Then run KASAN once for the batch, update the public
-surfaces, and open the pull request.
+Pull request with KASAN in CI, then merge on the maintainer's approval and publish the
+advisory. The correction batch of review 0144 then merges `main`.
