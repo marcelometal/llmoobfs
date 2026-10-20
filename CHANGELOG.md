@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- In progress (journal 0149): synchronize mutable file status flags with the
+  backing open; add the `F_SETFL` positional-write regression to the VM suite.
+
 - Process (journal 0148): add the agreed batch cadence, issue ownership,
   client-neutral scope and reference practice to `AGENTS.md`. Keep the full
   continuity and outreach rules in the local MoobFS rules file.

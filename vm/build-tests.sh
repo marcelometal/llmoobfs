@@ -14,6 +14,7 @@ strict="-static -O2 -Wall -Wextra -Werror"
 t() { name=$1; shift; $cc $strict "$@" -o "$out/$name"; }
 
 t layer      tests/layer.c
+t fcntl-flags tests/fcntl-flags.c
 t mounted    tests/mounted.c
 t failnth    -Iinclude tests/failnth.c
 t hostile    tests/hostile.c

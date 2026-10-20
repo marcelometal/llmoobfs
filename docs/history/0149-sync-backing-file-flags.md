@@ -1,0 +1,69 @@
+# 0149 — Synchronize mutable status flags on the backing file
+
+Date: 2026-10-20. Status: correction in progress; final two-direction test and batch validation pending.
+
+## Goal and decision
+
+Fix review 0144 R1. A file opened with `O_APPEND` still appended through MoobFS
+after the caller cleared the flag using `F_SETFL`; the reviewed ext4 VM returned
+`AAAAZ` instead of `ZAAA` after `pwrite(..., offset=0)`.
+
+The exact Linux 6.12.112 `fs/fcntl.c` changes the upper file's `f_flags` and
+`f_iocb_flags`. `fs/overlayfs/file.c` shows the stacking precedent: before
+lower I/O, compare mutable status flags, validate a change against the lower
+file, and update its flags and I/O request flags together under `f_lock`.
+`layer/main.c` now applies this pattern to the lower file before delegated
+read, write, splice and mmap operations. This includes clearing or setting
+`O_APPEND` and `O_DIRECT`, plus nonblocking status flags. The upper VFS
+`F_SETFL` check remains authoritative for the caller. A lower check can
+return an error to the delegated operation. No UAPI or format changes.
+
+Alternative considered: synchronizing the lower file in `check_flags`.
+Rejected because Linux 6.12.112's callback receives only flags, not the
+upper `struct file`, so it cannot find the backing file. The existing lower
+file is retained for the life of the upper open, so open-time copying alone
+cannot follow later `F_SETFL` calls.
+
+## Test and evidence so far
+
+`tests/fcntl-flags.c` is registered in `vm/build-tests.sh` and runs for each
+lower filesystem in `vm/suite.sh`. It creates a fresh file exclusively,
+clears `O_APPEND` and verifies a positional write stays at offset zero, then
+sets the flag again and verifies that a positional write appends. The
+suite removes its file immediately afterward: the first full `make vm-test`
+attempt passed this ext4 regression but later stopped at `bench-run-ext4`
+because the benchmark harness requires the layer root to contain only
+`bench/`, and this test had left `fcntl-flags` there. The suite cleanup was
+added; this first attempt is not a full pass.
+Before this correction, review 0144 reproduced the wrong result in a dedicated
+Linux 6.12.112/ext4 VM. The corrected module and updated test were also built
+and run together in a fresh dedicated Linux 6.12.112/ext4 KASAN-kernel VM:
+
+```text
+FCNTL_RESULT bytes=4 content=ZAAA append_flag=0
+FCNTL_FLAGS_PASS
+FCNTL_FIX_VM_PASS
+```
+
+The test-only `neg/fcntl-flags-test-only` branch is `80f9e81`. Its module
+and test ran in a separate dedicated Linux 6.12.112/ext4 VM and returned
+`FCNTL_RESULT bytes=5 content=AAAAZ append_flag=0`, confirming that the
+test detects the original defect. The corrected VM's captured dmesg had no
+KASAN or lockdep diagnostic according to `vm/kdiag.sh`; this was a targeted
+check, not a full KASAN suite.
+
+`make checkpatch` reported checkpatch, spelling and const-struct checks OK.
+`git diff --check`, shell syntax checks and a strict C syntax check passed.
+The full `make vm-test` rerun exited zero with `MOOBFS_ACCEPTANCE_PASS` and
+`MOOBFS_LAYER_PASS` across ext4, btrfs and XFS after the cleanup was added.
+That run contained the clear-append assertion. The set-append assertion was
+added afterward and is pending the integrated batch VM suite. Only VM guests
+load the module. No push or pull request.
+
+## Limits and next step
+
+The ext4 run establishes this `O_APPEND` case, not every mutable flag,
+filesystem or race. Because the change uses the lower file's `f_lock`, run
+KASAN/lockdep promptly before the batch is considered ready. Complete the
+two-direction test in the integrated full suite,
+and integrate the parallel R2 correction with one final batch KASAN run.

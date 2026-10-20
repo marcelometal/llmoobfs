@@ -98,6 +98,33 @@ static struct file *moobl_real(const struct file *file)
 	return ((struct moobl_file *)file->private_data)->real;
 }
 
+/* F_SETFL changes the layer file after open; the backing file must follow it. */
+#define MOOBL_SETFL_MASK (O_APPEND | O_NONBLOCK | O_NDELAY | O_DIRECT)
+
+static int moobl_sync_flags(struct file *file)
+{
+	struct file *real = moobl_real(file);
+	unsigned int flags = READ_ONCE(file->f_flags) & MOOBL_SETFL_MASK;
+	int err;
+
+	if (!((flags ^ READ_ONCE(real->f_flags)) & MOOBL_SETFL_MASK))
+		return 0;
+	if (((flags ^ real->f_flags) & O_APPEND) && IS_APPEND(file_inode(real)))
+		return -EPERM;
+	if ((flags & O_DIRECT) && !(real->f_mode & FMODE_CAN_ODIRECT))
+		return -EINVAL;
+	if (real->f_op->check_flags) {
+		err = real->f_op->check_flags(flags);
+		if (err)
+			return err;
+	}
+	spin_lock(&real->f_lock);
+	real->f_flags = (real->f_flags & ~MOOBL_SETFL_MASK) | flags;
+	real->f_iocb_flags = iocb_flags(real);
+	spin_unlock(&real->f_lock);
+	return 0;
+}
+
 static const struct address_space_operations moobl_aops = {
 	/* Data never lives in this mapping; mmap is delegated to the lower file. */
 	.direct_IO = noop_direct_IO,
@@ -1281,9 +1308,13 @@ static ssize_t moobl_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	struct file *file = iocb->ki_filp;
 	struct backing_file_ctx ctx = MOOBL_CTX(file);
+	int err;
 
 	if (!iov_iter_count(iter))
 		return 0;
+	err = moobl_sync_flags(file);
+	if (err)
+		return err;
 	return backing_file_read_iter(moobl_real(file), iter, iocb,
 				      iocb->ki_flags, &ctx);
 }
@@ -1297,6 +1328,9 @@ static ssize_t moobl_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	if (!iov_iter_count(iter))
 		return 0;
+	ret = moobl_sync_flags(file);
+	if (ret)
+		return ret;
 	ctx.cred = moobl_wcred_get(file);
 	if (IS_ERR(ctx.cred))
 		return PTR_ERR(ctx.cred);
@@ -1315,6 +1349,10 @@ static ssize_t moobl_splice_read(struct file *in, loff_t *ppos,
 				 unsigned int flags)
 {
 	struct backing_file_ctx ctx = MOOBL_CTX(in);
+	int err = moobl_sync_flags(in);
+
+	if (err)
+		return err;
 
 	return backing_file_splice_read(moobl_real(in), ppos, pipe, len, flags, &ctx);
 }
@@ -1326,6 +1364,9 @@ static ssize_t moobl_splice_write(struct pipe_inode_info *pipe, struct file *out
 	struct inode *inode = file_inode(out);
 	ssize_t ret;
 
+	ret = moobl_sync_flags(out);
+	if (ret)
+		return ret;
 	ctx.cred = moobl_wcred_get(out);
 	if (IS_ERR(ctx.cred))
 		return PTR_ERR(ctx.cred);
@@ -1342,6 +1383,10 @@ static ssize_t moobl_splice_write(struct pipe_inode_info *pipe, struct file *out
 static int moobl_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct backing_file_ctx ctx = MOOBL_CTX(file);
+	int err = moobl_sync_flags(file);
+
+	if (err)
+		return err;
 
 	return backing_file_mmap(moobl_real(file), vma, &ctx);
 }

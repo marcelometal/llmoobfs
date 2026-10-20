@@ -48,6 +48,8 @@ run_lower() {
     grep -q 'moobfs_layer' /proc/mounts || fail "layer-proc-mounts-$fs"
     mount -t moobfs_layer -o lower="$LAYER" none /mnt && fail "layer-stack-on-itself-$fs"
     "$BIN/layer" "$LAYER" "$LOWER" "$reflink" links || fail "layer-tests-$fs"
+    "$BIN/fcntl-flags" "$LAYER/fcntl-flags" || fail "fcntl-flags-$fs"
+    rm "$LAYER/fcntl-flags" || fail "fcntl-flags-cleanup-$fs"
     # every refusal of a typed attribute write with its errno, and the limit of 64 per file,
     # paths a syzkaller seed reaches poorly (journal 0141); prints TYPED_LIMITS_PASS
     "$BIN/layer" typed "$LAYER" "$LOWER" || fail "typed-limits-$fs"
