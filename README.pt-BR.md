@@ -14,7 +14,7 @@
 
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
-> diários 0111 e 0114). A última tag, `v0.4.0-experimental` (2026-10-19), tem todas as correções
+> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), tem todas as correções
 > feitas até essa data; as seguintes entram na `main`. Detalhes em [Estado](#estado).
 
 ## O problema
@@ -113,8 +113,8 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 
 ## Estado
 
-**Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.0-experimental`
-(2026-10-19), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
+**Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
+(2026-10-20), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
 de cotas justas do F2. Não é para produção.** Fatos em 2026-10-19:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
@@ -131,7 +131,7 @@ de cotas justas do F2. Não é para produção.** Fatos em 2026-10-19:
   [diário 0114](docs/history/0114-second-inspection-of-5582e06.md)) e conferidas contra o kernel,
   acharam quatro defeitos de segurança (achados F9 a F12 do ADR-0011), relatados como avisos de
   segurança privados e corrigidos nos diários 0116 e 0117; nossos próprios testes e revisões
-  acharam outros antes. As tags até a `v0.3.0-experimental` carregam defeitos corrigidos depois
+  acharam outros antes. As tags até a `v0.4.0-experimental` carregam defeitos corrigidos depois
   ([changelog](CHANGELOG.md)).
 - **As medições são de nível piloto**, de uma máquina; o relatório que as reúne é o
   [diário 0088](docs/history/0088-m4-report.md). Não são uma afirmação geral de velocidade.
@@ -390,8 +390,8 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md) e
-  [0083](docs/history/0083-index-inspection-fixes.md). As tags até a `v0.3.0-experimental` carregam
-  defeitos corrigidos depois; as correções posteriores à `v0.4.0-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
+  [0083](docs/history/0083-index-inspection-fixes.md). As tags até a `v0.4.0-experimental` carregam
+  defeitos corrigidos depois; as correções posteriores à `v0.4.1-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
   ([vm/fstests/](vm/fstests/README.md)); o syzkaller rodou quatro rodadas de seis horas; a última
   medição ficou abaixo do limiar de cobertura do item S3 do [roteiro de segurança](docs/security-roadmap.md). O SELinux em
   modo enforcing foi exercitado uma vez (diário 0104); AppArmor e Smack não foram.

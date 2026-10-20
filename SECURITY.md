@@ -12,7 +12,8 @@ them not implemented yet).
 | Version | Supported |
 | --- | --- |
 | `main` | Use this. Fixes land here only; there are no backports and no maintenance branches. |
-| `v0.4.0-experimental` | Source snapshot of 2026-10-19, not supported: it has every fix made up to that date (findings F1 to F12 except the fair-shares part of F2); later fixes land on `main` only. |
+| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: it has every fix made up to that date (findings F1 to F12 except the fair-shares part of F2); later fixes land on `main` only. |
+| `v0.4.0-experimental` | Source snapshot, not supported. Its queries are about twice as slow as they should be (a buffer allocated per query, journal 0139). |
 | `v0.3.0-experimental` | Source snapshot, not supported. It carries defects fixed since, security ones included (findings F6 to F12 of ADR-0011; see `CHANGELOG.md`). |
 | `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported; they carry more of the same defects. |
 
