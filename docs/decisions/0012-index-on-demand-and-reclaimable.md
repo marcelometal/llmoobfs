@@ -6,6 +6,10 @@ implementation departs from the sketch below; items 3 and 4 are not implemented.
 order: fault injection in the test suite first (journal 0095), then this. It changes how
 [ADR-0009](0009-query-role-and-user-space-index.md) builds the index, not what it answers.
 
+*Status correction, 2026-10-20 (journal 0146):* the opening status is stale: items 3 and 4
+were implemented in journal 0101, as the dated implementation note below already records.
+All six items are implemented; the measured steady-state cost remains as recorded below.
+
 ## Context
 
 Two costs of the layer come from one design choice, the index built whole at mount and kept

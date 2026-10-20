@@ -1,11 +1,10 @@
 # Security policy
 
 MoobFS is experimental kernel code developed by a single maintainer. There is no
-released version, no production security guarantee and no stable UAPI. Run it
+stable release, no production security guarantee and no stable UAPI. Run it
 only in a disposable VM with synthetic data. This policy describes how to report
 a problem and what to expect; the longer-term plan is in
-[docs/security-roadmap.md](docs/security-roadmap.md) (items S1 to S11, most of
-them not implemented yet).
+[docs/security-roadmap.md](docs/security-roadmap.md) (items S1 to S13, with implemented tests and remaining gaps recorded per item).
 
 ## Supported versions
 

@@ -115,7 +115,7 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 
 **Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
 (2026-10-20), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
-de cotas justas do F2. Não é para produção.** Fatos em 2026-10-19:
+de cotas justas do F2. Não é para produção.** Fatos em 2026-10-20:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
@@ -152,7 +152,8 @@ O projeto tem um mantenedor e ainda nenhuma revisão humana externa. O que mais 
 quanto conhecimento de kernel exige, está em **[docs/help-wanted.md](docs/help-wanted.md)**: uma
 revisão do modelo de credenciais ou das travas do índice, se você conhece o VFS; uma verificação
 de se o seu sistema de memória se encaixa, se você constrói um; uma rodada dos testes na sua
-máquina ou em outro kernel; e algumas issues que não exigem conhecimento de kernel. As regras para
+máquina ou em outro kernel; e correções de documentação ou de reprodutibilidade que não exigem
+conhecimento de kernel. As regras para
 mudanças estão em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
@@ -221,19 +222,28 @@ responde a cada um: [adoption-risks.md](docs/adoption-risks.md).
 
 ## O que foi medido
 
-O relatório que responde às quatro perguntas do [plano de benchmark](docs/benchmark-plan.md) é o
-[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). Toda campanha é de nível piloto:
-uma semente de dados, no máximo três repetições, muitas vezes uma só rodada, e um ruído entre
-rodadas de cerca de 20 a 25 % em valores de dezenas de microssegundos. Números de máquinas
-diferentes não são comparados entre si. O código do índice mudou depois da maior parte dessas
-medições (diários [0082](docs/history/0082-index-lock-and-reclaim.md),
-[0083](docs/history/0083-index-inspection-fixes.md)); só as duas campanhas abaixo rodaram depois.
+O [relatório M4](docs/history/0088-m4-report.md) reúne as campanhas iniciais: uma semente de
+dados, no máximo três repetições, muitas vezes uma só rodada, e ruído entre rodadas de cerca de
+20 a 25 % em valores de dezenas de microssegundos. São resultados históricos dos módulos
+indicados em cada diário, não novas medições desta tag. Números de máquinas diferentes não são
+comparados entre si.
 
-O que a camada acrescenta por operação, no módulo atual (10 000 memórias, medianas, sistema de
-baixo puro contra a camada): uma leitura por caminho vai de 8,5 para 11,0 µs no ext4 (10,1 para
-12,0 no btrfs, 9,8 para 15,0 no XFS); gravar um atributo, de 8,9 para 21,7 µs (8,9 para 21,3; 6,0
-para 11,6); criar uma memória de forma durável não muda dentro do ruído, porque os flushes do
-dispositivo levam 12 a 14 ms.
+A comparação posterior entre módulos usa 40 repetições, frequência de CPU fixa, ordem dos
+módulos alternada e intervalos bootstrap de 95 %
+([método](docs/history/0134-measurement-method-review.md),
+[diário 0139](docs/history/0139-query-buffer-regression.md),
+[confirmação](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). Ela encontrou e corrigiu
+uma regressão de aproximadamente 2x nas consultas. O módulo corrigido continua 1 a 3 % mais
+lento que o módulo 0102 em três formatos filtrados; o desenho sob demanda do 0102 custa 7,6 a
+12,5 % contra o módulo anterior, que construía o índice na montagem. A causa dos 1 a 3 % restantes
+segue sem explicação. É uma máquina e um conjunto de dados; essa comparação não repete as
+medições contra SQLite nem com o cliente real.
+
+O que a camada acrescentou por operação na campanha do relatório M4 (10 000 memórias, medianas,
+sistema de baixo puro contra a camada): uma leitura por caminho passou de 8,5 para 11,0 µs no
+ext4 (10,1 para 12,0 no btrfs, 9,8 para 15,0 no XFS); gravar um atributo, de 8,9 para 21,7 µs
+(8,9 para 21,3; 6,0 para 11,6); criar uma memória de forma durável não mudou dentro do ruído,
+porque os flushes do dispositivo levavam 12 a 14 ms.
 
 O que um banco ao lado custa na escrita, que este projeto supunha e nunca tinha medido: quase
 nada. Publicar uma memória de forma durável leva 6,6 a 8,5 ms só com o arquivo, e 6,6 a 8,7 ms com
@@ -276,7 +286,8 @@ Onde perde, empata ou custa:
   (diários [0031](docs/history/0031-remount-time.md), [0055](docs/history/0055-measurement-gaps.md)).
 - **Memória.** Cerca de 0,5 a 0,6 KiB de memória do kernel por arquivo, que não vai para o swap,
   pela contagem do próprio índice, que subconta. O orçamento padrão de 128 MiB nunca foi atingido
-  num teste.
+  num teste. Os buffers de consulta são adicionais: até cerca de 1,1 MB fica retido por arquivo
+  aberto que consultou com o limite máximo de resultados, até fechar (diário 0139).
 - **As escritas do cliente real** ficaram cerca de 10 % mais lentas numa rodada, e uma página que
   ele escreve fica consultável cerca de 11 ms depois, não quando a escrita retorna: um processo à
   parte copia os campos para atributos ([diário 0071](docs/history/0071-client-stage2-live-mirror.md)).
@@ -285,8 +296,8 @@ Onde perde, empata ou custa:
   pequena para arquivos pequenos: 6,7 % no btrfs e 13,6 % no XFS num conjunto em que 15 % dos
   arquivos são cópias, nenhuma no ext4 ([diário 0085](docs/history/0085-m4-question-3-space.md)).
 
-Não medido: CPU e memória por consulta, concorrência, a latência de um segundo cliente,
-repetições com intervalos de confiança. Resultados brutos: [bench/results/](bench/results/README.md).
+Ainda faltam: CPU e memória por consulta, vazão sob concorrência, latência de um segundo
+cliente e repetição das comparações com SQLite e com o cliente com intervalos de confiança. Resultados brutos: [bench/results/](bench/results/README.md).
 
 ## Experimente numa VM
 

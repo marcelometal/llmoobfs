@@ -101,6 +101,12 @@ authorization policy; zero leakage between users on all lower filesystems.
   dentry alias when it exists; without a verifiable path, they are omitted. This may produce
   false negatives until the next mount; it is a documented limitation, not a leak.
 
+*Correction, 2026-10-20 (journal 0146).* The rename limitation above describes the earlier
+implementation. Since ADR-0012 (journal 0098), a directory renamed through the layer marks
+its domain stale and the next query rebuilds that domain (`moobl_index_renamed`,
+`domain_fresh`, `domain_pin` in `layer/index.c`). This does not remove the TOCTOU window or
+provide tracking of direct changes to the lower tree. The original specification is preserved.
+
 ## 4. Batch operations: contract, decision conditional on measurement
 
 Two candidates, with different purposes:

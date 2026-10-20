@@ -1,37 +1,35 @@
 # Comparison and when not to use MoobFS
 
-A summary of [value-assessment.md](value-assessment.md), written so
-that a reader can decide quickly whether the project is relevant to them. The short version,
-copied from that assessment: **today, for anything outside a laboratory, SQLite or plain
-files are the recommendation.** MoobFS is an experimental kernel module with only a source pre-release tag, no
-measured performance and one tested kernel series; the narrow case it targets is attribute
+Current comparison, updated on 2026-10-20 from the code and journals. The original
+[value assessment](value-assessment.md) remains a dated analysis. Its recommendation still holds: **today, for anything outside a laboratory, SQLite or plain
+files are the recommendation.** MoobFS is an experimental kernel module with source
+pre-release tags, measurements limited to the recorded hosts and workloads, and one tested kernel series; the narrow case it targets is attribute
 queries over many Unix users with the operating system's permissions deciding what each
 caller sees, while the data stay ordinary files.
 
 ## 1. Comparison
 
-Rows copied from the "Comparação honesta" table of the value assessment. "Proven" means
-tested in the project's VM at small scale; "not measured" means exactly that.
+The comparison separates implemented behaviour from measurements. Test results apply to the
+recorded configurations, not arbitrary workloads or production use.
 
 | Criterion | Plain files | SQLite next to the files (WAL, composite indexes, `ANALYZE`) | FUSE-based filesystems | MoobFS |
 | --- | --- | --- | --- | --- |
-| Attribute query | `find` + `getfattr`, linear scan | Composite indexes, full SQL (mature) | Depends on the project; logic in a user-space process | Conjunctive `QUERY`, in-RAM scan; correct against an oracle, speed not measured |
-| Query authorization | POSIX per file, no query call | In the application | Usually in the daemon | POSIX per result, by the kernel (proven at test scale) |
-| Read latency by path | Reference | Reference (file) | Extra user-space round trip | Reference plus one VFS hop; magnitude unknown |
-| Writing a memory | Reference | File plus row (two writes) | Through the daemon | File plus xattr plus RAM update; amplification not measured |
+| Attribute query | `find` + `getfattr`, linear scan | Composite indexes, full SQL (mature) | Depends on the project; logic in a user-space process | Domain-scoped `QUERY2`, up to four ANDed predicates and one ordering attribute; oracle checks and bounded measurements in journals 0048 and 0088 |
+| Query authorization | POSIX per file, no query call | In the application | Usually in the daemon | Domain permission check and reader-set partition; per-result checks after permission changes or with security labels (spec-query-v2 §3) |
+| Read latency by path | Reference | Reference (file) | Extra user-space round trip | One extra VFS hop; 2 to 5 µs per read by path in the M4 pilot (journal 0088), not a measurement of every later module |
+| Writing a memory | Reference | File plus row (two writes) | Through the daemon | File plus xattr plus RAM update; durable-write latency measured, no demonstrated write-cost advantage (journal 0088); physical write amplification still unmeasured |
 | Recovery between sessions | Nothing to rebuild | Opens the file | Depends | Linear scan of each domain at its first query |
-| Memory | None | Page cache, pageable | Process memory | Non-pageable index, estimated 0.3 to 2 KiB per inode |
-| Maturity | Maximal | Decades | Varies | Months, one author |
+| Memory | None | Page cache, pageable | Process memory | Non-pageable index; about 0.5 to 0.6 KiB per file in the M4 accounting, which undercounts; query buffers are additional |
+| Maturity | Maximal | Decades | Varies | Experimental, one maintainer, no outside human review |
 | Failure domain | Minimal | Process | Process (the kernel survives) | Host (ring 0) |
 | Installation | None | Library | FUSE library and a process; often no root | Kernel module, root, module signing |
 | Portability | Total | Total | Linux, macOS and others | Linux 6.12 in a test VM |
 | Reversibility | Total | High (stable file format) | Depends | Total: unmount and the lower tree is plain files (proven) |
-| Observability | `ls`, `getfattr` | `EXPLAIN`, shell | Process logs | `GET_INFO`, `moobfs-check`, `dmesg` |
+| Observability | `ls`, `getfattr` | `EXPLAIN`, shell | Process logs | `GET_INFO`, `moobfs-check`, `dmesg`, index tracepoints |
 | Atomicity of data and metadata | No | Yes, inside the database | Depends | No; a client convention |
 
 The FUSE column is a general description of the approach, not a measurement of any product;
-no FUSE system has been benchmarked against MoobFS, and no comparison may be stated before
-M4 ([benchmark-plan.md](benchmark-plan.md)). MoobFS is native kernel code by design
+no FUSE system has been benchmarked against MoobFS, so no measured comparison is available ([benchmark-plan.md](benchmark-plan.md)). MoobFS is native kernel code by design
 ([ADR-0001](decisions/0001-native-filesystem.md)), which is a trade-off, not a merit in
 itself: a defect in the module can crash the host, where a FUSE defect kills a process.
 
@@ -41,21 +39,22 @@ mem0, Letta, ai-memory and similar projects decide what an agent remembers, how 
 summarized, ranked and injected into a prompt. MoobFS does none of that: it stores files and
 answers attribute predicates. In the M4 plan these frameworks appear as **workloads** run on
 top of the layer (a file backend or data directory over a MoobFS mount), not as baselines to
-beat ([benchmark-plan.md](benchmark-plan.md), "Sistemas comparados"; [ADR-0007](decisions/0007-stacked-memory-layer.md),
-note on acceptance). Whether any of them gains anything from running over MoobFS is an open
-question that only M4 can answer.
+beat ([benchmark-plan.md](benchmark-plan.md); [ADR-0007](decisions/0007-stacked-memory-layer.md),
+note on acceptance). The ai-memory test and LangGraph adapter provide bounded compatibility
+and query evidence (journals [0088](history/0088-m4-report.md) and
+[0089](history/0089-second-client-langgraph-adapter.md)), not proof of a benefit to every client.
 
 ## 3. When MoobFS is probably not worth it
 
-Each line comes from the "Casos em que provavelmente não vale a pena" and §9.6 of the value
-assessment.
+These limits update the cases discussed in the value assessment, §9.6.
 
 - **A single process or a single agent owns the data.** There is no cross-user query to
   authorize; SQLite or files are faster to adopt and mature. The assessment rates this case
   "low probability of being worth it".
-- **You need OR, sorting, aggregation, joins, full-text or vector search.** `QUERY` is a
-  conjunction of at most four attribute predicates; everything else belongs in the client or
-  in a database.
+- **You need a mature database query engine.** `QUERY2` supports up to four ANDed predicates
+  and ordering by one attribute. An optional SQLite virtual table provides SQL over it
+  ([ADR-0013](decisions/0013-user-space-query-library.md)), but is a prototype. Full-text and
+  vector retrieval belong in the client or a database.
 - **The host is not Linux, or you do not have root.** Mounting requires `CAP_SYS_ADMIN` in
   the initial user namespace; user-namespace and idmapped mounts are refused. Hosted CI,
   rootless containers, serverless, macOS and Windows are out.
@@ -69,10 +68,13 @@ assessment.
 - **Your kernel is outside the tested matrix.** Only Debian 6.12.111 (QEMU) and upstream
   6.12.112 (KASAN) have run the module; other kernels are not promised to compile or behave.
 - **The corpus is large.** The index is non-pageable RAM, bounded by `index_budget`
-  (default 128 MiB, an estimated order of 10^5 inodes); near the budget, answers can be
-  incomplete; each domain's part is rebuilt by a linear scan on its first query after a mount or
-  a release.
-- **You need it in production today, or in any critical setting.** Only a source pre-release tag exists; the
+  (default 128 MiB). A failed update marks its domain for rebuilding; its next query returns
+  a fresh answer or an explicit error, rather than a silently partial answer
+  ([ADR-0016](decisions/0016-failed-index-update-rebuilds-its-domain.md)). A domain larger than
+  the budget fails with `ENOMEM`. Users still compete for the shared budget and can force
+  repeated releases and scans; fair shares are not implemented. A query buffer can additionally
+  retain about 1.1 MB per open file until close (journal 0139), outside the index budget.
+- **You need it in production today, or in any critical setting.** Only source pre-release tags exist; the
   module is one author's code; its own tests and two source reviews by AI assistants found
   kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011); there is no
   outside human review; fstests ran as its `quick` group only and syzkaller for five six-hour
@@ -95,24 +97,26 @@ hypotheses to test in a disposable VM, not recommendations for deployment.
 - **No database daemon per host is wanted**; this matters mainly against server databases,
   since SQLite is also in-process.
 - **The host has root, a fixed kernel and a corpus inside the index budget**, and the team
-  accepts that a negative M4 result may end the experiment.
+  accepts the recorded costs and the possibility that its own workload will not benefit.
 
-## 5. What M4 must show before any performance claim
+## 5. What has been measured, and what is still missing
 
-From "Medições do M4 indispensáveis" in the value assessment and the harness specification
-([benchmark-harness.md](benchmark-harness.md)). Until these runs exist, the project makes
-**no** statement about speed, efficiency, memory use or scale.
+The [M4 report](history/0088-m4-report.md) is complete as a pilot, including losses. Its early
+SQLite and client comparisons used few repetitions and are not fresh results for every later
+tag. The [40-repetition confirmation](history/0143-syzkaller-fifth-run-threshold-met.md)
+compares modules, with confidence intervals: it confirms the query-buffer regression is fixed
+and leaves a 1 to 3 % residual against module 0102 on filtered queries. It does not update the
+SQLite comparison. See the [measurement plan](benchmark-plan.md) for the remaining methodology.
 
-| Measurement | Purpose |
+| Measurement | Evidence and remaining gap |
 | --- | --- |
-| W3: p50/p95/p99 latency for the fixed query forms Q1 to Q9 against SQLite with composite indexes, after `ANALYZE`, gated by `EXPLAIN QUERY PLAN`; the cost of per-result authorization isolated | Whether the in-kernel index is at least equivalent |
-| W1 and relative write amplification (`WA_relative`) at equal durability | Whether one store plus xattr beats file plus row |
-| W2: pass-through overhead against the bare lower filesystem | The price of the extra VFS hop |
-| W6/W7: index rebuild and remount at scales S1 to S6, cold and warm cache | Whether the RAM-only index is viable |
-| Budget saturation from 50 to 100 %, real RAM versus `index_used` | What happens near the limit |
-| W5/W8: concurrency and the global index lock | Scaling with concurrent clients |
-| An unmodified real client (ai-memory or equivalent) over the mount | Compatibility beyond the own test client |
-| `chmod`/`rename` racing `QUERY` under KASAN; a timing-channel assessment of authorization | Safety of the authorization path |
+| Query latency against SQLite | Synthetic and real-client shapes measured (journals 0048, 0068, 0088); repeat with current modules, intervals and SQLite cache settings; SQLite does not perform the same filesystem permission checks |
+| Durable writes and pass-through overhead | M4 pilot measured latency (journal 0088); physical write amplification still unmeasured |
+| Mount and first-query cost | On-demand index measured cold and warm (journal 0098); one data set and host |
+| Index budget | Small-budget release/rebuild and failed-update recovery tested (journals 0101, 0130); default-budget saturation series and actual RAM versus `index_used` still missing |
+| Concurrency | Correctness races tested (journals 0052, 0098); throughput scaling across clients still missing |
+| Real clients | ai-memory acceptance and structured queries, plus LangGraph adapter equivalence (journals 0057, 0068, 0089); no general client-performance claim |
+| Authorization | Race and timing tests recorded (journals 0020, 0043, 0052, 0116); outside human review still missing |
 
 A run in which the layer wins none of these is a valid result and, as
 [ADR-0007](decisions/0007-stacked-memory-layer.md) states, should change the project's

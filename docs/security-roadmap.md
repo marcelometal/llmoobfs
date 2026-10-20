@@ -114,6 +114,10 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
   coverage fetched in time).
   A fifth, on 2026-10-19/20 with richer descriptions (journal 0143): 540 919 executions, no
   report; the handlers at **88.7 %** of their PCs, above the threshold below.
+- **Clarification, 2026-10-20 (journal 0146):** the fifth run reaches the aggregate PC target,
+  but `moobl_xattr_get()` still has 0 of 4 PCs, without an established explanation. The separate
+  requirement below to exercise every reachable function is therefore not yet demonstrated.
+  Keep this evidence gap distinct from the maintainer's stabilization milestone.
 - **Threshold, set on 2026-10-15** (journal 0109): the ioctl and attribute handlers (from
   `moobl_root_ioctl()` through `query_run()`, `results_to_user()`, `moobl_xattr_get/set()` and the
   validation in `common/attr.c`) at 85 % of their PCs or more, measured by the manager's

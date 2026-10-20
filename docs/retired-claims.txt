@@ -51,3 +51,14 @@ As tags até a `v0.3.0-experimental`
 syzkaller (four six-hour runs
 last measured below the coverage threshold
 medição ficou abaixo do limiar de cobertura
+
+# Documentation audit, 2026-10-20 (journal 0146).
+speed not measured
+magnitude unknown
+near the budget, answers can be
+until these runs exist
+Every number published so far comes from one host and few repetitions
+Todos os números publicados até agora vêm de uma máquina e poucas repetições
+the second client being written
+latency per operation on the current module is pending
+all but two fixed
