@@ -280,6 +280,42 @@ Accepted by the maintainer on 2026-10-13, small, to arrive with the second half 
 incomplete); the suite enables and reads them; `scan_retries` is replaced, `scan_delay_us` stays
 because it changes timing.
 
+### S14 to S21. Making the tests find what reviews found (added 2026-10-20, journal 0156)
+
+Planned, not started. Rounds 1 and 2 of the independent review found defects no test could see.
+The tests checked the end state, not the windows in between, and the same assistants wrote the
+code and its tests. These items make the test suite itself find that kind of defect. ADR-0017
+(proposed) refers to S14 and S15.
+
+- **S14. Mutation testing of the homogeneity rule.** A CI job removes, one at a time, each check
+  of `reach_ok()`, `target_ok()`, `ext_acl()`, `place_dentry_above()` and the scan's
+  `inner_ok`, and requires some suite marker to fail. Done when every check has a failing
+  marker, as T2, T3 and T4 now do by hand.
+- **S15. Randomized differential test of permissions.** Random trees and sequences of chmod,
+  chown, setfacl, rename, link and unlink, from several uids, with and without a build in
+  progress (`scan_delay_us`). Every `QUERY2` answer is compared with what `open(2)` and
+  `getxattr(2)` say as that uid. Done when it runs in the suite with a fixed seed set and a
+  longer run in the nightly job.
+- **S16. A test-only consistency mode in the module.** A module parameter that, after each
+  update hook and each build, compares the index with the lower filesystem for the files it
+  touched, and warns on a difference. It would have caught R2-2, R2-3 and R2-8 when they
+  happened. Done when the suite runs with it on and stays silent.
+- **S17. Branch coverage of the suite.** gcov of `layer/` under `make vm-test`, published with
+  each batch: the branches no test reaches. Done when the report is produced in CI.
+- **S18. Nightly fuzzing.** syzkaller every night on the benchmark host with the current
+  descriptions and seeds, its report kept. Done when a week of nightly runs is recorded.
+- **S19. Static analysis.** `sparse`, `smatch`, Coccinelle and the clang analyzer in CI, the
+  tools kernel maintainers run on patches. Done when they run on every pull request and their
+  findings are fixed or justified.
+- **S20. Writing the tests apart from the code.** For a change to the permission rule or the
+  index protocol, a second model writes the test from the specification without seeing the
+  implementation. Also a checklist item in `CONTRIBUTING.md`: "a value computed before a
+  registration, a lock drop, a retry or a sleep, and used after it". Done when the checklist
+  is in place and one change has gone through the procedure.
+- **S21. A model of the loader and hook protocol.** A TLA+ model of `index_load()`'s
+  registration and retry against the update hooks, checked for every interleaving. Heavier
+  than the others; after S14 to S16.
+
 ## Out of scope for this list
 
 - LLM content guardrails: the layer is storage; control over what an agent reads or writes
