@@ -168,3 +168,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0139 — Steady state measured with a test and an interval; a 2x query regression found and fixed](0139-query-buffer-regression.md)
 - [0140 — Interoperability test: xattr tools through the layer](0140-interoperability-test.md)
 - [0141 — Typed attribute limits and query validation tested case by case](0141-typed-attribute-limits-tested.md)
+- [0142 — Fifth pre-release tag: v0.4.1-experimental](0142-fifth-prerelease-tag.md)

@@ -15,8 +15,9 @@ journal 0087). A patch version: the UAPI and the on-disk conventions do not chan
 
 - The fix of journal 0139 (pull request 101): the result buffer is kept with the open file.
 - The casefold refusal (journal 0136, pull request 97), merged after the v0.4.0 tag.
-- Tests: the interoperability test with common xattr tools (journal 0140, pull request 99) and
-  the typed-attribute limits and refusals (journal 0141, pull request 103).
+- Tests: the interoperability test with common xattr tools (journal 0140, pull request 99; first
+  CI run 39352397079 passed) and the typed-attribute limits and refusals (journal 0141, pull
+  request 103).
 - arm64 under emulation (journal 0137, pull request 98): the ext4, btrfs, XFS and fault-injection
   steps passed under KASAN (runs 39265856488, 39271760023, 39300702939, 39343759274).
 - syzkaller: the fourth six-hour run (journal 0138) and the descriptions for the weak handlers;

@@ -93,3 +93,6 @@ nanosecond, saw an ordinary edit. The reference file is now on the lower ext4.
 ## Next step
 
 After merge, dispatch `interop.yml` on `main` and record the run here with a dated note.
+
+*Note, 2026-10-19 (later).* First CI run on `main` (run 39352397079, amd64 with KVM): `INTEROP_PASS`,
+all 14 asserted steps `INTEROP_OK`, and the KFileMetaData helper built and ran (`INTEROP_OBSERVED: kfmd`).

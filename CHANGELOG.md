@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## v0.4.1-experimental — 2026-10-20
+
+Fifth source pre-release, the one to use instead of `v0.4.0-experimental`, whose queries are
+about twice as slow as they should be (journal 0139). Same findings status as v0.4.0: F1 to F12
+fixed except the fair-shares part of F2. No binaries, no packaging, no support; no outside human
+review. Journal 0142.
+
+- **Fixed:** the query slowdown of v0.4.0, found by the measurement method of journal 0134 and
+  bisected to one change (a buffer for the requested limit allocated on every query); a
+  casefolded lower directory is now refused (issue #95).
+- **Testing:** interoperability with getfattr, fselect, cshatag, Recoll and KFileMetaData;
+  every refusal of a typed attribute write and the 64-attribute limit; arm64 under emulation
+  (ext4, btrfs, XFS and fault injection under KASAN); a fourth six-hour syzkaller run with no
+  report and richer descriptions for the weakly covered handlers.
+- **Measured:** the on-demand index costs 7 to 12 % on filtered queries against the index built
+  at mount (40 repetitions, CPU frequency held, bootstrap intervals).
+
+The entries below are the detail.
+
 - Tests (journal 0141): new suite marker `TYPED_LIMITS_PASS` (`tests/layer.c typed`, once per
   lower filesystem): every refusal of a typed attribute write with its errno and an unchanged
   lower, and the limit of 64 per file (the 65th gives `ENOSPC`, replacing and removing at the
@@ -13,7 +32,7 @@
   journal 0134 (40 repetitions, frequency held, bootstrap interval): the on-demand index costs
   7 to 12 % against the index built at mount, which the 2026-10-14 report could not show.
 - CI, arm64 (exploratory, journal 0137): the guest boots under emulation and the suite step ext4
-  passed under KASAN twice, and btrfs and XFS once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
+  passed under KASAN twice, btrfs and XFS once, and the fault-injection step once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
   `virtme-ng-init`; the job now uses the bash init, a virtio-fs root, the disks in reverse order,
   and runs the test programs from a guest tmpfs (from virtio-fs they crashed at random).
 - syzkaller (journal 0138): a fourth six-hour run with F2 and F4, no report; handler coverage
@@ -27,7 +46,8 @@
 - Testing (journal 0140): an interoperability test, `vm/interop-guest.sh` with the on-demand
   workflow `interop.yml` (not a required check), runs getfattr/setfattr, fselect, cshatag,
   Recoll and KDE KFileMetaData through a layer mount and ends in `INTEROP_PASS` or
-  `INTEROP_FAIL: <steps>`. Passed once locally (arm64, not CI); never run in CI yet.
+  `INTEROP_FAIL: <steps>`. Passed locally (arm64) and in CI on amd64 (run 39352397079, all 14
+  steps).
 
 ## v0.4.0-experimental — 2026-10-19
 
