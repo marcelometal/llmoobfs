@@ -569,6 +569,17 @@ revisão). Perguntas vão para o GitHub Discussions ou para uma issue. Contribui
 IA são bem-vindas com revisão humana e evidência de teste precisa. Não coloque detalhes privados
 de vulnerabilidade em issues públicas; use o [contato de segurança](SECURITY.md).
 
+## Registros externos do projeto
+
+Registros conferidos em 20/10/2026. Os links descrevem acompanhamento de versões e descoberta
+do código; veja [Estado](#estado) para o comportamento testado e as limitações.
+
+| Serviço | Registro |
+| --- | --- |
+| [Anitya](https://release-monitoring.org/project/392843/) | Acompanha as pré-releases experimentais; sem mapeamento para pacote de distribuição. |
+| [Open Hub](https://openhub.net/p/moobfs) | Ficha pública do projeto; a análise de código ainda não foi concluída. |
+| [XERJ Corpus Hub](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Snapshot do código selecionado; a revisão de licença está pendente, portanto o corpus ainda não pode ser instalado. |
+
 ## Como citar
 
 Os metadados de citação estão em [CITATION.cff](CITATION.cff).
