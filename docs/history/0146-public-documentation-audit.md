@@ -108,3 +108,36 @@ No new runtime test was run by this documentation agent. The VM result above is 
 coordinating review's evidence, to be recorded in journal 0144. Documentation generation and
 validation were rerun; the negative test from the earlier audit is not repeated because these
 new statements record open defects, not executable fixes. No publication occurred.
+
+
+## Addendum, 2026-10-20 — local R1/R2 correction batch prepared
+
+The coordinator requested the public-state update for the next local batch. Reviewed the
+updated local handoff/rules and repository instructions, commit `fb84050` and journal 0149
+for R1, and the R2 working diff plus journal 0150 in the independent correction worktree.
+The R1 source synchronizes mutable backing-file flags before delegated I/O; R2 propagates
+operational `getxattr` errors while retaining the exclusions for `ENODATA`, oversized values
+(`ERANGE`) and invalid encodings. No module source was changed by this documentation work.
+
+README EN/PT, SECURITY, FAQ and generated copy, when-not-to-use, landing page and generated
+status EN/PT now distinguish **implemented local corrections** from the released tag, which
+still contains R1/R2. Journal 0144 is preserved as the original review. They link to journals
+0149 and 0150 for validation details. The wording explicitly leaves integrated validation,
+batch KASAN/lockdep and publication pending. It does not claim a completed full R2 suite or
+a real lower-filesystem I/O-fault reproduction. The R2 targeted test injects the value-read
+result; the initial code-reading evidence and later test evidence must not be conflated.
+
+At this documentation snapshot, R1's clear-append regression had positive and negative VM
+results and a full VM pass before the set-append assertion was added; the added assertion
+awaited the integrated run. R2 had a targeted positive and expected negative failure, while
+its full VM run was still in progress. These results belong to the correcting agents' journals;
+no runtime test was performed by this documentation agent. The old unqualified wording that
+neither fix exists was added to retired claims; historic records remain unchanged.
+
+Local checks after regeneration: `python3 scripts/site-journey.py .`,
+`python3 scripts/site-faq.py`, `sh scripts/check-retired-claims.sh`,
+`python3 scripts/site-faq.py --check`, `python3 scripts/check-site.py .`, and
+`git diff --check`. All completed successfully: the FAQ has 61 generated elements and matches
+its source, `RETIRED_CLAIMS_OK`, 12 valid HTML pages, and no whitespace errors. The coordinator
+must integrate this documentation with both source corrections and reconcile the pending validation wording
+against the actual final runs before publication. No push, pull request or external update.

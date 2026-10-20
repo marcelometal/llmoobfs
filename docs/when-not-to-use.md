@@ -46,12 +46,14 @@ and query evidence (journals [0088](history/0088-m4-report.md) and
 
 ## 3. When MoobFS is probably not worth it
 
-Two additional **unfixed** findings are recorded in the
-[current review](history/0144-independent-review.md): `F_SETFL` clearing `O_APPEND` does not
-reach the backing file, so positional writes can still append (reproduced in a Linux
-6.12.112/ext4 VM); and `attrs_read()` can skip operational lower `getxattr` errors such as
-`EIO` or `ENOMEM` and accept an incomplete index (code inspection only, without reproducing
-a lower read failure). These reinforce the restriction to disposable test environments.
+The two defects from [review 0144](history/0144-independent-review.md) remain in
+`v0.4.1-experimental`. The local review batch synchronizes backing-file flags after `F_SETFL`
+([0149](history/0149-sync-backing-file-flags.md)) and propagates operational lower `getxattr`
+errors ([0150](history/0150-propagate-index-xattr-read-errors.md)). Positive and negative regression
+evidence exists for clearing append and for injected value-read errors, respectively.
+Integrated validation, batch KASAN/lockdep and publication are pending; no full R2 suite pass
+or actual lower-filesystem I/O-fault reproduction is claimed here. Keep using disposable test
+environments. The released tag does not contain these local corrections.
 
 These limits update the cases discussed in the value assessment, §9.6.
 
@@ -78,7 +80,7 @@ These limits update the cases discussed in the value assessment, §9.6.
   (default 128 MiB). A failed update marks its domain for rebuilding; its next query returns
   a rebuilt answer or an explicit error
   ([ADR-0016](decisions/0016-failed-index-update-rebuilds-its-domain.md)). This recovery does not
-  cover the separate lower-read error-handling defect found in the current review above. A domain larger than
+  by itself cover lower-read errors; R2 separately corrects that path in the local batch above. A domain larger than
   the budget fails with `ENOMEM`. Users still compete for the shared budget and can force
   repeated releases and scans; fair shares are not implemented. A query buffer can additionally
   retain about 1.1 MB per open file until close (journal 0139), outside the index budget.

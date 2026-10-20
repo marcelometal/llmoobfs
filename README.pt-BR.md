@@ -15,8 +15,10 @@
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
 > diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), tem todas as correções
-> feitas até essa data; as seguintes entram na `main`. A [revisão atual](docs/history/0144-independent-review.md)
-> registra dois achados sem correção, com níveis distintos de evidência; veja [Limitações](#limitações). Detalhes em [Estado](#estado).
+> feitas até essa data; as seguintes entram na `main`. Os dois achados da
+> [revisão atual](docs/history/0144-independent-review.md) têm correções num lote local;
+> a validação integrada e a publicação estão pendentes. A `v0.4.1-experimental` ainda contém
+> ambos os defeitos. Veja [Limitações](#limitações).
 
 ## O problema
 
@@ -378,14 +380,19 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
 
 ## Limitações
 
-- **Dois achados seguem abertos na [revisão atual](docs/history/0144-independent-review.md).**
-  Limpar `O_APPEND` com `fcntl(F_SETFL)` depois de abrir um arquivo não atualiza as flags do
-  arquivo de baixo: uma escrita posicional continua acrescentando ao fim pela camada,
-  diferentemente do acesso direto ao ext4. Reproduzido numa VM Linux 6.12.112 sobre ext4.
-  Separadamente, a leitura do código mostrou que `attrs_read()` trata erros de `getxattr` do
-  sistema de baixo, como `EIO` ou `ENOMEM`, como atributos inválidos que podem ser ignorados,
-  podendo aceitar um índice de domínio incompleto. Esse caminho de erro não foi reproduzido
-  com falha no sistema de baixo. Nenhum dos dois achados foi corrigido ainda.
+- **As correções da revisão são locais; a validação integrada e a publicação estão pendentes.**
+  A `v0.4.1-experimental` contém ambos os defeitos da
+  [revisão 0144](docs/history/0144-independent-review.md): flags desatualizadas no arquivo de baixo
+  após `F_SETFL` e erros de `getxattr` ignorados silenciosamente durante a indexação. A correção
+  local R1 sincroniza flags mutáveis antes de delegar a E/S
+  ([0149](docs/history/0149-sync-backing-file-flags.md)); o teste que limpa append passou e falhou
+  sem a correção, enquanto a nova verificação que ativa append aguarda a rodada integrada.
+  A correção local R2 propaga erros operacionais de leitura e preserva as exclusões existentes
+  de atributos ausentes, grandes demais ou malformados
+  ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)); rodaram o teste direcionado com erros
+  injetados e a negativa, mas não se afirma aqui aprovação da suíte completa R2 nem da
+  KASAN/lockdep do lote. Injetar o resultado de leitura não reproduz uma falha real de E/S do
+  sistema de arquivos de baixo.
 
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
   APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em

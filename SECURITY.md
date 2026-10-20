@@ -11,7 +11,7 @@ a problem and what to expect; the longer-term plan is in
 | Version | Supported |
 | --- | --- |
 | `main` | Use this. Fixes land here only; there are no backports and no maintenance branches. |
-| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: it has every fix made up to that date (findings F1 to F12 except the fair-shares part of F2); later fixes land on `main` only. |
+| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: fixes F1 to F12 except fair shares of F2, but contains review 0144 R1/R2; their corrections are in an unpublished local batch. |
 | `v0.4.0-experimental` | Source snapshot, not supported. Its queries are about twice as slow as they should be (a buffer allocated per query, journal 0139). |
 | `v0.3.0-experimental` | Source snapshot, not supported. It carries defects fixed since, security ones included (findings F6 to F12 of ADR-0011; see `CHANGELOG.md`). |
 | `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported; they carry more of the same defects. |
@@ -107,13 +107,18 @@ These are targets for a single volunteer maintainer, not guarantees:
 
 ## Current boundaries
 
-The [review of 2026-10-20](docs/history/0144-independent-review.md) records two **unfixed**
-findings beyond the earlier ADR-0011 list. A Linux 6.12.112 VM with ext4 reproduced writes
-still appending after `fcntl(F_SETFL)` cleared `O_APPEND` on the layer file; its backing file
-keeps the old flags. Code inspection also found `attrs_read()` skipping lower `getxattr`
-errors (`EIO`, `ENOMEM`) and allowing an incomplete domain index to be accepted. That lower
-error path has not been reproduced dynamically. These are different evidence levels, not
-claims that both failures have been exercised or fixed.
+The [review of 2026-10-20](docs/history/0144-independent-review.md) found two defects beyond
+ADR-0011: stale backing-file flags after `F_SETFL` (R1), and operational lower `getxattr`
+errors skipped during indexing (R2). Both affect `v0.4.1-experimental`. Corrections are
+implemented in the local review batch; integrated validation, batch KASAN/lockdep and
+publication are pending. R1 synchronizes mutable lower flags before delegated I/O
+([0149](docs/history/0149-sync-backing-file-flags.md)). R2 propagates operational read errors
+through the existing build/adoption failure paths, while preserving the exclusions for
+missing, oversized or malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)).
+R1 has a VM reproduction and clear-append positive/negative results; R2 has targeted positive
+and negative tests injecting the value-read result. The R2 test does not induce an actual
+lower-filesystem I/O fault. Consult those journals for remaining validation; neither a full
+R2 suite nor the batch sanitizer gate is claimed passed here.
 
 The parser checks image structure and hashes, but checksums are not
 authentication. The module validates at mount, not continuously against external

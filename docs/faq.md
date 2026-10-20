@@ -145,10 +145,15 @@ kernel panic or data loss; the project's tests and two source reviews by AI assi
 kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but the fairness
 part of F2 fixed). Run it only in a disposable VM with synthetic data.
 
-The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md) adds two unfixed findings: clearing
-`O_APPEND` with `F_SETFL` leaves positional writes appending through the layer (reproduced in
-a Linux 6.12.112/ext4 VM), and `attrs_read()` can skip lower `getxattr` errors such as `EIO` or
-`ENOMEM`, accepting an incomplete index (confirmed by code inspection, not fault reproduction).
+The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md)
+found stale backing-file flags after `F_SETFL` and silently skipped lower `getxattr` errors.
+Both defects remain in `v0.4.1-experimental`; corrections are implemented in a local batch.
+R1 synchronizes mutable flags before delegated I/O, and R2 propagates operational read errors.
+R1 has clear-append positive/negative VM evidence; R2 has targeted positive/negative injected-error
+tests. Integrated validation and batch KASAN/lockdep are pending, as is publication. An injected
+value-read error does not establish behavior under a real lower-filesystem I/O fault.
+See [R1 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0149-sync-backing-file-flags.md)
+and [R2 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0150-propagate-index-xattr-read-errors.md).
 [`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`; journal 0144]
 
 ## 16. How can I try it?

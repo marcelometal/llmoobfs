@@ -62,3 +62,10 @@ Todos os números publicados até agora vêm de uma máquina e poucas repetiçõ
 the second client being written
 latency per operation on the current module is pending
 all but two fixed
+
+# Review corrections prepared locally; source tag remains affected (0149/0150).
+Neither finding is fixed yet
+Nenhum dos dois achados foi corrigido ainda
+Two findings remain unfixed
+Unfixed findings from the current review
+Achados sem correção da revisão atual
