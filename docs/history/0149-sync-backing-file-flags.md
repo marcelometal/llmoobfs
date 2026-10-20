@@ -3,6 +3,11 @@
 Date: 2026-10-20. Status: correction integrated locally; complete VM suite passed;
 batch KASAN/lockdep pending.
 
+Work started on 2026-10-20 (the start minute was not captured). The first
+full-VM attempt log ended at 06:42 BRT, the correction commit was made at
+06:53, and the integrated suite log ended at 07:07. These are calendar markers,
+not a measurement of hands-on effort.
+
 ## Goal and decision
 
 Fix review 0144 R1. A file opened with `O_APPEND` still appended through MoobFS
@@ -53,6 +58,12 @@ test detects the original defect. The corrected VM's captured dmesg had no
 KASAN or lockdep diagnostic according to `vm/kdiag.sh`; this was a targeted
 check, not a full KASAN suite.
 
+After adding the set-append assertion, commit `2a1570d` placed that exact
+final test source on the negative branch without the module fix. A new
+`MOOB_ONLY=ext4 make vm-test` run exited 2 as expected at
+`FCNTL_RESULT bytes=5 content=AAAAZ append_flag=0` and
+`MOOBFS_VM_FAIL: fcntl-flags-ext4`, before reaching the set-append assertion.
+
 `make checkpatch` reported checkpatch, spelling and const-struct checks OK.
 `git diff --check`, shell syntax checks and a strict C syntax check passed.
 The full `make vm-test` rerun exited zero with `MOOBFS_ACCEPTANCE_PASS` and
@@ -70,6 +81,14 @@ While documenting the new VM steps, the current `docs/testing.md` and
 although the suite already implements it. Both current-state guides received
 dated corrections and now describe the R1/R2 regressions without claiming
 that a selected step equals a full-suite pass.
+
+Documentation validation after integration: `sh scripts/check-retired-claims.sh`
+reported `RETIRED_CLAIMS_OK`; `python3 scripts/site-faq.py --check` matched
+its source; `python3 scripts/check-site.py .` validated 12 HTML pages.
+An initial call `python3 scripts/site-journey.py --check` failed with
+`KeyError: '0007'` because this generator takes the repository root as its
+positional argument, not a `--check` flag. The correct command,
+`python3 scripts/site-journey.py .`, completed and left no file changes.
 
 ## Limits and next step
 

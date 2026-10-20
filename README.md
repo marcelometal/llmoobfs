@@ -11,8 +11,8 @@
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
-> tag, `v0.4.1-experimental` (2026-10-20), has every fix made up to that date; later ones land on
-> `main`. The two findings of the [current review](docs/history/0144-independent-review.md)
+> tag, `v0.4.1-experimental` (2026-10-20), is a source snapshot before this review batch.
+> The two findings of the [current review](docs/history/0144-independent-review.md)
 > have corrections in the review batch, which passed the full integrated VM suite.
 > Batch KASAN/lockdep remains pending.
 > `v0.4.1-experimental` still contains both defects. See [Limitations](#limitations).

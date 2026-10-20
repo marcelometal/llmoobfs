@@ -164,3 +164,13 @@ the retired list. No module source or historical review 0144 was modified.
 The documentation agent regenerated the pages and ran retired-claims, FAQ consistency,
 site validation and whitespace checks; all passed. This agent did not rerun the VM suite.
 The runtime evidence is the coordinator's integrated run and belongs with journals 0149/0150.
+
+## Dated wording correction — 2026-10-20
+
+The README in both languages, FAQ and site landing page still said the
+`v0.4.1-experimental` tag contained every fix made “up to” 2026-10-20.
+Corrections 0149/0150 were made later on that same calendar date, so the
+wording was ambiguous and could falsely imply they were in the tag. Current
+surfaces now describe the tag as a source snapshot before this review batch,
+and the old phrases were added to `docs/retired-claims.txt`. The FAQ page was
+regenerated from its Markdown source. The tag itself was not changed.

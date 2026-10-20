@@ -14,8 +14,8 @@
 
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
-> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), tem todas as correções
-> feitas até essa data; as seguintes entram na `main`. Os dois achados da
+> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
+> código anterior a este lote de revisão. Os dois achados da
 > [revisão atual](docs/history/0144-independent-review.md) têm correções no lote de revisão,
 > que passou na suíte completa integrada em VM. A KASAN/lockdep do lote continua pendente.
 > A `v0.4.1-experimental` ainda contém
@@ -118,8 +118,9 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 ## Estado
 
 **Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
-(2026-10-20), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
-de cotas justas do F2. Não é para produção.** Fatos em 2026-10-20:
+(2026-10-20), contém as correções dos achados F1 a F12 do ADR-0011, exceto a parte
+de cotas justas do F2, mas ainda contém os defeitos R1/R2 da revisão 0144.
+Não é para produção.** Fatos em 2026-10-20:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de

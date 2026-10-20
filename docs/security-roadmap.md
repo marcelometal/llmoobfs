@@ -41,6 +41,13 @@ with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.
 
+*Separate stabilization note, 2026-10-20:* independent review 0144 identified
+two file/index correctness defects outside the F1–F12 list. Corrections
+([0149](history/0149-sync-backing-file-flags.md),
+[0150](history/0150-propagate-index-xattr-read-errors.md)) passed the integrated
+full VM suite; their batch KASAN/lockdep gate is pending. The S9 fair-share
+gap and outside-human-review gap remain unchanged.
+
 > Note from 2026-10-11 (entry 0030), measured on the Azure host: `QUERY` time grows by about
 > 1.15 µs per entry from another owner that matches the query (18 µs with none, 28 ms with
 > 20 000), with variation below 3%. An agent can estimate how many memories belonging to

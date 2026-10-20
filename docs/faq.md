@@ -8,8 +8,8 @@ Rendered copy: [studiomoob.github.io/llmoobfs/faq.html](https://studiomoob.githu
 MoobFS is an experimental GPL-2.0 Linux kernel module, stacked over ext4, btrfs or XFS, that
 passes POSIX operations to the lower filesystem and adds typed `user.moob.*` attributes, an
 in-memory attribute index and query ioctls. It is a research project: the tags are source
-pre-releases, and the last one, `v0.4.1-experimental` (2026-10-20), has every fix made up to that
-date; later ones land on `main`.
+pre-releases, and the last one, `v0.4.1-experimental` (2026-10-20), is a source
+snapshot before the corrections in review 0144.
 [`README.md`; `docs/research-originality.md` §9]
 
 ## 2. What problem does it target?
@@ -140,7 +140,7 @@ APIs change between versions; compatibility with other kernels is not promised.
 
 ## 15. Is it production-ready? Is there a release?
 It is not production-ready. It is a research project with source pre-release tags only, the last of which,
-`v0.4.1-experimental` (2026-10-20), has every fix made up to that date; later ones land on `main`. A module bug can cause a
+`v0.4.1-experimental` (2026-10-20), is a source snapshot before the corrections in review 0144. A module bug can cause a
 kernel panic or data loss; the project's tests and two source reviews by AI assistants found
 kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but the fairness
 part of F2 fixed). Run it only in a disposable VM with synthetic data.
