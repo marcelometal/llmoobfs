@@ -1381,8 +1381,8 @@ static int scan_child(struct scan_job *job, struct scan_dir *cur, struct scan_na
 	char *cpath;
 	int err = 0;
 
-	if (IS_ERR(child))
-		return PTR_ERR(child);
+	if (IS_ERR(child))	/* ENOENT: the directory died after its names were read (R2-10) */
+		return PTR_ERR(child) == -ENOENT ? 0 : PTR_ERR(child);
 	if (d_really_is_negative(child) || !(d_is_dir(child) || d_is_reg(child)))
 		goto out;
 	if (!job->index && !d_is_dir(child))

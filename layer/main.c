@@ -58,6 +58,16 @@ static void moobl_copy_attr(struct inode *dest, const struct inode *src)
 	fsstack_copy_inode_size(dest, (struct inode *)src);
 }
 
+/*
+ * moobl_copy_attr() and the link count, where fsstack_copy_attr_all() was used: that one copies
+ * the lower's whole i_flags word, which journal 0079 masks everywhere else (V8, journal 0155).
+ */
+static void moobl_copy_attr_nlink(struct inode *dest, const struct inode *src)
+{
+	moobl_copy_attr(dest, src);
+	set_nlink(dest, src->i_nlink);
+}
+
 static int moobl_set_lower_path(struct dentry *dentry, struct vfsmount *mnt,
 				struct dentry *lower_dentry)
 {
@@ -140,7 +150,7 @@ static int moobl_inode_set(struct inode *inode, void *data)
 	struct inode *lower = data;
 
 	MOOBL_I(inode)->lower = lower;
-	fsstack_copy_attr_all(inode, lower);
+	moobl_copy_attr_nlink(inode, lower);
 	fsstack_copy_inode_size(inode, lower);
 	inode->i_ino = lower->i_ino;
 #ifdef CONFIG_FS_POSIX_ACL
@@ -663,6 +673,11 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	};
 	int err;
 
+	/* RENAME_WHITEOUT would make a device node through a layer that refuses mknod (V6, 0155) */
+	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE)) {
+		err = -EINVAL;
+		goto out_put;
+	}
 	/*
 	 * A directory may not move to another domain or depth: its subtree's partition would
 	 * change (docs/spec-query-v2.md §5); like a cross-device rename, mv copies instead.
@@ -715,12 +730,12 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 		goto out_unlock;
 	/* Name operations hold the parents' locks: link counts may be copied here. */
 	if (target)
-		fsstack_copy_attr_all(target, moobl_lower_inode(target));
-	fsstack_copy_attr_all(new_dir, d_inode(lower_new_dir));
+		moobl_copy_attr_nlink(target, moobl_lower_inode(target));
+	moobl_copy_attr_nlink(new_dir, d_inode(lower_new_dir));
 	if (new_dir != old_dir)
-		fsstack_copy_attr_all(old_dir, d_inode(lower_old_dir));
+		moobl_copy_attr_nlink(old_dir, d_inode(lower_old_dir));
 	if ((flags & RENAME_EXCHANGE) && target)
-		fsstack_copy_attr_all(d_inode(old_dentry),
+		moobl_copy_attr_nlink(d_inode(old_dentry),
 				      moobl_lower_inode(d_inode(old_dentry)));
 	/* A replaced file or directory is gone, unless other names still link to the file. */
 	if (target && !(flags & RENAME_EXCHANGE) &&

@@ -37,6 +37,7 @@
  *                                                    openable unless it was concurrently removed
  */
 #include <time.h>
+#include <sys/syscall.h>
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <unistd.h>
@@ -84,6 +85,10 @@ int main(int argc, char **argv)
 	}
 	if (argc >= 5 && !strcmp(argv[2], "rename")) {
 		printf("rename %d\n", rename(argv[3], argv[4]) ? errno : 0);
+		return 0;
+	}
+	if (argc >= 5 && !strcmp(argv[2], "whiteout")) {	/* refused by the layer (V6, 0155) */
+		printf("whiteout %d\n", syscall(SYS_renameat2, AT_FDCWD, argv[3], AT_FDCWD, argv[4], 1u << 2 /* RENAME_WHITEOUT */) ? errno : 0);
 		return 0;
 	}
 	if (argc >= 6 && !strcmp(argv[2], "xset")) {	/* typed string: type byte, then UTF-8 */

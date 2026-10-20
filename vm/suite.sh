@@ -389,6 +389,10 @@ run_lower() {
     mv "$LAYER/dshared/m3.md" "$LAYER/da/m9.md" && chown 1001:1001 "$LAYER/da/m9.md" && chmod 0600 "$LAYER/da/m9.md" || fail "q2-move-file-$fs"
     q2cmp 1001 da 5 moved-in
     q2cmp 1001 dshared 2 moved-out
+    # V6 (journal 0155): RENAME_WHITEOUT would create a device node; the layer refuses it
+    echo w > "$LAYER/dshared/wo.src" || fail "v6-file-$fs"
+    [ "$("$BIN/query" "$LAYER" whiteout "$LAYER/dshared/wo.src" "$LAYER/dshared/wo.dst")" = "whiteout 22" ] || fail "v6-rename-whiteout-not-refused-$fs"
+    rm "$LAYER/dshared/wo.src" || fail "v6-clean-$fs"
     # T3 (journal 0155): an extended ACL on the domain directory itself. dacl is 0750 and 1001's,
     # its file 0640: without the ACL only 1001 and its group traverse and read it. The ACL lets
     # 1002 traverse, so the file must leave the homogeneous answers, or 1002 would receive it.
