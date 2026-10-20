@@ -5,6 +5,11 @@
 - syzkaller (journal 0143): a fifth six-hour run, no report; the ioctl and attribute handlers at
   88.7 % of their PCs, above the 85 % threshold of security roadmap S3. The fix of journal 0139
   confirmed with 40 repetitions: within 1 to 3 % of module 0102 on filtered queries.
+- syzkaller descriptions for the weak handlers (journal 0138; first run in journal 0143): the `QUERY2` cursor
+  as resources with a continuing call `ioctl$MOOB_IOC_QUERY2_NEXT`, typed query terms and
+  attribute values from short lists, and six new seeds (cursor pages, long keys, value types,
+  the equality plan, per-result checks, attribute flags).
+
 ## v0.4.1-experimental — 2026-10-20
 
 Fifth source pre-release, the one to use instead of `v0.4.0-experimental`, whose queries are
@@ -19,6 +24,8 @@ review. Journal 0142.
   every refusal of a typed attribute write and the 64-attribute limit; arm64 under emulation
   (ext4, btrfs, XFS and fault injection under KASAN); a fourth six-hour syzkaller run with no
   report and richer descriptions for the weakly covered handlers.
+  *Correction, 2026-10-20:* the richer descriptions were not in this tag; they were merged after
+  it, with their first run (journal 0143).
 - **Measured:** the on-demand index costs 7 to 12 % on filtered queries against the index built
   at mount (40 repetitions, CPU frequency held, bootstrap intervals).
 
