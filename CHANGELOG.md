@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Tests (journal 0141): new suite marker `TYPED_LIMITS_PASS` (`tests/layer.c typed`, once per
+  lower filesystem): every refusal of a typed attribute write with its errno and an unchanged
+  lower, and the limit of 64 per file (the 65th gives `ENOSPC`, replacing and removing at the
+  limit, what does not count). `q2invalid` and `invalid` now check each term and header rule of
+  `QUERY2` and `QUERY` next to a valid request. Paths syzkaller reaches poorly (journal 0138).
 - CI, arm64 (exploratory, journal 0137): the guest boots under emulation and the suite step ext4
   passed under KASAN twice, and btrfs and XFS once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
   `virtme-ng-init`; the job now uses the bash init, a virtio-fs root, the disks in reverse order,

@@ -165,3 +165,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0136 — A casefolded lower directory is refused (issue #95)](0136-casefolded-lower-refused.md)
 - [0137 — arm64 under emulation: the guest boots and the ext4 step passes under KASAN](0137-arm64-guest-boots-under-emulation.md)
 - [0138 — syzkaller: a fourth six-hour run with F2 and F4, coverage measured, two gaps fixed](0138-syzkaller-fourth-run.md)
+- [0141 — Typed attribute limits and query validation tested case by case](0141-typed-attribute-limits-tested.md)
