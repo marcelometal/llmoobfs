@@ -9,6 +9,9 @@
   as resources with a continuing call `ioctl$MOOB_IOC_QUERY2_NEXT`, typed query terms and
   attribute values from short lists, and six new seeds (cursor pages, long keys, value types,
   the equality plan, per-result checks, attribute flags).
+- **Review finding (journal 0151, exact target `d110d4e`):** a chmod during a domain's first
+  index build can leave a stale homogeneous entry, allowing later `QUERY2` results for a file
+  whose read permission has been revoked. Reproduced in the disposable VM; no fix is included.
 
 ## v0.4.1-experimental — 2026-10-20
 
