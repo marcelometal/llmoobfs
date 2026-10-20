@@ -40,7 +40,7 @@
   removal; much of Q1's p99 difference is associated with the first cycle.
   Reproducible analysis of existing data, not a new benchmark or a causal attribution.
 
-- Independent review of 3627172, round 2 (journal 0153): twelve findings, two of them
+- Independent review of 3627172, round 2 (journal 0155): twelve findings, two of them
   reproduced in the VM with `tests/review-3627172-vm.sh`: a directory 65 or more components
   below the mount root is placed nowhere by the write paths, so its chmod sets no fallback and
   a value change below it is not indexed (R2-1); a file renamed inside its directory while the
