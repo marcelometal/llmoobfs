@@ -129,6 +129,13 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
   but `moobl_xattr_get()` still has 0 of 4 PCs, without an established explanation. The separate
   requirement below to exercise every reachable function is therefore not yet demonstrated.
   Keep this evidence gap distinct from the maintainer's stabilization milestone.
+- **Update, 2026-10-20 (journal 0154):** the 0 of 4 is explained by the corpus, not by the
+  function. Of the fifth run's 1 082 programs, 40 read an attribute and 14 of those mount the
+  layer, and in most of them the read cannot reach it. A replay of the seeds in a disposable
+  guest, with per-call KCOV coverage, gives 3 of the 4 PCs to every read that reaches the layer.
+  The fourth is the `security.*` branch, which the LSM answers itself for `security.selinux`.
+  Three new seeds end in such a read. The per-function criterion is demonstrated when the next
+  run's report shows the function covered.
 - **Threshold, set on 2026-10-15** (journal 0109): the ioctl and attribute handlers (from
   `moobl_root_ioctl()` through `query_run()`, `results_to_user()`, `moobl_xattr_get/set()` and the
   validation in `common/attr.c`) at 85 % of their PCs or more, measured by the manager's

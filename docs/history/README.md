@@ -180,3 +180,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0151 — Independent security review of d110d4e: stale homogeneity after chmod during index build](0151-review-d110d4e.md)
 - [0152 — A chmod during the first build of a domain no longer leaves the file in its answers](0152-chmod-during-build-fixed.md)
 - [0153 — The review correction batch integrated with the chmod-during-build fix](0153-review-batch-integration.md)
+- [0154 — moobl_xattr_get at 0 PCs explained by the corpus; pull requests 106 and 107 merged](0154-xattr-get-coverage-explained.md)

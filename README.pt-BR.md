@@ -439,7 +439,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   defeitos corrigidos depois; as correções posteriores à `v0.4.1-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
   ([vm/fstests/](vm/fstests/README.md)); o syzkaller rodou cinco rodadas de seis horas; a última
   medição ficou acima do limiar agregado de PCs do item S3 do [roteiro de segurança](docs/security-roadmap.md),
-  mas ainda falta evidência de cobertura de `moobl_xattr_get`. O SELinux em
+  e o `moobl_xattr_get` ficou com 0 PCs no relatório dessa rodada, porque o corpus quase não guardou
+  leituras de atributo dentro de uma camada montada; reexecutadas com cobertura por chamada, as
+  sementes chegam nela (diário 0154). O SELinux em
   modo enforcing foi exercitado uma vez (diário 0104); AppArmor e Smack não foram.
 - A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU). Renomear um
   diretório pela camada torna o domínio desatualizado e a próxima consulta o reconstrói;
