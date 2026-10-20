@@ -1,7 +1,7 @@
 # ADR-0017 — The project's position on the design objections of review round 2 (D1 to D3)
 
-Date: 2026-10-20. Status: **proposed**, awaiting the maintainer's acceptance or refusal. Nothing
-here is implemented; the commitments in each section are work to do if it is accepted.
+Date: 2026-10-20. Status: **accepted** by the maintainer on 2026-10-20 (journal 0156). Nothing
+here is implemented; the commitments in each section are planned work.
 
 ## Context
 
@@ -86,17 +86,22 @@ not:
   file;
 - nothing has to run for the files to stay plain and readable.
 
-Whether that is worth a kernel module is an empirical question. The project commits to building
-the user-space comparison: an indexer driven by `fanotify` over the same tree, behind the same
-query interface. Then it will publish what each one gets right and wrong: exactness under
-concurrent writes, permission answers, cost. If user space is as good, the project says so.
+Whether that is worth a kernel module is an empirical question. A user-space baseline already
+exists: `udx`, a per-domain SQLite index kept by `inotify` (journals 0092 and 0094). On static
+data it gives the same answers as the layer, at comparable query cost. What it was not measured
+on is what this objection is about:
+- exactness while files are written and renamed concurrently;
+- answers right after a permission change;
+- a `fanotify` filesystem-wide mark instead of one `inotify` watch per directory (journal 0092
+  notes it was not used).
+
+The project commits to extending that comparison to those three. It will publish what each side
+gets right and wrong, and if user space is as good, it says so.
 
 **Would change it.** That comparison, in either direction.
 
 ## Consequences
 
-- Accepted: the three positions are what the project answers in public. The commitments
-  (measurement of D2.1, the D2.2 mode, S14 and S15, the user-space comparison of D3) enter
-  `ROADMAP.md` and `docs/security-roadmap.md` as planned work.
-- Refused: the objections stay recorded in journal 0155 without an answer, and the public answer
-  says so.
+The three positions are what the project answers in public. The commitments enter the plans:
+- the measurement of D2.1 and the comparison of D3 in `ROADMAP.md`;
+- the D2.2 mode (S16), S14 and S15 in `docs/security-roadmap.md`.
