@@ -8,6 +8,7 @@
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/studiomoob/llmoobfs/badge)](https://scorecard.dev/viewer/?uri=github.com/studiomoob/llmoobfs)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
+[![DOI Zenodo: snapshot experimental](https://zenodo.org/badge/DOI/10.5281/zenodo.23514721.svg)](https://doi.org/10.5281/zenodo.23514721)
 
 > Este arquivo é um espelho de cortesia do [README em inglês](README.md), que prevalece em caso
 > de diferença ([ADR-0010](docs/decisions/0010-english-everywhere.md)).
@@ -582,7 +583,16 @@ do código; veja [Estado](#estado) para o comportamento testado e as limitaçõe
 
 ## Como citar
 
-Os metadados de citação estão em [CITATION.cff](CITATION.cff).
+Para citar o snapshot experimental de código-fonte arquivado no commit
+[`02381fba`](https://github.com/studiomoob/llmoobfs/commit/02381fba3f0a908623cac52180a39f24e02e98a6), use:
+
+> Studio Moob. (2026). *MoobFS: experimental Linux filesystem layer for LLM-agent memory — source snapshot 02381fba*
+> (Version `0.4.1-experimental+git.02381fba`) [Computer software]. Zenodo.
+> [https://doi.org/10.5281/zenodo.23514721](https://doi.org/10.5281/zenodo.23514721)
+
+Esse arquivo é posterior à tag `v0.4.1-experimental`. O DOI identifica esse
+snapshot fixo; o `main` pode conter mudanças posteriores. Os metadados de citação
+da tag permanecem em [CITATION.cff](CITATION.cff).
 
 ## Licença
 

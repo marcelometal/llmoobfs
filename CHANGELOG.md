@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Documentation (journal 0168): add the Zenodo version DOI badge and full archived-snapshot
+  citation to both READMEs, distinguishing commit `02381fba` from the earlier source tag.
+
 - Documentation (journal 0167): add verified external project records to both READMEs,
   with the scope and current limits of each record; preserve the four existing badges.
 
