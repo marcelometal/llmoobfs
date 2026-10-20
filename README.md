@@ -113,7 +113,8 @@ production.** Facts as of 2026-10-19:
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
   filesystems ext4, btrfs and XFS only. The attribute encoding's tests also pass on big-endian
-  s390x under emulation; arm64 runs are being measured ([journal 0124](docs/history/0124-big-endian-pass-arm64-without-kvm.md)).
+  s390x under emulation. The module also runs on arm64 under emulation, without KVM, in an
+  exploratory job: the ext4, btrfs and XFS steps passed under KASAN ([journal 0137](docs/history/0137-arm64-guest-boots-under-emulation.md)).
 - **Tested with** fault injection inside the module, fstests' `quick` group on the three lower
   filesystems, syzkaller (four six-hour runs; one defect found and fixed), a first KCSAN run (no
   race in the module) and SELinux enforcing (journals 0091, 0096, 0104, 0109, 0112, 0115, 0133, 0138).
@@ -352,8 +353,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
 ## Limitations
 
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
-  kernel APIs are version-specific and the pinned test target is not a compatibility promise. The
-  module has not run on another architecture; only the user-space encoding tests ran on big-endian.
+  kernel APIs are version-specific and the pinned test target is not a compatibility promise. On
+  another architecture the module ran only in the exploratory arm64 job (emulated, three lower
+  filesystems, journal 0137); the user-space encoding tests also ran on big-endian.
 - The index is RAM only, non-pageable and bounded by `index_budget` (default 128 MiB). Each
   domain is built by a linear scan on its first query after mount, and again after it was
   released or a directory in it was renamed; the budget and the shrinker were tested on small
