@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Integration (journal 0153): the correction batch of review 0144 (R1, R2) and the fix of
+  review 0151 (journal 0152) in one tree; every public surface states the three findings. The
+  complete `make vm-test` passes. Its QEMU guard is now 1200 s; one complete run had reached
+  the old 600 s under TCG on an arm64 host.
 - Fix (0149): synchronize mutable file status flags with the backing open
   before delegated I/O. The clear-append regression fails without the fix and
   passes with it; clear- and set-append assertions pass in the integrated VM
