@@ -539,6 +539,17 @@ Questions go to GitHub Discussions or an issue. AI-assisted contributions are we
 human review and accurate test evidence. Do not put private vulnerability details in public
 issues; use the [security contact](SECURITY.md).
 
+## External project records
+
+Records checked on 2026-10-20. These links describe release tracking and source discovery;
+see [Status](#status) for tested behavior and limitations.
+
+| Service | Record |
+| --- | --- |
+| [Anitya](https://release-monitoring.org/project/392843/) | Tracks the experimental pre-releases; no distribution package mapping. |
+| [Open Hub](https://openhub.net/p/moobfs) | Public project entry; code analysis is not complete. |
+| [XERJ Corpus Hub](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Source snapshot selected; license review is pending, so the corpus is not installable yet. |
+
 ## Citing
 
 Citation metadata is in [CITATION.cff](CITATION.cff).

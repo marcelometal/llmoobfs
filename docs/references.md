@@ -304,6 +304,18 @@ Other failures must abort an index build or adoption.
 | LangMem | https://github.com/langchain-ai/langmem | MIT | `48e3c11` |
 | OpenAI Agents SDK sessions | https://github.com/openai/openai-agents-python | MIT | `125efa0` |
 
+## 5. Public project metadata
+
+Sources for the external-records section of both READMEs, checked on 2026-10-20
+(journal 0167). These records describe release tracking and source discovery, not a
+kernel review or a compatibility test.
+
+| Source | Used for |
+| --- | --- |
+| [MoobFS on Anitya](https://release-monitoring.org/project/392843/) | Experimental pre-release tracking and the absence of a distribution package mapping. |
+| [MoobFS on Open Hub](https://openhub.net/p/moobfs) | Public project metadata; code analysis is not complete. |
+| [MoobFS candidate corpus on XERJ](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Selection of a source snapshot; license review is pending and the corpus is not installable yet. |
+
 ## Not included
 
 Works surveyed but not used in a decision (most of `docs/research-academic-survey.md` and the
