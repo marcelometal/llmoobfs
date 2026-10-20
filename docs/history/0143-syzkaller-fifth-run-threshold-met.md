@@ -56,3 +56,14 @@ separately. The on-demand index against the index built at mount is confirmed at
 With this run every condition the maintainer set for leaving stabilization holds: the fix batches
 tested and merged, KCSAN, negative rounds, a long syzkaller run with no report, and now the S3
 coverage threshold. Open: no outside human review; the fair-shares part of F2 (S9).
+
+## Dated qualification — 2026-10-20 (journals 0144–0146)
+
+The measured 88.7% meets S3's numeric aggregate threshold. The written criterion
+also requires every reachable function to be exercised, with explained exclusions.
+The saved result is still 0/4 PCs for `moobl_xattr_get`; the inspected object has
+instrumentation, and no runtime investigation has resolved the discrepancy.
+The aggregate alone therefore does not establish the complete S3 criterion.
+This qualifies the evidence above without rewriting the maintainer's recorded
+stabilization decision. The residual of 1–3% refers to p50; the stored Q1 p99
+difference is +54.03%, further examined in journal 0147.

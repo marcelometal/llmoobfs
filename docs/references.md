@@ -278,6 +278,12 @@ set. Read on 2026-10-14.
 | Elasticsearch document-level security | [Elastic docs](https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/controlling-access-at-document-field-level) | precedent for count leakage (ADR-0009); the current page states that restricted documents still count in the scoring statistics |
 | LMDB, RocksDB, LevelDB | https://www.symas.com/mdb, https://rocksdb.org/, https://github.com/google/leveldb | engines weighed for a user-space index (ADR-0009) |
 
+Review 0144 also consults Linux 6.12.112's `fs/overlayfs/file.c`
+(`ovl_real_fdget`, `ovl_change_flags`), `fs/backing-file.c`,
+`fs/read_write.c` and `include/linux/fs.h` for synchronization of mutable
+file flags and initialization of the lower synchronous I/O request. These are
+the exact test-kernel sources, not a newer API substituted for the build.
+
 ## 4. Agent-memory clients analyzed
 
 | Client | Repository | License | Analyzed |

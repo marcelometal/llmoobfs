@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Review (0144): two open correctness findings, not fixes. Clearing `O_APPEND`
+  with `F_SETFL` still appends through the layer (reproduced in an ext4 VM);
+  operational `getxattr` errors can be silently omitted from an index build
+  (confirmed in source, lower-error reproduction pending).
+- Coverage (0145): the fifth run's 88.7% aggregate meets the numeric S3 threshold,
+  but `moobl_xattr_get` at 0/4 leaves its per-function criterion unresolved.
+- Documentation (0146): reconcile current public surfaces with implementation and
+  recorded evidence, distinguish historical pilots from repeated measurements,
+  and document the review's open limitations in English and Portuguese.
+- Measurement analysis (0147): the existing 1–3% p50 residual survives first-cycle
+  removal; much of Q1's p99 difference is associated with the first cycle.
+  Reproducible analysis of existing data, not a new benchmark or a causal attribution.
+
 - syzkaller (journal 0143): a fifth six-hour run, no report; the ioctl and attribute handlers at
   88.7 % of their PCs, above the 85 % threshold of security roadmap S3. The fix of journal 0139
   confirmed with 40 repetitions: within 1 to 3 % of module 0102 on filtered queries.
