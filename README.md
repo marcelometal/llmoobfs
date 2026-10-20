@@ -12,7 +12,8 @@
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
 > tag, `v0.4.1-experimental` (2026-10-20), has every fix made up to that date; later ones land on
-> `main`. Details under [Status](#status).
+> `main`. The [current review](docs/history/0144-independent-review.md) records two unresolved
+> findings, with different evidence levels; see [Limitations](#limitations). Details under [Status](#status).
 
 ## The problem
 
@@ -361,6 +362,14 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 ## Limitations
 
+- **Two findings remain open in the [current review](docs/history/0144-independent-review.md).**
+  Clearing `O_APPEND` with `fcntl(F_SETFL)` after opening a file does not update the backing
+  file's flags: a positional write still appends through the layer, unlike direct ext4 access.
+  Reproduced in a Linux 6.12.112 VM over ext4. Separately, code inspection found that
+  `attrs_read()` treats lower `getxattr` errors such as `EIO` or `ENOMEM` as skippable invalid
+  attributes and can accept an incomplete domain index. That error path has not been reproduced
+  with a failing lower filesystem. Neither finding is fixed yet.
+
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
   kernel APIs are version-specific and the pinned test target is not a compatibility promise. On
   another architecture the module ran only in the exploratory arm64 job (emulated, three lower
@@ -372,8 +381,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
   mounts are refused, and so is an idmapped mount as `lower=`; no rootless containers.
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
-- Only pilot-grade figures exist: two hosts, one data-set seed, three repetitions at most
-  (journals 0025 to 0085). No speed or efficiency claim beyond the conditions stated in
+- Early SQLite/client figures are pilots: two hosts, one data-set seed, three repetitions at
+  most (journals 0025 to 0085). Later module comparisons use 40 repetitions and intervals
+  (journals 0139 and 0143). No speed or efficiency claim beyond the conditions stated in
   [What was measured](#what-was-measured) may be made from them; no comparison with FUSE
   exists, and the comparison with the bare lower filesystem on the current module is pending.
 - No outside human review. Two independent source reviews by AI assistants (journals
@@ -386,11 +396,12 @@ KASAN harness runs the layer suite), and no benchmark exists.
   [0082](docs/history/0082-index-lock-and-reclaim.md) and
   [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.4.0-experimental` carry
   defects fixed later; fixes after `v0.4.1-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
-  syzkaller ran for five six-hour rounds, now above the coverage threshold of
-  [security roadmap](docs/security-roadmap.md) S3. SELinux enforcing was exercised once (journal
+  syzkaller ran for five six-hour rounds, above the aggregate PC threshold of
+  [security roadmap](docs/security-roadmap.md) S3; `moobl_xattr_get` still lacks coverage evidence. SELinux enforcing was exercised once (journal
   0104); AppArmor and Smack were not.
-- `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
-  after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
+- `QUERY` authorization holds at query time only (TOCTOU contract). A directory rename through
+  the layer makes its domain stale and the next query rebuilds it; direct lower-tree changes
+  remain untracked ([spec-m3](docs/spec-m3.md) §3.1 and its correction note).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower
   filesystem's. Acceptance ran over ext4 only.
 - Inode numbers are the lower's, and a file is identified by that number. A btrfs subvolume or

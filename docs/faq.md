@@ -144,7 +144,12 @@ It is not production-ready. It is a research project with source pre-release tag
 kernel panic or data loss; the project's tests and two source reviews by AI assistants found
 kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but the fairness
 part of F2 fixed). Run it only in a disposable VM with synthetic data.
-[`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`]
+
+The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md) adds two unfixed findings: clearing
+`O_APPEND` with `F_SETFL` leaves positional writes appending through the layer (reproduced in
+a Linux 6.12.112/ext4 VM), and `attrs_read()` can skip lower `getxattr` errors such as `EIO` or
+`ENOMEM`, accepting an incomplete index (confirmed by code inspection, not fault reproduction).
+[`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`; journal 0144]
 
 ## 16. How can I try it?
 

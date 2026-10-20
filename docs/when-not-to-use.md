@@ -46,6 +46,13 @@ and query evidence (journals [0088](history/0088-m4-report.md) and
 
 ## 3. When MoobFS is probably not worth it
 
+Two additional **unfixed** findings are recorded in the
+[current review](history/0144-independent-review.md): `F_SETFL` clearing `O_APPEND` does not
+reach the backing file, so positional writes can still append (reproduced in a Linux
+6.12.112/ext4 VM); and `attrs_read()` can skip operational lower `getxattr` errors such as
+`EIO` or `ENOMEM` and accept an incomplete index (code inspection only, without reproducing
+a lower read failure). These reinforce the restriction to disposable test environments.
+
 These limits update the cases discussed in the value assessment, §9.6.
 
 - **A single process or a single agent owns the data.** There is no cross-user query to
@@ -69,8 +76,9 @@ These limits update the cases discussed in the value assessment, §9.6.
   6.12.112 (KASAN) have run the module; other kernels are not promised to compile or behave.
 - **The corpus is large.** The index is non-pageable RAM, bounded by `index_budget`
   (default 128 MiB). A failed update marks its domain for rebuilding; its next query returns
-  a fresh answer or an explicit error, rather than a silently partial answer
-  ([ADR-0016](decisions/0016-failed-index-update-rebuilds-its-domain.md)). A domain larger than
+  a rebuilt answer or an explicit error
+  ([ADR-0016](decisions/0016-failed-index-update-rebuilds-its-domain.md)). This recovery does not
+  cover the separate lower-read error-handling defect found in the current review above. A domain larger than
   the budget fails with `ENOMEM`. Users still compete for the shared budget and can force
   repeated releases and scans; fair shares are not implemented. A query buffer can additionally
   retain about 1.1 MB per open file until close (journal 0139), outside the index budget.

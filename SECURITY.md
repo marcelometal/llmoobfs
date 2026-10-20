@@ -107,6 +107,14 @@ These are targets for a single volunteer maintainer, not guarantees:
 
 ## Current boundaries
 
+The [review of 2026-10-20](docs/history/0144-independent-review.md) records two **unfixed**
+findings beyond the earlier ADR-0011 list. A Linux 6.12.112 VM with ext4 reproduced writes
+still appending after `fcntl(F_SETFL)` cleared `O_APPEND` on the layer file; its backing file
+keeps the old flags. Code inspection also found `attrs_read()` skipping lower `getxattr`
+errors (`EIO`, `ENOMEM`) and allowing an incomplete domain index to be accepted. That lower
+error path has not been reproduced dynamically. These are different evidence levels, not
+claims that both failures have been exercised or fixed.
+
 The parser checks image structure and hashes, but checksums are not
 authentication. The module validates at mount, not continuously against external
 backing-device writes. Neither encryption nor authorization beyond ordinary VFS

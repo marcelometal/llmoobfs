@@ -84,3 +84,27 @@ kernel run is applicable to this documentation-only change.
 - The coordinating review integrates this commit, adds the history index and CHANGELOG entry,
   and submits one reviewed batch when authorized. Reconcile any new runtime evidence before
   publication, especially the S3 function criterion.
+
+
+## Addendum, 2026-10-20 — unresolved findings from review 0144
+
+The coordinating reviewer supplied a Linux 6.12.112/ext4 VM reproduction: after opening with
+`O_APPEND` and clearing it with `fcntl(F_SETFL)`, `pwrite` at offset zero changed direct ext4
+`AAAA` to `ZAAA` (4 bytes), while the layer produced `AAAAZ` (5 bytes); `F_GETFL` showed append
+clear on both. The backing open retains its initial flags (`layer/main.c`). Code inspection
+also confirmed that `attrs_read()` (`layer/index.c`, the `n <= 0` branch after `vfs_getxattr`)
+drops operational errors such as `EIO`/`ENOMEM` along with invalid encodings. The latter has
+no dynamic reproduction with a failing lower filesystem yet. Neither finding is fixed.
+
+Current limitations now state both with their different evidence levels: README EN/PT,
+SECURITY, FAQ and its generated page, when-not-to-use, the landing page and generated status
+pages in both languages. Links target the coordinator's journal 0144, to be integrated in the
+same batch. The budget-recovery description is qualified so it does not imply the separate
+lower-read problem is fixed by ADR-0016. Remaining duplicate README limitation bullets about
+three repetitions, rename-until-remount and the aggregate S3 target were also synchronized
+with the corrected primary sections.
+
+No new runtime test was run by this documentation agent. The VM result above is the
+coordinating review's evidence, to be recorded in journal 0144. Documentation generation and
+validation were rerun; the negative test from the earlier audit is not repeated because these
+new statements record open defects, not executable fixes. No publication occurred.

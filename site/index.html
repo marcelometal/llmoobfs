@@ -106,6 +106,7 @@ grep '^DEMO| ' build/vm/console.log</code></pre>
 
 <section class="section split" aria-labelledby="limitations"><div><h2 id="limitations">Limitations.</h2>
 <p class="intro">For anything beyond a disposable VM today, SQLite or plain files remain the recommendation.</p>
+<p><strong>Two findings remain unfixed.</strong> Clearing <code>O_APPEND</code> with <code>F_SETFL</code> leaves positional writes appending through the layer (reproduced in a Linux 6.12.112/ext4 VM). Code inspection also found that <code>attrs_read()</code> can skip lower <code>getxattr</code> errors such as <code>EIO</code> or <code>ENOMEM</code> and accept an incomplete index; that error path has not been reproduced with a failing lower filesystem. <a href="https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md">Current review and evidence ↗</a></p>
 <div class="evidence"><div><strong>3</strong><span>lower filesystems validated</span></div><div><strong>1</strong><span>kernel series tested</span></div><div><strong>0</strong><span>outside human reviews</span></div></div>
 <p><a href="https://github.com/studiomoob/llmoobfs/blob/main/docs/when-not-to-use.md">Comparison and when not to use MoobFS ↗</a> · <a href="https://github.com/studiomoob/llmoobfs/blob/main/docs/adoption-risks.md">Adoption risks ↗</a></p></div>
 <div><p>Facts verified in the repository as of 2026-10-20:</p>

@@ -15,7 +15,8 @@
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
 > diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), tem todas as correções
-> feitas até essa data; as seguintes entram na `main`. Detalhes em [Estado](#estado).
+> feitas até essa data; as seguintes entram na `main`. A [revisão atual](docs/history/0144-independent-review.md)
+> registra dois achados sem correção, com níveis distintos de evidência; veja [Limitações](#limitações). Detalhes em [Estado](#estado).
 
 ## O problema
 
@@ -377,6 +378,15 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
 
 ## Limitações
 
+- **Dois achados seguem abertos na [revisão atual](docs/history/0144-independent-review.md).**
+  Limpar `O_APPEND` com `fcntl(F_SETFL)` depois de abrir um arquivo não atualiza as flags do
+  arquivo de baixo: uma escrita posicional continua acrescentando ao fim pela camada,
+  diferentemente do acesso direto ao ext4. Reproduzido numa VM Linux 6.12.112 sobre ext4.
+  Separadamente, a leitura do código mostrou que `attrs_read()` trata erros de `getxattr` do
+  sistema de baixo, como `EIO` ou `ENOMEM`, como atributos inválidos que podem ser ignorados,
+  podendo aceitar um índice de domínio incompleto. Esse caminho de erro não foi reproduzido
+  com falha no sistema de baixo. Nenhum dos dois achados foi corrigido ainda.
+
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
   APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em
   outra arquitetura, o módulo só rodou no job exploratório de arm64 (com emulação, três sistemas de
@@ -390,8 +400,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   e idmapped são recusadas, assim como uma montagem idmapped como `lower=`; não há contêineres sem
   root.
 - As UAPIs v1 e v2 podem mudar, sem promessa de compatibilidade ([compatibility.md](docs/compatibility.md)); as tags `-experimental` são instantâneos do código-fonte, sem binários, empacotamento nem suporte.
-- Só existem números de nível piloto: duas máquinas, uma semente de dados, no máximo três
-  repetições (diários 0025 a 0085). Nenhuma afirmação de velocidade ou eficiência além das
+- Os números iniciais contra SQLite e com o cliente são pilotos: duas máquinas, uma semente de
+  dados, no máximo três repetições (diários 0025 a 0085). Comparações posteriores entre módulos
+  usam 40 repetições e intervalos (diários 0139 e 0143). Nenhuma afirmação de velocidade ou eficiência além das
   condições descritas em [O que foi medido](#o-que-foi-medido) pode ser feita a partir deles; não
   existe comparação com FUSE, e a comparação com o sistema de arquivos de baixo puro no módulo atual
   está pendente.
@@ -406,10 +417,13 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   [0083](docs/history/0083-index-inspection-fixes.md). As tags até a `v0.4.0-experimental` carregam
   defeitos corrigidos depois; as correções posteriores à `v0.4.1-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
   ([vm/fstests/](vm/fstests/README.md)); o syzkaller rodou cinco rodadas de seis horas; a última
-  medição ficou acima do limiar de cobertura do item S3 do [roteiro de segurança](docs/security-roadmap.md). O SELinux em
+  medição ficou acima do limiar agregado de PCs do item S3 do [roteiro de segurança](docs/security-roadmap.md),
+  mas ainda falta evidência de cobertura de `moobl_xattr_get`. O SELinux em
   modo enforcing foi exercitado uma vez (diário 0104); AppArmor e Smack não foram.
-- A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU); falsos negativos
-  possíveis depois de renomear um diretório, até remontar ([spec-m3](docs/spec-m3.md) §3.1).
+- A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU). Renomear um
+  diretório pela camada torna o domínio desatualizado e a próxima consulta o reconstrói;
+  mudanças diretas na árvore de baixo continuam sem rastreamento
+  ([spec-m3](docs/spec-m3.md) §3.1 e sua nota de correção).
 - A atomicidade entre arquivo e metadados é uma convenção do cliente; durabilidade, reflink e
   dedupe são do sistema de arquivos de baixo. A aceitação rodou só sobre ext4.
 - Os números de inode são os do sistema de baixo, e um arquivo é identificado por esse número. Um
