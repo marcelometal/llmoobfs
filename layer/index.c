@@ -1096,11 +1096,27 @@ static int index_replace(struct moobl_index *ix, u64 ino, const struct moobl_pla
 static void record_dentry_path(struct moobl_index *ix, struct moobl_ix_inode *rec,
 			       struct dentry *dentry);
 
+/* Whether dentry still has the last component of path as its name (the rename takes d_lock). */
+static bool name_is(struct dentry *dentry, const char *path)
+{
+	const char *base = strrchr(path, '/');
+	size_t len;
+	bool same;
+
+	base = base ? base + 1 : path;
+	len = strlen(base);
+	spin_lock(&dentry->d_lock);
+	same = dentry->d_name.len == len && !memcmp(dentry->d_name.name, base, len);
+	spin_unlock(&dentry->d_lock);
+	return same;
+}
+
 /*
  * Brings the index to what the lower filesystem holds for one file or directory, placed at
  * pl. A dentry that was removed meanwhile is skipped, and so is one that left parent, the
- * lower directory its name was read from (when given): the write path that removed or moved
- * it has updated the index. The name comes from path (the scan) or from where (a layer dentry).
+ * lower directory its name was read from (when given), and one whose name is no longer the last
+ * component of path: the write path that removed, moved or renamed it has updated the index.
+ * The name comes from path (the scan) or from where (a layer dentry).
  * With dom (the lower domain directory), the file's own homogeneity is not taken from pl but
  * decided here at every reading, after the loader is registered: a change of permissions that
  * completed before is seen by the reading, one that runs after makes the reading be done
@@ -1130,6 +1146,8 @@ static int index_load(struct super_block *sb, struct dentry *lower, struct dentr
 			break;	/* removed */
 		if (parent && READ_ONCE(lower->d_parent) != parent)
 			break;	/* renamed away */
+		if (path && !IS_ROOT(lower) && !name_is(lower, path))
+			break;	/* renamed within its directory: the rename hook adopted it (0156) */
 		if (dom && !pl->hetero) {
 			cur.hetero = !target_ok(li, dom, &err);
 			if (err)	/* an ACL that could not be read is not an answer */
@@ -1355,6 +1373,16 @@ static int scan_child(struct scan_job *job, struct scan_dir *cur, struct scan_na
 	}
 	if (moobl_casefolded(child))	/* refused by lookups, so out of the answers too */
 		goto out;
+	if (IX(job->sb)->domain_depth && cur->depth >= MOOBL_MAX_DEPTH) {
+		/*
+		 * Beyond the depth where_is() can walk, the write paths place nothing: a chmod there
+		 * sets no fallback and a write is not applied. What they cannot keep current is not
+		 * indexed either (journal 0156).
+		 */
+		pr_info_once("moobfs_layer: names more than %d components below the mount root are left out of the index\n",
+			     MOOBL_MAX_DEPTH);
+		goto out;
+	}
 	cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path, cur->path[0] ? "/" : "", sn->len,
 			  sn->name);
 	if (!cpath) {

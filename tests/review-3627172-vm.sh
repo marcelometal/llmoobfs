@@ -99,11 +99,17 @@ timeout 300 qemu-system-x86_64 -machine q35 -accel tcg -cpu max -m 768M -smp 2 \
 echo "$RUN"
 grep -E '^R2-|REVIEW2_RESULT|RENAMED|REVIEW_|moobfs_scan_reread:' "$RUN/console.log"
 grep -q '^REVIEW_VM_DONE' "$RUN/console.log"
-# R2-1: the control hides the file after the chmod; the deep run keeps answering it (and the old value)
+# Expectations inverted after the fixes (journal 0156); before them, at 3627172, the defect
+# lines below appeared and this script checked for them.
+# R2-1: the control hides the file after the chmod; nothing beyond the placeable depth is
+# indexed, so the deep runs never answer the file (and never the old value)
 grep -q 'REVIEW2_RESULT depth=10 chmod_depth=5 uid=1001 before=1 exists=0 eq_x=0 eq_y=0 open=-1 errno=13' "$RUN/console.log"
-grep -q 'REVIEW2_RESULT depth=66 chmod_depth=65 uid=1001 before=1 exists=1 eq_x=1 eq_y=0 open=-1 errno=13' "$RUN/console.log"
-grep -q 'REVIEW2_RESULT depth=70 chmod_depth=0 uid=1001 before=1 exists=1 eq_x=1 eq_y=0 open=0 errno=0' "$RUN/console.log"
-# R2-2: after the inode is evicted the control names b; the race names a, which no longer exists
+if grep -q 'REVIEW2_RESULT depth=66 chmod_depth=65 uid=1001 before=1 exists=1 eq_x=1' "$RUN/console.log"; then exit 1; fi
+if grep -q 'REVIEW2_RESULT depth=70 chmod_depth=0 uid=1001 before=1 exists=1 eq_x=1' "$RUN/console.log"; then exit 1; fi
+grep -q 'REVIEW2_RESULT depth=66 chmod_depth=65 uid=1001 before=0 exists=0 eq_x=0 eq_y=0 open=-1 errno=13' "$RUN/console.log"
+grep -q 'REVIEW2_RESULT depth=70 chmod_depth=0 uid=1001 before=0 exists=0 eq_x=0 eq_y=0 open=0 errno=0' "$RUN/console.log"
+# R2-2: after the inode is evicted both the control and the race name b
 grep -q 'REVIEW2_RESULT samedir delay=-1 cached=1 after_drop=1 path_after_drop=b exists_b=1 exists_a=0' "$RUN/console.log"
-grep -q 'REVIEW2_RESULT samedir delay=300000 cached=1 after_drop=1 path_after_drop=a exists_b=1 exists_a=0' "$RUN/console.log"
+if grep -q 'REVIEW2_RESULT samedir delay=300000 cached=1 after_drop=1 path_after_drop=a' "$RUN/console.log"; then exit 1; fi
+grep -q 'REVIEW2_RESULT samedir delay=300000 cached=1 after_drop=1 path_after_drop=b exists_b=1 exists_a=0' "$RUN/console.log"
 grep -q 'moobfs_scan_reread:' "$RUN/console.log"
