@@ -60,3 +60,17 @@ technical status changed, so they need no text change. No external page is edite
 Next: maintainer review of the signed local commit. Recheck the external records
 and current `main` before any later publication. No push, pull request or merge
 is authorized in this unit.
+
+## 2026-10-20 — Publication follow-up
+
+The maintainer authorized pushing this branch and opening a pull request, with
+merge reserved for a later explicit approval. This supersedes the preparation-only
+publication restriction above; it does not change the content or scope of the
+README records.
+
+Before publication, the remote `main` was still `02381fba`, the preparation base.
+The isolated branch was clean, its six changed files were documentation only,
+`git diff --check 02381fba..HEAD` passed and no existing pull request used this
+head branch. The documented checks above remain the validation for the unchanged
+README content; no new kernel tests were run. Other sessions' checkouts and work
+were not incorporated. Next: push the branch and open the pull request; no merge.
