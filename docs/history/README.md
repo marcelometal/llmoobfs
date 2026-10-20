@@ -170,3 +170,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0141 — Typed attribute limits and query validation tested case by case](0141-typed-attribute-limits-tested.md)
 - [0142 — Fifth pre-release tag: v0.4.1-experimental](0142-fifth-prerelease-tag.md)
 - [0143 — syzkaller: a fifth six-hour run reaches the S3 coverage threshold; the 40-repetition confirmation](0143-syzkaller-fifth-run-threshold-met.md)
+- [0153 — Independent review of 3627172, round 2: the stale-state class, error paths, tests; two defects reproduced](0153-review-3627172-round-2.md)
