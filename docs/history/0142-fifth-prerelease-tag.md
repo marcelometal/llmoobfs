@@ -42,3 +42,6 @@ the merge commit; the release notes are the opening summary of the changelog sec
 
 Same as journal 0135: one kernel series (6.12), x86-64 tested in a VM, arm64 only under emulation
 in an exploratory job; no outside human review. Open: fair shares of the index budget (S9).
+
+*Correction, 2026-10-20 (journal 0143).* The descriptions for the weak handlers were not in this
+tag: branch `syz-coverage` was merged after it, with the fifth run.

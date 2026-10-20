@@ -93,7 +93,7 @@ if want run; then
 	"enable_syscalls": [
 		"openat\$moobfs_root", "openat\$moobfs_dom", "openat\$moobfs_file",
 		"mount\$moobfs_layer", "umount2\$moobfs", "ioctl\$MOOB_IOC_QUERY", "ioctl\$MOOB_IOC_GET_INFO",
-		"ioctl\$MOOB_IOC_QUERY2", "ioctl\$MOOB_IOC_QUERY2_BATCH",
+		"ioctl\$MOOB_IOC_QUERY2", "ioctl\$MOOB_IOC_QUERY2_NEXT", "ioctl\$MOOB_IOC_QUERY2_BATCH",
 		"fsetxattr\$moob", "setxattr\$moob", "fremovexattr\$moob", "fgetxattr\$moob", "getxattr\$moob",
 		"creat", "close", "read", "pread64", "write", "pwrite64", "lseek", "chdir", "fchdir",
 		"mkdir", "mkdirat", "rmdir", "unlink", "unlinkat", "rename", "renameat2", "link", "linkat",

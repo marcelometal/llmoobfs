@@ -45,12 +45,14 @@ openat$moobfs_file(fd const[AT_FDCWD], file ptr[in, filename], flags flags[open_
 
 ioctl$MOOB_IOC_QUERY(fd fd_moobfs_root, cmd const[MOOB_IOC_QUERY], arg ptr[inout, moob_query])
 ioctl$MOOB_IOC_GET_INFO(fd fd_moobfs_root, cmd const[MOOB_IOC_GET_INFO], arg ptr[out, moob_info])
-ioctl$MOOB_IOC_QUERY2(fd fd_moobfs_dom, cmd const[MOOB_IOC_QUERY2], arg ptr[inout, moob_query2])
+ioctl$MOOB_IOC_QUERY2(fd fd_moobfs_dom, cmd const[MOOB_IOC_QUERY2], arg ptr[inout, moob_query2_t[moob_cursor_out]])
+ioctl$MOOB_IOC_QUERY2_NEXT(fd fd_moobfs_dom, cmd const[MOOB_IOC_QUERY2], arg ptr[inout, moob_query2_t[moob_cursor]])
 ioctl$MOOB_IOC_QUERY2_BATCH(fd fd_moobfs_dom, cmd const[MOOB_IOC_QUERY2_BATCH], arg ptr[in, moob_query2_batch])
 
 # typed attributes: valid and broken names, every type, broken encodings
-moob_xattr_names = "user.moob.kind", "user.moob.score", "user.moob.created", "user.moob.title", "user.moob.flag", "user.moob.weight", "user.moob.format", "user.moob.Bad", "user.moob.", "user.moob.a..b", "user.other", "security.selinux", "system.posix_acl_access"
-moob_attr_names = "kind", "score", "created", "title", "flag", "weight", "format", "", "Bad", "a..b"
+# security.capability: its removal takes the mounter's credentials in moobl_xattr_set
+moob_xattr_names = "user.moob.kind", "user.moob.score", "user.moob.created", "user.moob.title", "user.moob.flag", "user.moob.weight", "user.moob.tag", "user.moob.format", "user.moob.Bad", "user.moob.", "user.moob.a..b", "user.other", "security.selinux", "security.capability", "system.posix_acl_access"
+moob_attr_names = "kind", "score", "created", "title", "flag", "weight", "tag", "format", "", "Bad", "a..b"
 
 fsetxattr$moob(fd fd_moobfs_file, name ptr[in, string[moob_xattr_names]], val ptr[in, moob_value], size bytesize[val], flags flags[setxattr_flags])
 setxattr$moob(path ptr[in, filename], name ptr[in, string[moob_xattr_names]], val ptr[in, moob_value], size bytesize[val], flags flags[setxattr_flags])
@@ -58,11 +60,24 @@ fremovexattr$moob(fd fd_moobfs_file, name ptr[in, string[moob_xattr_names]])
 fgetxattr$moob(fd fd_moobfs_file, name ptr[in, string[moob_xattr_names]], val buffer[out], size len[val])
 getxattr$moob(path ptr[in, filename], name ptr[in, string[moob_xattr_names]], val buffer[out], size len[val])
 
+# A few values of each type, so that two files or a file and a term often hold equal, ordered or
+# special values (value_cmp, journal 0138: 12 of 24 PCs with random 8-byte values). Strings
+# share prefixes; the two long ones are longer than the cursor's 96 inline bytes and share them.
+# Doubles are bit patterns: 0, -0, 1, -1, 2, +inf, -inf, quiet and signalling NaN (refused),
+# the smallest denormal and the largest finite value.
+moob_str_vals = "note", "nota", "notes", "not", "task", "x", "y", "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+moob_str_lens = 0, 1, 3, 4, 5, 100, 1024, 1025
+moob_int_vals = 0, 1, 2, 3, 7, 0x10, 0x20, 0xffffffffffffffff, 0xfffffffffffffffb, 0x7fffffffffffffff, 0x8000000000000000
+moob_dbl_vals = 0x0, 0x8000000000000000, 0x3ff0000000000000, 0xbff0000000000000, 0x4000000000000000, 0x7ff0000000000000, 0xfff0000000000000, 0x7ff8000000000000, 0xfff8000000000000, 0x7ff0000000000001, 0x1, 0x7fefffffffffffff
+
 moob_value [
 	str	moob_val_str
-	i64	moob_val_8[MOOB_T_INT64]
-	dbl	moob_val_8[MOOB_T_DOUBLE]
-	tm	moob_val_8[MOOB_T_TIME]
+	strv	moob_val_strv
+	i64	moob_val_8[MOOB_T_INT64, flags[moob_int_vals, int64]]
+	dbl	moob_val_8[MOOB_T_DOUBLE, flags[moob_dbl_vals, int64]]
+	tm	moob_val_8[MOOB_T_TIME, flags[moob_int_vals, int64]]
+	i64r	moob_val_8[MOOB_T_INT64, int64]
+	dblr	moob_val_8[MOOB_T_DOUBLE, int64]
 	bool	moob_val_bool
 	raw	moob_val_raw
 	junk	array[int8, 0:16]
@@ -73,9 +88,14 @@ moob_val_str {
 	s	array[int8, 0:1100]
 } [packed]
 
-type moob_val_8[T] {
+moob_val_strv {
+	type	const[MOOB_T_STRING, int8]
+	s	stringnoz[moob_str_vals]
+} [packed]
+
+type moob_val_8[T, V] {
 	type	const[T, int8]
-	v	int64
+	v	V
 } [packed]
 
 moob_val_bool {
@@ -89,8 +109,42 @@ moob_val_raw {
 } [packed]
 
 # Layouts of moobfs_ioctl.h with natural alignment, as the C compiler lays them out (sizes checked:
-# term 1098, query 4440, query2 4656, info 104, batch 32, result 272)
-moob_query_term {
+# term 1098, query 4440, query2 4656, info 104, batch 32, result 272; cursor at offset 104 of
+# query2, terms at 264, value at 70 of a term)
+moob_ops = 1, 2, 3, 4, 5, 6, 7
+moob_limits = 0, 1, 2, 4, 4096, 4097
+
+# A term is one of: a value of each queryable type with a valid length and a chosen value, an
+# EXISTS term, or any bytes (the invalid shapes term_check refuses). The typed ones are packed
+# with the value at offset 70, as the C layout puts value[] there, and padded with zeros to 1098.
+moob_query_term [
+	str	moob_term_t[MOOB_T_STRING, flags[moob_str_lens, int16], string[moob_str_vals, 1024]]
+	i64	moob_term_t[MOOB_T_INT64, const[8, int16], flags[moob_int_vals, int64]]
+	tm	moob_term_t[MOOB_T_TIME, const[8, int16], flags[moob_int_vals, int64]]
+	dbl	moob_term_t[MOOB_T_DOUBLE, const[8, int16], flags[moob_dbl_vals, int64]]
+	bool	moob_term_t[MOOB_T_BOOL, const[1, int16], int8[0:2]]
+	exists	moob_term_exists
+	any	moob_term_any
+]
+
+type moob_term_t[T, L, V] {
+	name	string[moob_attr_names, 65]
+	op	flags[moob_ops, int8]
+	type	const[T, int8]
+	flags	int8[0:1]
+	len	L
+	value	V
+} [packed, size[1098]]
+
+moob_term_exists {
+	name	string[moob_attr_names, 65]
+	op	const[7, int8]
+	type	const[0, int8]
+	flags	const[0, int8]
+	len	const[0, int16]
+} [packed, size[1098]]
+
+moob_term_any {
 	name	string[moob_attr_names, 65]
 	op	int8[0:8]
 	type	int8[0:7]
@@ -110,7 +164,7 @@ moob_query_result {
 moob_query {
 	version		int32[0:2]
 	nterms		int32[0:5]
-	limit		int32[0:4097]
+	limit		flags[moob_limits, int32]
 	flags		int32[0:1]
 	results		ptr64[out, array[moob_query_result]]
 	count		int32
@@ -123,10 +177,73 @@ moob_info {
 	data	array[int8, 104]
 }
 
-moob_query2 {
+# The QUERY2 cursor is 128 bytes under a MAC keyed per mount, so random bytes never continue a
+# query (journal 0138: query2_exec at 41 of 75 PCs). Each of its 16 little-endian words is a
+# resource of its own. ioctl$MOOB_IOC_QUERY2 (and each request of a batch) leaves the cursor
+# unwritten (zero, a new query, unless an earlier call of the program wrote that memory) and
+# returns its words;
+# ioctl$MOOB_IOC_QUERY2_NEXT sends words returned earlier, word for word, to continue that
+# query (or, mixed from different queries, to be refused with ESTALE) and returns the next ones.
+# A resource cannot be optional and still be created (pkg/compiler), hence the two calls.
+resource moob_cw0[int64]: 0
+resource moob_cw1[int64]: 0
+resource moob_cw2[int64]: 0
+resource moob_cw3[int64]: 0
+resource moob_cw4[int64]: 0
+resource moob_cw5[int64]: 0
+resource moob_cw6[int64]: 0
+resource moob_cw7[int64]: 0
+resource moob_cw8[int64]: 0
+resource moob_cw9[int64]: 0
+resource moob_cw10[int64]: 0
+resource moob_cw11[int64]: 0
+resource moob_cw12[int64]: 0
+resource moob_cw13[int64]: 0
+resource moob_cw14[int64]: 0
+resource moob_cw15[int64]: 0
+
+moob_cursor_out {
+	w0	moob_cw0	(out)
+	w1	moob_cw1	(out)
+	w2	moob_cw2	(out)
+	w3	moob_cw3	(out)
+	w4	moob_cw4	(out)
+	w5	moob_cw5	(out)
+	w6	moob_cw6	(out)
+	w7	moob_cw7	(out)
+	w8	moob_cw8	(out)
+	w9	moob_cw9	(out)
+	w10	moob_cw10	(out)
+	w11	moob_cw11	(out)
+	w12	moob_cw12	(out)
+	w13	moob_cw13	(out)
+	w14	moob_cw14	(out)
+	w15	moob_cw15	(out)
+}
+
+moob_cursor {
+	w0	moob_cw0
+	w1	moob_cw1
+	w2	moob_cw2
+	w3	moob_cw3
+	w4	moob_cw4
+	w5	moob_cw5
+	w6	moob_cw6
+	w7	moob_cw7
+	w8	moob_cw8
+	w9	moob_cw9
+	w10	moob_cw10
+	w11	moob_cw11
+	w12	moob_cw12
+	w13	moob_cw13
+	w14	moob_cw14
+	w15	moob_cw15
+}
+
+type moob_query2_t[CURSOR] {
 	version		int32[1:3]
 	nterms		int32[0:5]
-	limit		int32[0:4097]
+	limit		flags[moob_limits, int32]
 	flags		int32[0:1]
 	results		ptr64[out, array[moob_query_result]]
 	count		int32
@@ -135,7 +252,7 @@ moob_query2 {
 	order		int8[0:3]
 	order_type	int8[0:7]
 	pad		array[int8, 5]
-	cursor		array[int8, 128]
+	cursor		CURSOR
 	reserved	array[int64, 4]
 	terms		array[moob_query_term, 4]
 }
@@ -143,6 +260,6 @@ moob_query2 {
 moob_query2_batch {
 	version		int32[1:3]
 	nqueries	len[queries, int32]
-	queries		ptr64[inout, array[moob_query2, 0:9]]
+	queries		ptr64[inout, array[moob_query2_t[moob_cursor_out], 0:9]]
 	reserved	array[int64, 2]
 }
