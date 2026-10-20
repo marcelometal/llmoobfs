@@ -344,6 +344,20 @@ static void entry_free(struct moobl_index *ix, struct moobl_ix_entry *e)
 	kfree(e);
 }
 
+/*
+ * A record that lost part of its file's attributes is dropped whole (journal 0156): with no
+ * record, rec_whole() cannot vouch for it, and a rename or a link reads the file again from
+ * the lower filesystem instead of carrying the partial record into another built domain.
+ */
+static void rec_drop(struct moobl_index *ix, struct moobl_ix_inode *rec)
+{
+	struct moobl_ix_entry *e, *tmp;
+
+	list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
+		entry_free(ix, e);
+	inode_rec_put_if_empty(ix, rec);
+}
+
 static struct moobl_ix_entry *entry_find(struct moobl_ix_inode *rec, const char *name)
 {
 	struct moobl_ix_entry *e;
@@ -425,8 +439,12 @@ static int rec_set_partition(struct moobl_index *ix, struct moobl_ix_inode *rec,
 	}
 	rec->domain = pl->domain;
 	rec->hetero = pl->hetero;
-	if (err)
+	if (err) {
+		/* the entries that moved go too: the caller frees the record (rec_drop) */
+		while (!list_empty(&rec->entries))
+			entry_free(ix, list_first_entry(&rec->entries, struct moobl_ix_entry, by_ino));
 		domain_lost(ix, pl->domain, err);
+	}
 	return err;
 }
 
@@ -438,6 +456,7 @@ static int index_put(struct moobl_index *ix, u64 ino, const struct moobl_place *
 	struct moobl_ix_name *nm;
 	struct moobl_ix_entry *e, *old;
 	u16 len = (u16)(size - 1);
+	int err;
 
 	lockdep_assert_held_write(&ix->lock);
 	if (value[0] == MOOB_T_RAW)
@@ -445,25 +464,29 @@ static int index_put(struct moobl_index *ix, u64 ino, const struct moobl_place *
 	rec = inode_rec_get(ix, ino);
 	if (IS_ERR(rec))
 		return PTR_ERR(rec);
-	rec_set_partition(ix, rec, pl);
+	err = rec_set_partition(ix, rec, pl);
+	if (err) {
+		inode_rec_put_if_empty(ix, rec);
+		return err;
+	}
 	old = entry_find(rec, name);
 	if (old)
 		entry_free(ix, old);	/* before name_get: freeing may drop the name node */
 	nm = name_get(ix, name, rec->domain, rec->hetero);
 	if (IS_ERR(nm)) {
-		inode_rec_put_if_empty(ix, rec);
+		rec_drop(ix, rec);	/* the old value is gone, the new one not stored */
 		return PTR_ERR(nm);
 	}
 	if (charge(ix, sizeof(*e) + len)) {
 		name_put_if_empty(ix, nm);
-		inode_rec_put_if_empty(ix, rec);
+		rec_drop(ix, rec);
 		return -ENOMEM;
 	}
 	e = kmalloc(sizeof(*e) + len, GFP_KERNEL);
 	if (!e) {
 		uncharge(ix, sizeof(*e) + len);
 		name_put_if_empty(ix, nm);
-		inode_rec_put_if_empty(ix, rec);
+		rec_drop(ix, rec);
 		return -ENOMEM;
 	}
 	e->name = nm;
@@ -1833,15 +1856,18 @@ static void record_dentry_path(struct moobl_index *ix, struct moobl_ix_inode *re
 			       struct dentry *dentry)
 {
 	char *buf = (char *)__get_free_page(GFP_KERNEL);
-	char *p;
+	char *p = buf ? dentry_path_raw(dentry, buf, PAGE_SIZE) : ERR_PTR(-ENOMEM);
 
 	lockdep_assert_held_write(&ix->lock);
-	if (!buf)
-		return;
-	p = dentry_path_raw(dentry, buf, PAGE_SIZE);
-	if (!IS_ERR(p))
-		index_set_path(ix, rec, *p == '/' ? p + 1 : p);
-	free_page((unsigned long)buf);
+	if (IS_ERR(p) || index_set_path(ix, rec, *p == '/' ? p + 1 : p)) {
+		/* no name rather than the old one: QUERY then takes the dentry cache or none (0156) */
+		if (rec->path)
+			uncharge(ix, strlen(rec->path) + 1);
+		kfree(rec->path);
+		rec->path = NULL;
+	}
+	if (buf)
+		free_page((unsigned long)buf);
 }
 
 int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *name,
@@ -2080,7 +2106,8 @@ void moobl_index_renamed(struct super_block *sb, struct dentry *moved, struct de
 		}
 	} else if (rec && rec_whole(ix, rec)) {
 		record_dentry_path(ix, rec, where);
-		rec_set_partition(ix, rec, &pl);
+		if (rec_set_partition(ix, rec, &pl))
+			inode_rec_put_if_empty(ix, rec);	/* emptied: nothing else frees it (R2-8) */
 	} else {
 		/*
 		 * No record, or one that may hold only part of the file: in a domain being built
@@ -2143,8 +2170,8 @@ void moobl_index_perm_changed(struct super_block *sb, struct dentry *dentry)
 	nofs = place_and_lock(ix, dentry, &pl);
 	index_touched(ix, d_inode(dentry)->i_ino);
 	rec = xa_load(&ix->inodes, d_inode(dentry)->i_ino);
-	if (rec)
-		rec_set_partition(ix, rec, &pl);
+	if (rec && rec_set_partition(ix, rec, &pl))
+		inode_rec_put_if_empty(ix, rec);	/* emptied: nothing else frees it (R2-8) */
 	ix_write_unlock(ix, nofs);
 }
 
