@@ -83,6 +83,12 @@ correct). Clients should set permissions when they create a domain and leave the
   than X or absent" (§6), which is how an optional expiry is expressed.
 - `moobfs-attr` sets and reads them from a shell; any language can use `setxattr` with the
   encoding above.
+- Generic xattr tools see the stored bytes, type byte included: `getfattr`, fselect, Recoll and
+  KFileMetaData read a string as `\x01decision`, and integers and the other fixed-size types as
+  raw little-endian bytes (fselect's `xattr(user.moob.kind) = 'decision'` matches nothing). A
+  plain-text value written by such a tool under `user.moob.*` is refused with `EINVAL`; prefixing
+  the type byte works (`setfattr -v 0x0168656c6c6f`). Other `user.*` names pass through
+  unchanged. Journal 0140, `vm/interop-guest.sh`.
 
 ## 5. Identity and provenance
 

@@ -95,6 +95,18 @@ invoked by `vm/suite.sh`; it was used during the phase 2e investigation
 | `MOOBFS_VM_FAIL: kernel diagnostics under KASAN/lockdep` | The suite passed but `dmesg` had a diagnostic; `build/vng/dmesg.txt` has it | — |
 | `MOOBFS_VM_FAIL: missing <tool> on the host` / `missing disk /dev/vdX` | Environment error before the suite started | — |
 
+### Interoperability test (`vm/interop-guest.sh`, `interop.yml`)
+
+On demand only, never a required check (journal 0140). A plain build of the pinned 6.12.112
+kernel under virtme-ng, one layer mount over ext4. Each check prints `INTEROP_OK: <step>` or
+`INTEROP_CHECK_FAIL: <step>`; `INTEROP_OBSERVED:` lines record what the tools show of the typed
+encoding and are not judged.
+
+| Marker | Proves | Does not prove |
+| --- | --- | --- |
+| `INTEROP_PASS` | Every step below passed: `einval-plain-moob` (setfattr of a plain or empty value under `user.moob.*` fails with `EINVAL`, nothing reaches the lower), `hex-typed-write` (a value with the type byte in hex is accepted and read back by `moobfs-attr`), `hex-layer-equals-lower` and `-final` (`getfattr -e hex` prints the same attributes and bytes through the layer and on the lower), `xdg-tags-roundtrip` (set, replace and remove `user.xdg.tags`, seen identically on both sides), `fselect-has-xattr` and `fselect-xdg-value`, `cshatag-ok`, `cshatag-outdated`, `cshatag-corrupt` (content changed with the mtime restored, exit 5) and `cshatag-keeps-typed`, `recoll-moob-field` and `recoll-xdg-fields` (field searches over `[xattrtofields]` find exactly the right files), `kernel-log` (no `BUG:`, `Oops:`, `WARNING:` or panic in `dmesg`) | KFileMetaData (run and recorded when its helper builds, `INTEROP_SKIP: kfmd` otherwise); Baloo's indexer and Dolphin; numeric search of typed values; other lower filesystems; KASAN |
+| `INTEROP_FAIL: <steps>` | Lists every failed step; `setup (<what>)` when the mount, the module or a required tool was missing | — |
+
 ### Failure marker
 
 `MOOBFS_VM_FAIL: <step>` names the failing step as written in the `fail` call
