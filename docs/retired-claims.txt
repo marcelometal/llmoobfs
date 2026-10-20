@@ -69,3 +69,9 @@ Nenhum dos dois achados foi corrigido ainda
 Two findings remain unfixed
 Unfixed findings from the current review
 Achados sem correção da revisão atual
+
+# Integrated review-batch VM run at 49098aa completed on 2026-10-20.
+integrated validation and publication are pending
+validação integrada e a publicação estão pendentes
+still awaits the integrated run
+ativa append aguarda a rodada integrada

@@ -13,7 +13,8 @@
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
 > tag, `v0.4.1-experimental` (2026-10-20), has every fix made up to that date; later ones land on
 > `main`. The two findings of the [current review](docs/history/0144-independent-review.md)
-> have corrections in a local batch; integrated validation and publication are pending.
+> have corrections in the review batch, which passed the full integrated VM suite.
+> Batch KASAN/lockdep remains pending.
 > `v0.4.1-experimental` still contains both defects. See [Limitations](#limitations).
 
 ## The problem
@@ -363,17 +364,17 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 ## Limitations
 
-- **The review corrections are local, with integrated validation and publication pending.**
+- **The review batch passed the full integrated VM suite; batch KASAN/lockdep is pending.**
   `v0.4.1-experimental` contains both defects identified in
   [review 0144](docs/history/0144-independent-review.md): stale backing-file flags after
-  `F_SETFL`, and lower `getxattr` errors silently skipped during indexing. The local R1 fix
-  synchronizes mutable flags before delegated I/O ([0149](docs/history/0149-sync-backing-file-flags.md));
-  its clear-append test passed and failed without the fix, while the added set-append assertion
-  still awaits the integrated run. The local R2 fix propagates operational read errors and
-  preserves the existing exclusions for missing, oversized and malformed attributes
-  ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)); targeted injected-error and negative
-  tests ran, but a complete R2 suite and batch KASAN/lockdep are not established here. Injecting
-  the read result is not a reproduction of an actual lower-filesystem I/O failure.
+  `F_SETFL`, and lower `getxattr` errors silently skipped during indexing. R1 synchronizes
+  mutable flags before delegated I/O ([0149](docs/history/0149-sync-backing-file-flags.md));
+  clearing and setting append both passed on ext4, btrfs and XFS in the integrated run at
+  `49098aa`. R2 propagates operational read errors and preserves the existing exclusions for
+  missing, oversized and malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
+  the same full VM run passed its injected-error regression and the acceptance/layer suites.
+  Negative rounds detected both original defects. Injecting the read result does not reproduce
+  an actual lower-filesystem I/O failure; the separate batch sanitizer gate is still pending.
 
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
   kernel APIs are version-specific and the pinned test target is not a compatibility promise. On

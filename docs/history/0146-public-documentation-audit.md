@@ -141,3 +141,26 @@ Local checks after regeneration: `python3 scripts/site-journey.py .`,
 its source, `RETIRED_CLAIMS_OK`, 12 valid HTML pages, and no whitespace errors. The coordinator
 must integrate this documentation with both source corrections and reconcile the pending validation wording
 against the actual final runs before publication. No push, pull request or external update.
+
+
+## Addendum, 2026-10-20 — integrated R1/R2 VM suite completed
+
+The coordinator reported the full integrated `make vm-test` at `49098aa` exited zero:
+`FCNTL_RESULT` produced `ZAAA`, `FCNTL_SET_RESULT` produced `ZAAAY`, and
+`FCNTL_FLAGS_PASS` appeared for ext4, btrfs and XFS. `XATTRREAD_PASS`,
+`MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS` also passed. This supersedes the earlier
+snapshot of pending integrated validation, while preserving it as the factual record at that
+time. The separate batch KASAN/lockdep run is still compiling on the dedicated host; it is not
+reported as passed. No push or pull request has been performed by this documentation agent.
+
+README EN/PT, SECURITY, FAQ and generated copy, when-not-to-use, landing page and generated
+status EN/PT now report the full integrated VM result. They keep the affected-tag warning,
+the difference between injected errors and physical lower I/O faults, and the pending
+sanitizer gate. Public prose describes the review batch rather than permanently labelling it
+"unpublished", so opening the pull request will not change the meaning. The actual release
+snapshot remains affected regardless of a future pull request. Old pending-run phrases enter
+the retired list. No module source or historical review 0144 was modified.
+
+The documentation agent regenerated the pages and ran retired-claims, FAQ consistency,
+site validation and whitespace checks; all passed. This agent did not rerun the VM suite.
+The runtime evidence is the coordinator's integrated run and belongs with journals 0149/0150.

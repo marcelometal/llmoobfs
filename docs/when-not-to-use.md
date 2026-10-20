@@ -47,13 +47,15 @@ and query evidence (journals [0088](history/0088-m4-report.md) and
 ## 3. When MoobFS is probably not worth it
 
 The two defects from [review 0144](history/0144-independent-review.md) remain in
-`v0.4.1-experimental`. The local review batch synchronizes backing-file flags after `F_SETFL`
+`v0.4.1-experimental`. The review batch synchronizes backing-file flags after `F_SETFL`
 ([0149](history/0149-sync-backing-file-flags.md)) and propagates operational lower `getxattr`
 errors ([0150](history/0150-propagate-index-xattr-read-errors.md)). Positive and negative regression
 evidence exists for clearing append and for injected value-read errors, respectively.
-Integrated validation, batch KASAN/lockdep and publication are pending; no full R2 suite pass
-or actual lower-filesystem I/O-fault reproduction is claimed here. Keep using disposable test
-environments. The released tag does not contain these local corrections.
+The full integrated VM suite at `49098aa` passed, including clearing and setting append on
+ext4, btrfs and XFS, the R2 injected-error regression, and the acceptance/layer suites.
+Batch KASAN/lockdep remains pending; injecting a value-read result is not a reproduction of
+an actual lower-filesystem I/O fault. Keep using disposable test environments. The released
+tag does not contain these corrections.
 
 These limits update the cases discussed in the value assessment, §9.6.
 

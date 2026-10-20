@@ -147,11 +147,12 @@ part of F2 fixed). Run it only in a disposable VM with synthetic data.
 
 The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md)
 found stale backing-file flags after `F_SETFL` and silently skipped lower `getxattr` errors.
-Both defects remain in `v0.4.1-experimental`; corrections are implemented in a local batch.
+Both defects remain in `v0.4.1-experimental`; corrections are implemented in the review batch.
 R1 synchronizes mutable flags before delegated I/O, and R2 propagates operational read errors.
-R1 has clear-append positive/negative VM evidence; R2 has targeted positive/negative injected-error
-tests. Integrated validation and batch KASAN/lockdep are pending, as is publication. An injected
-value-read error does not establish behavior under a real lower-filesystem I/O fault.
+The full integrated VM suite at `49098aa` passed: clearing and setting append on ext4, btrfs
+and XFS, R2 injected-error regression, and acceptance/layer suites. Negative rounds detected
+both original defects. Batch KASAN/lockdep remains pending. An injected value-read error does
+not establish behavior under a real lower-filesystem I/O fault.
 See [R1 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0149-sync-backing-file-flags.md)
 and [R2 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0150-propagate-index-xattr-read-errors.md).
 [`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`; journal 0144]

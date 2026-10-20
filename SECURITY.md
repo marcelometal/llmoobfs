@@ -11,7 +11,7 @@ a problem and what to expect; the longer-term plan is in
 | Version | Supported |
 | --- | --- |
 | `main` | Use this. Fixes land here only; there are no backports and no maintenance branches. |
-| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: fixes F1 to F12 except fair shares of F2, but contains review 0144 R1/R2; their corrections are in an unpublished local batch. |
+| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: fixes F1 to F12 except fair shares of F2, but contains review 0144 R1/R2; their corrections are in the review batch, newer than this tag. |
 | `v0.4.0-experimental` | Source snapshot, not supported. Its queries are about twice as slow as they should be (a buffer allocated per query, journal 0139). |
 | `v0.3.0-experimental` | Source snapshot, not supported. It carries defects fixed since, security ones included (findings F6 to F12 of ADR-0011; see `CHANGELOG.md`). |
 | `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported; they carry more of the same defects. |
@@ -110,15 +110,16 @@ These are targets for a single volunteer maintainer, not guarantees:
 The [review of 2026-10-20](docs/history/0144-independent-review.md) found two defects beyond
 ADR-0011: stale backing-file flags after `F_SETFL` (R1), and operational lower `getxattr`
 errors skipped during indexing (R2). Both affect `v0.4.1-experimental`. Corrections are
-implemented in the local review batch; integrated validation, batch KASAN/lockdep and
-publication are pending. R1 synchronizes mutable lower flags before delegated I/O
+implemented in the review batch. The full integrated VM suite at `49098aa` passed; batch
+KASAN/lockdep remains pending. R1 synchronizes mutable lower flags before delegated I/O
 ([0149](docs/history/0149-sync-backing-file-flags.md)). R2 propagates operational read errors
 through the existing build/adoption failure paths, while preserving the exclusions for
 missing, oversized or malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)).
-R1 has a VM reproduction and clear-append positive/negative results; R2 has targeted positive
-and negative tests injecting the value-read result. The R2 test does not induce an actual
-lower-filesystem I/O fault. Consult those journals for remaining validation; neither a full
-R2 suite nor the batch sanitizer gate is claimed passed here.
+R1 has a VM reproduction and negative evidence, and both clearing and setting append passed
+on ext4, btrfs and XFS in the integrated run. R2 has positive and negative tests injecting the
+value-read result; its regression also passed in that full run together with the acceptance
+and layer suites. The R2 test does not induce an actual lower-filesystem I/O fault. Consult
+those journals for validation scope; the separate batch sanitizer gate remains pending.
 
 The parser checks image structure and hashes, but checksums are not
 authentication. The module validates at mount, not continuously against external
