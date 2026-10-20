@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- syzkaller (journal 0143): a fifth six-hour run, no report; the ioctl and attribute handlers at
+  88.7 % of their PCs, above the 85 % threshold of security roadmap S3. The fix of journal 0139
+  confirmed with 40 repetitions: within 1 to 3 % of module 0102 on filtered queries.
 ## v0.4.1-experimental — 2026-10-20
 
 Fifth source pre-release, the one to use instead of `v0.4.0-experimental`, whose queries are

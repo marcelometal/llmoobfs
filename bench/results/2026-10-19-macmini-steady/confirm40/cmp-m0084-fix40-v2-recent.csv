@@ -1,0 +1,7 @@
+workload,op,metric,reps_a,reps_b,median_a,median_b,rel_diff,ci_low,ci_high,p_value,verdict
+W3,query:Q1,p50_us,40,40,27.5493,28.4833,0.0339,0.0303,0.0399,0.0000,differs
+W3,query:Q1,p95_us,40,40,28.8333,29.7484,0.0317,0.0239,0.0432,0.0000,differs
+W3,query:Q1,p99_us,40,40,39.7358,45.1685,0.1367,0.0967,0.1702,0.0000,differs
+W3,query:Q2,p50_us,40,40,142.0147,145.9768,0.0279,0.0207,0.0382,0.0000,differs
+W3,query:Q2,p95_us,40,40,148.6316,153.1356,0.0303,0.0209,0.0471,0.0000,differs
+W3,query:Q2,p99_us,40,40,214.9240,258.1463,0.2011,0.1834,0.2195,0.0000,differs

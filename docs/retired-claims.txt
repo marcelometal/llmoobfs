@@ -48,3 +48,6 @@ the last one is `v0.4.0-experimental`
 Tags up to `v0.3.0-experimental` carry
 Tags up to v0.3.0-experimental carry
 As tags até a `v0.3.0-experimental`
+syzkaller (four six-hour runs
+last measured below the coverage threshold
+medição ficou abaixo do limiar de cobertura
