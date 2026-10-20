@@ -91,6 +91,11 @@
 
 - Documentation (journal 0167): add verified external project records to both READMEs,
   with the scope and current limits of each record; preserve the four existing badges.
+
+- Planning (journal 0165): add G1–G6 client integration and retrieval packages to
+  ROADMAP with priorities, dependencies, effort estimates and validation gates.
+  All remain planned; implementation is explicitly deferred.
+
 - Assessment (journal 0164): evaluate client integration, derived search-index
   lifecycle, portable recovery and end-to-end validation. Recommendations only;
   native stacked architecture and the accepted roadmap sequence are unchanged.

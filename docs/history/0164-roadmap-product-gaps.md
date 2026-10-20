@@ -137,3 +137,10 @@ No performance, adoption, portability or confidentiality improvement is claimed.
   and [Indexing](https://qdrant.tech/documentation/manage-data/indexing/),
   consulted 2026-10-20 via the official site and Context7 (`/websites/qdrant_tech`).
   Thanks to the authors for documenting the filtered-retrieval trade-offs.
+
+## Follow-up, 2026-10-20
+
+The maintainer subsequently approved adding the proposals to the roadmap with
+priorities and validation criteria, explicitly without starting implementation.
+[Journal 0165](0165-client-roadmap-priorities.md) records that planning change.
+The original assessment above retains its historical status.
