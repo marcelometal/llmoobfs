@@ -322,29 +322,39 @@ static int moobl_d_revalidate(struct dentry *dentry, unsigned int flags)
 	/*
 	 * Ref-walk runs without the parent's lock, so moobl_instantiate() can swap a negative
 	 * dentry's lower dentry and drop the old one meanwhile. The old one is freed only after a
-	 * grace period: read it under RCU, and hold it only to call the lower's own revalidation
-	 * (review item 3, journal 0120). A lower dentry already dead was replaced: look up again.
+	 * grace period: read it under RCU and hold it for the checks below (review item 3,
+	 * journal 0120). A lower dentry already dead was replaced: look up again.
 	 */
 	rcu_read_lock();
 	lower = READ_ONCE(((struct moobl_dentry *)dentry->d_fsdata)->lower.dentry);
-	if (READ_ONCE(lower->d_flags) & DCACHE_OP_REVALIDATE) {
-		if (!lockref_get_not_dead(&lower->d_lockref)) {
-			rcu_read_unlock();
-			return 0;
-		}
+	if (!lockref_get_not_dead(&lower->d_lockref)) {
 		rcu_read_unlock();
-		rc = lower->d_op->d_revalidate(lower, flags);
-		dput(lower);
-	} else {
-		rcu_read_unlock();
+		return 0;
 	}
-	if (d_really_is_positive(dentry)) {
+	rcu_read_unlock();
+	if (lower->d_flags & DCACHE_OP_REVALIDATE)
+		rc = lower->d_op->d_revalidate(lower, flags);
+	/*
+	 * The checks of the RCU path, which used to fall back to this one and get a yes: a lower
+	 * dentry removed behind the layer, a different lower inode, a negative upper dentry over a
+	 * positive lower one (a failed instantiation, R2-4; V4, M5 of journal 0155).
+	 */
+	if (rc > 0 && d_unhashed(lower)) {
+		rc = 0;
+	} else if (rc > 0 && d_really_is_positive(dentry)) {
 		struct inode *inode = d_inode(dentry);
 
-		moobl_copy_attr(inode, moobl_lower_inode(inode));
-		if (!inode->i_nlink)
-			return 0;
+		if (d_inode(lower) != moobl_lower_inode(inode)) {
+			rc = 0;
+		} else {
+			moobl_copy_attr(inode, moobl_lower_inode(inode));
+			if (!inode->i_nlink)
+				rc = 0;
+		}
+	} else if (rc > 0 && d_really_is_positive(lower)) {
+		rc = 0;
 	}
+	dput(lower);
 	return rc;
 }
 
@@ -546,9 +556,14 @@ static int moobl_create(struct mnt_idmap *idmap, struct inode *dir,
 	if (err)
 		return err;
 	err = vfs_create(&nop_mnt_idmap, lower_dir, lower_dentry, mode, excl);
-	if (!err)
+	if (!err) {
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
+		if (err)	/* undo the lower file, as ecryptfs_do_create() does (R2-4) */
+			vfs_unlink(&nop_mnt_idmap, lower_dir, lower_dentry, NULL);
+	}
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
+	if (err && d_really_is_negative(dentry))
+		d_drop(dentry);
 	return err;
 }
 
@@ -568,6 +583,8 @@ static int moobl_mkdir(struct mnt_idmap *idmap, struct inode *dir,
 	if (!err)
 		set_nlink(dir, lower_dir->i_nlink);
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
+	if (err && d_really_is_negative(dentry))
+		d_drop(dentry);	/* the next lookup finds what the lower holds (R2-4) */
 	return err;
 }
 
@@ -730,6 +747,7 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	struct dentry *lower_old = moobl_lower_dentry(old_dentry);
 	struct dentry *lower_dentry;
 	struct inode *lower_dir;
+	bool linked;
 	int err;
 
 	if (MOOBL_SB(dir->i_sb)->nolinks)
@@ -738,15 +756,18 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	if (err)
 		return err;
 	err = vfs_link(lower_old, &nop_mnt_idmap, lower_dir, lower_dentry, NULL);
+	linked = !err;
 	if (!err)
 		err = moobl_instantiate(dir, new_dentry, lower_dentry, lower_dir);
-	if (!err)
+	if (linked)	/* the lower link exists even when the upper inode could not be made */
 		set_nlink(inode, moobl_lower_inode(inode)->i_nlink);
 	moobl_unlock_parent(new_dentry, lower_dentry, lower_dir);
-	if (!err) {
+	if (!err)
 		moobl_index_linked(dir->i_sb, new_dentry);
+	if (linked)
 		moobl_index_perm_changed(dir->i_sb, old_dentry);	/* nlink > 1: heterogeneous */
-	}
+	if (err && d_really_is_negative(new_dentry))
+		d_drop(new_dentry);	/* the next lookup finds the new lower link (R2-4) */
 	return err;
 }
 
@@ -766,6 +787,8 @@ static int moobl_symlink(struct mnt_idmap *idmap, struct inode *dir,
 	if (!err)
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
+	if (err && d_really_is_negative(dentry))
+		d_drop(dentry);	/* the next lookup finds what the lower holds (R2-4) */
 	return err;
 }
 
