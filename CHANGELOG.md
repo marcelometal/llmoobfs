@@ -24,6 +24,10 @@
   not refused, though the layer's names are case-sensitive; it is now refused, with every name in
   it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
   `casefold`.
+- Testing (journal 0140): an interoperability test, `vm/interop-guest.sh` with the on-demand
+  workflow `interop.yml` (not a required check), runs getfattr/setfattr, fselect, cshatag,
+  Recoll and KDE KFileMetaData through a layer mount and ends in `INTEROP_PASS` or
+  `INTEROP_FAIL: <steps>`. Passed once locally (arm64, not CI); never run in CI yet.
 
 ## v0.4.0-experimental — 2026-10-19
 

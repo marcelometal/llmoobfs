@@ -20,6 +20,8 @@ echo "upstream kernel (KASAN workflow):  linux-$kver  sha256 $ksum"
 [ "$(yaml KERNEL_SHA256 .github/workflows/kasan-arm64.yml)" = "$ksum" ] || bad "kasan-arm64.yml KERNEL_SHA256 differs from kasan.yml"
 [ "$(yaml KERNEL_VERSION .github/workflows/kcsan.yml)" = "$kver" ] || bad "kcsan.yml KERNEL_VERSION differs from kasan.yml"
 [ "$(yaml KERNEL_SHA256 .github/workflows/kcsan.yml)" = "$ksum" ] || bad "kcsan.yml KERNEL_SHA256 differs from kasan.yml"
+[ "$(yaml KERNEL_VERSION .github/workflows/interop.yml)" = "$kver" ] || bad "interop.yml KERNEL_VERSION differs from kasan.yml"
+[ "$(yaml KERNEL_SHA256 .github/workflows/interop.yml)" = "$ksum" ] || bad "interop.yml KERNEL_SHA256 differs from kasan.yml"
 dver=$(sed -n 's/^KERNEL_VERSION=//p' docs/development.md | head -n 1)
 dsum=$(sed -n 's/^KERNEL_SHA256=//p' docs/development.md | head -n 1)
 [ "$dver" = "$kver" ] || bad "docs/development.md KERNEL_VERSION ($dver) differs from kasan.yml ($kver)"
@@ -37,6 +39,11 @@ hdr=$(grep -o 'linux-headers-[0-9.]*+deb13-amd64=[0-9.-]*' vm/Dockerfile | head 
 
 # virtme-ng for the KASAN harness
 echo "virtme-ng (vm/kasan-requirements.txt): $(sed -n 's/^virtme-ng==\([^ ]*\).*/\1/p' vm/kasan-requirements.txt)"
+
+# the tools of the interoperability test (journal 0140)
+for p in FSELECT_VERSION CSHATAG_VERSION RECOLL_DEB KFMD_DEB; do
+	echo "interop.yml $p: $(yaml "$p" .github/workflows/interop.yml)"
+done
 
 # the tarball against kernel.org's signed list of sums (the signature itself is not checked here)
 if [ "$offline" -eq 0 ]; then
