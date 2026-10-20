@@ -10,6 +10,8 @@
  *   layer cfsetup <lower>           on a lower made with -O casefold: a casefolded directory ci
  *                                   holding Note.md, and an ordinary directory plain
  *   layer cfcheck <mount>           the layer refuses the casefolded directory and every name in it
+ *   layer typed <mount> <lower>     every refusal of a typed attribute write, with its errno, and
+ *                                   the per-file limit of 64; a refused write leaves the lower as it was
  */
 #define _GNU_SOURCE
 #include <sys/types.h>
@@ -135,6 +137,188 @@ static int as_user(int fd, int how)
 	return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
 }
 
+/*
+ * Every extended attribute of a lower file, names and values, serialized into out: two
+ * snapshots compare equal when nothing below changed. Returns the length plus one, so that a
+ * file without attributes still gives a non-zero answer, or 0 when the snapshot failed.
+ */
+static size_t xstate(const char *path, char *out, size_t cap)
+{
+	static char list[65536];
+	ssize_t n = listxattr(path, list, sizeof list), v;
+	size_t o = 0, l;
+	char *s;
+
+	if (n < 0) return 0;
+	for (s = list; s < list + n; s += l) {
+		l = strlen(s) + 1;
+		if (o + l + sizeof v > cap) return 0;
+		memcpy(out + o, s, l); o += l;
+		v = getxattr(path, s, out + o + sizeof v, cap - o - sizeof v);
+		if (v < 0) return 0;
+		memcpy(out + o, &v, sizeof v); o += sizeof v + (size_t)v;
+	}
+	return o + 1;
+}
+
+/*
+ * Typed attribute writes through the layer, refused and accepted (moobl_typed_check and
+ * moobl_xattr_set, docs/spec-m2.md §3 and §8, docs/client-contract.md §4). These are the paths a
+ * syzkaller seed reaches poorly (journal 0138): the 65th attribute needs 64 writes first. Each
+ * refusal is checked twice: the errno, and an unchanged lower file (names and values).
+ */
+static int typed_limits(void)
+{
+	static char before[131072], after[131072], big[8192], name[128];
+	static const char *F = "typed-limits";
+	char buf[8192];
+	size_t b;
+	ssize_t n;
+	int fd, i;
+
+#define REFUSED(nm, val, len, flg, e) do { b = xstate(lo(F), before, sizeof before); CHECK(b); errno = 0; \
+	CHECK(setxattr(up(F), nm, val, len, flg) == -1 && errno == (e)); \
+	CHECK(xstate(lo(F), after, sizeof after) == b && !memcmp(before, after, b)); } while (0)
+#define RM_REFUSED(nm, e) do { b = xstate(lo(F), before, sizeof before); CHECK(b); errno = 0; \
+	CHECK(removexattr(up(F), nm) == -1 && errno == (e)); \
+	CHECK(xstate(lo(F), after, sizeof after) == b && !memcmp(before, after, b)); } while (0)
+	/* accepted: the lower holds exactly the bytes written */
+#define ACCEPTED(nm, val, len, flg) do { CHECK(!setxattr(up(F), nm, val, len, flg)); \
+	CHECK(getxattr(lo(F), nm, buf, sizeof buf) == (ssize_t)(len) && !memcmp(buf, val, len)); } while (0)
+
+	fd = open(up(F), O_WRONLY | O_CREAT | O_EXCL, 0644); CHECK(fd >= 0); close(fd);
+
+	/* the bounds themselves are accepted, so the refusals below are for the reason named */
+	big[0] = 1; memset(big + 1, 'a', 1024);
+	ACCEPTED("user.moob.s", big, 1025, 0);				/* string of 1 024 bytes */
+	big[0] = 6; memset(big + 1, 0xa5, 1000);
+	ACCEPTED("user.moob.r", big, 1001, 0);				/* raw, any bytes */
+	ACCEPTED("user.moob.i", "\x02\x01\x02\x03\x04\x05\x06\x07\x80", 9, 0);	/* int64 */
+	ACCEPTED("user.moob.t", "\x05\0\0\0\0\0\0\0\0", 9, 0);		/* time */
+	ACCEPTED("user.moob.d", "\x03\0\0\0\0\0\0\xf0\x7f", 9, 0);	/* double +infinity is not NaN */
+	ACCEPTED("user.moob.b", "\x04\x00", 2, 0);			/* bool false */
+	ACCEPTED("user.moob.u", "\x01\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\xf4\x8f\xbf\xbf", 14, 0);	/* é € U+1F600 U+10FFFF */
+	memset(name, 0, sizeof name); memcpy(name, "user.moob.", 10); memset(name + 10, 'a', 64);
+	ACCEPTED(name, "\x04\x01", 2, 0);				/* name of 64 bytes */
+	ACCEPTED("user.moob.a.b_c.9", "\x04\x01", 2, 0);		/* every character of the alphabet's classes */
+	CHECK(!removexattr(up(F), name) && !removexattr(up(F), "user.moob.a.b_c.9"));
+	CHECK(!removexattr(up(F), "user.moob.s") && !removexattr(up(F), "user.moob.r"));
+	CHECK(!removexattr(up(F), "user.moob.i") && !removexattr(up(F), "user.moob.t"));
+	CHECK(!removexattr(up(F), "user.moob.d") && !removexattr(up(F), "user.moob.u"));
+	CHECK(!removexattr(up(F), "user.moob.b"));
+	errno = 0; CHECK(getxattr(lo(F), "user.moob.s", buf, sizeof buf) == -1 && errno == ENODATA);
+
+	/* names: the reserved one gives EPERM, a name outside [a-z0-9_.]{1,64} or with edge or
+	 * doubled dots gives EINVAL, for a write and for a removal */
+	REFUSED("user.moob.format", "\x01x", 2, 0, EPERM);
+	REFUSED("user.moob.format", "1", 1, XATTR_CREATE, EPERM);
+	REFUSED("user.moob.", "\x04\x01", 2, 0, EINVAL);			/* empty */
+	REFUSED("user.moob.KIND", "\x04\x01", 2, 0, EINVAL);
+	REFUSED("user.moob.a..b", "\x04\x01", 2, 0, EINVAL);
+	REFUSED("user.moob..a", "\x04\x01", 2, 0, EINVAL);
+	REFUSED("user.moob.a.", "\x04\x01", 2, 0, EINVAL);
+	REFUSED("user.moob.a-b", "\x04\x01", 2, 0, EINVAL);
+	REFUSED("user.moob.a b", "\x04\x01", 2, 0, EINVAL);
+	REFUSED("user.moob.\xc3\xa9", "\x04\x01", 2, 0, EINVAL);		/* not ASCII */
+	name[10 + 64] = 'a';
+	REFUSED(name, "\x04\x01", 2, 0, EINVAL);				/* 65 bytes */
+	RM_REFUSED(name, EINVAL);
+	RM_REFUSED("user.moob.a..b", EINVAL);
+	RM_REFUSED("user.moob.", EINVAL);
+
+	/* encodings: each rule of docs/spec-m2.md §8, on a well-formed absent name */
+	REFUSED("user.moob.v", "", 0, 0, EINVAL);				/* no type byte */
+	REFUSED("user.moob.v", "\x00x", 2, 0, EINVAL);			/* unknown types */
+	REFUSED("user.moob.v", "\x07x", 2, 0, EINVAL);
+	REFUSED("user.moob.v", "\xff\x01", 2, 0, EINVAL);
+	REFUSED("user.moob.v", "\x02", 1, 0, EINVAL);				/* int64: 0, 7 and 9 bytes */
+	REFUSED("user.moob.v", "\x02\0\0\0\0\0\0\0", 8, 0, EINVAL);
+	REFUSED("user.moob.v", "\x02\0\0\0\0\0\0\0\0\0", 10, 0, EINVAL);
+	REFUSED("user.moob.v", "\x05\0\0\0\0\0\0\0", 8, 0, EINVAL);		/* time: 7 and 9 bytes */
+	REFUSED("user.moob.v", "\x05\0\0\0\0\0\0\0\0\0", 10, 0, EINVAL);
+	REFUSED("user.moob.v", "\x03\0\0\0\0\0\0\0", 8, 0, EINVAL);		/* double: 7 and 9 bytes */
+	REFUSED("user.moob.v", "\x03\0\0\0\0\0\0\0\0\0", 10, 0, EINVAL);
+	REFUSED("user.moob.v", "\x03\0\0\0\0\0\0\xf8\x7f", 9, 0, EINVAL);	/* quiet NaN */
+	REFUSED("user.moob.v", "\x03\x01\0\0\0\0\0\xf0\x7f", 9, 0, EINVAL);	/* signalling NaN */
+	REFUSED("user.moob.v", "\x03\xff\xff\xff\xff\xff\xff\xff\xff", 9, 0, EINVAL);	/* negative NaN */
+	REFUSED("user.moob.v", "\x04", 1, 0, EINVAL);				/* bool: 0 and 2 bytes */
+	REFUSED("user.moob.v", "\x04\x01\x00", 3, 0, EINVAL);
+	REFUSED("user.moob.v", "\x04\x02", 2, 0, EINVAL);			/* bool outside 0/1 */
+	REFUSED("user.moob.v", "\x04\xff", 2, 0, EINVAL);
+	REFUSED("user.moob.v", "\x01" "a\0b", 4, 0, EINVAL);			/* string with NUL */
+	REFUSED("user.moob.v", "\x01\0", 2, 0, EINVAL);
+	REFUSED("user.moob.v", "\x01\x80", 2, 0, EINVAL);			/* lone continuation byte */
+	REFUSED("user.moob.v", "\x01\xc0\x80", 3, 0, EINVAL);			/* overlong NUL */
+	REFUSED("user.moob.v", "\x01\xc1\xbf", 3, 0, EINVAL);			/* overlong two bytes */
+	REFUSED("user.moob.v", "\x01\xe0\x80\x80", 4, 0, EINVAL);		/* overlong three bytes */
+	REFUSED("user.moob.v", "\x01\xf0\x80\x80\x80", 5, 0, EINVAL);		/* overlong four bytes */
+	REFUSED("user.moob.v", "\x01\xed\xa0\x80", 4, 0, EINVAL);		/* surrogate U+D800 */
+	REFUSED("user.moob.v", "\x01\xf4\x90\x80\x80", 5, 0, EINVAL);		/* above U+10FFFF */
+	REFUSED("user.moob.v", "\x01\xf5\x80\x80\x80", 5, 0, EINVAL);
+	REFUSED("user.moob.v", "\x01" "a\xe2\x82", 4, 0, EINVAL);		/* sequence cut by the end */
+	REFUSED("user.moob.v", "\x01\xe2\x28\xa1", 4, 0, EINVAL);		/* bad second byte */
+	big[0] = 1; memset(big + 1, 'a', 1025);
+	REFUSED("user.moob.v", big, 1026, 0, EINVAL);				/* string of 1 025 bytes */
+	big[0] = 6; memset(big + 1, 0, 4097);
+	REFUSED("user.moob.v", big, 4098, 0, EINVAL);				/* raw of 4 097 bytes */
+	errno = 0; CHECK(getxattr(lo(F), "user.moob.v", buf, sizeof buf) == -1 && errno == ENODATA);
+	/* an invalid replacement keeps the value already there */
+	ACCEPTED("user.moob.v", "\x04\x01", 2, 0);
+	REFUSED("user.moob.v", "\x04\x02", 2, 0, EINVAL);
+	REFUSED("user.moob.v", "\x05\0", 2, XATTR_REPLACE, EINVAL);
+
+	/* flags and removal are the lower's answers, passed through for typed names too */
+	REFUSED("user.moob.v", "\x04\x00", 2, XATTR_CREATE, EEXIST);
+	REFUSED("user.moob.w", "\x04\x00", 2, XATTR_REPLACE, ENODATA);
+	RM_REFUSED("user.moob.w", ENODATA);
+	ACCEPTED("user.moob.v", "\x04\x00", 2, XATTR_REPLACE);
+	ACCEPTED("user.moob.w", "\x04\x00", 2, XATTR_CREATE);
+	CHECK(!removexattr(up(F), "user.moob.w"));
+	RM_REFUSED("user.moob.w", ENODATA);
+
+	/*
+	 * The limit of 64 typed attributes per file. What does not count: user.moob.format (planted
+	 * on the lower, where only the tools write it), opaque user.* names, among them "user.moob"
+	 * and "user.moobx.*", which do not start with "user.moob." and are not validated either.
+	 */
+	CHECK(!setxattr(lo(F), "user.moob.format", "1", 1, 0));
+	CHECK(!setxattr(up(F), "user.other.a", "x", 1, 0));
+	CHECK(!setxattr(up(F), "user.moob", "\xff\xff", 2, 0));
+	CHECK(!setxattr(up(F), "user.moobx.k", "\xff\xff", 2, 0));
+	for (i = 1; i < 64; i++) {	/* user.moob.v is the first */
+		snprintf(name, sizeof name, "user.moob.t%d", i);
+		CHECK(!setxattr(up(F), name, "\x04\x01", 2, 0));
+	}
+	REFUSED("user.moob.t64", "\x04\x01", 2, 0, ENOSPC);
+	REFUSED("user.moob.t64", "\x04\x01", 2, XATTR_CREATE, ENOSPC);
+	/* the lower had room: the same bytes under an opaque name are accepted, so the ENOSPC
+	 * above is the layer's limit, not the lower's xattr space */
+	ACCEPTED("user.other.t64", "\x04\x01", 2, 0);
+	ACCEPTED("user.moob.t63", "\x04\x00", 2, 0);			/* replacing at the limit */
+	ACCEPTED("user.moob.t62", "\x04\x00", 2, XATTR_REPLACE);
+	REFUSED("user.moob.t1", "\x04\x00", 2, XATTR_CREATE, EEXIST);	/* existing: not ENOSPC */
+	REFUSED("user.moob.t63", "\x04\x02", 2, 0, EINVAL);		/* validation still applies */
+	CHECK(!removexattr(up(F), "user.moob.t5"));			/* a removal frees a slot */
+	ACCEPTED("user.moob.t64", "\x04\x01", 2, XATTR_CREATE);
+	REFUSED("user.moob.t65", "\x04\x01", 2, 0, ENOSPC);
+	n = listxattr(up(F), buf, sizeof buf); CHECK(n > 0);
+	{
+		int typed = 0;
+		char *s;
+
+		for (s = buf; s < buf + n; s += strlen(s) + 1)
+			if (!strncmp(s, "user.moob.", 10) && strcmp(s, "user.moob.format")) typed++;
+		CHECK(typed == 64);
+	}
+
+	CHECK(!unlink(up(F)));
+	puts("TYPED_LIMITS_PASS");
+	return 0;
+#undef REFUSED
+#undef RM_REFUSED
+#undef ACCEPTED
+}
+
 int main(int argc, char **argv)
 {
 	struct stat st, lst;
@@ -178,6 +362,11 @@ int main(int argc, char **argv)
 		CHECK(!unlink(up("fill")));
 		puts("LAYER_RESERVE_PASS");
 		return 0;
+	}
+	if (argc == 4 && !strcmp(argv[1], "typed")) {
+		snprintf(mnt, sizeof mnt, "%s", argv[2]);
+		snprintf(low, sizeof low, "%s", argv[3]);
+		return typed_limits();
 	}
 	if (argc == 3 && !strcmp(argv[1], "cfsetup")) {
 		int f;

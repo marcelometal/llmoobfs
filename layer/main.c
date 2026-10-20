@@ -80,11 +80,17 @@ static const struct inode_operations moobl_symlink_iops;
 static const struct file_operations moobl_dir_fops;
 static const struct file_operations moobl_file_fops;
 
-/* An open file of the layer: the lower file, and the credentials of its writes (moobl_wcred_get) */
+/*
+ * An open file of the layer: the lower file, the credentials of its writes (moobl_wcred_get),
+ * and the buffer its queries fill before copying out (moobl_qbuf_get)
+ */
 struct moobl_file {
 	struct file *real;
 	spinlock_t lock;
 	const struct cred *wcred;	/* last write credentials built, or NULL */
+	struct moob_query_result *qbuf;	/* kept between queries, qcap records */
+	u32 qcap;
+	bool qbusy;			/* qbuf lent to a query now */
 };
 
 static struct file *moobl_real(const struct file *file)
@@ -1173,8 +1179,65 @@ static int moobl_file_init(struct file *file, struct file *real)
 	mf->real = real;
 	spin_lock_init(&mf->lock);
 	mf->wcred = NULL;
+	mf->qbuf = NULL;
+	mf->qcap = 0;
+	mf->qbusy = false;
 	file->private_data = mf;
 	return 0;
+}
+
+/*
+ * A buffer for n query results. The results are copied to the caller only after query_sem is
+ * released (journal 0105), so they are first gathered in kernel memory; allocating that for
+ * the requested limit on every call (up to 4096 records of 272 bytes, a vmalloc) doubled the
+ * latency of a query (journal 0139). The buffer is kept with the open file and reused; a
+ * query made while another one on the same file holds it gets a buffer of its own. Every
+ * record a query returns is written in full first (put_result), so nothing of an earlier
+ * query reaches the caller.
+ */
+struct moob_query_result *moobl_qbuf_get(struct file *file, u32 n)
+{
+	struct moobl_file *mf = file->private_data;
+	struct moob_query_result *old = NULL, *buf;
+
+	spin_lock(&mf->lock);
+	if (mf->qbusy) {
+		spin_unlock(&mf->lock);
+		return kvmalloc_array(n, sizeof(*buf), GFP_KERNEL);
+	}
+	mf->qbusy = true;
+	if (mf->qcap >= n) {
+		spin_unlock(&mf->lock);
+		return mf->qbuf;
+	}
+	old = mf->qbuf;
+	mf->qbuf = NULL;
+	mf->qcap = 0;
+	spin_unlock(&mf->lock);
+	kvfree(old);
+	buf = kvmalloc_array(n, sizeof(*buf), GFP_KERNEL);
+	spin_lock(&mf->lock);
+	if (buf) {
+		mf->qbuf = buf;
+		mf->qcap = n;
+	} else {
+		mf->qbusy = false;
+	}
+	spin_unlock(&mf->lock);
+	return buf;
+}
+
+void moobl_qbuf_put(struct file *file, struct moob_query_result *buf)
+{
+	struct moobl_file *mf = file->private_data;
+
+	spin_lock(&mf->lock);
+	if (buf && buf == mf->qbuf) {
+		mf->qbusy = false;
+		buf = NULL;
+	}
+	spin_unlock(&mf->lock);
+	kvfree(buf);
 }
 
 #define MOOBL_CTX(file) {						\
@@ -1209,6 +1272,7 @@ static int moobl_release(struct inode *inode, struct file *file)
 	fput(mf->real);
 	if (mf->wcred)
 		put_cred(mf->wcred);
+	kvfree(mf->qbuf);
 	kfree(mf);
 	return 0;
 }

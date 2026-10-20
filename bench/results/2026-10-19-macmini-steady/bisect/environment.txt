@@ -1,0 +1,21 @@
+date: 2026-10-19T20:12:25-03:00
+uname: Linux debian 6.12.111+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+commit (main module and all user-space tools): 7292cee
+cpu: model name	: Intel(R) Core(TM) i7-2635QM CPU @ 2.00GHz
+loadavg before: 0.37 0.27 0.18 1/207 1099485
+moobfs mounts before (unmounted by this driver, not remounted):
+module loaded before: none
+module m0102: /home/debian/bisect/mods/m0102.ko sha256 4b36791f11616bdb
+module fcf6dbc: /home/debian/bisect/mods/fcf6dbc.ko sha256 febd869ccb143c08
+module c8801dc: /home/debian/bisect/mods/c8801dc.ko sha256 e244966fa8ba70bd
+module 6502d46: /home/debian/bisect/mods/6502d46.ko sha256 31ad523aa64ed224
+module ed613fd: /home/debian/bisect/mods/ed613fd.ko sha256 90d0aacfa47954fd
+module b752ec3: /home/debian/bisect/mods/b752ec3.ko sha256 667a9e2c66d5043a
+module f54ea05: /home/debian/bisect/mods/f54ea05.ko sha256 c742428e733bce71
+module 8efedea: /home/debian/bisect/mods/8efedea.ko sha256 d51f99912f08fabb
+module main: /home/debian/bisect/mods/main.ko sha256 2183e2c809cc5559
+cpu-freq show (before fix): cpufreq: governors [schedutil x8] no_turbo=0 driver intel_cpufreq
+cpu-freq fix printed: cpufreq: governors [performance x8] no_turbo=1 driver intel_cpufreq
+cpu-freq restore printed: cpufreq: governors [schedutil x8] no_turbo=0 driver intel_cpufreq
+loadavg after: 0.97 0.45 0.25 1/209 1102946
+module loaded after: none
