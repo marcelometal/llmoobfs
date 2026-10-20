@@ -7,6 +7,11 @@
   lower, and the limit of 64 per file (the 65th gives `ENOSPC`, replacing and removing at the
   limit, what does not count). `q2invalid` and `invalid` now check each term and header rule of
   `QUERY2` and `QUERY` next to a valid request. Paths syzkaller reaches poorly (journal 0138).
+- Fixed (journal 0139): since pull request 71 every `QUERY`/`QUERY2` allocated a buffer for the
+  requested limit (about 1.1 MB at the maximum), which made filtered queries 1.3 to 2.5 times
+  slower; the buffer is now kept with the open file and reused. Measured with the method of
+  journal 0134 (40 repetitions, frequency held, bootstrap interval): the on-demand index costs
+  7 to 12 % against the index built at mount, which the 2026-10-14 report could not show.
 - CI, arm64 (exploratory, journal 0137): the guest boots under emulation and the suite step ext4
   passed under KASAN twice, and btrfs and XFS once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
   `virtme-ng-init`; the job now uses the bash init, a virtio-fs root, the disks in reverse order,

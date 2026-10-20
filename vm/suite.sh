@@ -531,7 +531,8 @@ run_lower() {
           [ $(( n % 7 )) -eq 0 ] && { chmod 0711 "$LAYER/dr"; chmod 0755 "$LAYER/dr"; }
       done ) &
     racer=$!
-    "$BIN/query" --uid 1001 "$LAYER/dr" race2 5 | tee /tmp/q2e.txt || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
+    # two processes on one open file: one finds its result buffer lent (journal 0139)
+    MOOB_RACE2_FORK=1 "$BIN/query" --uid 1001 "$LAYER/dr" race2 5 | tee /tmp/q2e.txt || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
     rm -f /tmp/q2e.go; wait $racer
     grep -q '^race2: [1-9]' /tmp/q2e.txt || fail "q2e-no-iterations-$fs"
     # a rename or move cut by the end of the race may leave t<i>.md behind or r<i>.md in dr2

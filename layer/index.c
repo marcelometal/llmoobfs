@@ -2917,7 +2917,7 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 		err = term_check(&q->terms[i], 0);
 	if (err)
 		goto out;
-	kres = kvmalloc_array(q->limit, sizeof(*kres), GFP_KERNEL);
+	kres = moobl_qbuf_get(file, q->limit);
 	if (!kres) {
 		err = -ENOMEM;
 		goto out;
@@ -2947,7 +2947,8 @@ static long do_query(struct super_block *sb, struct file *file, void __user *arg
 	if (!err && copy_to_user(arg, q, sizeof(*q)))
 		err = -EFAULT;
 out:
-	kvfree(kres);
+	if (kres)
+		moobl_qbuf_put(file, kres);
 	kfree(q);
 	return err;
 }
@@ -3261,7 +3262,7 @@ out:
 static long query2_one(struct super_block *sb, struct file *file, struct moob_query2 *q,
 		       u64 domain, unsigned int depth)
 {
-	struct moob_query_result *kres = kvmalloc_array(q->limit, sizeof(*kres), GFP_KERNEL);
+	struct moob_query_result *kres = moobl_qbuf_get(file, q->limit);
 	long err;
 
 	if (!kres)
@@ -3273,7 +3274,7 @@ static long query2_one(struct super_block *sb, struct file *file, struct moob_qu
 	}
 	if (!err)
 		err = results_to_user(IX(sb), q->results, kres, q->count);
-	kvfree(kres);
+	moobl_qbuf_put(file, kres);
 	return err;
 }
 
