@@ -11,7 +11,7 @@
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
-> tag, `v0.4.0-experimental` (2026-10-19), has every fix made up to that date; later ones land on
+> tag, `v0.4.1-experimental` (2026-10-20), has every fix made up to that date; later ones land on
 > `main`. Details under [Status](#status).
 
 ## The problem
@@ -106,7 +106,7 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 
 ## Status
 
-**Experimental. Source pre-release tags only; the last one, `v0.4.0-experimental` (2026-10-19), has
+**Experimental. Source pre-release tags only; the last one, `v0.4.1-experimental` (2026-10-20), has
 every fix up to that date: findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
 production.** Facts as of 2026-10-19:
 
@@ -123,7 +123,7 @@ production.** Facts as of 2026-10-19:
   [journal 0114](docs/history/0114-second-inspection-of-5582e06.md)) and verified against the
   kernel found four security defects (findings F9 to F12 of ADR-0011), reported as private
   advisories and fixed in journals 0116 and 0117; our own tests and reviews found others before.
-  Tags up to `v0.3.0-experimental` carry defects fixed since ([changelog](CHANGELOG.md)).
+  Tags up to `v0.4.0-experimental` carry defects fixed since ([changelog](CHANGELOG.md)).
 - **The measurements are pilot-grade**, from one host; the report that gathers them is
   [journal 0088](docs/history/0088-m4-report.md). They are not a general speed claim.
 - The index lives **in RAM only** and cannot be paged out. It is built per domain by the first
@@ -375,8 +375,8 @@ KASAN harness runs the layer suite), and no benchmark exists.
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md) and
-  [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.3.0-experimental` carry
-  defects fixed later; fixes after `v0.4.0-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
+  [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.4.0-experimental` carry
+  defects fixed later; fixes after `v0.4.1-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
   syzkaller ran for four six-hour rounds, last measured below the coverage threshold of
   [security roadmap](docs/security-roadmap.md) S3. SELinux enforcing was exercised once (journal
   0104); AppArmor and Smack were not.

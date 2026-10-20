@@ -43,3 +43,8 @@ em arm64 estão sendo medidas
 module has not run on another architecture
 x86-64 only for the module
 módulo não rodou em outra arquitetura
+`v0.4.0-experimental` (2026-10-19), has every fix
+the last one is `v0.4.0-experimental`
+Tags up to `v0.3.0-experimental` carry
+Tags up to v0.3.0-experimental carry
+As tags até a `v0.3.0-experimental`
