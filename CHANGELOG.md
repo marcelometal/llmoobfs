@@ -92,6 +92,10 @@
 - Documentation (journal 0167): add verified external project records to both READMEs,
   with the scope and current limits of each record; preserve the four existing badges.
 
+- Research (journal 0166): assess established query, cache and retrieval
+  algorithms against source and historical measurements; document hypotheses
+  and validation plans. No algorithm adopted or implemented.
+
 - Planning (journal 0165): add G1–G6 client integration and retrieval packages to
   ROADMAP with priorities, dependencies, effort estimates and validation gates.
   All remain planned; implementation is explicitly deferred.

@@ -169,6 +169,10 @@ Effort is a preliminary engineering estimate: S = hours, M = one to three days,
 L = one week or more. Estimates exclude external review and infrastructure wait
 time and must be refined when a batch is scoped.
 
+The [known-algorithm assessment](docs/research-algorithm-fit.md) maps existing
+techniques to these packages, with evidence, trade-offs and experiment proposals.
+It does not select an algorithm or authorize implementation.
+
 | Item | Priority / effort | Scope and dependencies | Validation required before completion |
 | --- | --- | --- | --- |
 | **G1 — Usable client integration** | P1 / L | One narrow client package and one adapter: durable publication, typed fields, paging, explicit errors, capability detection from an accessible domain and fallback. Builds on the [client contract](docs/client-contract.md) and [ADR-0013](docs/decisions/0013-user-space-query-library.md). Any new UAPI needs its own decision; projection remains the separately accepted ADR-0014. | Adapter answers equal the reference on the supported query shapes, including multi-page results; test a caller unable to open the mount root, missing/unsupported module, budget exhaustion and heterogeneous files. Fallback must preserve the caller's access restrictions. Crash injection at publication steps yields an old complete or new complete final file (or absence before first publication), never mixed content/attributes. Document concurrent-writer semantics and unsupported operations. |

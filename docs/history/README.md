@@ -185,6 +185,7 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0156 — Round 2 review batch: corrections, tests and remaining limitations](0156-round-2-review-batch.md)
 - [0164 — Product gaps around the filesystem and semantic retrieval (assessment, not implementation)](0164-roadmap-product-gaps.md)
 - [0165 — Client roadmap priorities and validation gates (planned, implementation deferred)](0165-client-roadmap-priorities.md)
+- [0166 — Known algorithms assessed against the current index and client roadmap](0166-known-algorithms-assessment.md)
 - [0167 — Verified external project records in the READMEs](0167-readme-external-records.md)
 - [0168 — Zenodo snapshot DOI badge and citation in the READMEs](0168-zenodo-doi-readme.md)
 - [0169 — Confirmed TeleAI discovery link in the READMEs](0169-teleai-readme.md)
