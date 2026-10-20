@@ -183,6 +183,7 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0154 — moobl_xattr_get at 0 PCs explained by the corpus; pull requests 106 and 107 merged](0154-xattr-get-coverage-explained.md)
 - [0155 — Independent review of 3627172, round 2: the stale-state class, error paths, tests; two defects reproduced](0155-review-3627172-round-2.md)
 - [0156 — Round 2 review batch: corrections, tests and remaining limitations](0156-round-2-review-batch.md)
+- [0164 — Product gaps around the filesystem and semantic retrieval (assessment, not implementation)](0164-roadmap-product-gaps.md)
 - [0167 — Verified external project records in the READMEs](0167-readme-external-records.md)
 - [0168 — Zenodo snapshot DOI badge and citation in the READMEs](0168-zenodo-doi-readme.md)
 - [0169 — Confirmed TeleAI discovery link in the READMEs](0169-teleai-readme.md)

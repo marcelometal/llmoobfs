@@ -91,6 +91,9 @@
 
 - Documentation (journal 0167): add verified external project records to both READMEs,
   with the scope and current limits of each record; preserve the four existing badges.
+- Assessment (journal 0164): evaluate client integration, derived search-index
+  lifecycle, portable recovery and end-to-end validation. Recommendations only;
+  native stacked architecture and the accepted roadmap sequence are unchanged.
 
 - Coverage (journal 0154): `moobl_xattr_get` at 0 of 4 PCs in the fifth syzkaller run is explained
   by its corpus, which kept almost no attribute read inside a mounted layer. Replayed with
