@@ -1043,8 +1043,22 @@ for fs in ext4 btrfs xfs; do
     br_cmp || fail "br-index-differs-after-build-all-$fs"
     f=$("$BIN/query" "$LAYER" info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
     [ $(( f & 8 )) -eq 0 ] || fail "br-index-incomplete-$fs"
+    # A chmod to 0600 while the first build of a new domain reads the file (journal 0152): the
+    # reading is repeated, and the file's own homogeneity must be decided again with it, or the
+    # file stays in the answers to a caller that can no longer read it. The scan sleeps one
+    # second per file so that the chmod, 0.3 s in, lands inside the reading.
+    tr_on moobfs_scan_reread || fail "br-chmod-trace-on-$fs"
+    echo 1000000 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail "br-chmod-delay-$fs"
+    "$BIN/chmodrace" "$LAYER/chmodrace" 300000 > /tmp/br-chmod.txt; rc=$?
+    echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
+    cr_retries=$(tr_count moobfs_scan_reread)
+    tr_off moobfs_scan_reread
+    cat /tmp/br-chmod.txt
+    [ $rc -ne 1 ] || fail "br-chmod-during-build-still-answered-$fs"
+    [ $rc -eq 0 ] || fail "br-chmod-run-$fs"
+    [ "$cr_retries" -gt 0 ] || fail "br-chmod-not-in-the-window-$fs (the test proved nothing)"
     umount "$LAYER" && rm -rf "$LOWER/br" && umount "$LOWER" || fail "br-cleanup-$fs"
-    echo "BUILD_RACE_PASS: $fs, $(cut -d' ' -f2- /tmp/br.txt) readings_repeated=$retries; every domain equal to the oracle"
+    echo "BUILD_RACE_PASS: $fs, $(cut -d' ' -f2- /tmp/br.txt) readings_repeated=$retries; every domain equal to the oracle; chmod during a build: absent"
 done
 fi
 if want release; then

@@ -154,6 +154,11 @@ and XFS, R2 injected-error regression, and acceptance/layer suites. Negative rou
 both original defects. The local batch KASAN/UBSAN/lockdep suite also passed on Linux 6.12.112;
 pull-request CI is a separate pre-merge gate. An injected value-read error does
 not establish behavior under a real lower-filesystem I/O fault.
+A later review ([0151](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0151-review-d110d4e.md))
+found that a chmod during the first build of a domain could leave the file in `QUERY2` answers to
+users who can no longer read it; it is fixed in
+[0152](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0152-chmod-during-build-fixed.md),
+with a suite test that fails without the fix.
 See [R1 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0149-sync-backing-file-flags.md)
 and [R2 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0150-propagate-index-xattr-read-errors.md).
 [`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`; journal 0144]

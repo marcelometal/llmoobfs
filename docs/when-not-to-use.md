@@ -47,7 +47,9 @@ and query evidence (journals [0088](history/0088-m4-report.md) and
 ## 3. When MoobFS is probably not worth it
 
 The two defects from [review 0144](history/0144-independent-review.md) remain in
-`v0.4.1-experimental`. The review batch synchronizes backing-file flags after `F_SETFL`
+`v0.4.1-experimental`, and so does a third, from [review 0151](history/0151-review-d110d4e.md): a
+chmod during the first build of a domain could leave the file in `QUERY2` answers to users who can
+no longer read it (fixed in [0152](history/0152-chmod-during-build-fixed.md)). The review batch synchronizes backing-file flags after `F_SETFL`
 ([0149](history/0149-sync-backing-file-flags.md)) and propagates operational lower `getxattr`
 errors ([0150](history/0150-propagate-index-xattr-read-errors.md)). Positive and negative regression
 evidence exists for clearing append and for injected value-read errors, respectively.

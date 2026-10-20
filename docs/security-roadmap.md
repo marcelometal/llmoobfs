@@ -47,7 +47,10 @@ two file/index correctness defects outside the F1–F12 list. Corrections
 [0150](history/0150-propagate-index-xattr-read-errors.md)) passed the integrated
 full VM suite and local KASAN/UBSAN/lockdep gate at `49098aa`.
 Pull-request CI is still a separate pre-merge gate. The S9 fair-share
-gap and outside-human-review gap remain unchanged.
+gap and outside-human-review gap remain unchanged. A further review ([0151](history/0151-review-d110d4e.md))
+found a permission defect: a chmod during the first build of a domain left the file in `QUERY2`
+answers to users who can no longer read it. Fixed in [0152](history/0152-chmod-during-build-fixed.md)
+through a private advisory.
 
 > Note from 2026-10-11 (entry 0030), measured on the Azure host: `QUERY` time grows by about
 > 1.15 µs per entry from another owner that matches the query (18 µs with none, 28 ms with

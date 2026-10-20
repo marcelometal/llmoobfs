@@ -1101,15 +1101,22 @@ static void record_dentry_path(struct moobl_index *ix, struct moobl_ix_inode *re
  * pl. A dentry that was removed meanwhile is skipped, and so is one that left parent, the
  * lower directory its name was read from (when given): the write path that removed or moved
  * it has updated the index. The name comes from path (the scan) or from where (a layer dentry).
+ * With dom (the lower domain directory), the file's own homogeneity is not taken from pl but
+ * decided here at every reading, after the loader is registered: a change of permissions that
+ * completed before is seen by the reading, one that runs after makes the reading be done
+ * again. pl->hetero then says only whether the directories down to the file pass. A
+ * classification computed before the reading could otherwise outlive a chmod that found no
+ * record to update (journal 0152).
  * -EAGAIN when updates to this very file kept arriving for MOOBL_LOAD_TRIES readings.
  */
 static int index_load(struct super_block *sb, struct dentry *lower, struct dentry *parent,
-		      const struct moobl_place *pl, const char *path, struct dentry *where,
-		      struct attr_buf *b)
+		      const struct moobl_place *pl, struct inode *dom, const char *path,
+		      struct dentry *where, struct attr_buf *b)
 {
 	struct moobl_index *ix = IX(sb);
 	struct inode *li = d_inode(lower), *upper;
 	struct moobl_loader ld = { .ino = li->i_ino };
+	struct moobl_place cur = *pl;
 	struct moobl_ix_inode *rec;
 	unsigned int nofs;
 	int tries, err = 0;
@@ -1123,6 +1130,11 @@ static int index_load(struct super_block *sb, struct dentry *lower, struct dentr
 			break;	/* removed */
 		if (parent && READ_ONCE(lower->d_parent) != parent)
 			break;	/* renamed away */
+		if (dom && !pl->hetero) {
+			cur.hetero = !target_ok(li, dom, &err);
+			if (err)	/* an ACL that could not be read is not an answer */
+				break;
+		}
 		err = attrs_read(lower, b);
 		if (err)
 			break;
@@ -1138,7 +1150,7 @@ static int index_load(struct super_block *sb, struct dentry *lower, struct dentr
 			continue;
 		}
 		list_del(&ld.list);
-		err = index_replace(ix, li->i_ino, pl, b);
+		err = index_replace(ix, li->i_ino, &cur, b);
 		rec = err ? NULL : xa_load(&ix->inodes, li->i_ino);
 		if (rec && path)
 			err = index_set_path(ix, rec, path);	/* a scan has no other source of the name */
@@ -1224,6 +1236,12 @@ struct scan_dir {
 	struct dentry *dom;		/* lower domain directory, referenced, or NULL */
 };
 
+/* The domain directory against which index_load() decides a scanned directory's own place. */
+static struct inode *self_dom(const struct scan_dir *sd)
+{
+	return sd->self.domain && sd->dom && sd->self.domain == sd->inner ? d_inode(sd->dom) : NULL;
+}
+
 /* One walk of a part of the lower tree. */
 struct scan_job {
 	struct super_block *sb;
@@ -1281,7 +1299,7 @@ static int scan_push_dir(struct scan_job *job, struct scan_dir *cur, struct dent
 		nd->dom = dget(cur->dom);
 		nd->inner = cur->inner;
 		nd->self.domain = cur->inner;
-		nd->self.hetero = !(cur->inner_ok && target_ok(d_inode(child), dom, &err));
+		nd->self.hetero = !cur->inner_ok;	/* the directory itself: index_load() */
 		nd->inner_ok = cur->inner_ok && reach_ok(d_inode(child), dom, false, &err);
 		if (err) {	/* an ACL that could not be read is not an answer */
 			scan_dir_free(nd);
@@ -1294,7 +1312,8 @@ static int scan_push_dir(struct scan_job *job, struct scan_dir *cur, struct dent
 			return 0;
 		}
 		/* a domain directory: its own attributes belong outside, its content to its domain */
-		err = index_load(job->sb, child, cur->dentry, &nd->self, cpath, NULL, &job->buf);
+		err = index_load(job->sb, child, cur->dentry, &nd->self, self_dom(nd), cpath, NULL,
+				 &job->buf);
 		scan_dir_free(nd);
 		return err;
 	}
@@ -1305,13 +1324,11 @@ static int scan_push_dir(struct scan_job *job, struct scan_dir *cur, struct dent
 /* A child regular file of the scan: its attributes go into the index; frees cpath. */
 static int scan_file(struct scan_job *job, struct scan_dir *cur, struct dentry *child, char *cpath)
 {
-	struct moobl_place fpl = { .domain = cur->inner };
-	int err = 0;
+	struct moobl_place fpl = { .domain = cur->inner, .hetero = cur->inner && !cur->inner_ok };
+	int err;
 
-	if (cur->inner)
-		fpl.hetero = !(cur->inner_ok && target_ok(d_inode(child), d_inode(cur->dom), &err));
-	if (!err)
-		err = index_load(job->sb, child, cur->dentry, &fpl, cpath, NULL, &job->buf);
+	err = index_load(job->sb, child, cur->dentry, &fpl, cur->inner ? d_inode(cur->dom) : NULL,
+			 cpath, NULL, &job->buf);
 	kfree(cpath);
 	return err;
 }
@@ -1373,8 +1390,8 @@ static int scan_run(struct scan_job *job)
 		}
 		cond_resched();
 		if (job->index && !cur->skip_self) {
-			err = index_load(job->sb, cur->dentry, cur->parent, &cur->self, cur->path,
-					 NULL, &job->buf);
+			err = index_load(job->sb, cur->dentry, cur->parent, &cur->self,
+					 self_dom(cur), cur->path, NULL, &job->buf);
 			if (err)
 				goto drop;
 		}
@@ -1463,8 +1480,8 @@ static int scan_moved(struct scan_job *job, struct list_head *todo, struct dentr
 
 		if (!domain && job->stop && md->depth == job->stop) {
 			/* a domain directory: only its own attributes belong outside */
-			err = index_load(job->sb, md->lower, NULL, &md->self, md->path, NULL,
-					 &job->buf);
+			err = index_load(job->sb, md->lower, NULL, &md->self, NULL, md->path,
+					 NULL, &job->buf);
 			if (err)
 				break;
 			continue;
@@ -1913,7 +1930,7 @@ static void index_adopt(struct super_block *sb, struct dentry *lower, struct den
 	err = attr_buf_init(&buf);
 	if (!err) {
 		old = override_creds(sbi->creds);
-		err = index_load(sb, lower, NULL, pl, NULL, where, &buf);
+		err = index_load(sb, lower, NULL, pl, NULL, NULL, where, &buf);
 		revert_creds(old);
 		attr_buf_free(&buf);
 	}
@@ -1959,6 +1976,8 @@ static struct moved_dir *dir_moved_prepare(struct moobl_index *ix, struct dentry
 		struct inode *dom = moobl_lower_inode(d_inode(domd));
 
 		place_dentry_above(ix, where, d_inode(moved), &md->self, &above);
+		if (md->self.domain)	/* its own homogeneity is decided when it is read */
+			md->self.hetero = !above;
 		md->inner_ok = above && reach_ok(moobl_lower_inode(d_inode(moved)), dom, false, NULL);
 	}
 	md->lower = dget(moobl_lower_dentry(moved));

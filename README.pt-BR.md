@@ -20,7 +20,9 @@
 > que passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.
 > A CI do pull request é uma etapa separada e obrigatória antes do merge.
 > A `v0.4.1-experimental` ainda contém
-> ambos os defeitos. Veja [Limitações](#limitações).
+> ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
+> construção do índice que deixava o arquivo nas respostas do `QUERY2`; corrigido no diário 0152.
+> Veja [Limitações](#limitações).
 
 ## O problema
 
@@ -120,8 +122,13 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 
 **Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
 (2026-10-20), contém as correções dos achados F1 a F12 do ADR-0011, exceto a parte
-de cotas justas do F2, mas ainda contém os defeitos R1/R2 da revisão 0144.
-Não é para produção.** Fatos em 2026-10-20:
+de cotas justas do F2. Não é para produção.** Três achados posteriores a afetam e estão corrigidos só
+na `main`: flags de estado do arquivo desatualizadas depois de `F_SETFL` e erros de leitura de
+atributo tomados como "sem atributo" ao indexar (revisão [0144](docs/history/0144-independent-review.md),
+R1 e R2), e um chmod durante a primeira construção de um domínio, que podia deixar o arquivo nas
+respostas do `QUERY2` para usuários que já não conseguem lê-lo (diários
+[0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Fatos em 2026-10-20:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
@@ -391,6 +398,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   limpar e ativar append passaram em ext4, btrfs e XFS na rodada integrada do commit `49098aa`.
   R2 propaga erros operacionais de leitura e preserva as exclusões existentes de atributos
   ausentes, grandes demais ou malformados ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
+  uma terceira revisão ([0151](docs/history/0151-review-d110d4e.md)) achou que um chmod durante a
+  primeira construção de um domínio podia deixar o arquivo nas respostas do `QUERY2` para quem já não
+  consegue lê-lo, corrigido no [0152](docs/history/0152-chmod-during-build-fixed.md);
   a mesma rodada completa em VM passou na regressão com erros injetados e nas suítes de
   aceitação e da camada. As negativas detectaram ambos os defeitos originais. Injetar o
   resultado de leitura não reproduz uma falha real de E/S do sistema de baixo. A rodada local

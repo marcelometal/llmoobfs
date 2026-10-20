@@ -45,7 +45,10 @@ finished. New features wait for project review and the maintainer's decision.
 | ADR-0012 — On-demand, reclaimable index | Domain build ([0098](docs/history/0098-index-on-demand.md)), releases ([0101](docs/history/0101-domains-released.md)), tracepoints ([0102](docs/history/0102-index-tracepoints.md)); steady-state cost measured ([0139](docs/history/0139-query-buffer-regression.md)) | Fair budget shares; performance residual investigation |
 | S3 — syzkaller | Five six-hour runs; fifth has no report and 88.7 % aggregate handler coverage ([0143](docs/history/0143-syzkaller-fifth-run-threshold-met.md)) | `moobl_xattr_get` coverage remains unexplained; the aggregate target alone does not establish the per-function criterion |
 
-Stabilization update, 2026-10-20: the two correctness findings of the
+Stabilization update, 2026-10-20: a third finding, from the review of
+[0151](docs/history/0151-review-d110d4e.md) (a chmod during the first build of a domain left the
+file in `QUERY2` answers), is fixed in [0152](docs/history/0152-chmod-during-build-fixed.md).
+The two correctness findings of the
 [independent review](docs/history/0144-independent-review.md) have corrections
 in [0149](docs/history/0149-sync-backing-file-flags.md) and
 [0150](docs/history/0150-propagate-index-xattr-read-errors.md). Their integrated

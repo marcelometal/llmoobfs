@@ -15,7 +15,9 @@
 > The two findings of the [current review](docs/history/0144-independent-review.md)
 > have corrections in the review batch, which passed the full integrated VM suite.
 > The local batch KASAN/UBSAN/lockdep suite also passed; pull-request CI is a separate pre-merge gate.
-> `v0.4.1-experimental` still contains both defects. See [Limitations](#limitations).
+> `v0.4.1-experimental` still contains both defects. A later review (journal 0151) found a third,
+> a chmod during an index build that left the file in `QUERY2` answers; fixed in journal 0152.
+> See [Limitations](#limitations).
 
 ## The problem
 
@@ -110,8 +112,13 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 ## Status
 
 **Experimental. Source pre-release tags only; the last one, `v0.4.1-experimental` (2026-10-20), has
-every fix up to that date: findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
-production.** Facts as of 2026-10-20:
+the fixes of findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
+production.** Three later findings affect it and are fixed on `main` only: stale file-status flags
+after `F_SETFL` and attribute-read errors taken as "no attribute" while indexing (review
+[0144](docs/history/0144-independent-review.md), R1 and R2), and a chmod during the first build of a
+domain that could leave the file in `QUERY2` answers to users who can no longer read it (journals
+[0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Facts as of 2026-10-20:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
@@ -373,6 +380,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   `49098aa`. R2 propagates operational read errors and preserves the existing exclusions for
   missing, oversized and malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
   the same full VM run passed its injected-error regression and the acceptance/layer suites.
+  A third review ([0151](docs/history/0151-review-d110d4e.md)) found that a chmod during the
+  first build of a domain could leave the file in `QUERY2` answers to users who can no longer read
+  it; fixed in [0152](docs/history/0152-chmod-during-build-fixed.md), with a suite test and a negative round.
   Negative rounds detected both original defects. Injecting the read result does not reproduce
   an actual lower-filesystem I/O failure. The full local sanitizer run at `49098aa`
   reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` and

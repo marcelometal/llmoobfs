@@ -19,6 +19,7 @@ t mounted    tests/mounted.c
 t failnth    -Iinclude tests/failnth.c
 t hostile    tests/hostile.c
 t buildrace  -Iinclude tests/buildrace.c -lpthread
+t chmodrace  -Iinclude tests/chmodrace.c
 t query      -Iinclude tests/query.c common/attr.c
 t ipc        tests/ipc.c
 t reconf     tests/reconf.c

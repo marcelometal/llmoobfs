@@ -177,3 +177,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0148 — Make the shared project rules visible at the right entry points](0148-agent-rules-entrypoints.md)
 - [0149 — Synchronize mutable status flags on the backing file](0149-sync-backing-file-flags.md)
 - [0150 — Propagate attribute-read errors while building the index](0150-propagate-index-xattr-read-errors.md)
+- [0151 — Independent security review of d110d4e: stale homogeneity after chmod during index build](0151-review-d110d4e.md)
+- [0152 — A chmod during the first build of a domain no longer leaves the file in its answers](0152-chmod-during-build-fixed.md)
