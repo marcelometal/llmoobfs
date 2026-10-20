@@ -1,7 +1,7 @@
 # 0150 — Propagate attribute-read errors while building the index
 
-Date: 2026-10-20. Status: completed locally, pending batch integration and
-KASAN/lockdep. Work started at approximately 06:37 and ended at 06:57 BRT on
+Date: 2026-10-20. Status: integrated locally; complete batch VM suite passed,
+KASAN/lockdep pending. Work started at approximately 06:37 and ended at 06:57 BRT on
 2026-10-20 (20 minutes of calendar time, including VM wait; hands-on effort was
 not separately metered).
 
@@ -80,3 +80,12 @@ remains an optional separate integration test. This correction did not change
 locking or object lifetime; the batch's KASAN/lockdep gate was not run here.
 Next, integrate it with the local review batch and run that gate before
 publication.
+
+## Batch integration note — 2026-10-20
+
+Cherry-picked this correction into the review batch as `49098aa`, together
+with R1. The full `make vm-test` on that integrated source exited zero and
+reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS`.
+The batch KASAN/lockdep gate is running; its result is not established here.
+This note supersedes the pending-integration next step above without removing
+the original per-correction record.

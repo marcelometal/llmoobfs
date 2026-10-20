@@ -140,8 +140,10 @@ The caller sets:
 
 The suite runs `run_lower <fs> <device> <reflink yes|no>` for ext4, btrfs and
 XFS, then the acceptance block (git, SQLite, power loss, I/O errors) over ext4.
-There is no way yet to run a single step in isolation; the suite is sequential
-(planned as `MOOB_ONLY`, see `community-plan.md` section 1).
+For development, `MOOB_ONLY=<step>` selects named steps and ends with a partial
+pass marker; the complete run remains the validation gate (see
+[`testing.md`](testing.md), section 5). Correction dated 2026-10-20: the former
+claim that this switch was still planned had become stale.
 
 ## 5. Adding a test
 

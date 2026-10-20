@@ -1,6 +1,7 @@
 # 0149 — Synchronize mutable status flags on the backing file
 
-Date: 2026-10-20. Status: correction in progress; final two-direction test and batch validation pending.
+Date: 2026-10-20. Status: correction integrated locally; complete VM suite passed;
+batch KASAN/lockdep pending.
 
 ## Goal and decision
 
@@ -24,7 +25,7 @@ upper `struct file`, so it cannot find the backing file. The existing lower
 file is retained for the life of the upper open, so open-time copying alone
 cannot follow later `F_SETFL` calls.
 
-## Test and evidence so far
+## Test and evidence
 
 `tests/fcntl-flags.c` is registered in `vm/build-tests.sh` and runs for each
 lower filesystem in `vm/suite.sh`. It creates a fresh file exclusively,
@@ -57,13 +58,23 @@ check, not a full KASAN suite.
 The full `make vm-test` rerun exited zero with `MOOBFS_ACCEPTANCE_PASS` and
 `MOOBFS_LAYER_PASS` across ext4, btrfs and XFS after the cleanup was added.
 That run contained the clear-append assertion. The set-append assertion was
-added afterward and is pending the integrated batch VM suite. Only VM guests
-load the module. No push or pull request.
+added afterward. The integrated R1/R2 source snapshot `49098aa` then ran the
+full `make vm-test` with exit status zero. `FCNTL_RESULT bytes=4 content=ZAAA
+append_flag=0`, `FCNTL_SET_RESULT bytes=5 content=ZAAAY append_flag=1` and
+`FCNTL_FLAGS_PASS` appeared on ext4, btrfs and XFS, followed by
+`XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS`. Only VM
+guests load the module. No push or pull request.
+
+While documenting the new VM steps, the current `docs/testing.md` and
+`docs/development.md` were found to still describe `MOOB_ONLY` as planned,
+although the suite already implements it. Both current-state guides received
+dated corrections and now describe the R1/R2 regressions without claiming
+that a selected step equals a full-suite pass.
 
 ## Limits and next step
 
-The ext4 run establishes this `O_APPEND` case, not every mutable flag,
-filesystem or race. Because the change uses the lower file's `f_lock`, run
-KASAN/lockdep promptly before the batch is considered ready. Complete the
-two-direction test in the integrated full suite,
-and integrate the parallel R2 correction with one final batch KASAN run.
+The three lower-filesystem runs establish the tested `O_APPEND` transitions,
+not every mutable flag or concurrent `F_SETFL` race. Because the change uses
+the lower file's `f_lock`, the dedicated ext4 KASAN/lockdep check was run
+promptly; the full batch KASAN/lockdep gate is in progress and is not yet
+counted as passed. This correction was integrated with R2 before that gate.

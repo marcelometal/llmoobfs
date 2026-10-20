@@ -2,17 +2,26 @@
 
 ## Unreleased
 
-- In progress (journal 0149): synchronize mutable file status flags with the
-  backing open; add the `F_SETFL` positional-write regression to the VM suite.
+- Fix (0149): synchronize mutable file status flags with the backing open
+  before delegated I/O. The clear-append regression fails without the fix and
+  passes with it; clear- and set-append assertions pass in the integrated VM
+  suite on ext4, btrfs and XFS.
+- Fix (0150): propagate operational lower `getxattr` read errors while building
+  or updating the index. Injected `EIO`/`ENOMEM` tests and the full VM suite
+  pass on the correction branch; the negative branch confirms the old silent
+  omission. The integrated full VM suite passes; batch KASAN/lockdep is pending.
+- Documentation: correct stale `MOOB_ONLY` instructions in `docs/testing.md`
+  and `docs/development.md` with dated notes (journal 0149).
 
 - Process (journal 0148): add the agreed batch cadence, issue ownership,
   client-neutral scope and reference practice to `AGENTS.md`. Keep the full
   continuity and outreach rules in the local MoobFS rules file.
 
-- Review (0144): two open correctness findings, not fixes. Clearing `O_APPEND`
-  with `F_SETFL` still appends through the layer (reproduced in an ext4 VM);
-  operational `getxattr` errors can be silently omitted from an index build
-  (confirmed in source, lower-error reproduction pending).
+- Review (0144): two correctness findings in the reviewed source. Clearing
+  `O_APPEND` with `F_SETFL` still appended through the layer (reproduced in an
+  ext4 VM); operational `getxattr` errors could silently omit an index entry
+  (confirmed in source). Corrections are recorded in 0149 and 0150; the latter
+  uses injected errors, not a physical lower-filesystem I/O failure.
 - Coverage (0145): the fifth run's 88.7% aggregate meets the numeric S3 threshold,
   but `moobl_xattr_get` at 0/4 leaves its per-function criterion unresolved.
 - Documentation (0146): reconcile current public surfaces with implementation and

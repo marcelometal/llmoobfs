@@ -285,7 +285,7 @@ Review 0144 and correction 0149 also consult Linux 6.12.112's `fs/fcntl.c`
 file flags and initialization of the lower synchronous I/O request. These are
 the exact test-kernel sources, not a newer API substituted for the build.
 
-Correction 0150 consults Linux 6.12.112's `fs/xattr.c` (`vfs_getxattr()` and
+Correction 0150 consults Linux 6.12.112's `fs/xattr.c` (GPL-2.0-only; `vfs_getxattr()` and
 `__vfs_getxattr()`). A value read can return a negative error from permission,
 security or the lower filesystem handler. `-ENODATA` means a name listed earlier
 may have been removed; `-ERANGE` means the value exceeded the scan buffer.
