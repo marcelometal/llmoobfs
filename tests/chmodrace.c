@@ -1,5 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Review d110d4e: disposable VM only; a fresh domain is required. */
+/*
+ * A chmod that lands while the first build of a domain is reading the file (journals 0151,
+ * 0152). A child running as uid 1001 starts the build with a query; the parent makes the file
+ * private (0600) and writes a new value while the scan sleeps (scan_delay_us). The file must
+ * then be absent from the domain's answers, as it is when the chmod comes after the build.
+ * Exit 0: absent; 1: still answered to a caller that cannot read it; 3: the setup did not
+ * produce the revoked state (getxattr did not fail with EACCES); 2: error.
+ * Disposable VM only; the domain directory must not exist yet.
+ */
 #define _GNU_SOURCE
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -52,7 +60,7 @@ int main(int argc, char **argv)
 	unsigned int delay;
 
 	if (argc != 3) {
-		fprintf(stderr, "usage: review-build-permissions fresh-domain chmod-delay-us\n");
+		fprintf(stderr, "usage: chmodrace fresh-domain chmod-delay-us\n");
 		return 2;
 	}
 	setbuf(stdout, NULL);
@@ -93,7 +101,9 @@ int main(int argc, char **argv)
 		printf("REVIEW_RESULT uid=%u first=%u after=%u getxattr=%d errno=%d\n",
 		       (unsigned int)getuid(), first, after, rc, saved);
 		close(fd);
-		_exit(rc == -1 && saved == EACCES && after ? 1 : 0);
+		if (rc != -1 || saved != EACCES)
+			_exit(3);
+		_exit(after ? 1 : 0);
 	}
 	close(start[1]);
 	if (read(start[0], value, 1) != 1)

@@ -13,7 +13,7 @@ cp /bin/busybox "$STAGE/bin/"
 ln -s busybox "$STAGE/bin/sh"
 make layer KDIR="/lib/modules/$KERNEL/build" > "$RUN/build.log" 2>&1
 cp layer/moobfs_layer.ko "$STAGE/"
-gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/review-build-permissions.c \
+gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/chmodrace.c \
     -o "$STAGE/review-build-permissions"
 python3 - "$KERNEL" "$STAGE/mods" <<'PY'
 import lzma
