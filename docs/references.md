@@ -278,6 +278,19 @@ set. Read on 2026-10-14.
 | Elasticsearch document-level security | [Elastic docs](https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/controlling-access-at-document-field-level) | precedent for count leakage (ADR-0009); the current page states that restricted documents still count in the scoring statistics |
 | LMDB, RocksDB, LevelDB | https://www.symas.com/mdb, https://rocksdb.org/, https://github.com/google/leveldb | engines weighed for a user-space index (ADR-0009) |
 
+Review 0144 and correction 0149 also consult Linux 6.12.112's `fs/fcntl.c`
+(GPL-2.0), `fs/overlayfs/file.c` (GPL-2.0-only)
+(`ovl_real_fdget`, `ovl_change_flags`), `fs/backing-file.c`,
+`fs/read_write.c` and `include/linux/fs.h` for synchronization of mutable
+file flags and initialization of the lower synchronous I/O request. These are
+the exact test-kernel sources, not a newer API substituted for the build.
+
+Correction 0150 consults Linux 6.12.112's `fs/xattr.c` (GPL-2.0-only; `vfs_getxattr()` and
+`__vfs_getxattr()`). A value read can return a negative error from permission,
+security or the lower filesystem handler. `-ENODATA` means a name listed earlier
+may have been removed; `-ERANGE` means the value exceeded the scan buffer.
+Other failures must abort an index build or adoption.
+
 ## 4. Agent-memory clients analyzed
 
 | Client | Repository | License | Analyzed |

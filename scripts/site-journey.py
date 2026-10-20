@@ -35,8 +35,8 @@ MILESTONES = [
   'Medido contra SQLite na mesma máquina: mais rápido em consultas filtradas, mais lento em percursos ordenados longos.', ['0047']),
  ('2026-10-12', f'A written threat and credential model, the contract every review is judged against ({adr("0011")}).',
   f'Um modelo de ameaças e de credenciais escrito, o contrato contra o qual toda revisão é julgada ({adr("0011")}).', ['0060']),
- ('2026-10-12', 'First security finding fixed: a write to a set-user-ID file crashed the kernel.',
-  'Primeiro achado de segurança corrigido: uma escrita num arquivo set-user-ID derrubava o kernel.', ['0069']),
+ ('2026-10-12', 'A security finding fixed: a write to a set-user-ID file crashed the kernel.',
+  'Um achado de segurança corrigido: uma escrita num arquivo set-user-ID derrubava o kernel.', ['0069']),
  ('2026-10-13', 'A real memory client on the layer: equal answers from 150 to 60 000 memories.',
   'Um cliente de memória real sobre a camada: respostas iguais de 150 a 60 000 memórias.', ['0068', '0088']),
  ('2026-10-13', 'fstests\' quick group passes over the three lower filesystems; systematic allocation-failure injection.',
@@ -53,6 +53,10 @@ MILESTONES = [
   f'SQL sobre um domínio por uma tabela virtual do SQLite ({adr("0013")}).', ['0108']),
  ('2026-10-14', 'syzkaller over the layer: a reference leak found and fixed; two six-hour runs.',
   'syzkaller sobre a camada: um vazamento de referência achado e corrigido; duas rodadas de seis horas.', ['0109', '0112']),
+ ('2026-10-19', 'A measurement method with intervals finds a roughly 2x query regression; reusing the query buffer fixes it.',
+  'Um método de medição com intervalos encontra uma regressão de aproximadamente 2x nas consultas; reutilizar o buffer da consulta a corrige.', ['0134', '0139']),
+ ('2026-10-20', 'v0.4.1-experimental published; a fifth six-hour syzkaller run reports no crash and reaches 88.7% aggregate handler coverage, with xattr-get coverage still unexplained.',
+  'v0.4.1-experimental publicada; a quinta rodada de seis horas do syzkaller termina sem relato de crash e chega a 88,7% de cobertura agregada dos handlers, ainda sem explicar a cobertura de xattr-get.', ['0142', '0143']),
 ]
 
 T = {
@@ -80,7 +84,7 @@ T = {
    updated='Atualizado em'),
 }
 
-UPDATED = '2026-10-18'
+UPDATED = '2026-10-20'
 
 STATUS = [
  ('What does it do that existing filesystems do not? Why is FUSE not enough?',
@@ -106,6 +110,9 @@ STATUS = [
   f'Test clients only: an agent-memory tool and a LangGraph store, both with answers equal to their own storage ({j("0088")}, {j("0089")}). No production users; it is not ready for them.',
   f'Só clientes de teste: uma ferramenta de memória para agentes e um store do LangGraph, os dois com respostas iguais às do armazenamento deles ({j("0088")}, {j("0089")}). Nenhum usuário em produção; o projeto não está pronto para isso.'),
  ('Kernel versions and architectures', 'Versões do kernel e arquiteturas', f'One series, 6.12, on x86-64, in virtual machines. The attribute encoding and the image tools also pass their tests on big-endian s390x under emulation, on every pull request; on arm64, under emulation and without KVM, the module passes the ext4, btrfs and XFS steps under KASAN in an exploratory job ({j("0137")}).', f'Uma série, 6.12, em x86-64, em máquinas virtuais. A codificação de atributos e as ferramentas de imagem também passam nos testes em s390x big-endian, com emulação, em todo pull request; em arm64, com emulação e sem KVM, o módulo passa nos passos de ext4, btrfs e XFS sob KASAN num job exploratório ({j("0137")}).'),
+ ('Corrections from the current review', 'Correções da revisão atual',
+  f'The review batch synchronizes backing-file flags after F_SETFL (R1) and propagates operational getxattr errors (R2). v0.4.1-experimental contains both original defects. The full integrated VM suite at 49098aa passed: clearing and setting append on ext4, btrfs and XFS, the injected-error regression, and acceptance/layer suites. Negative rounds detected both defects. The full local KASAN/UBSAN/lockdep suite also passed on Linux 6.12.112; pull-request CI is a separate pre-merge gate. Injected results do not reproduce a real lower-I/O fault (<a href="{GH}docs/history/0149-sync-backing-file-flags.md">R1</a>, <a href="{GH}docs/history/0150-propagate-index-xattr-read-errors.md">R2</a>).',
+  f'O lote de revisão sincroniza flags do arquivo de baixo após F_SETFL (R1) e propaga erros operacionais de getxattr (R2). A v0.4.1-experimental contém ambos os defeitos originais. A suíte completa integrada em VM do commit 49098aa passou: limpar e ativar append em ext4, btrfs e XFS, regressão com erros injetados e suítes de aceitação e da camada. As negativas detectaram ambos os defeitos. A suíte local completa sob KASAN/UBSAN/lockdep também passou no Linux 6.12.112; a CI do pull request é uma etapa separada antes do merge. Resultados injetados não reproduzem falha real de E/S de baixo (<a href="{GH}docs/history/0149-sync-backing-file-flags.md">R1</a>, <a href="{GH}docs/history/0150-propagate-index-xattr-read-errors.md">R2</a>).'),
  ('Security', 'Segurança',
   f'A written threat model ({adr("0011")}) with every finding recorded; private reporting through <a href="{GH}SECURITY.md">SECURITY.md</a>.',
   f'Um modelo de ameaças escrito ({adr("0011")}) com cada achado registrado; relato privado pelo <a href="{GH}SECURITY.md">SECURITY.md</a>.'),
@@ -117,16 +124,16 @@ RESEARCH = [
   f'A consulta responde a partir de uma partição por diretório quando "todo mundo que atravessa consegue ler". Bits de modo e ACLs dão uma condição suficiente; rótulos de segurança (SELinux, Smack) ainda não cabem nela, e sistemas com rótulos voltam à checagem resultado a resultado ({j("0104")}). Existe uma condição correta que traga os rótulos para dentro da partição?',
   'Security, databases', 'Segurança, banco de dados'),
  ('Ordered traversals in a kernel index', 'Percursos ordenados num índice do kernel',
-  f'SQLite is 4 to 6 times faster on "the N most recent" with a filter ({j("0047")}, {j("0048")}). Which in-kernel structure closes the gap without growing memory beyond the index budget?',
-  f'O SQLite é de 4 a 6 vezes mais rápido em "os N mais recentes" com filtro ({j("0047")}, {j("0048")}). Que estrutura dentro do kernel fecha essa diferença sem passar do orçamento de memória do índice?',
+  f'The optimization of {j("0048")} moved the short "N most recent" queries ahead of SQLite in that pilot. Long ordered traversals from the real client still lose, at about half the speed of SQLite at 60 000 memories ({j("0068")}, {j("0088")}). Which structure improves that measured case within the memory budget?',
+  f'A otimização do {j("0048")} colocou as consultas curtas "N mais recentes" à frente do SQLite naquele piloto. Os percursos ordenados longos do cliente real ainda perdem, com cerca de metade da velocidade do SQLite em 60 000 memórias ({j("0068")}, {j("0088")}). Que estrutura melhora esse caso medido dentro do orçamento de memória?',
   'Data structures, systems', 'Estruturas de dados, sistemas'),
  ('Kernel module or user-space index?', 'Módulo do kernel ou índice em espaço de usuário?',
   f'The same queries were measured against a per-domain SQLite index kept by inotify ({j("0092")}, {j("0094")}). Under which workloads does each win, and what does consistency cost on each side?',
   f'As mesmas consultas foram medidas contra um índice SQLite por domínio mantido por inotify ({j("0092")}, {j("0094")}). Em que cargas cada um ganha, e quanto custa a consistência de cada lado?',
   'Operating systems, evaluation', 'Sistemas operacionais, avaliação'),
  ('Measurement uncertainty in filesystem evaluation', 'Incerteza de medição na avaliação de sistemas de arquivos',
-  'Every number published so far comes from one host and few repetitions. A sound methodology (warm and cold cache, variance, repeatability across hosts) would turn pilot numbers into results.',
-  'Todos os números publicados até agora vêm de uma máquina e poucas repetições. Uma metodologia sólida (cache quente e frio, variância, repetição em outras máquinas) transformaria números-piloto em resultados.',
+  f'The early SQLite and client comparisons are pilots. The later module comparison uses 40 repetitions, held CPU frequency and confidence intervals ({j("0134")}, {j("0139")}, {j("0143")}). Repeating the SQLite comparisons with that method and reproducing them on other hardware remain open.',
+  f'As comparações iniciais com SQLite e com o cliente são pilotos. A comparação posterior entre módulos usa 40 repetições, frequência de CPU fixa e intervalos de confiança ({j("0134")}, {j("0139")}, {j("0143")}). Repetir as comparações com SQLite com esse método e reproduzi-las em outro hardware continua em aberto.',
   'Performance evaluation', 'Avaliação de desempenho'),
  ('Benchmarks for agent memory at the storage layer', 'Benchmarks de memória de agentes na camada de armazenamento',
   'Agent-memory papers benchmark recall quality; few measure the storage queries a memory system issues. A reproducible workload from real clients would be useful beyond this project.',

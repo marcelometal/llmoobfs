@@ -770,6 +770,11 @@ static unsigned int scan_delay_us;
 module_param(scan_delay_us, uint, 0644);
 MODULE_PARM_DESC(scan_delay_us, "tests only: microseconds the index scan sleeps between reading a file and storing it");
 
+/* Tests only: fail one listed attribute's value read, after listxattr succeeds. */
+static int scan_getxattr_errno_once;
+module_param(scan_getxattr_errno_once, int, 0644);
+MODULE_PARM_DESC(scan_getxattr_errno_once, "tests only: errno for one index-scan getxattr");
+
 /* One file being read from the lower filesystem into the index, by a build or an adoption. */
 struct moobl_loader {
 	struct list_head list;
@@ -1046,8 +1051,14 @@ static int attrs_read(struct dentry *lower, struct attr_buf *b)
 			continue;
 		if (moob_attr_name_reserved(name, strlen(name)) || !moob_attr_name_ok(name, strlen(name)))
 			continue;
-		n = vfs_getxattr(&nop_mnt_idmap, lower, p, b->value, MOOB_ATTR_VALUE_MAX + 1);
-		if (n <= 0 || moob_attr_validate(b->value, n) != MOOB_ATTR_OK)
+		n = xchg(&scan_getxattr_errno_once, 0);
+		n = n > 0 ? -n : vfs_getxattr(&nop_mnt_idmap, lower, p, b->value,
+						  MOOB_ATTR_VALUE_MAX + 1);
+		if (n == -ENODATA || n == -ERANGE)
+			continue;	/* removed meanwhile, or exceeds the typed-value limit */
+		if (n < 0)
+			return (int)n;
+		if (!n || moob_attr_validate(b->value, n) != MOOB_ATTR_OK)
 			continue;	/* invalid encodings are not indexed; moobfs-check reports them */
 		if (b->value[0] == MOOB_T_RAW)
 			continue;	/* raw payloads are stored but never indexed */

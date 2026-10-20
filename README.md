@@ -11,8 +11,13 @@
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
-> tag, `v0.4.1-experimental` (2026-10-20), has every fix made up to that date; later ones land on
-> `main`. Details under [Status](#status).
+> tag, `v0.4.1-experimental` (2026-10-20), is a source snapshot before this review batch.
+> The two findings of the [current review](docs/history/0144-independent-review.md)
+> have corrections in the review batch, which passed the full integrated VM suite.
+> The local batch KASAN/UBSAN/lockdep suite also passed; pull-request CI is a separate pre-merge gate.
+> `v0.4.1-experimental` still contains both defects. A later review (journal 0151) found a third,
+> a chmod during an index build that left the file in `QUERY2` answers; fixed in journal 0152.
+> See [Limitations](#limitations).
 
 ## The problem
 
@@ -107,11 +112,13 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 ## Status
 
 **Experimental. Source pre-release tags only; the last one, `v0.4.1-experimental` (2026-10-20), has
-every fix up to that date: findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
-production.** A later review found a defect in it, fixed on `main` only: a chmod during the first
-build of a domain could leave the file in `QUERY2` answers to users who can no longer read it
-(journals [0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
-Facts as of 2026-10-19:
+the fixes of findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
+production.** Three later findings affect it and are fixed on `main` only: stale file-status flags
+after `F_SETFL` and attribute-read errors taken as "no attribute" while indexing (review
+[0144](docs/history/0144-independent-review.md), R1 and R2), and a chmod during the first build of a
+domain that could leave the file in `QUERY2` answers to users who can no longer read it (journals
+[0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Facts as of 2026-10-20:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
@@ -145,8 +152,8 @@ For anything beyond a disposable VM, SQLite or plain files remain the recommenda
 The project has one maintainer and no outside human review yet. What would help most, by how much
 kernel knowledge it takes, is in **[docs/help-wanted.md](docs/help-wanted.md)**: a review of the
 credential model or of the index locking, if you know the VFS; a check of whether your memory
-system fits, if you build one; a run of the tests on your machine or on another kernel; and a
-few issues that need no kernel knowledge. Rules for changes are in
+system fits, if you build one; a run of the tests on your machine or on another kernel; and
+documentation or reproducibility corrections that need no kernel knowledge. Rules for changes are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
@@ -214,18 +221,26 @@ each: [adoption-risks.md](docs/adoption-risks.md).
 
 ## What was measured
 
-The report that answers the four questions of the [benchmark plan](docs/benchmark-plan.md) is
-[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). Every campaign is pilot-grade: one data-set seed, three repetitions at
-most, often one run, and a run-to-run noise of about 20 to 25 % on values of tens of
-microseconds. Numbers from different hosts are not compared with each other. The index code
-changed after most of these measurements (journals
-[0082](docs/history/0082-index-lock-and-reclaim.md),
-[0083](docs/history/0083-index-inspection-fixes.md)); only the two campaigns below were run after.
+The [M4 report](docs/history/0088-m4-report.md) gathers the early campaigns: one data-set seed,
+three repetitions at most, often one run, and run-to-run noise of about 20 to 25 % on values of
+tens of microseconds. Those are historical results for the modules named in each journal, not
+fresh measurements of this tag. Numbers from different hosts are not compared with each other.
 
-What the layer adds per operation, on the current module (10 000 memories, medians, bare lower
-against the layer): a read by path goes from 8.5 to 11.0 µs on ext4 (10.1 to 12.0 on btrfs, 9.8
-to 15.0 on XFS); setting one attribute from 8.9 to 21.7 µs (8.9 to 21.3; 6.0 to 11.6); creating a
-memory durably is unchanged within noise, because the device flushes take 12 to 14 ms.
+The later module-to-module comparison uses 40 repetitions, held CPU frequency, rotated module
+order and 95 % bootstrap intervals ([method](docs/history/0134-measurement-method-review.md),
+[journal 0139](docs/history/0139-query-buffer-regression.md),
+[confirmation](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). It found and fixed a
+roughly 2x query regression. The fixed module remains 1 to 3 % slower in median latency (p50) than module 0102 on three
+filtered shapes; the on-demand design in 0102 costs 7.6 to 12.5 % against the earlier module
+that built its index at mount. The cause of the remaining 1 to 3 % is unresolved. This is one
+host and one data set; it does not rerun the comparisons with SQLite or the real client.
+Tail latency differs more on some shapes: the median of per-run p99 for the two-equality
+query is 54 % above module 0102 in that confirmation (95 % interval: +51 to +55 %).
+
+What the layer added per operation in the M4 report's campaign (10 000 memories, medians, bare
+lower against the layer): a read by path went from 8.5 to 11.0 µs on ext4 (10.1 to 12.0 on btrfs,
+9.8 to 15.0 on XFS); setting one attribute from 8.9 to 21.7 µs (8.9 to 21.3; 6.0 to 11.6);
+creating a memory durably was unchanged within noise, because device flushes took 12 to 14 ms.
 
 What a side database costs at write time, which this project had assumed and never measured:
 almost nothing. Publishing a memory durably takes 6.6 to 8.5 ms with the file alone, and 6.6 to
@@ -268,7 +283,8 @@ Where it loses, ties or costs:
   [0031](docs/history/0031-remount-time.md), [0055](docs/history/0055-measurement-gaps.md)).
 - **Memory.** About 0.5 to 0.6 KiB of kernel memory per file that cannot be paged out, by the
   index's own accounting, which undercounts. The 128 MiB default budget was never reached in a
-  test.
+  test. Query buffers are additional: up to about 1.1 MB is retained per open file that queried
+  with the maximum result limit, until close (journal 0139).
 - **Writes of the real client** were about 10 % slower in one run, and a page it writes is
   queryable about 11 ms later, not when the write returns: a separate process copies its fields
   into attributes ([journal 0071](docs/history/0071-client-stage2-live-mirror.md)). The client
@@ -277,8 +293,8 @@ Where it loses, ties or costs:
   small for small files: 6.7 % on btrfs and 13.6 % on XFS on a set where 15 % of the files are
   copies, none on ext4 ([journal 0085](docs/history/0085-m4-question-3-space.md)).
 
-Not measured: CPU and memory per query, concurrency, a second client's latency, repetitions
-with confidence intervals. Raw results: [bench/results/](bench/results/README.md).
+Still missing: CPU and memory per query, throughput under concurrency, a second client's
+latency, and a repeat of the SQLite/client comparisons with confidence intervals. Raw results: [bench/results/](bench/results/README.md).
 
 ## Try it in a VM
 
@@ -355,6 +371,23 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 ## Limitations
 
+- **The review batch passed the full integrated VM suite and local KASAN/UBSAN/lockdep.**
+  `v0.4.1-experimental` contains both defects identified in
+  [review 0144](docs/history/0144-independent-review.md): stale backing-file flags after
+  `F_SETFL`, and lower `getxattr` errors silently skipped during indexing. R1 synchronizes
+  mutable flags before delegated I/O ([0149](docs/history/0149-sync-backing-file-flags.md));
+  clearing and setting append both passed on ext4, btrfs and XFS in the integrated run at
+  `49098aa`. R2 propagates operational read errors and preserves the existing exclusions for
+  missing, oversized and malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
+  the same full VM run passed its injected-error regression and the acceptance/layer suites.
+  A third review ([0151](docs/history/0151-review-d110d4e.md)) found that a chmod during the
+  first build of a domain could leave the file in `QUERY2` answers to users who can no longer read
+  it; fixed in [0152](docs/history/0152-chmod-during-build-fixed.md), with a suite test and a negative round.
+  Negative rounds detected both original defects. Injecting the read result does not reproduce
+  an actual lower-filesystem I/O failure. The full local sanitizer run at `49098aa`
+  reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` and
+  `MOOBFS_KASAN_PASS` on Linux 6.12.112. Pull-request CI remains a separate pre-merge gate.
+
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
   kernel APIs are version-specific and the pinned test target is not a compatibility promise. On
   another architecture the module ran only in the exploratory arm64 job (emulated, three lower
@@ -366,8 +399,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
   mounts are refused, and so is an idmapped mount as `lower=`; no rootless containers.
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
-- Only pilot-grade figures exist: two hosts, one data-set seed, three repetitions at most
-  (journals 0025 to 0085). No speed or efficiency claim beyond the conditions stated in
+- Early SQLite/client figures are pilots: two hosts, one data-set seed, three repetitions at
+  most (journals 0025 to 0085). Later module comparisons use 40 repetitions and intervals
+  (journals 0139 and 0143). No speed or efficiency claim beyond the conditions stated in
   [What was measured](#what-was-measured) may be made from them; no comparison with FUSE
   exists, and the comparison with the bare lower filesystem on the current module is pending.
 - No outside human review. Two independent source reviews by AI assistants (journals
@@ -380,11 +414,12 @@ KASAN harness runs the layer suite), and no benchmark exists.
   [0082](docs/history/0082-index-lock-and-reclaim.md) and
   [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.4.0-experimental` carry
   defects fixed later; fixes after `v0.4.1-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
-  syzkaller ran for five six-hour rounds, now above the coverage threshold of
-  [security roadmap](docs/security-roadmap.md) S3. SELinux enforcing was exercised once (journal
+  syzkaller ran for five six-hour rounds, above the aggregate PC threshold of
+  [security roadmap](docs/security-roadmap.md) S3; `moobl_xattr_get` still lacks coverage evidence. SELinux enforcing was exercised once (journal
   0104); AppArmor and Smack were not.
-- `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
-  after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
+- `QUERY` authorization holds at query time only (TOCTOU contract). A directory rename through
+  the layer makes its domain stale and the next query rebuilds it; direct lower-tree changes
+  remain untracked ([spec-m3](docs/spec-m3.md) §3.1 and its correction note).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower
   filesystem's. Acceptance ran over ext4 only.
 - Inode numbers are the lower's, and a file is identified by that number. A btrfs subvolume or

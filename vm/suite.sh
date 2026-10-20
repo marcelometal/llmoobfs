@@ -21,6 +21,8 @@
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
+#   xattrread           a listed typed value that fails getxattr must fail a build or invalidate
+#                       a built domain; an attribute removed between list/get is skipped
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -30,7 +32,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -48,6 +50,8 @@ run_lower() {
     grep -q 'moobfs_layer' /proc/mounts || fail "layer-proc-mounts-$fs"
     mount -t moobfs_layer -o lower="$LAYER" none /mnt && fail "layer-stack-on-itself-$fs"
     "$BIN/layer" "$LAYER" "$LOWER" "$reflink" links || fail "layer-tests-$fs"
+    "$BIN/fcntl-flags" "$LAYER/fcntl-flags" || fail "fcntl-flags-$fs"
+    rm "$LAYER/fcntl-flags" || fail "fcntl-flags-cleanup-$fs"
     # every refusal of a typed attribute write with its errno, and the limit of 64 per file,
     # paths a syzkaller seed reaches poorly (journal 0141); prints TYPED_LIMITS_PASS
     "$BIN/layer" typed "$LAYER" "$LOWER" || fail "typed-limits-$fs"
@@ -1445,6 +1449,45 @@ done
 [ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
 umount "$LAYER" && rm -rf "$LOWER/bdx" && umount "$LOWER" || fail "bd-cleanup"
 echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
+fi
+if want xattrread; then
+# The test-only knob returns one error after listxattr finds a typed attribute. A failed
+# first build must return EIO and the next query must rebuild it. A failed adoption into
+# a built domain must invalidate it so that the next query finds the moved file.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail "xr-lower-mount"
+mkdir "$LOWER/xattr-read-0150" || fail "xr-root"
+mkdir "$LOWER/xattr-read-0150/source" "$LOWER/xattr-read-0150/incoming" \
+      "$LOWER/xattr-read-0150/target" "$LOWER/xattr-read-0150/memory" \
+      "$LOWER/xattr-read-0150/removed" || fail "xr-domains"
+: > "$LOWER/xattr-read-0150/source/file" || fail "xr-file"
+: > "$LOWER/xattr-read-0150/incoming/file" || fail "xr-incoming-file"
+: > "$LOWER/xattr-read-0150/memory/file" || fail "xr-memory-file"
+: > "$LOWER/xattr-read-0150/removed/file" || fail "xr-removed-file"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/source/file" kind string note || fail "xr-attr"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/incoming/file" kind string note || fail "xr-incoming-attr"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/memory/file" kind string note || fail "xr-memory-attr"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/removed/file" kind string note || fail "xr-removed-attr"
+mount -t moobfs_layer -o lower="$LOWER/xattr-read-0150",domain_depth=1 none "$LAYER" || fail "xr-layer-mount"
+knob=/sys/module/moobfs_layer/parameters/scan_getxattr_errno_once
+echo 5 > "$knob" || fail "xr-arm-eio"
+got=$("$BIN/query" "$LAYER/source" q2errno kind eq string note) || fail "xr-build-query"
+[ "$got" = 'q2 5' ] || { echo "XR_BUILD_EIO: $got"; fail "xr-build-eio"; }
+[ "$("$BIN/query" "$LAYER/source" q2 kind eq string note | cut -f2)" = file ] || fail "xr-retry"
+echo 12 > "$knob" || fail "xr-arm-enomem"
+[ "$("$BIN/query" "$LAYER/memory" q2errno kind eq string note)" = 'q2 12' ] || fail "xr-build-enomem"
+[ "$("$BIN/query" "$LAYER/memory" q2 kind eq string note | cut -f2)" = file ] || fail "xr-enomem-retry"
+[ "$("$BIN/query" "$LAYER/target" q2errno kind eq string note)" = 'q2 0' ] || fail "xr-target-build"
+echo 5 > "$knob" || fail "xr-arm-adopt-eio"
+mv "$LAYER/incoming/file" "$LAYER/target/link" || fail "xr-rename"
+"$BIN/query" "$LAYER/target" q2 kind eq string note > /tmp/xr-adopt.txt || fail "xr-adopt-query"
+[ "$(cut -f2 /tmp/xr-adopt.txt)" = link ] || { cat /tmp/xr-adopt.txt; fail "xr-adopt-rebuild"; }
+# ENODATA means that the listed name disappeared before its value was fetched; it is
+# permitted to skip that value. The test knob simulates that race without another writer.
+echo 61 > "$knob" || fail "xr-arm-enodata"
+[ "$("$BIN/query" "$LAYER/removed" q2errno kind eq string note)" = 'q2 0' ] || fail "xr-enodata"
+[ "$(cat "$knob")" = 0 ] || fail "xr-disarmed"
+umount "$LAYER" && umount "$LOWER" || fail "xr-unmount"
+echo "XATTRREAD_PASS: EIO/ENOMEM build errors, retry, adoption rebuild and ENODATA race"
 fi
 rmmod moobfs_layer || fail layer-unload
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in

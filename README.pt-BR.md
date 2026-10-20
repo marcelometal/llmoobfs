@@ -14,8 +14,15 @@
 
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
-> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), tem todas as correções
-> feitas até essa data; as seguintes entram na `main`. Detalhes em [Estado](#estado).
+> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
+> código anterior a este lote de revisão. Os dois achados da
+> [revisão atual](docs/history/0144-independent-review.md) têm correções no lote de revisão,
+> que passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.
+> A CI do pull request é uma etapa separada e obrigatória antes do merge.
+> A `v0.4.1-experimental` ainda contém
+> ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
+> construção do índice que deixava o arquivo nas respostas do `QUERY2`; corrigido no diário 0152.
+> Veja [Limitações](#limitações).
 
 ## O problema
 
@@ -114,12 +121,14 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 ## Estado
 
 **Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
-(2026-10-20), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
-de cotas justas do F2. Não é para produção.** Uma revisão posterior achou nela um defeito, corrigido
-só na `main`: um chmod durante a primeira construção de um domínio podia deixar o arquivo nas
+(2026-10-20), contém as correções dos achados F1 a F12 do ADR-0011, exceto a parte
+de cotas justas do F2. Não é para produção.** Três achados posteriores a afetam e estão corrigidos só
+na `main`: flags de estado do arquivo desatualizadas depois de `F_SETFL` e erros de leitura de
+atributo tomados como "sem atributo" ao indexar (revisão [0144](docs/history/0144-independent-review.md),
+R1 e R2), e um chmod durante a primeira construção de um domínio, que podia deixar o arquivo nas
 respostas do `QUERY2` para usuários que já não conseguem lê-lo (diários
 [0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
-Fatos em 2026-10-19:
+Fatos em 2026-10-20:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
@@ -156,7 +165,8 @@ O projeto tem um mantenedor e ainda nenhuma revisão humana externa. O que mais 
 quanto conhecimento de kernel exige, está em **[docs/help-wanted.md](docs/help-wanted.md)**: uma
 revisão do modelo de credenciais ou das travas do índice, se você conhece o VFS; uma verificação
 de se o seu sistema de memória se encaixa, se você constrói um; uma rodada dos testes na sua
-máquina ou em outro kernel; e algumas issues que não exigem conhecimento de kernel. As regras para
+máquina ou em outro kernel; e correções de documentação ou de reprodutibilidade que não exigem
+conhecimento de kernel. As regras para
 mudanças estão em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
@@ -225,19 +235,30 @@ responde a cada um: [adoption-risks.md](docs/adoption-risks.md).
 
 ## O que foi medido
 
-O relatório que responde às quatro perguntas do [plano de benchmark](docs/benchmark-plan.md) é o
-[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). Toda campanha é de nível piloto:
-uma semente de dados, no máximo três repetições, muitas vezes uma só rodada, e um ruído entre
-rodadas de cerca de 20 a 25 % em valores de dezenas de microssegundos. Números de máquinas
-diferentes não são comparados entre si. O código do índice mudou depois da maior parte dessas
-medições (diários [0082](docs/history/0082-index-lock-and-reclaim.md),
-[0083](docs/history/0083-index-inspection-fixes.md)); só as duas campanhas abaixo rodaram depois.
+O [relatório M4](docs/history/0088-m4-report.md) reúne as campanhas iniciais: uma semente de
+dados, no máximo três repetições, muitas vezes uma só rodada, e ruído entre rodadas de cerca de
+20 a 25 % em valores de dezenas de microssegundos. São resultados históricos dos módulos
+indicados em cada diário, não novas medições desta tag. Números de máquinas diferentes não são
+comparados entre si.
 
-O que a camada acrescenta por operação, no módulo atual (10 000 memórias, medianas, sistema de
-baixo puro contra a camada): uma leitura por caminho vai de 8,5 para 11,0 µs no ext4 (10,1 para
-12,0 no btrfs, 9,8 para 15,0 no XFS); gravar um atributo, de 8,9 para 21,7 µs (8,9 para 21,3; 6,0
-para 11,6); criar uma memória de forma durável não muda dentro do ruído, porque os flushes do
-dispositivo levam 12 a 14 ms.
+A comparação posterior entre módulos usa 40 repetições, frequência de CPU fixa, ordem dos
+módulos alternada e intervalos bootstrap de 95 %
+([método](docs/history/0134-measurement-method-review.md),
+[diário 0139](docs/history/0139-query-buffer-regression.md),
+[confirmação](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). Ela encontrou e corrigiu
+uma regressão de aproximadamente 2x nas consultas. O módulo corrigido continua 1 a 3 % mais
+lento na latência mediana (p50) que o módulo 0102 em três formatos filtrados; o desenho sob demanda do 0102 custa 7,6 a
+12,5 % contra o módulo anterior, que construía o índice na montagem. A causa dos 1 a 3 % restantes
+segue sem explicação. É uma máquina e um conjunto de dados; essa comparação não repete as
+medições contra SQLite nem com o cliente real. A latência de cauda difere mais em alguns
+formatos: a mediana dos p99 de cada rodada na consulta de duas igualdades ficou 54 % acima do
+módulo 0102 nessa confirmação (intervalo de 95 %: +51 a +55 %).
+
+O que a camada acrescentou por operação na campanha do relatório M4 (10 000 memórias, medianas,
+sistema de baixo puro contra a camada): uma leitura por caminho passou de 8,5 para 11,0 µs no
+ext4 (10,1 para 12,0 no btrfs, 9,8 para 15,0 no XFS); gravar um atributo, de 8,9 para 21,7 µs
+(8,9 para 21,3; 6,0 para 11,6); criar uma memória de forma durável não mudou dentro do ruído,
+porque os flushes do dispositivo levavam 12 a 14 ms.
 
 O que um banco ao lado custa na escrita, que este projeto supunha e nunca tinha medido: quase
 nada. Publicar uma memória de forma durável leva 6,6 a 8,5 ms só com o arquivo, e 6,6 a 8,7 ms com
@@ -280,7 +301,8 @@ Onde perde, empata ou custa:
   (diários [0031](docs/history/0031-remount-time.md), [0055](docs/history/0055-measurement-gaps.md)).
 - **Memória.** Cerca de 0,5 a 0,6 KiB de memória do kernel por arquivo, que não vai para o swap,
   pela contagem do próprio índice, que subconta. O orçamento padrão de 128 MiB nunca foi atingido
-  num teste.
+  num teste. Os buffers de consulta são adicionais: até cerca de 1,1 MB fica retido por arquivo
+  aberto que consultou com o limite máximo de resultados, até fechar (diário 0139).
 - **As escritas do cliente real** ficaram cerca de 10 % mais lentas numa rodada, e uma página que
   ele escreve fica consultável cerca de 11 ms depois, não quando a escrita retorna: um processo à
   parte copia os campos para atributos ([diário 0071](docs/history/0071-client-stage2-live-mirror.md)).
@@ -289,8 +311,8 @@ Onde perde, empata ou custa:
   pequena para arquivos pequenos: 6,7 % no btrfs e 13,6 % no XFS num conjunto em que 15 % dos
   arquivos são cópias, nenhuma no ext4 ([diário 0085](docs/history/0085-m4-question-3-space.md)).
 
-Não medido: CPU e memória por consulta, concorrência, a latência de um segundo cliente,
-repetições com intervalos de confiança. Resultados brutos: [bench/results/](bench/results/README.md).
+Ainda faltam: CPU e memória por consulta, vazão sob concorrência, latência de um segundo
+cliente e repetição das comparações com SQLite e com o cliente com intervalos de confiança. Resultados brutos: [bench/results/](bench/results/README.md).
 
 ## Experimente numa VM
 
@@ -368,6 +390,24 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
 
 ## Limitações
 
+- **O lote de revisão passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.**
+  A `v0.4.1-experimental` contém ambos os defeitos da
+  [revisão 0144](docs/history/0144-independent-review.md): flags desatualizadas no arquivo de baixo
+  após `F_SETFL` e erros de `getxattr` ignorados silenciosamente durante a indexação. R1
+  sincroniza flags mutáveis antes de delegar a E/S ([0149](docs/history/0149-sync-backing-file-flags.md));
+  limpar e ativar append passaram em ext4, btrfs e XFS na rodada integrada do commit `49098aa`.
+  R2 propaga erros operacionais de leitura e preserva as exclusões existentes de atributos
+  ausentes, grandes demais ou malformados ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
+  uma terceira revisão ([0151](docs/history/0151-review-d110d4e.md)) achou que um chmod durante a
+  primeira construção de um domínio podia deixar o arquivo nas respostas do `QUERY2` para quem já não
+  consegue lê-lo, corrigido no [0152](docs/history/0152-chmod-during-build-fixed.md);
+  a mesma rodada completa em VM passou na regressão com erros injetados e nas suítes de
+  aceitação e da camada. As negativas detectaram ambos os defeitos originais. Injetar o
+  resultado de leitura não reproduz uma falha real de E/S do sistema de baixo. A rodada local
+  completa sob sanitizers no commit `49098aa` registrou `XATTRREAD_PASS`,
+  `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` e `MOOBFS_KASAN_PASS` no Linux 6.12.112.
+  A CI do pull request é uma etapa separada e obrigatória antes do merge.
+
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
   APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em
   outra arquitetura, o módulo só rodou no job exploratório de arm64 (com emulação, três sistemas de
@@ -381,8 +421,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   e idmapped são recusadas, assim como uma montagem idmapped como `lower=`; não há contêineres sem
   root.
 - As UAPIs v1 e v2 podem mudar, sem promessa de compatibilidade ([compatibility.md](docs/compatibility.md)); as tags `-experimental` são instantâneos do código-fonte, sem binários, empacotamento nem suporte.
-- Só existem números de nível piloto: duas máquinas, uma semente de dados, no máximo três
-  repetições (diários 0025 a 0085). Nenhuma afirmação de velocidade ou eficiência além das
+- Os números iniciais contra SQLite e com o cliente são pilotos: duas máquinas, uma semente de
+  dados, no máximo três repetições (diários 0025 a 0085). Comparações posteriores entre módulos
+  usam 40 repetições e intervalos (diários 0139 e 0143). Nenhuma afirmação de velocidade ou eficiência além das
   condições descritas em [O que foi medido](#o-que-foi-medido) pode ser feita a partir deles; não
   existe comparação com FUSE, e a comparação com o sistema de arquivos de baixo puro no módulo atual
   está pendente.
@@ -397,10 +438,13 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   [0083](docs/history/0083-index-inspection-fixes.md). As tags até a `v0.4.0-experimental` carregam
   defeitos corrigidos depois; as correções posteriores à `v0.4.1-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
   ([vm/fstests/](vm/fstests/README.md)); o syzkaller rodou cinco rodadas de seis horas; a última
-  medição ficou acima do limiar de cobertura do item S3 do [roteiro de segurança](docs/security-roadmap.md). O SELinux em
+  medição ficou acima do limiar agregado de PCs do item S3 do [roteiro de segurança](docs/security-roadmap.md),
+  mas ainda falta evidência de cobertura de `moobl_xattr_get`. O SELinux em
   modo enforcing foi exercitado uma vez (diário 0104); AppArmor e Smack não foram.
-- A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU); falsos negativos
-  possíveis depois de renomear um diretório, até remontar ([spec-m3](docs/spec-m3.md) §3.1).
+- A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU). Renomear um
+  diretório pela camada torna o domínio desatualizado e a próxima consulta o reconstrói;
+  mudanças diretas na árvore de baixo continuam sem rastreamento
+  ([spec-m3](docs/spec-m3.md) §3.1 e sua nota de correção).
 - A atomicidade entre arquivo e metadados é uma convenção do cliente; durabilidade, reflink e
   dedupe são do sistema de arquivos de baixo. A aceitação rodou só sobre ext4.
 - Os números de inode são os do sistema de baixo, e um arquivo é identificado por esse número. Um

@@ -151,16 +151,28 @@ above.
 
 ## 5. Running a single test
 
-Not supported yet; `vm/suite.sh` is sequential and stops at the first failure.
-Edit a local copy of the suite to skip steps while debugging, but do not commit
-such edits. A `MOOB_ONLY=<step>` switch is planned (community plan, section 1).
+`MOOB_ONLY=<step> make vm-test` runs selected named steps of `vm/suite.sh` in a
+disposable VM and stops at the first failure. It ends in `MOOBFS_ONLY_PASS`,
+which is partial evidence, not a substitute for the complete suite. The step
+names are checked by `vm/suite.sh` before the guest starts.
+
+Correction dated 2026-10-20: this section previously said the switch was only
+planned, although section 6 and the suite already described and implemented it.
 
 ## 6. KASAN locally and in CI
 
 While developing, `MOOB_ONLY="btrfs powerloss" make vm-test` (or the same variable before
-`sh vm/kasan-local.sh`) runs only those steps of `vm/suite.sh`: `ext4`, `btrfs`, `xfs`, `demo`,
-`clients`, `powerloss`, `ioerror`, `reserve`. Such a run ends in `MOOBFS_ONLY_PASS` and is not
+`sh vm/kasan-local.sh`) runs only those steps of `vm/suite.sh`; the accepted
+names are listed in its `MOOB_ONLY` validation. Such a run ends in `MOOBFS_ONLY_PASS` and is not
 evidence for a pull request.
+
+The complete `ext4`, `btrfs` and `xfs` steps include `tests/fcntl-flags.c`:
+after clearing `O_APPEND` with `F_SETFL`, a positional write must overwrite at
+its requested offset; after setting it again, the write must append (journal
+0149). `MOOB_ONLY=xattrread make vm-test` exercises injected `EIO` and `ENOMEM`
+on a listed typed value during index construction, retry, adoption into a
+built domain and an `ENODATA` list/get race (journal 0150). It injects the
+value-read result in the module; it does not simulate a physical lower-I/O fault.
 
 See [development.md](development.md) section 6 for the command-by-command
 reproduction of `.github/workflows/kasan.yml`. The job starts on every pull
