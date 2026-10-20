@@ -1,6 +1,6 @@
 # 0156 — Round 2 of the independent review: findings verified, fixed, tested or recorded
 
-Date: 2026-10-20. Status: in progress (local branch `review2-batch`; KASAN run pending).
+Date: 2026-10-20. Status: done; pull request 109, merge awaiting the maintainer.
 
 ## Goal
 
@@ -100,17 +100,25 @@ KASAN run for the whole batch.
   the chmod check on all three; `BIGDIR_PASS`, `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`,
   `MOOBFS_LAYER_PASS`. The Debian harness has no `fail-nth`, so `FAULT_INJECTION_PASS` is not
   part of it.
-- KASAN/UBSAN/lockdep with `failnth`: see the addendum.
+- KASAN/UBSAN/lockdep in the CI of pull request 109 (run 39466977662): `MOOBFS_KASAN_PASS`,
+  `HOMOGENEITY_GAPS_PASS` on the three filesystems, and `FAULT_INJECTION_PASS: operations=22
+  calls=322 faults=300 unexpected=0`, the first run of the extended `failnth`. The new checks
+  saw faults: `create` 8, `link` 4, `chmod-file` 1, `setxattr-then-move` 2; no state check
+  reported a difference.
 
 ## Limitations
 
-- The `failnth` checks for R2-3, R2-4 and R2-8 run only in the KASAN harness and have not run.
+- The `failnth` state checks for R2-3, R2-4 and R2-8 passed, but had no negative round: they
+  were not run with the fixes undone. With one or two faults per operation, nothing shows that
+  the injected failure landed on the fixed path.
 - R2-6 and R2-10 have no test of their own.
 - The F14 advisory exists as a private draft (GHSA-qgjj-2f2p-q82m), to be published after the
-  merge; the issues are drafted outside the repository and not opened.
+  merge.
+- Deferred to issues, opened with the pull request: R2-5 #110, R2-7 #111, R2-9 #112, R2-11
+  #113, T5 to T11 #114, V1, V3, V5, V7 #115, M1 #116, M2 #117, M3 #118, M4, M6, M7, M8 #119.
 - ADR-0017 is a proposal.
 
 ## Next step
 
-KASAN once for the batch. Then the maintainer's decisions: ADR-0017, the F14 advisory and the
-issue list. Then the pull request.
+Merge, then publish the F14 advisory. Then a negative round for the new `failnth` checks in the
+KASAN harness, and the round-3 review request (filled in outside the repository).
