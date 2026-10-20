@@ -61,3 +61,16 @@ Zenodo record or archived file is modified.
 
 Next: maintainer review of the signed local commit. Recheck `main` before later
 publication. No push, pull request or merge is authorized by this preparation.
+
+## 2026-10-20 — Publication follow-up
+
+The maintainer authorized pushing this branch and opening a pull request, while
+reserving merge for a later explicit approval. This replaces the preparation-only
+publication restriction above; the README content and citation scope are unchanged.
+
+The remote `main` was reconfirmed at `2993df2`, the preparation base. The isolated
+branch was clean, only the six expected documentation files differed, whitespace
+checks passed, `CITATION.cff` was unchanged and no pull request used this head
+branch. No other session's checkout or uncommitted work was incorporated. The
+documentation checks above remain valid for the unchanged badge and citation.
+Next: push this branch and open the pull request; no merge is authorized.
