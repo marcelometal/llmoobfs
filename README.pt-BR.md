@@ -431,7 +431,7 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   (diários [0111](docs/history/0111-review-5582e06.md) e [0114](docs/history/0114-second-inspection-of-5582e06.md)),
   e os testes do próprio projeto acharam e corrigiram defeitos do lado do kernel, alguns de
   segurança; os achados estão no [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
-  (F1 a F12), e os defeitos anteriores nos diários [0015](docs/history/0015-phase-2e-investigation.md),
+  (F1 a F14), e os defeitos anteriores nos diários [0015](docs/history/0015-phase-2e-investigation.md),
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md) e
@@ -458,6 +458,12 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   ext4 só vão para quem o ext4 os daria num acesso direto (achado F4, diário 0132).
 - `noatime`, `relatime` e `strictatime` na montagem da camada não têm efeito; os tempos de acesso
   seguem as opções de montagem do sistema de arquivos de baixo.
+- `sync_file_range(2)` pela camada dá sucesso e não grava nada: as páginas ficam no cache do arquivo
+  de baixo, que ele não alcança (V2 do diário 0155; o overlayfs tem a mesma lacuna). Use `fsync` ou
+  `fdatasync`.
+- Com domínios ligados, nada a mais de 64 componentes abaixo da raiz da montagem é indexado nem
+  respondido pelo `QUERY2`: os caminhos de escrita não conseguem localizar nomes mais fundos
+  (achado F14, diário 0156). Os arquivos continuam sendo lidos e gravados normalmente.
 
 ## O que está implementado, com evidência
 

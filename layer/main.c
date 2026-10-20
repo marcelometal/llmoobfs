@@ -171,7 +171,10 @@ static int moobl_inode_set(struct inode *inode, void *data)
 	} else if (S_ISLNK(inode->i_mode)) {
 		inode->i_op = &moobl_symlink_iops;
 	} else {
-		/* Devices and fifos: attributes only; opening them is refused. */
+		/*
+		 * Devices, FIFOs and sockets. Devices cannot be opened (SB_I_NODEV); a FIFO or a
+		 * socket opened through the layer is its own endpoint, not the lower's (V9, 0155).
+		 */
 		inode->i_op = &moobl_special_iops;
 		init_special_inode(inode, inode->i_mode, lower->i_rdev);
 	}

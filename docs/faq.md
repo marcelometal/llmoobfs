@@ -142,7 +142,7 @@ APIs change between versions; compatibility with other kernels is not promised.
 It is not production-ready. It is a research project with source pre-release tags only, the last of which,
 `v0.4.1-experimental` (2026-10-20), is a source snapshot before the corrections in review 0144. A module bug can cause a
 kernel panic or data loss; the project's tests and two source reviews by AI assistants found
-kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but the fairness
+kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011, all but the fairness
 part of F2 fixed). Run it only in a disposable VM with synthetic data.
 
 The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md)

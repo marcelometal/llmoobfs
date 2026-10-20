@@ -37,6 +37,8 @@ Suggested order by cost-benefit. Each item has a verifiable done-when criterion.
 
 *Status, 2026-10-12 (journal 0060).* Done: [ADR-0011](decisions/0011-threat-and-credential-model.md),
 with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (journal 0084).
+*Update, 2026-10-20 (journal 0156):* findings F13 (review round 1, journal 0151) and F14 (round 2, journal 0155) recorded and fixed; the other defects of round 2 are fixed or recorded as issues, and S14 to S21 below plan the tests that would have found them.
+
 *Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.

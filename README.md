@@ -407,7 +407,7 @@ KASAN harness runs the layer suite), and no benchmark exists.
 - No outside human review. Two independent source reviews by AI assistants (journals
   [0111](docs/history/0111-review-5582e06.md) and [0114](docs/history/0114-second-inspection-of-5582e06.md))
   and the project's own tests found and fixed kernel-side defects, security ones among them; the
-  findings are listed in [ADR-0011](docs/decisions/0011-threat-and-credential-model.md) (F1 to F12),
+  findings are listed in [ADR-0011](docs/decisions/0011-threat-and-credential-model.md) (F1 to F14),
   the earlier defects in journals [0015](docs/history/0015-phase-2e-investigation.md),
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
@@ -432,6 +432,12 @@ KASAN harness runs the layer suite), and no benchmark exists.
   them directly (finding F4, journal 0132).
 - `noatime`, `relatime` and `strictatime` on the layer's mount have no effect; access times
   follow the mount options of the lower filesystem.
+- `sync_file_range(2)` through the layer succeeds and writes nothing: the pages live in the
+  lower file's cache, which it does not reach (V2 of journal 0155; overlayfs has the same gap).
+  Use `fsync` or `fdatasync`.
+- With domains on, nothing more than 64 components below the mount root is indexed or answered by
+  `QUERY2`: the write paths cannot place deeper names (finding F14, journal 0156). The files are
+  still read and written normally.
 
 ## What is implemented, with evidence
 
