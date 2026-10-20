@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Tests (journal 0141): new suite marker `TYPED_LIMITS_PASS` (`tests/layer.c typed`, once per
+  lower filesystem): every refusal of a typed attribute write with its errno and an unchanged
+  lower, and the limit of 64 per file (the 65th gives `ENOSPC`, replacing and removing at the
+  limit, what does not count). `q2invalid` and `invalid` now check each term and header rule of
+  `QUERY2` and `QUERY` next to a valid request. Paths syzkaller reaches poorly (journal 0138).
 - Fixed (journal 0139): since pull request 71 every `QUERY`/`QUERY2` allocated a buffer for the
   requested limit (about 1.1 MB at the maximum), which made filtered queries 1.3 to 2.5 times
   slower; the buffer is now kept with the open file and reused. Measured with the method of
