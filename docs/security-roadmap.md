@@ -287,7 +287,7 @@ because it changes timing.
 Planned, not started. Rounds 1 and 2 of the independent review found defects no test could see.
 The tests checked the end state, not the windows in between, and the same assistants wrote the
 code and its tests. These items make the test suite itself find that kind of defect. ADR-0017
-(proposed) refers to S14 and S15.
+(accepted on 2026-10-20) refers to S14 and S15; these commitments remain planned.
 
 - **S14. Mutation testing of the homogeneity rule.** A CI job removes, one at a time, each check
   of `reach_ok()`, `target_ok()`, `ext_acl()`, `place_dentry_above()` and the scan's
