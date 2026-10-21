@@ -197,7 +197,17 @@ int main(int argc, char **argv)
 			case OP_LOOKUP: fresh(a, sizeof a, "db", 1); break;
 			case OP_LINK: fresh(b, sizeof b, "da", 1); snprintf(a, sizeof a, "da/l%06d", seq++); break;
 			case OP_CHMOD_FILE:	/* one entry; 0600 moves it to the heterogeneous partition */
-				fresh(a, sizeof a, "da", 1);
+				/* A fresh domain has no existing heterogeneous name node to reuse.
+				 * Otherwise a previous operation can make this update allocate nothing,
+				 * and a negative round misses the empty-record defect (journal 0170). */
+				snprintf(b, sizeof b, "p%06d", seq++);
+				if (mkdir(up(b), 0755)) { perror("chmod domain"); return 2; }
+				fresh(a, sizeof a, b, 1);
+				dfd = open(up(b), O_RDONLY | O_DIRECTORY);
+				q2_fill(&q[0], res, 64);
+				if (dfd < 0 || ioctl(dfd, MOOB_IOC_QUERY2, &q[0]) || q[0].count != 1) {
+					perror("chmod domain build"); return 2;
+				}
 				if (info_of(&i0)) { perror("info"); return 2; }
 				break;
 			case OP_REPLACE_THEN_MOVE:	/* kind is replaced under the fault, tag is not */

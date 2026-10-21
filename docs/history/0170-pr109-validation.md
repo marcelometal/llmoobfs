@@ -42,6 +42,11 @@ Do not push, merge the GitHub PR or publish an advisory in this preparation.
   fault 2, where the moved file is missing from the destination answer. It ends
   with `unexpected=1` and the harness fails. The unmodified integrated faults
   step passed; this is executed regression evidence, not a compiler failure.
+- First R2-8 mutation (`3f46981`) unexpectedly passed: prior operations had already
+  created the heterogeneous `kind` name node in the shared domain, so changing
+  permissions could reuse it without the allocation this check needed to fail.
+  Give each chmod attempt a fresh built domain. This retains the public syscall
+  scenario while requiring the transition to allocate its new partition's node.
 
 ## Limitations and next step
 
