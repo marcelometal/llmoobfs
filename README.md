@@ -219,6 +219,9 @@ each: [adoption-risks.md](docs/adoption-risks.md).
 **How to check any claim here.** Run `make vm-test` and read `build/vm/console.log`
 ([testing guide](docs/testing.md)); set up the environment with
 [docs/development.md](docs/development.md).
+Require the final markers and no `MOOBFS_VM_FAIL`; QEMU exit 0 alone is insufficient.
+`CASEFOLD_SKIPPED`, `STALL_SKIPPED` and an idmapped lower marked `not tested`
+remain coverage exclusions. `ipc` is built but not invoked by the suite.
 
 ## What was measured
 

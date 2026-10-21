@@ -99,9 +99,13 @@ Inside the container, `vm/in-container.sh`:
   `log.img`, 64 MiB each) for dm-log-writes and dm-flakey;
 - boots `qemu-system-x86_64 -machine q35 -accel tcg -cpu max -m 512M -smp 2`
   with the five images as virtio disks, `rdinit=/init`, no network, under
-  `timeout 600`;
+  `timeout 1200`;
 - requires QEMU to exit 0 and the console to contain `MOOBFS_VM_PASS:`,
   `MOOBFS_LAYER_PASS:` and `MOOBFS_ACCEPTANCE_PASS:` and no `MOOBFS_VM_FAIL:`.
+  QEMU exit 0 alone is insufficient: the guest also powers off on failure.
+  Optional skips remain exclusions; see the testing guide.
+- runs `tests/test_harness_verdicts.py` in the container before building the
+  modules: controlled producer/child failures and success controls, without a module.
 
 Logs and evidence land in `build/vm/`:
 
@@ -117,7 +121,7 @@ Logs and evidence land in `build/vm/`:
 CI uploads `console.log`, `image-report.json`, `environment.txt` and
 `kernel.config` as the `native-vm-evidence` artifact for 30 days.
 
-Duration: the CI job has a 35-minute timeout and the QEMU phase a 600-second
+Duration: the CI job has a 35-minute timeout and the QEMU phase a 1200-second
 timeout. On Apple Silicon everything runs under x86 emulation and takes
 noticeably longer than on a Linux x86-64 host; measured times on specific
 machines are not recorded yet, so treat any figure you see elsewhere as

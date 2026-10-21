@@ -326,3 +326,14 @@ Works surveyed but not used in a decision (most of `docs/research-academic-surve
 originality matrix), and tools only planned (syzkaller, LTP, sqlite-vec, USearch). They stay in the
 research documents. Two page ranges could not be confirmed and are omitted: Büttcher and Clarke
 (FAST 2005) and the SC22 article number of GUFI.
+
+## 6. Harness verdict regression (journal 0171)
+
+- Linux man-pages [`wait(2)`](https://man7.org/linux/man-pages/man2/waitpid.2.html):
+  child waiting and `WIFEXITED`/`WEXITSTATUS`, used by `tests/query.c` before
+  printing its race2 summary.
+- Linux man-pages [`ld.so(8)`](https://man7.org/linux/man-pages/man8/ld.so.8.html):
+  `LD_PRELOAD` symbol interposition, used only in the disposable Linux container's
+  `tests/test_harness_verdicts.py` to control ioctl replies and child exit status.
+  It exercises the real fork/wait path without a module; it does not emulate
+  the filesystem or prove query correctness. Thanks to the Linux man-pages maintainers.

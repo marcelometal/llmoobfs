@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Documentation (journal 0171, issue 114 T11): clarify QEMU verdict markers,
+  explicit coverage skips, the 1200-second guard and compiled-only test programs.
+
 - Harness (journal 0171, issue 114 T7): preserve failing producer statuses in
   logged race, buildrace and oracle checks; print race2 statistics only after
   validating the forked child. Add controlled failure and success regressions.

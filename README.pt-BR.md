@@ -233,6 +233,9 @@ responde a cada um: [adoption-risks.md](docs/adoption-risks.md).
 **Como conferir qualquer afirmação daqui.** Rode `make vm-test` e leia `build/vm/console.log`
 ([guia de testes](docs/testing.md)); prepare o ambiente com
 [docs/development.md](docs/development.md).
+Exija os marcadores finais e ausência de `MOOBFS_VM_FAIL`; QEMU sair com código 0 não basta.
+`CASEFOLD_SKIPPED`, `STALL_SKIPPED` e um lower idmapped marcado `not tested`
+continuam sendo lacunas de cobertura. `ipc` é compilado, mas não invocado pela suíte.
 
 ## O que foi medido
 

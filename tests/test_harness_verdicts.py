@@ -37,25 +37,30 @@ class HarnessVerdicts(unittest.TestCase):
                               'BIN': str(self.work), 'LAYER': str(self.work),
                               'PRODUCER_EXIT': status})
 
+    def check_race_producer(self, token):
+        line = next(s for s in SUITE.splitlines() if token in s)
+        line = line.replace('/tmp/', str(self.work) + '/')
+        setup = ('fs=fixture\nfail() { echo "MOOBFS_VM_FAIL: $*"; exit 1; }\n'
+                 'touch "$BIN/q2e.go" "$BIN/race.go"\n'
+                 'sleep 0.01 & racer=$!\n')
+        for status in ('9', '0'):
+            run = self.shell(setup + line + '\necho CHECK_PASS\n', status)
+            self.assertIn('plausible', run.stdout)
+            if status == '9':
+                self.assertNotEqual(run.returncode, 0, run)
+                self.assertIn('MOOBFS_VM_FAIL:', run.stdout)
+                self.assertNotIn('CHECK_PASS', run.stdout)
+                flag = 'q2e.go' if token == 'race2 5' else 'race.go'
+                self.assertFalse((self.work / flag).exists())
+            else:
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertIn('CHECK_PASS', run.stdout)
+
+    def test_race2_producer_status_and_cleanup(self):
+        self.check_race_producer("race2 5")
+
     def test_race_producer_status_and_cleanup(self):
-        for token in ('race2 5', 'race 5'):
-            line = next(s for s in SUITE.splitlines() if token in s)
-            line = line.replace('/tmp/', str(self.work) + '/')
-            setup = ('fs=fixture\nfail() { echo "MOOBFS_VM_FAIL: $*"; exit 1; }\n'
-                     'touch "$BIN/q2e.go" "$BIN/race.go"\n'
-                     'sleep 0.01 & racer=$!\n')
-            for status in ('9', '0'):
-                run = self.shell(setup + line + '\necho CHECK_PASS\n', status)
-                self.assertIn('plausible', run.stdout)
-                if status == '9':
-                    self.assertNotEqual(run.returncode, 0, run)
-                    self.assertIn('MOOBFS_VM_FAIL:', run.stdout)
-                    self.assertNotIn('CHECK_PASS', run.stdout)
-                    flag = 'q2e.go' if token == 'race2 5' else 'race.go'
-                    self.assertFalse((self.work / flag).exists())
-                else:
-                    self.assertEqual(run.returncode, 0, run.stderr)
-                    self.assertIn('CHECK_PASS', run.stdout)
+        self.check_race_producer("race 5")
 
     def test_buildrace_status(self):
         line = next(s for s in SUITE.splitlines() if '"$LAYER" 24 60' in s)
@@ -76,7 +81,7 @@ class HarnessVerdicts(unittest.TestCase):
             run = self.shell('TOOLS=$BIN LOWER=$LAYER fs=fixture\n'
                              'fail() { echo "MOOBFS_VM_FAIL: $*"; exit 1; }\n' +
                              line + '\necho CHECK_PASS', status)
-            self.assertIn('EQUIV_PASS:', run.stdout)
+            self.assertIn('EQUIV_PASS:', (self.work / 'bench-equiv.txt').read_text())
             self.assertEqual('CHECK_PASS' in run.stdout, status == '0')
             self.assertEqual(run.returncode == 0, status == '0')
 
@@ -116,8 +121,9 @@ void _exit(int status)
                       '-I' + str(ROOT / 'include'), str(mock), '-o', str(self.work / 'mock.so')]):
             built = subprocess.run(args, capture_output=True, text=True)
             self.assertEqual(built.returncode, 0, built.stderr)
-        for failed in (False, True):
+        for failed in (True, False):
             env = {**os.environ, 'LD_PRELOAD': str(self.work / 'mock.so'), 'MOOB_RACE2_FORK': '1'}
+            env.pop('FAIL_CHILD', None)
             if failed:
                 env['FAIL_CHILD'] = '1'
             run = subprocess.run([str(binary), str(self.work), 'race2', '0.01'],
