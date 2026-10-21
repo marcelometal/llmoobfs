@@ -61,7 +61,7 @@ struct moobl_index {
 	u32 domains_built;		/* domains in state built, the outside part included */
 	u32 builds;			/* builds completed since mount */
 	u32 releases;			/* built domains released since mount */
-	bool over_budget;		/* charge() refused an allocation (index lock) */
+	u64 refusals;			/* allocations charge() refused since mount (index lock) */
 	unsigned int idle;		/* seconds a used domain is kept from the shrinker */
 	struct shrinker *shrinker;	/* releases built domains under memory pressure */
 	dev_t dev;			/* the layer's anonymous device, for tracepoints */

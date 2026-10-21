@@ -167,7 +167,7 @@ static int entry_cmp(const struct moobl_ix_entry *e, u8 type, const u8 *v, u16 l
 static int charge(struct moobl_index *ix, size_t bytes)
 {
 	if (ix->used + bytes > ix->budget) {
-		ix->over_budget = true;
+		ix->refusals++;	/* never reset: concurrent builds compare samples (issue #111) */
 		return -ENOMEM;
 	}
 	ix->used += bytes;
@@ -1597,7 +1597,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	const struct cred *old;
 	struct scan_job job;
 	unsigned int nofs, released = 0;
-	u64 t0, used0;
+	u64 t0, used0, refused = 0;
 	int tries, err;
 
 	if (!dom)
@@ -1636,7 +1636,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 
 		nofs = ix_write_lock(ix);
 		WRITE_ONCE(dom->state, MOOBL_DOM_BUILDING);
-		ix->over_budget = false;
+		refused = ix->refusals;	/* a build of another domain cannot clear what follows */
 		dom->restart = false;
 		dom->top_gen = gen;
 		ix_write_unlock(ix, nofs);
@@ -1670,7 +1670,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 			ix->builds++;
 		}
 		/* over the budget: make room by releasing what was queried least recently */
-		if (err == -ENOMEM && ix->over_budget && may_release &&
+		if (err == -ENOMEM && ix->refusals != refused && may_release &&
 		    released < MOOBL_BUDGET_RELEASES) {
 			ix_write_unlock(ix, nofs);
 			moved_list_free(&todo);
