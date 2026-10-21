@@ -20,6 +20,7 @@ t failnth    -Iinclude tests/failnth.c
 t renamepath-fault -Iinclude tests/renamepath-fault.c
 t deadscan   -Iinclude tests/deadscan.c
 t rootpath-race -Iinclude tests/rootpath-race.c
+t overbudget-race -Iinclude tests/overbudget-race.c
 t hostile    tests/hostile.c
 t buildrace  -Iinclude tests/buildrace.c -lpthread
 t chmodrace  -Iinclude tests/chmodrace.c

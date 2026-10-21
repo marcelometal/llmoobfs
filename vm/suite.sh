@@ -20,6 +20,7 @@
 #   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
 #   permgaps            decisive search, truncation, directory and encoding checks (0172)
 #   rootpath            a domain directory renamed while a build waits to start (issue #110)
+#   overbudget          builds over the budget while other domains are built (issue #111)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -43,7 +44,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1475,6 +1476,43 @@ for fs in ext4 btrfs xfs; do
     [ $rp_ok -eq 1 ] || fail "rootpath-race-inconclusive-$fs"
     umount "$LAYER" && rm -rf "$LOWER/rp" && umount "$LOWER" || fail "rp-cleanup-$fs"
     echo "ROOTPATH_PASS: $fs"
+done
+fi
+if want overbudget; then
+# Issue #111 (R2-7 of journal 0155): a build over the budget releases the domain queried least
+# recently and tries again. The flag that told it so was mount-wide and cleared by every build,
+# so a build of another domain in between made it fail with ENOMEM instead. Domains x and y fit
+# the budget alone, not together; tests/overbudget-race.c queries them in turn while churners
+# rebuild four domains without attributes without pause. No query of x or y may fail. The race
+# is not widened: the test counts over many turns.
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "ob-lower-$fs"
+    rm -rf "$LOWER/ob" && mkdir -p "$LOWER/ob/x" "$LOWER/ob/y" || fail "ob-directory-$fs"
+    "$BIN/overbudget-race" plant "$LOWER/ob/x" 2500 && "$BIN/overbudget-race" plant "$LOWER/ob/y" 2500 || fail "ob-plant-$fs"
+    for k in 0 1 2 3; do
+        # no attribute: a build of z<k> clears the old flag but charges nothing, so it never
+        # releases a domain itself; the only releases are those of x and y
+        mkdir -p "$LOWER/ob/z$k/s" && : > "$LOWER/ob/z$k/f" || fail "ob-small-$fs"
+    done
+    mount -t moobfs_layer -o lower="$LOWER/ob",domain_depth=1 none "$LAYER" || fail "ob-mount-$fs"
+    ob_one=$("$BIN/overbudget-race" used "$LAYER" x) || fail "ob-measure-$fs"
+    umount "$LAYER" || fail "ob-unmount-$fs"
+    ob_budget=$((ob_one * 3 / 2 + 65536)); [ "$ob_budget" -ge 1048576 ] || fail "ob-domain-too-small-$fs ($ob_one)"
+    mount -t moobfs_layer -o lower="$LOWER/ob",domain_depth=1,index_budget=$ob_budget none "$LAYER" || fail "ob-budget-mount-$fs"
+    tr_on moobfs_domain_build moobfs_domain_release || fail "ob-trace-$fs"
+    run_logged /tmp/ob.txt "$BIN/overbudget-race" run "$LAYER" 20 4; rc=$?
+    tr_off moobfs_domain_build moobfs_domain_release
+    if [ $rc -ne 0 ]; then
+        # the builds of x and y that failed with ENOMEM, and what was released around them
+        ob_x=$(stat -c %i "$LOWER/ob/x"); ob_y=$(stat -c %i "$LOWER/ob/y")
+        grep -E "domain=($ob_x|$ob_y) err=-12" $TR/trace | head -5
+        echo "ob: builds $(tr_count moobfs_domain_build), releases $(tr_count moobfs_domain_release)"
+        grep " moobfs_domain_release: " $TR/trace | tail -5
+        fail "overbudget-race-$fs"
+    fi
+    umount "$LAYER" && rm -rf "$LOWER/ob" && umount "$LOWER" || fail "ob-cleanup-$fs"
+    echo "OVERBUDGET_PASS: $fs, one domain $ob_one bytes, budget $ob_budget"
 done
 fi
 if want stall && [ ! -c /dev/fuse ]; then
