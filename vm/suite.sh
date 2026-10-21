@@ -26,6 +26,15 @@
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
+# Capture the producer status before displaying its output: POSIX pipelines return
+# the last command's status. A failed log read also makes the check fail.
+run_logged() (
+    log=$1; shift
+    rc=0
+    "$@" > "$log" || rc=$?
+    cat "$log" || return 1
+    return "$rc"
+)
 want() {
     [ -z "${MOOB_ONLY:-}" ] && return 0
     case " $MOOB_ONLY " in *" $1 "*) return 0 ;; esac
@@ -572,7 +581,7 @@ run_lower() {
       done ) &
     racer=$!
     # two processes on one open file: one finds its result buffer lent (journal 0139)
-    MOOB_RACE2_FORK=1 "$BIN/query" --uid 1001 "$LAYER/dr" race2 5 | tee /tmp/q2e.txt || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
+    MOOB_RACE2_FORK=1 run_logged /tmp/q2e.txt "$BIN/query" --uid 1001 "$LAYER/dr" race2 5 || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
     rm -f /tmp/q2e.go; wait $racer
     grep -q '^race2: [1-9]' /tmp/q2e.txt || fail "q2e-no-iterations-$fs"
     # a rename or move cut by the end of the race may leave t<i>.md behind or r<i>.md in dr2
@@ -611,7 +620,7 @@ run_lower() {
           [ $(( n % 7 )) -eq 0 ] && { mv "$LAYER/ns/race" "$LAYER/ns/race2" 2>/dev/null; mv "$LAYER/ns/race2" "$LAYER/ns/race" 2>/dev/null; }
       done ) &
     racer=$!
-    "$BIN/query" --uid 1001 "$LAYER" race 5 | tee /tmp/race.txt || { rm -f /tmp/race.go; wait $racer; fail "race-query-$fs"; }
+    run_logged /tmp/race.txt "$BIN/query" --uid 1001 "$LAYER" race 5 || { rm -f /tmp/race.go; wait $racer; fail "race-query-$fs"; }
     rm -f /tmp/race.go; wait $racer
     grep -q '^race: [1-9]' /tmp/race.txt || fail "race-no-iterations-$fs"
     chmod 0644 "$LAYER/ns/race/"*.md || fail "race-final-mode-$fs"
@@ -643,7 +652,8 @@ run_lower() {
     rm -f /tmp/bench-base.db*
     SQLITE=$TOOLS/sqlite3 sh "$BIN/bench-sqlbase.sh" init /tmp/bench-base.db || fail "bench-sqlbase-init-$fs"
     SQLITE=$TOOLS/sqlite3 sh "$BIN/bench-sqlbase.sh" load /tmp/bench-base.db /tmp/bench-m.txt "$LAYER/bench" || fail "bench-sqlbase-load-$fs"
-    env SQLITE="$TOOLS/sqlite3" SQLBASE="$BIN/bench-sqlbase.sh" BIN="$BIN" sh "$BIN/bench-equiv.sh" "$BIN/bench-queries-w3.txt" /tmp/bench-base.db "$LOWER/bench" "$LAYER" | tee /tmp/bench-equiv.txt | tail -1 | grep -q '^EQUIV_PASS: 9 shapes (kernel' || { cat /tmp/bench-equiv.txt; fail "bench-equiv-$fs"; }
+    run_logged /tmp/bench-equiv.txt env SQLITE="$TOOLS/sqlite3" SQLBASE="$BIN/bench-sqlbase.sh" BIN="$BIN" sh "$BIN/bench-equiv.sh" "$BIN/bench-queries-w3.txt" /tmp/bench-base.db "$LOWER/bench" "$LAYER" || fail "bench-equiv-$fs"
+    tail -1 /tmp/bench-equiv.txt | grep -q '^EQUIV_PASS: 9 shapes (kernel' || fail "bench-equiv-marker-$fs"
     tail -1 /tmp/bench-equiv.txt
     "$BIN/bench-load" --manifest /tmp/bench-m.txt --target "$LAYER/bench" --workload W4 --out /tmp/bench-w4 || fail "bench-w4-$fs"
     [ "$(cat /tmp/bench-w1.*.rec /tmp/bench-w2.*.rec /tmp/bench-w3.*.rec /tmp/bench-w4.*.rec | wc -c)" -eq $(( (300 + 300 + 9 + 600) * 32 )) ] || fail "bench-records-$fs"
@@ -1043,7 +1053,7 @@ for fs in ext4 btrfs xfs; do
     # ever finished (EAGAIN for ever), which is the starvation journal 0098 records as a limit.
     tr_on moobfs_scan_reread || fail "br-trace-on-$fs"
     echo 40 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail "br-delay-$fs"
-    "$BIN/buildrace" "$LAYER" 24 60 | tee /tmp/br.txt; rc=$?
+    run_logged /tmp/br.txt "$BIN/buildrace" "$LAYER" 24 60; rc=$?
     echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
     [ $rc -eq 0 ] || fail "br-run-$fs"
     grep -q '^BUILDRACE_DONE' /tmp/br.txt || fail "br-done-$fs"

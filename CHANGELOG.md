@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Harness (journal 0171, issue 114 T7): preserve failing producer statuses in
+  logged race, buildrace and oracle checks; print race2 statistics only after
+  validating the forked child. Add controlled failure and success regressions.
+
 - Validation (journal 0170): reconcile PR 109 with current documentation and add
   VM regressions for failed rename-path allocation and removal during an index scan.
 
