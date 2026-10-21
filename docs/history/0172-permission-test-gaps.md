@@ -1,6 +1,6 @@
 # 0172 — Permission and independent-oracle gaps of issue 114
 
-Date: 2026-10-21. Status: investigation and local implementation in progress.
+Date: 2026-10-21. Status: locally validated within the restricted scope; review before push. T9 fault coverage and batch KASAN remain deferred.
 Started: 2026-10-21T12:10:07.953095+00:00. Elapsed calendar time, not measured labor effort.
 
 ## Scope and decisions
@@ -103,3 +103,74 @@ fault injection. S14/S15 stay planned. No new milestone, compatibility,
 support, disclosure or research position changes the generated journey pages,
 FAQ, SECURITY, ADRs, main roadmap or help requests; retain their state and
 check the site/FAQ rather than inventing a new claim of stabilization.
+
+## Full native VM validation of the local-only batch
+
+Frozen source `866257f` passed `make vm-test` on Debian 6.12.111+deb13-amd64,
+exit 0, from 12:20:29 to 12:30:27 UTC on 2026-10-21: 597.82 seconds elapsed.
+All 1,530 tracked source hashes matched afterwards; no frozen source was edited.
+The final M1, acceptance and layer markers are present; no VM failure marker.
+
+`PERMISSION_GAPS_PASS` and `UNPRIV_RELEASE_PASS` executed on ext4, btrfs and
+XFS. Each release check observed eight real domain releases and tested uid
+1001 before release and after rebuild. Casefold and FUSE scenarios executed;
+the native idmapped-lower case remains explicitly not tested. No allocation
+faults or new sanitizer run are claimed by this result.
+
+`make test` passed the host attribute checks and nine image tests. ShellCheck
+0.10/SPDX, `make checkpatch`, retired claims, the 12-page site, FAQ consistency
+and whitespace passed. Negative module controls are still in progress; a
+compiler/setup failure will not count as a successful negative control.
+
+## Decisive negative controls
+
+Five normal signed commits on the separate negative worktree each differ from
+`866257f` in exactly one production source file. None is merged into the review
+branch. Run the same frozen tests, with a single module mutation, in the pinned
+Debian VM. Backups preceded each file-by-file mutation reset; no directory
+reset, shared-history rewrite or change to another session was used.
+
+| Gap | Local mutation commit | Mutation | Expected runtime failure observed |
+| --- | --- | --- | --- |
+| T5 | `e32e2e0` | Remove MAY_EXEC from query2_target | `T5 QUERY2 execute check decisive after successful open` |
+| T6 | `5cff699` | Let a denied candidate set truncated after the visible limit | `T6 hidden candidates do not set truncated` |
+| T8 | `0a30f68` | Admit attributed directories without the target read check | `T8 attributed directory differs from lower getxattr` |
+| T10 | `8f08495` | The shared validator accepts bool payload 2 | `T10 independent encoding/permission membership` |
+| T9, release only | `62b5c30` | Bypass caller_may_read for non-root callers | `T9 unprivileged release/rebuild permission answer` |
+
+T5/T6/T8/T10 used `MOOB_ONLY=permgaps make vm-test`; T9 used
+`MOOB_ONLY=release make vm-test`. All five launchers returned 2 after a real
+guest assertion failure, with the M1 pass marker present, the expected helper
+failure and VM failure marker present, and no partial-pass marker. All frozen
+tracked source hashes remained unchanged. These are runtime failures, not
+compiler errors. Each stops on its first failing ext4 scenario; do not claim
+negative runs on btrfs/XFS. The positive complete run covers all three lowers.
+
+## Final scope, limitations and next step
+
+The final locally reviewed tree changes only tests, the shared test-build list,
+the VM suite and documentation. No production module/common validator/UAPI,
+kernel configuration, badge or citation changes. No production correction was
+needed for the scoped fixtures; this is not evidence that other defects are absent.
+After the executed `866257f` snapshot, only this journal's factual evidence
+changed. A full VM rerun for that documentation-only completion is unnecessary.
+
+T5/T6/T8 and the fixed independent T10 coverage have positive and decisive
+negative evidence. The random hostile oracle still shares the common validator;
+18 independent cases do not replace it with a universal independent parser.
+T9 is partial: the new unprivileged control tests a shrinker release/rebuild;
+allocation-fault queries in the enabled suite remain root-only. The deferred
+six-case fault candidate is preserved at `1e77ad5` on the local draft branch,
+not enabled or tested by this batch. No KASAN is claimed for the new batch.
+The maintainer's local-only constraint permits review now; sanitizer validation
+remains pending before a future authorized publication.
+
+Retain native/negative logs, source manifests, interrupted attempt, draft PR
+and proposed issue reconciliation outside Git in
+`MoobFS-local/revisao/issue114-permissions-0172/`. Do not push, create a PR,
+edit/close issue 114, merge or contact anyone during this preparation. T7/T11
+were already integrated by PR 123; the new scope remains local until approved
+and integrated. Other sessions' branches, commits and pre-existing files are
+checked against the initial preservation receipt.
+
+Locally completed: 2026-10-21T12:38:11.754431+00:00. Calendar time, not measured labor effort.
