@@ -37,7 +37,8 @@ Do not push, merge the GitHub PR or publish an advisory in this preparation.
 - First R2-3 mutation failed compilation: removing its callers left `rec_drop`
   unused under `-Werror`. Remove the unused helper in the negative branch and
   retry; that compiler failure is not regression evidence.
-- New tests and negative rounds: in progress. Logs remain outside Git.
+- Logs remain outside Git; the negative outcomes below were checked against
+  their specific runtime failure signatures.
 - R2-3 negative at `905c4e7`: the existing `setxattr-then-move` check detects
   fault 2, where the moved file is missing from the destination answer. It ends
   with `unexpected=1` and the harness fails. The unmodified integrated faults
@@ -53,12 +54,27 @@ Do not push, merge the GitHub PR or publish an advisory in this preparation.
 - R2-4 mutation `c0be08b` is detected by the create and mkdir agreement checks
   (faults 5 and 12): each leaves a name visible on only one side. Link's error
   recovery is not independently isolated by that negative run.
+  Inspection of the exact Linux 6.12.112 `iget5_locked()` explains this limit:
+  it first calls `ilookup5()` and allocates only on a cache miss. The link's
+  positive source dentry already holds the matching upper inode used by
+  `moobl_get_inode()`, so this path reuses it. Allocation failure cannot force
+  upper-inode creation to fail under that precondition. Keep the defensive
+  recovery; do not add an artificial production hook or claim a link-specific
+  negative result. The interpretation is limited to this kernel and path.
 - R2-6 mutation `c10969f` preserves the old path after the confirmed fault and
   dentry eviction (`path=a flags=0`); the test fails with `r26-stale-path`.
   Its positive control returns `b`; the fixed fault case returns `PATH_UNKNOWN`.
 - R2-10 mutation `7a8bd7f`: the observed removal is followed by query failure
   (`errno=ENOENT`), and the harness fails at `r210-dead-directory`. The fixed
   run returns success and zero results after the same observed scan/removal.
+- Full `make vm-test` at test source `b969623`: exit 0, Debian
+  `6.12.111+deb13-amd64` in a disposable QEMU VM. Includes the three lower
+  filesystems, `MOOBFS_VM_PASS`, `MOOBFS_ACCEPTANCE_PASS` and
+  `MOOBFS_LAYER_PASS`. Both new test programs compile through the shared build
+  list here; their fault/trace scenarios execute in the separate KASAN harness.
+- `make test` on macOS: all nine host tests pass. This is separate from Linux
+  module execution. Checkpatch, shell syntax, retired claims, site (12 pages),
+  FAQ/source consistency, whitespace and preservation comparisons pass.
 
 ## Limitations and next step
 
