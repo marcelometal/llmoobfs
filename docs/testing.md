@@ -19,7 +19,7 @@ disposable QEMU guest; that is the only supported way to run the module.
 Disk and time: `build/` grows to several GiB with the kernel tree for KASAN.
 Measured wall-clock times per machine are not recorded yet; the CI timeouts are
 35 minutes for the VM job and 150 minutes for KASAN, and the QEMU phase of
-`make vm-test` is bounded by `timeout 1200`.
+`make vm-test` is bounded by `timeout 2400`.
 
 ## 2. Targets
 
@@ -132,6 +132,19 @@ misses the interleaving is inconclusive, never a pass.
 The holder may fail with `EAGAIN`, the documented answer of a v1 QUERY whose
 domain is taken down while it checks results (`query_repin()`).
 
+### Concurrent index-budget refusals (issue 111, journal 0175)
+
+`MOOB_ONLY=overbudget make vm-test` runs `tests/overbudget-race.c` on ext4,
+btrfs and XFS; the full suite includes it too. The fixture alternates queries
+between two domains that each fit the budget alone but cannot coexist, while
+four other domains are rebuilt after renames. It makes at least 30 alternating
+queries per lower, subject to a sixfold time cap.
+
+| Marker | Proves | Does not prove |
+| --- | --- | --- |
+| `OVERBUDGET_RACE_PASS` | At least 30 queries of the two fitting domains completed without `ENOMEM` or an unexpected error; prints `EAGAIN`, `ENOMEM` and other-error counts | Every possible thread schedule; `EAGAIN` is tolerated during concurrent rename activity |
+| `OVERBUDGET_PASS: <fs>` | The fixture passed on that lower | A complete suite by itself |
+
 ### KASAN harness (`vm/kasan-guest.sh`)
 
 | Marker | Proves | Does not prove |
@@ -190,7 +203,7 @@ Expected noise that is **not** a failure:
   `alone`, `layer` and `again` only.
 
 A failure is: `MOOBFS_VM_FAIL:`, a missing required final marker, QEMU exiting
-nonzero (including the 1200-second timeout), or in KASAN any of the `dmesg`
+nonzero (including the 2400-second timeout), or in KASAN any of the `dmesg`
 patterns above. **QEMU exit 0 alone does not prove success:** `vm/init` powers
 off on both failure and success. `vm/in-container.sh` requires exit 0, all three
 full-run markers (`MOOBFS_VM_PASS`, `MOOBFS_LAYER_PASS`,

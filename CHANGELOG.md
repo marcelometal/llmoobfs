@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fix (journal 0175, issue 111, R2-7 of journal 0155): concurrent domain
+  builds can no longer erase the budget-refusal signal before the failing build
+  tries to release an older domain. The new `overbudget` suite step checks this
+  on ext4, btrfs and XFS. Raise the emulated guest's hung-run guard to 2400 s
+  after the expanded full suite reached the previous 1200 s guard.
+
 - Fix (journal 0174, issue 110, R2-5 of journal 0155): a domain directory
   renamed between the moment a build took its name and the moment the build
   recorded the rename generation no longer leaves the domain fresh under the

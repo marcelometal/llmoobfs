@@ -18,9 +18,9 @@
  * in turn, so that every query builds its domain over the budget and releases the other. Each
  * churner renames a directory inside its own domain z<k>, which has no attribute, and queries
  * it, so that z<k> is built again and again: each build cleared the old flag, and none charges
- * the budget or releases a domain. No query of the alternating process may fail: each of x and
- * y fits alone, and the other is idle and releasable by it alone. Prints OVERBUDGET_RACE_PASS with the counts, or
- * OVERBUDGET_RACE_FAIL and exits 1. EAGAIN (renames kept coming) is counted, not a failure.
+ * the budget or releases a domain. Neither alternating query may return ENOMEM: each of x and
+ * y fits alone, and the other is idle and releasable by it alone. Prints OVERBUDGET_RACE_PASS
+ * with the counts, or OVERBUDGET_RACE_FAIL and exits 1. EAGAIN is counted, not a failure.
  */
 #define _GNU_SOURCE
 #include <sys/ioctl.h>
@@ -137,6 +137,16 @@ static int run(const char *mnt, int seconds, int churners)
 	cap = start + 6.0 * seconds;
 	for (k = 0; k < churners; k++) {
 		pid[k] = fork();
+		if (pid[k] < 0) {
+			int j;
+
+			perror("fork");
+			for (j = 0; j < k; j++)
+				kill(pid[j], SIGTERM);
+			for (j = 0; j < k; j++)
+				waitpid(pid[j], NULL, 0);
+			return 2;
+		}
 		if (!pid[k])
 			churn(mnt, k, cap);
 	}

@@ -110,9 +110,9 @@ cp "/boot/config-$KERNEL" build/vm/kernel.config
 } > build/vm/environment.txt
 (cd "$STAGE" && find . -print0 | sort -z | cpio --null -o --format=newc 2>/dev/null | gzip -n) > build/vm/initramfs.cpio.gz
 set +e
-# A guard against a hung guest, not a time budget: the suite has grown since the 600 s of
-# phase 2a, and under TCG on an arm64 host (Docker) a complete run reached 600 s (journal 0153).
-timeout 1200 qemu-system-x86_64 \
+# A guard against a hung guest, not a time budget. The complete suite reached the previous
+# 1200 s guard during the btrfs release step under TCG after adding rootpath and overbudget.
+timeout 2400 qemu-system-x86_64 \
     -machine q35 -accel tcg -cpu max -m 512M -smp 2 \
     -drive file=build/vm/lower-ext4.img,format=raw,if=virtio \
     -drive file=build/vm/lower-btrfs.img,format=raw,if=virtio \
