@@ -18,7 +18,8 @@
  * through the layer while B is still building. Then the mount-wide QUERY must return every
  * attributed file, each under <new>/ and each present. Prints ROOTPATH_RACE_PASS, or
  * ROOTPATH_RACE_FAIL and exits 1; exits 3 (ROOTPATH_RACE_INCONCLUSIVE) when the interleaving
- * was not reached: A never waited on the mutex, or B finished before the rename.
+ * was not reached: A was not seen waiting, B had returned before the rename, or the build
+ * counter shows no build by A after B's. B may fail with EAGAIN (see run()).
  */
 #define _GNU_SOURCE
 #include <sys/ioctl.h>
@@ -119,6 +120,15 @@ static unsigned int builds(int fd)
 	return info.domain_builds;
 }
 
+static void show_info(int fd)
+{
+	struct moob_info info;
+
+	if (!ioctl(fd, MOOB_IOC_GET_INFO, &info))
+		printf("rootpath-race: domains_built=%u domain_builds=%u domain_releases=%u flags=%#x\n",
+		       info.domains_built, info.domain_builds, info.domain_releases, info.flags);
+}
+
 static int plant(const char *dir, int files, int every)
 {
 	char path[4096];
@@ -189,11 +199,19 @@ static int run(const char *mnt, const char *old, const char *new, unsigned int e
 		t_rename = now() - t0;
 		b_building = alive(b);	/* still building, or at least not returned, after it */
 	}
-	if (waitpid(b, &status, 0) != b || !WIFEXITED(status) || WEXITSTATUS(status)) {
+	/*
+	 * B only holds the mutex. A v1 QUERY whose domain is taken down while it checks results
+	 * fails with EAGAIN (query_repin()); A takes the stale domain down, so that is allowed.
+	 */
+	if (waitpid(b, &status, 0) != b || !WIFEXITED(status) ||
+	    (WEXITSTATUS(status) && WEXITSTATUS(status) != 10 + EAGAIN)) {
+		show_info(root);
+		printf("rootpath-race: builds since the start %u\n", builds(root) - b0);
 		printf("ROOTPATH_RACE_FAIL: the mount-wide QUERY failed (status %d)\n", status);
 		return 1;
 	}
-	printf("rootpath-race: B (mount-wide QUERY) took %.3f s\n", now() - t0);
+	printf("rootpath-race: B (mount-wide QUERY) took %.3f s, %s\n", now() - t0,
+	       WEXITSTATUS(status) ? "EAGAIN" : "answered");
 	if (waitpid(a, &status, 0) != a || !WIFEXITED(status) || WEXITSTATUS(status)) {
 		printf("ROOTPATH_RACE_FAIL: QUERY2 on the domain failed (status %d)\n", status);
 		return 1;
