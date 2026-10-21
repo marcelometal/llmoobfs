@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Contract/tests (journal 0173, issue 112): specify that all QUERY2_BATCH output
+  must be discarded on error; there is no partial-success or rollback protocol.
+  Add dedicated-VM controls for validation-before-execution, a later result-copy
+  fault, a final header-copy fault and successful reuse, without module/UAPI changes.
+
 - Documentation (journal 0171, issue 114 T11): clarify QEMU verdict markers,
   explicit coverage skips, the 1200-second guard and compiled-only test programs.
 

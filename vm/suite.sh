@@ -544,6 +544,7 @@ run_lower() {
         [ "$(wc -l < /tmp/kb.txt)" -eq 29 ] || { cat /tmp/kb.txt; fail "q2d-batch-count-$1-$fs"; }
     }
     q2batchcmp plain
+    "$BIN/batch-errors" "$LAYER/da" || fail "q2-batch-errors-plain-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/db" q2batcherrno -- kind exists x x)" = "q2batch 13" ] || fail "q2d-batch-isolation-$fs"
     [ "$("$BIN/query" "$LAYER/da/sub" q2batcherrno -- kind exists x x)" = "q2batch 25" ] || fail "q2d-batch-enotty-$fs"
     [ "$("$BIN/query" "$LAYER/da" q2batcherrno -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x)" = "q2batch 22" ] || fail "q2d-batch-nine-$fs"
@@ -553,6 +554,7 @@ run_lower() {
     chmod 0700 "$LAYER/da/sub" || fail "q2c-fallback-$fs"
     q2ord leap-fallback 5 --limit 2 --pages ns eq string n1 kind eq string note -- "$LOWER/da" ns eq string n1 kind eq string note
     set -f; q2batchcmp fallback; set +f
+    "$BIN/batch-errors" "$LAYER/da" || fail "q2-batch-errors-fallback-$fs"
     echo "QUERY2_LEAPFROG_PASS: $fs"
     # QUERY2 under concurrency (phase Q2e, spec test 8): mode changes, renames, unlink and
     # recreate, files moving to another domain and back, and chmod of the domain directory
