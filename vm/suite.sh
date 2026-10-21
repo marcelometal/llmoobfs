@@ -19,6 +19,7 @@
 #   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
 #   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
 #   permgaps            decisive search, truncation, directory and encoding checks (0172)
+#   rootpath            a domain directory renamed while a build waits to start (issue #110)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -42,7 +43,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1441,6 +1442,38 @@ for fs in ext4 btrfs xfs; do
     "$BIN/permission-gaps" check "$LAYER" "$LOWER/pg" v1 || fail "pg-v1-$fs"
     umount "$LAYER" && rm -rf "$LOWER/pg" && umount "$LOWER" || fail "pg-cleanup-$fs"
     echo "PERMISSION_GAPS_PASS: $fs (T5/T6/T8, independent T10 fixtures)"
+done
+fi
+if want rootpath; then
+# Issue #110 (R2-5 of journal 0155): QUERY2 takes the name of the domain directory before the
+# build records the generation of renames. tests/rootpath-race.c holds the domain's build mutex
+# with a mount-wide QUERY, makes a QUERY2 wait for it, and renames the domain directory
+# meanwhile; the mount-wide QUERY after that must find every attributed file under the new
+# name. The files are planted on the lower and the caches dropped, so that the build is slow
+# and the layer has no inode of them: the answer comes from the names the build recorded.
+rp_files=${ROOTPATH_FILES:-10000}; rp_every=200
+rp_expect=$(( (rp_files + rp_every - 1) / rp_every ))
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "rp-lower-$fs"
+    rm -rf "$LOWER/rp" && mkdir -p "$LOWER/rp/d" || fail "rp-directory-$fs"
+    "$BIN/rootpath-race" plant "$LOWER/rp/d" "$rp_files" "$rp_every" || fail "rp-plant-$fs"
+    sync && echo 3 > /proc/sys/vm/drop_caches
+    mount -t moobfs_layer -o lower="$LOWER/rp",domain_depth=1 none "$LAYER" || fail "rp-mount-$fs"
+    rp_ok=0
+    for attempt in 1 2 3; do
+        run_logged /tmp/rp.txt "$BIN/rootpath-race" run "$LAYER" d e "$rp_expect"; rc=$?
+        [ $rc -eq 0 ] && { rp_ok=1; break; }
+        [ $rc -eq 3 ] || fail "rootpath-race-$fs"
+        # the interleaving was not reached: put the name back and start from a cold mount
+        umount "$LAYER" || fail "rp-unmount-$fs"
+        [ -d "$LOWER/rp/e" ] && { mv "$LOWER/rp/e" "$LOWER/rp/d" || fail "rp-rename-back-$fs"; }
+        sync && echo 3 > /proc/sys/vm/drop_caches
+        mount -t moobfs_layer -o lower="$LOWER/rp",domain_depth=1 none "$LAYER" || fail "rp-remount-$fs"
+    done
+    [ $rp_ok -eq 1 ] || fail "rootpath-race-inconclusive-$fs"
+    umount "$LAYER" && rm -rf "$LOWER/rp" && umount "$LOWER" || fail "rp-cleanup-$fs"
+    echo "ROOTPATH_PASS: $fs"
 done
 fi
 if want stall && [ ! -c /dev/fuse ]; then
