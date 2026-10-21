@@ -1,6 +1,6 @@
 # 0171 — Preserve harness verdicts and state the actual test inventory
 
-Date: 2026-10-21. Status: complete locally; review and publication gates remain.
+Date: 2026-10-21. Status: full local KASAN passed; combined publication authorized; merge awaits maintainer approval.
 
 First recorded timestamp: 2026-10-21 09:07:29 UTC; preparation began earlier.
 Calendar time, not measured labor effort. The exact start was not measured.
@@ -171,3 +171,65 @@ accompany the local receipt. No push, PR creation, remote merge, issue closure,
 external message or advisory publication was performed by this preparation.
 
 Records closed: 2026-10-21 09:35:15 UTC. Calendar time, not measured labor effort.
+
+## 2026-10-21 — Authorized sanitizer validation and combined publication
+
+The maintainer authorized a complete KASAN run of the combined T7/T11 and
+TeleAI batch, followed by one push and one pull request only if it passes.
+Merge remains reserved for a separate maintainer decision. Issue 114 and
+PR 122 are not to be closed by publication alone.
+
+Before execution, public `main` was rechecked at `2d15455`, already included
+in the local batch `5953542`. No existing combined pull request was found.
+PR 122 remains open at `40aef8e`; its original worktree is preserved.
+
+Archive `5953542` was extracted into an exclusive execution directory; all
+1,528 archived source files were SHA-256 checked there before launch. The
+complete `sh vm/kasan-local.sh` run began at 09:41:24 UTC on 2026-10-21.
+The dedicated Linux host had no active QEMU/syzkaller guest before launch;
+its cached upstream 6.12.112 kernel matches `vm/kasan.config` and enables
+KASAN, UBSAN, lockdep and function tracing. Module execution is confined to
+the disposable guest. No running source or launcher is edited.
+
+The complete run ended at 10:34:57 UTC on 2026-10-21 with exit status 0:
+3,213 seconds (53 minutes 33 seconds) of elapsed calendar time. The collector
+verified all 1,528 archived source hashes again, with no mismatch. Linux
+`6.12.112-virtme` has KASAN, UBSAN, lockdep and function tracing enabled.
+
+- `MOOBFS_KASAN_PASS` is present; neither `MOOBFS_VM_FAIL` nor
+  `MOOBFS_VM_ENV_FAIL` is present in the final console. This is a complete run,
+  not a `MOOB_ONLY` run. The harness's kernel-diagnostic checks passed.
+- `RENAMEPATH_FAULT_PASS` and `DEADSCAN_PASS` executed. Allocation-fault injection
+  covered 22 operations, 324 calls and 302 faults with `unexpected=0`; the index
+  still matched the oracle. Fault-triggered allocation errors are expected in
+  this scenario, not a claim that the console contains no error text.
+- Build races and release/rebuild checks passed on ext4, btrfs and XFS.
+  The permission matrix covered 12 seeds with zero mismatches. The 3,000-entry
+  directory and xattr read-error scenarios passed.
+- Casefold rejection and the stalled-FUSE scenario executed. Unlike the earlier
+  native VM run, this kernel exercised and refused an idmapped lower mount.
+  Read-only-lower and freeze/thaw checks passed. `ipc` remains built-only;
+  this run does not expand the suite into every standalone helper.
+
+Logs, source manifest, launch receipt, verified result and preservation checks
+remain outside Git in
+`MoobFS-local/revisao/issue114-0171/kasan-2026-10-21/`. The execution snapshot
+was not edited. Afterwards only the changelog and journals 0170/0171 changed;
+all executable inputs still match the executed source. These results describe
+this kernel/configuration and harness, not a security proof or outside review.
+
+Before publication, public `main` was fetched again at `2d15455`; the combined
+branch did not exist remotely and no combined PR was found. The principal,
+original review and TeleAI worktrees retain their baseline branches, commits,
+status and pre-existing changed-file hashes. Required CI on the newly published
+head remains a separate check. This authorization supersedes the initial
+local-only publication restriction recorded above; it does not authorize a merge,
+issue closure or advisory publication.
+
+### Documentation-only addition while sanitizer execution was in progress
+
+On 2026-10-21, PR 109's public merge and all 11 successful checks were rechecked.
+Journal 0170's stale pending-publication status was corrected with a dated note
+and links to the actual CI and KASAN runs, preserving its preparation record.
+This addition is documentation only and changes none of the frozen executable
+inputs. The other open issues require technical changes beyond this batch.
