@@ -183,3 +183,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0154 — moobl_xattr_get at 0 PCs explained by the corpus; pull requests 106 and 107 merged](0154-xattr-get-coverage-explained.md)
 - [0167 — Verified external project records in the READMEs](0167-readme-external-records.md)
 - [0168 — Zenodo snapshot DOI badge and citation in the READMEs](0168-zenodo-doi-readme.md)
+- [0169 — Confirmed TeleAI discovery link in the READMEs](0169-teleai-readme.md)
