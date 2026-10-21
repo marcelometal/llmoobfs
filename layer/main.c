@@ -58,6 +58,16 @@ static void moobl_copy_attr(struct inode *dest, const struct inode *src)
 	fsstack_copy_inode_size(dest, (struct inode *)src);
 }
 
+/*
+ * moobl_copy_attr() and the link count, where fsstack_copy_attr_all() was used: that one copies
+ * the lower's whole i_flags word, which journal 0079 masks everywhere else (V8, journal 0155).
+ */
+static void moobl_copy_attr_nlink(struct inode *dest, const struct inode *src)
+{
+	moobl_copy_attr(dest, src);
+	set_nlink(dest, src->i_nlink);
+}
+
 static int moobl_set_lower_path(struct dentry *dentry, struct vfsmount *mnt,
 				struct dentry *lower_dentry)
 {
@@ -80,16 +90,49 @@ static const struct inode_operations moobl_symlink_iops;
 static const struct file_operations moobl_dir_fops;
 static const struct file_operations moobl_file_fops;
 
-/* An open file of the layer: the lower file, and the credentials of its writes (moobl_wcred_get) */
+/*
+ * An open file of the layer: the lower file, the credentials of its writes (moobl_wcred_get),
+ * and the buffer its queries fill before copying out (moobl_qbuf_get)
+ */
 struct moobl_file {
 	struct file *real;
 	spinlock_t lock;
 	const struct cred *wcred;	/* last write credentials built, or NULL */
+	struct moob_query_result *qbuf;	/* kept between queries, qcap records */
+	u32 qcap;
+	bool qbusy;			/* qbuf lent to a query now */
 };
 
 static struct file *moobl_real(const struct file *file)
 {
 	return ((struct moobl_file *)file->private_data)->real;
+}
+
+/* F_SETFL changes the layer file after open; the backing file must follow it. */
+#define MOOBL_SETFL_MASK (O_APPEND | O_NONBLOCK | O_NDELAY | O_DIRECT)
+
+static int moobl_sync_flags(struct file *file)
+{
+	struct file *real = moobl_real(file);
+	unsigned int flags = READ_ONCE(file->f_flags) & MOOBL_SETFL_MASK;
+	int err;
+
+	if (!((flags ^ READ_ONCE(real->f_flags)) & MOOBL_SETFL_MASK))
+		return 0;
+	if (((flags ^ real->f_flags) & O_APPEND) && IS_APPEND(file_inode(real)))
+		return -EPERM;
+	if ((flags & O_DIRECT) && !(real->f_mode & FMODE_CAN_ODIRECT))
+		return -EINVAL;
+	if (real->f_op->check_flags) {
+		err = real->f_op->check_flags(flags);
+		if (err)
+			return err;
+	}
+	spin_lock(&real->f_lock);
+	real->f_flags = (real->f_flags & ~MOOBL_SETFL_MASK) | flags;
+	real->f_iocb_flags = iocb_flags(real);
+	spin_unlock(&real->f_lock);
+	return 0;
 }
 
 static const struct address_space_operations moobl_aops = {
@@ -107,7 +150,7 @@ static int moobl_inode_set(struct inode *inode, void *data)
 	struct inode *lower = data;
 
 	MOOBL_I(inode)->lower = lower;
-	fsstack_copy_attr_all(inode, lower);
+	moobl_copy_attr_nlink(inode, lower);
 	fsstack_copy_inode_size(inode, lower);
 	inode->i_ino = lower->i_ino;
 #ifdef CONFIG_FS_POSIX_ACL
@@ -128,7 +171,10 @@ static int moobl_inode_set(struct inode *inode, void *data)
 	} else if (S_ISLNK(inode->i_mode)) {
 		inode->i_op = &moobl_symlink_iops;
 	} else {
-		/* Devices and fifos: attributes only; opening them is refused. */
+		/*
+		 * Devices, FIFOs and sockets. Devices cannot be opened (SB_I_NODEV); a FIFO or a
+		 * socket opened through the layer is its own endpoint, not the lower's (V9, 0155).
+		 */
 		inode->i_op = &moobl_special_iops;
 		init_special_inode(inode, inode->i_mode, lower->i_rdev);
 	}
@@ -289,29 +335,39 @@ static int moobl_d_revalidate(struct dentry *dentry, unsigned int flags)
 	/*
 	 * Ref-walk runs without the parent's lock, so moobl_instantiate() can swap a negative
 	 * dentry's lower dentry and drop the old one meanwhile. The old one is freed only after a
-	 * grace period: read it under RCU, and hold it only to call the lower's own revalidation
-	 * (review item 3, journal 0120). A lower dentry already dead was replaced: look up again.
+	 * grace period: read it under RCU and hold it for the checks below (review item 3,
+	 * journal 0120). A lower dentry already dead was replaced: look up again.
 	 */
 	rcu_read_lock();
 	lower = READ_ONCE(((struct moobl_dentry *)dentry->d_fsdata)->lower.dentry);
-	if (READ_ONCE(lower->d_flags) & DCACHE_OP_REVALIDATE) {
-		if (!lockref_get_not_dead(&lower->d_lockref)) {
-			rcu_read_unlock();
-			return 0;
-		}
+	if (!lockref_get_not_dead(&lower->d_lockref)) {
 		rcu_read_unlock();
-		rc = lower->d_op->d_revalidate(lower, flags);
-		dput(lower);
-	} else {
-		rcu_read_unlock();
+		return 0;
 	}
-	if (d_really_is_positive(dentry)) {
+	rcu_read_unlock();
+	if (lower->d_flags & DCACHE_OP_REVALIDATE)
+		rc = lower->d_op->d_revalidate(lower, flags);
+	/*
+	 * The checks of the RCU path, which used to fall back to this one and get a yes: a lower
+	 * dentry removed behind the layer, a different lower inode, a negative upper dentry over a
+	 * positive lower one (a failed instantiation, R2-4; V4, M5 of journal 0155).
+	 */
+	if (rc > 0 && d_unhashed(lower)) {
+		rc = 0;
+	} else if (rc > 0 && d_really_is_positive(dentry)) {
 		struct inode *inode = d_inode(dentry);
 
-		moobl_copy_attr(inode, moobl_lower_inode(inode));
-		if (!inode->i_nlink)
-			return 0;
+		if (d_inode(lower) != moobl_lower_inode(inode)) {
+			rc = 0;
+		} else {
+			moobl_copy_attr(inode, moobl_lower_inode(inode));
+			if (!inode->i_nlink)
+				rc = 0;
+		}
+	} else if (rc > 0 && d_really_is_positive(lower)) {
+		rc = 0;
 	}
+	dput(lower);
 	return rc;
 }
 
@@ -513,9 +569,14 @@ static int moobl_create(struct mnt_idmap *idmap, struct inode *dir,
 	if (err)
 		return err;
 	err = vfs_create(&nop_mnt_idmap, lower_dir, lower_dentry, mode, excl);
-	if (!err)
+	if (!err) {
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
+		if (err)	/* undo the lower file, as ecryptfs_do_create() does (R2-4) */
+			vfs_unlink(&nop_mnt_idmap, lower_dir, lower_dentry, NULL);
+	}
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
+	if (err && d_really_is_negative(dentry))
+		d_drop(dentry);
 	return err;
 }
 
@@ -535,6 +596,8 @@ static int moobl_mkdir(struct mnt_idmap *idmap, struct inode *dir,
 	if (!err)
 		set_nlink(dir, lower_dir->i_nlink);
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
+	if (err && d_really_is_negative(dentry))
+		d_drop(dentry);	/* the next lookup finds what the lower holds (R2-4) */
 	return err;
 }
 
@@ -613,6 +676,11 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	};
 	int err;
 
+	/* RENAME_WHITEOUT would make a device node through a layer that refuses mknod (V6, 0155) */
+	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE)) {
+		err = -EINVAL;
+		goto out_put;
+	}
 	/*
 	 * A directory may not move to another domain or depth: its subtree's partition would
 	 * change (docs/spec-query-v2.md §5); like a cross-device rename, mv copies instead.
@@ -665,12 +733,12 @@ static int moobl_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 		goto out_unlock;
 	/* Name operations hold the parents' locks: link counts may be copied here. */
 	if (target)
-		fsstack_copy_attr_all(target, moobl_lower_inode(target));
-	fsstack_copy_attr_all(new_dir, d_inode(lower_new_dir));
+		moobl_copy_attr_nlink(target, moobl_lower_inode(target));
+	moobl_copy_attr_nlink(new_dir, d_inode(lower_new_dir));
 	if (new_dir != old_dir)
-		fsstack_copy_attr_all(old_dir, d_inode(lower_old_dir));
+		moobl_copy_attr_nlink(old_dir, d_inode(lower_old_dir));
 	if ((flags & RENAME_EXCHANGE) && target)
-		fsstack_copy_attr_all(d_inode(old_dentry),
+		moobl_copy_attr_nlink(d_inode(old_dentry),
 				      moobl_lower_inode(d_inode(old_dentry)));
 	/* A replaced file or directory is gone, unless other names still link to the file. */
 	if (target && !(flags & RENAME_EXCHANGE) &&
@@ -697,6 +765,7 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	struct dentry *lower_old = moobl_lower_dentry(old_dentry);
 	struct dentry *lower_dentry;
 	struct inode *lower_dir;
+	bool linked;
 	int err;
 
 	if (MOOBL_SB(dir->i_sb)->nolinks)
@@ -705,15 +774,18 @@ static int moobl_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	if (err)
 		return err;
 	err = vfs_link(lower_old, &nop_mnt_idmap, lower_dir, lower_dentry, NULL);
+	linked = !err;
 	if (!err)
 		err = moobl_instantiate(dir, new_dentry, lower_dentry, lower_dir);
-	if (!err)
+	if (linked)	/* the lower link exists even when the upper inode could not be made */
 		set_nlink(inode, moobl_lower_inode(inode)->i_nlink);
 	moobl_unlock_parent(new_dentry, lower_dentry, lower_dir);
-	if (!err) {
+	if (!err)
 		moobl_index_linked(dir->i_sb, new_dentry);
+	if (linked)
 		moobl_index_perm_changed(dir->i_sb, old_dentry);	/* nlink > 1: heterogeneous */
-	}
+	if (err && d_really_is_negative(new_dentry))
+		d_drop(new_dentry);	/* the next lookup finds the new lower link (R2-4) */
 	return err;
 }
 
@@ -733,6 +805,8 @@ static int moobl_symlink(struct mnt_idmap *idmap, struct inode *dir,
 	if (!err)
 		err = moobl_instantiate(dir, dentry, lower_dentry, lower_dir);
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
+	if (err && d_really_is_negative(dentry))
+		d_drop(dentry);	/* the next lookup finds what the lower holds (R2-4) */
 	return err;
 }
 
@@ -1173,8 +1247,65 @@ static int moobl_file_init(struct file *file, struct file *real)
 	mf->real = real;
 	spin_lock_init(&mf->lock);
 	mf->wcred = NULL;
+	mf->qbuf = NULL;
+	mf->qcap = 0;
+	mf->qbusy = false;
 	file->private_data = mf;
 	return 0;
+}
+
+/*
+ * A buffer for n query results. The results are copied to the caller only after query_sem is
+ * released (journal 0105), so they are first gathered in kernel memory; allocating that for
+ * the requested limit on every call (up to 4096 records of 272 bytes, a vmalloc) doubled the
+ * latency of a query (journal 0139). The buffer is kept with the open file and reused; a
+ * query made while another one on the same file holds it gets a buffer of its own. Every
+ * record a query returns is written in full first (put_result), so nothing of an earlier
+ * query reaches the caller.
+ */
+struct moob_query_result *moobl_qbuf_get(struct file *file, u32 n)
+{
+	struct moobl_file *mf = file->private_data;
+	struct moob_query_result *old = NULL, *buf;
+
+	spin_lock(&mf->lock);
+	if (mf->qbusy) {
+		spin_unlock(&mf->lock);
+		return kvmalloc_array(n, sizeof(*buf), GFP_KERNEL);
+	}
+	mf->qbusy = true;
+	if (mf->qcap >= n) {
+		spin_unlock(&mf->lock);
+		return mf->qbuf;
+	}
+	old = mf->qbuf;
+	mf->qbuf = NULL;
+	mf->qcap = 0;
+	spin_unlock(&mf->lock);
+	kvfree(old);
+	buf = kvmalloc_array(n, sizeof(*buf), GFP_KERNEL);
+	spin_lock(&mf->lock);
+	if (buf) {
+		mf->qbuf = buf;
+		mf->qcap = n;
+	} else {
+		mf->qbusy = false;
+	}
+	spin_unlock(&mf->lock);
+	return buf;
+}
+
+void moobl_qbuf_put(struct file *file, struct moob_query_result *buf)
+{
+	struct moobl_file *mf = file->private_data;
+
+	spin_lock(&mf->lock);
+	if (buf && buf == mf->qbuf) {
+		mf->qbusy = false;
+		buf = NULL;
+	}
+	spin_unlock(&mf->lock);
+	kvfree(buf);
 }
 
 #define MOOBL_CTX(file) {						\
@@ -1209,6 +1340,7 @@ static int moobl_release(struct inode *inode, struct file *file)
 	fput(mf->real);
 	if (mf->wcred)
 		put_cred(mf->wcred);
+	kvfree(mf->qbuf);
 	kfree(mf);
 	return 0;
 }
@@ -1217,9 +1349,13 @@ static ssize_t moobl_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	struct file *file = iocb->ki_filp;
 	struct backing_file_ctx ctx = MOOBL_CTX(file);
+	int err;
 
 	if (!iov_iter_count(iter))
 		return 0;
+	err = moobl_sync_flags(file);
+	if (err)
+		return err;
 	return backing_file_read_iter(moobl_real(file), iter, iocb,
 				      iocb->ki_flags, &ctx);
 }
@@ -1233,6 +1369,9 @@ static ssize_t moobl_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	if (!iov_iter_count(iter))
 		return 0;
+	ret = moobl_sync_flags(file);
+	if (ret)
+		return ret;
 	ctx.cred = moobl_wcred_get(file);
 	if (IS_ERR(ctx.cred))
 		return PTR_ERR(ctx.cred);
@@ -1251,6 +1390,10 @@ static ssize_t moobl_splice_read(struct file *in, loff_t *ppos,
 				 unsigned int flags)
 {
 	struct backing_file_ctx ctx = MOOBL_CTX(in);
+	int err = moobl_sync_flags(in);
+
+	if (err)
+		return err;
 
 	return backing_file_splice_read(moobl_real(in), ppos, pipe, len, flags, &ctx);
 }
@@ -1262,6 +1405,9 @@ static ssize_t moobl_splice_write(struct pipe_inode_info *pipe, struct file *out
 	struct inode *inode = file_inode(out);
 	ssize_t ret;
 
+	ret = moobl_sync_flags(out);
+	if (ret)
+		return ret;
 	ctx.cred = moobl_wcred_get(out);
 	if (IS_ERR(ctx.cred))
 		return PTR_ERR(ctx.cred);
@@ -1278,6 +1424,10 @@ static ssize_t moobl_splice_write(struct pipe_inode_info *pipe, struct file *out
 static int moobl_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct backing_file_ctx ctx = MOOBL_CTX(file);
+	int err = moobl_sync_flags(file);
+
+	if (err)
+		return err;
 
 	return backing_file_mmap(moobl_real(file), vma, &ctx);
 }
@@ -1814,5 +1964,5 @@ module_init(moobl_init);
 module_exit(moobl_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Studio Moob");
-MODULE_VERSION("0.4.0");
+MODULE_VERSION("0.4.1");
 MODULE_DESCRIPTION("MoobFS memory layer: stacked filesystem with a typed attribute index");

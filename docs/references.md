@@ -25,6 +25,10 @@ used here and is missing from this list, or is described wrongly, please open an
 | checkpatch.pl | [Linux stable](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git) `scripts/` ([docs](https://docs.kernel.org/dev-tools/checkpatch.html)) | GPL-2.0 | tag `v6.12.112`, SHA-256 per file | style check of `layer/` and `kernel/` (`scripts/checkpatch.sh`) |
 | virtme-ng | [arighi/virtme-ng](https://github.com/arighi/virtme-ng) | GPL-2.0-only | `1.41`, hashes in `vm/kasan-requirements.txt` | KASAN/UBSAN/lockdep kernel runs (`.github/workflows/kasan.yml`) |
 | Linux 6.12.112 | [kernel.org](https://cdn.kernel.org/pub/linux/kernel/v6.x/) | GPL-2.0 | tarball SHA-256 | the KASAN kernel and the benchmark kernel (`bench/kernel-build.sh`) |
+| fselect | [jhspetersson/fselect](https://github.com/jhspetersson/fselect), release asset `fselect-x86_64-linux-musl.gz` | Apache-2.0 (per its repository) | `0.10.3`, SHA-256 as listed by GitHub for the asset | SQL-like file search with `has_xattr`/`xattr()` through the layer (`vm/interop-guest.sh`, `.github/workflows/interop.yml`, journal 0140); not vendored |
+| cshatag | [rfjakob/cshatag](https://github.com/rfjakob/cshatag), release asset `cshatag_v2.2.1_linux-static_amd64.tar.gz` | MIT | `v2.2.1`, SHA-256 computed from the official tarball (the project publishes a GPG signature only) | checksums in `user.shatag.*`, outdated and corrupt files detected through the layer (journal 0140); not vendored |
+| Recoll | [recoll.org](https://www.recoll.org/), Ubuntu 24.04 package `recollcmd` | GPL-2.0-or-later | `1.36.1-1build2` (CI); 1.43.0 in the local run | `[xattrtofields]` indexing of `user.moob.*` and `user.xdg.*` through the layer (journal 0140); not vendored |
+| KDE KFileMetaData | [KDE/kfilemetadata](https://invent.kde.org/frameworks/kfilemetadata), Ubuntu 24.04 package `libkf5filemetadata-dev`; `KFileMetaData::UserMetaData` | LGPL-2.1-or-later | `5.115.0-0ubuntu4` (CI); 5.116.0 in the local run | the tag, rating and comment attributes Dolphin and Baloo use, through `vm/interop-kfmd.cpp` (journal 0140); not vendored |
 
 ## 2. Research that shaped decisions
 
@@ -240,6 +244,9 @@ set. Read on 2026-10-14.
 | --- | --- | --- |
 | overlayfs | https://docs.kernel.org/filesystems/overlayfs.html | model of the stacked layer, `override_creds`, the rule against touching the lower filesystem (ADR-0007) |
 | eCryptfs | https://docs.kernel.org/filesystems/ecryptfs.html | model of a 1:1 stacked filesystem (ADR-0007) |
+| eCryptfs create, mkdir, symlink and link error paths | [`fs/ecryptfs/inode.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/ecryptfs/inode.c?h=v6.12.112): `ecryptfs_do_create()` unlinks the lower file when the upper inode cannot be made; `ecryptfs_mkdir()`, `ecryptfs_symlink()` drop a negative upper dentry | the undo and the `d_drop()` after a failed upper inode in `layer/main.c` (R2-4, journal 0156) |
+| Linux fault-injection stack filter and function tracing | [`lib/fault-inject.c`](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/lib/fault-inject.c?h=v6.12.112), [`Documentation/trace/ftrace.rst`](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/Documentation/trace/ftrace.rst?h=v6.12.112), Linux v6.12.112, GPL-2.0 | Exact pinned sources consulted for the function-scoped fail-nth allocation and PID-filtered scan synchronization in the R2-6/R2-10 VM regressions (journal 0170). |
+| Linux inode-cache lookup before allocation | [`fs/inode.c`, `iget5_locked()`, Linux v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/inode.c?h=v6.12.112), GPL-2.0 | Explains why the positive source inode in the hard-link path is reused rather than allocated; bounds the R2-4 negative evidence without adding a forced production failure hook (journal 0170). |
 | backing_file helpers | [`fs/backing-file.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/backing-file.c?h=v6.12.112) | I/O delegation in `layer/main.c` |
 | overlayfs `ovl_want_write()` | [`fs/overlayfs/util.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/overlayfs/util.c?h=v6.12.112), called from `ovl_create_object()` in `fs/overlayfs/dir.c` | write access on the lower mount around every change (`moobl_want_write()`, journal 0117) |
 | Filesystem freezing, `mnt_want_write()`, idmapped mounts | [`fs/namespace.c` at v6.12.112](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/fs/namespace.c?h=v6.12.112), `ext4_journal_check_start()` in `fs/ext4/ext4_jbd2.c`, https://docs.kernel.org/filesystems/idmappings.html, `fsfreeze(8)` and `X-mount.idmap` of `mount(8)` (util-linux) | the freeze and read-only lower tests and the idmapped-lower refusal (journal 0117) |
@@ -252,7 +259,7 @@ set. Read on 2026-10-14.
 | `drop_caches` | `Documentation/admin-guide/sysctl/vm.rst` (`drop_caches`: writing 2 frees reclaimable slab objects through every shrinker), Linux 6.12.112 | how the suite asks the shrinker for everything (journal 0101) |
 | `list_lru` | `include/linux/list_lru.h`, as used in `fs/dcache.c` and `fs/inode.c`, Linux 6.12.112 | considered for the least-recently-used order of built partitions (ADR-0012); not used, a walk of the domains was enough (journal 0101) |
 | btrfs extent-map shrinker | `fs/btrfs/extent_map.c` (`btrfs_extent_map_shrinker_worker`), Linux 6.12.112 | precedent for a filesystem dropping a map of its own and rebuilding it on demand (ADR-0012) |
-| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | reading where a file is (its depth and domain directory) consistently against renames, as path lookup does (`where_is()` in `layer/index.c`, journal 0098) |
+| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | reading where a file is (its depth and domain directory) consistently against renames, as path lookup does (`where_is()` in `layer/index.c`, journal 0098); the same sample-then-read order for the rename generation a build records (`rename_gen()`, issue 110, journal 0174) |
 | POSIX permission check | `acl_permission_check()` and `generic_permission()` in `fs/namei.c`, Linux 6.12.112 | the owner judged by the owner bits and a member of the group by the group bits, never by those of others: condition 1 of the homogeneity rule (journal 0116, finding F9) |
 | Reader-writer semaphores | `rwsem_read_trylock()` and `rwsem_down_read_slowpath()` in `kernel/locking/rwsem.c`, Linux 6.12.112 | a reader queues behind a waiting writer, so one stalled reader of `query_sem` stops every query once a writer waits (journals 0105 and 0116) |
 | FUSE request wait | `request_wait_answer()` in `fs/fuse/dev.c`, Linux 6.12.112 | a request the daemon has read is waited for without interruption: the stall of finding F10, and the daemon of `tests/fusestall.c` (journal 0116) |
@@ -274,6 +281,19 @@ set. Read on 2026-10-14.
 | Elasticsearch document-level security | [Elastic docs](https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/controlling-access-at-document-field-level) | precedent for count leakage (ADR-0009); the current page states that restricted documents still count in the scoring statistics |
 | LMDB, RocksDB, LevelDB | https://www.symas.com/mdb, https://rocksdb.org/, https://github.com/google/leveldb | engines weighed for a user-space index (ADR-0009) |
 
+Review 0144 and correction 0149 also consult Linux 6.12.112's `fs/fcntl.c`
+(GPL-2.0), `fs/overlayfs/file.c` (GPL-2.0-only)
+(`ovl_real_fdget`, `ovl_change_flags`), `fs/backing-file.c`,
+`fs/read_write.c` and `include/linux/fs.h` for synchronization of mutable
+file flags and initialization of the lower synchronous I/O request. These are
+the exact test-kernel sources, not a newer API substituted for the build.
+
+Correction 0150 consults Linux 6.12.112's `fs/xattr.c` (GPL-2.0-only; `vfs_getxattr()` and
+`__vfs_getxattr()`). A value read can return a negative error from permission,
+security or the lower filesystem handler. `-ENODATA` means a name listed earlier
+may have been removed; `-ERANGE` means the value exceeded the scan buffer.
+Other failures must abort an index build or adoption.
+
 ## 4. Agent-memory clients analyzed
 
 | Client | Repository | License | Analyzed |
@@ -287,9 +307,58 @@ set. Read on 2026-10-14.
 | LangMem | https://github.com/langchain-ai/langmem | MIT | `48e3c11` |
 | OpenAI Agents SDK sessions | https://github.com/openai/openai-agents-python | MIT | `125efa0` |
 
+## 5. Public project metadata
+
+Sources for the external-records section of both READMEs, checked on 2026-10-20
+(journal 0167). These records describe release tracking and source discovery, not a
+kernel review or a compatibility test.
+
+| Source | Used for |
+| --- | --- |
+| [MoobFS on Anitya](https://release-monitoring.org/project/392843/) | Experimental pre-release tracking and the absence of a distribution package mapping. |
+| [MoobFS on Open Hub](https://openhub.net/p/moobfs) | Public project metadata; code analysis is not complete. |
+| [MoobFS candidate corpus on XERJ](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Selection of a source snapshot; license review is pending and the corpus is not installable yet. |
+| [MoobFS experimental source snapshot on Zenodo](https://doi.org/10.5281/zenodo.23514721) | Citation metadata and the official version DOI badge for commit `02381fba`, archive version `0.4.1-experimental+git.02381fba` (journal 0168). |
+| [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory/blob/749a08cfe25ad23dda05565d1a11b444608b7786/README.md) | Verified MoobFS entry under **Emerging projects**, described as experimental agent-memory storage; source for the discovery link in both READMEs (journal 0169, checked 2026-10-20). This listing is not a kernel review or a compatibility test. |
+
 ## Not included
 
 Works surveyed but not used in a decision (most of `docs/research-academic-survey.md` and the
 originality matrix), and tools only planned (syzkaller, LTP, sqlite-vec, USearch). They stay in the
 research documents. Two page ranges could not be confirmed and are omitted: Büttcher and Clarke
 (FAST 2005) and the SC22 article number of GUFI.
+
+## 6. Harness verdict regression (journal 0171)
+
+- Linux man-pages [`wait(2)`](https://man7.org/linux/man-pages/man2/waitpid.2.html):
+  child waiting and `WIFEXITED`/`WEXITSTATUS`, used by `tests/query.c` before
+  printing its race2 summary.
+- Linux man-pages [`ld.so(8)`](https://man7.org/linux/man-pages/man8/ld.so.8.html):
+  `LD_PRELOAD` symbol interposition, used only in the disposable Linux container's
+  `tests/test_harness_verdicts.py` to control ioctl replies and child exit status.
+  It exercises the real fork/wait path without a module; it does not emulate
+  the filesystem or prove query correctness. Thanks to the Linux man-pages maintainers.
+
+## 7. Permission and independent-oracle regressions (journal 0172)
+
+- Linux v6.12.112, [`fs/proc/base.c`](https://raw.githubusercontent.com/gregkh/linux/v6.12.112/fs/proc/base.c),
+  GPL-2.0: exact `proc_fail_nth_write`/read handlers consulted for the child-owned
+  control descriptor in the deferred unprivileged-fault candidate, preserved
+  locally (journal 0172). It is not active coverage of this review batch.
+- Existing specifications [spec-m2.md](spec-m2.md) §3/§8 and
+  [spec-query-v2.md](spec-query-v2.md) §3/§4 define the expected fixture bytes,
+  directory authorization and filtered results. `tests/permission-gaps.c` uses
+  fixed expectations and lower-kernel access, without linking `common/attr.c`.
+
+## 8. Domain renamed while a build waits to start (issue 110, journal 0174)
+
+- Linux v6.12.112, `fs/namei.c` `vfs_rename()`, GPL-2.0: the filesystem's
+  `->rename()` runs before `d_move()`/`d_exchange()` of the VFS dentries. The
+  layer's rename hook therefore raises the generation after the lower rename
+  and before its own dentries move, which is why the fix reads the domain's
+  name from the lower dentry. Read in the source tree the KASAN harness builds.
+- Linux v6.12.112, `include/linux/sched.h` (`TASK_KILLABLE`) and
+  `fs/proc/array.c` (state letters), GPL-2.0: `mutex_lock_killable()` sleeps in
+  `TASK_KILLABLE`, shown as `D` in `/proc/<pid>/stat`, which `tests/rootpath-race.c`
+  uses to see the QUERY2 waiting; `/proc/<pid>/stack` and `wchan` gave no
+  function names in the guest kernel.

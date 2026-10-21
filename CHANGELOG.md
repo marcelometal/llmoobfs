@@ -2,8 +2,149 @@
 
 ## Unreleased
 
+- Documentation (journal 0176): record the locally validated issue 110/111
+  correction batch in PR 126, its publication gate and the paused follow-up order in
+  the roadmap and security roadmap; reconcile issue 112 as completed and keep
+  issue 114's remaining T9 gap visible.
+
+- Fix (journal 0175, issue 111, R2-7 of journal 0155): concurrent domain
+  builds can no longer erase the budget-refusal signal before the failing build
+  tries to release an older domain. The new `overbudget` suite step checks this
+  on ext4, btrfs and XFS. Raise the emulated guest's hung-run guard to 2400 s
+  after the expanded full suite reached the previous 1200 s guard.
+
+- Fix (journal 0174, issue 110, R2-5 of journal 0155): a domain directory
+  renamed between the moment a build took its name and the moment the build
+  recorded the rename generation no longer leaves the domain fresh under the
+  old name, which made the v1 QUERY omit its uncached files until another
+  rebuild. The build records the generation sampled before the name, and
+  QUERY2 reads the name from the lower dentry. New suite step `rootpath`.
+- Contract/tests (journal 0173, issue 112): specify that all QUERY2_BATCH output
+  must be discarded on error; there is no partial-success or rollback protocol.
+  Add dedicated-VM controls for validation-before-execution, a later result-copy
+  fault, a final header-copy fault and successful reuse, without module/UAPI changes.
+
+- Tests (journal 0172, issue 114 T5/T6/T8/T10 and part of T9): make the QUERY2
+  execute check decisive after a successful directory open; assert filtered
+  counts and truncation; compare attributed directories with lower permissions;
+  add fixed encoding expectations independent of the shared validator, and
+  unprivileged checks before index release and after rebuilding. Unprivileged
+  allocation-fault coverage remains deferred.
+
+- Documentation (journal 0171, issue 114 T11): clarify QEMU verdict markers,
+  explicit coverage skips, the 1200-second guard and compiled-only test programs.
+
+- Harness (journal 0171, issue 114 T7): preserve failing producer statuses in
+  logged race, buildrace and oracle checks; print race2 statistics only after
+  validating the forked child. Add controlled failure and success regressions.
+
+- Validation (journal 0170): reconcile PR 109 with current documentation and add
+  VM regressions for failed rename-path allocation and removal during an index scan.
+  Record its completed merge and successful published-head CI in a dated note.
+
+- Documentation (journal 0169): add the confirmed TeleAI Awesome Agent Memory listing
+  to both READMEs' external records, preserving all five existing badges.
+
+- Documentation (journal 0168): add the Zenodo version DOI badge and full archived-snapshot
+  citation to both READMEs, distinguishing commit `02381fba` from the earlier source tag.
+
+- Documentation (journal 0167): add verified external project records to both READMEs,
+  with the scope and current limits of each record; preserve the four existing badges.
+
+- Coverage (journal 0154): `moobl_xattr_get` at 0 of 4 PCs in the fifth syzkaller run is explained
+  by its corpus, which kept almost no attribute read inside a mounted layer. Replayed with
+  per-call coverage, every such read reaches 3 of the 4 PCs. Three new seeds
+  (`vm/syzkaller/seeds/xattr-get-*`) end in that read.
+- Integration (journal 0153): the correction batch of review 0144 (R1, R2) and the fix of
+  review 0151 (journal 0152) in one tree; every public surface states the three findings. The
+  complete `make vm-test` passes. Its QEMU guard is now 1200 s; one complete run had reached
+  the old 600 s under TCG on an arm64 host.
+- Fix (0149): synchronize mutable file status flags with the backing open
+  before delegated I/O. The clear-append regression fails without the fix and
+  passes with it; clear- and set-append assertions pass in the integrated VM
+  suite on ext4, btrfs and XFS.
+- Fix (0150): propagate operational lower `getxattr` read errors while building
+  or updating the index. Injected `EIO`/`ENOMEM` tests and the full VM suite
+  pass on the correction branch; the negative branch confirms the old silent
+  omission. The integrated full VM suite and local KASAN/UBSAN/lockdep run pass
+  at `49098aa`; pull-request CI remains a separate pre-merge gate.
+- Documentation: correct stale `MOOB_ONLY` instructions in `docs/testing.md`
+  and `docs/development.md` with dated notes (journal 0149).
+
+- Process (journal 0148): add the agreed batch cadence, issue ownership,
+  client-neutral scope and reference practice to `AGENTS.md`. Keep the full
+  continuity and outreach rules in the local MoobFS rules file.
+
+- Review (0144): two correctness findings in the reviewed source. Clearing
+  `O_APPEND` with `F_SETFL` still appended through the layer (reproduced in an
+  ext4 VM); operational `getxattr` errors could silently omit an index entry
+  (confirmed in source). Corrections are recorded in 0149 and 0150; the latter
+  uses injected errors, not a physical lower-filesystem I/O failure.
+- Coverage (0145): the fifth run's 88.7% aggregate meets the numeric S3 threshold,
+  but `moobl_xattr_get` at 0/4 leaves its per-function criterion unresolved.
+- Documentation (0146): reconcile current public surfaces with implementation and
+  recorded evidence, distinguish historical pilots from repeated measurements,
+  and document the review's open limitations in English and Portuguese.
+- Measurement analysis (0147): the existing 1–3% p50 residual survives first-cycle
+  removal; much of Q1's p99 difference is associated with the first cycle.
+  Reproducible analysis of existing data, not a new benchmark or a causal attribution.
+
+- Independent review of 3627172, round 2 (journal 0155): twelve findings, two of them
+  reproduced in the VM with `tests/review-3627172-vm.sh`: a directory 65 or more components
+  below the mount root is placed nowhere by the write paths, so its chmod sets no fallback and
+  a value change below it is not indexed (R2-1); a file renamed inside its directory while the
+  scan reads it keeps the scan's listing name (R2-2). Ten more findings from reading the code
+  (partial records carried across domains, a failed upper-inode creation, and lesser ones) and
+  eleven test gaps, two of them high (no test exercises an ACL on the domain directory, nor a
+  write under a private intermediate directory).
+- syzkaller (journal 0143): a fifth six-hour run, no report; the ioctl and attribute handlers at
+  88.7 % of their PCs, above the 85 % threshold of security roadmap S3. The fix of journal 0139
+  confirmed with 40 repetitions: within 1 to 3 % of module 0102 on filtered queries.
+- syzkaller descriptions for the weak handlers (journal 0138; first run in journal 0143): the `QUERY2` cursor
+  as resources with a continuing call `ioctl$MOOB_IOC_QUERY2_NEXT`, typed query terms and
+  attribute values from short lists, and six new seeds (cursor pages, long keys, value types,
+  the equality plan, per-result checks, attribute flags).
+- **Review finding (journal 0151, exact target `d110d4e`):** a chmod during a domain's first
+  index build can leave a stale homogeneous entry, allowing later `QUERY2` results for a file
+  whose read permission has been revoked. Reproduced in the disposable VM; no fix is included.
+- **Fixed (journal 0152):** the finding above. The file's own homogeneity is now checked inside
+  the index load, after the loader is registered and again at every repeated reading. New suite
+  step in `buildrace` (`tests/chmodrace.c`) on ext4, btrfs and XFS; the negative round fails
+  without the fix.
+
+## v0.4.1-experimental — 2026-10-20
+
+Fifth source pre-release, the one to use instead of `v0.4.0-experimental`, whose queries are
+about twice as slow as they should be (journal 0139). Same findings status as v0.4.0: F1 to F12
+fixed except the fair-shares part of F2. No binaries, no packaging, no support; no outside human
+review. Journal 0142.
+
+- **Fixed:** the query slowdown of v0.4.0, found by the measurement method of journal 0134 and
+  bisected to one change (a buffer for the requested limit allocated on every query); a
+  casefolded lower directory is now refused (issue #95).
+- **Testing:** interoperability with getfattr, fselect, cshatag, Recoll and KFileMetaData;
+  every refusal of a typed attribute write and the 64-attribute limit; arm64 under emulation
+  (ext4, btrfs, XFS and fault injection under KASAN); a fourth six-hour syzkaller run with no
+  report and richer descriptions for the weakly covered handlers.
+  *Correction, 2026-10-20:* the richer descriptions were not in this tag; they were merged after
+  it, with their first run (journal 0143).
+- **Measured:** the on-demand index costs 7 to 12 % on filtered queries against the index built
+  at mount (40 repetitions, CPU frequency held, bootstrap intervals).
+
+The entries below are the detail.
+
+- Tests (journal 0141): new suite marker `TYPED_LIMITS_PASS` (`tests/layer.c typed`, once per
+  lower filesystem): every refusal of a typed attribute write with its errno and an unchanged
+  lower, and the limit of 64 per file (the 65th gives `ENOSPC`, replacing and removing at the
+  limit, what does not count). `q2invalid` and `invalid` now check each term and header rule of
+  `QUERY2` and `QUERY` next to a valid request. Paths syzkaller reaches poorly (journal 0138).
+- Fixed (journal 0139): since pull request 71 every `QUERY`/`QUERY2` allocated a buffer for the
+  requested limit (about 1.1 MB at the maximum), which made filtered queries 1.3 to 2.5 times
+  slower; the buffer is now kept with the open file and reused. Measured with the method of
+  journal 0134 (40 repetitions, frequency held, bootstrap interval): the on-demand index costs
+  7 to 12 % against the index built at mount, which the 2026-10-14 report could not show.
 - CI, arm64 (exploratory, journal 0137): the guest boots under emulation and the suite step ext4
-  passed under KASAN twice, and btrfs and XFS once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
+  passed under KASAN twice, btrfs and XFS once, and the fault-injection step once. The boot failure of journal 0124 came from virtme-ng's x86-64-only
   `virtme-ng-init`; the job now uses the bash init, a virtio-fs root, the disks in reverse order,
   and runs the test programs from a guest tmpfs (from virtio-fs they crashed at random).
 - syzkaller (journal 0138): a fourth six-hour run with F2 and F4, no report; handler coverage
@@ -14,6 +155,11 @@
   not refused, though the layer's names are case-sensitive; it is now refused, with every name in
   it and as the lower root, as overlayfs refuses layers whose casefolding differs. New suite step
   `casefold`.
+- Testing (journal 0140): an interoperability test, `vm/interop-guest.sh` with the on-demand
+  workflow `interop.yml` (not a required check), runs getfattr/setfattr, fselect, cshatag,
+  Recoll and KDE KFileMetaData through a layer mount and ends in `INTEROP_PASS` or
+  `INTEROP_FAIL: <steps>`. Passed locally (arm64) and in CI on amd64 (run 39352397079, all 14
+  steps).
 
 ## v0.4.0-experimental — 2026-10-19
 

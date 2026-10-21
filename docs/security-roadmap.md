@@ -37,9 +37,31 @@ Suggested order by cost-benefit. Each item has a verifiable done-when criterion.
 
 *Status, 2026-10-12 (journal 0060).* Done: [ADR-0011](decisions/0011-threat-and-credential-model.md),
 with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (journal 0084).
+*Update, 2026-10-20 (journal 0156):* findings F13 (review round 1, journal 0151) and F14 (round 2, journal 0155) recorded and fixed; the other defects of round 2 are fixed or recorded as issues, and S14 to S21 below plan the tests that would have found them.
+
+*Update, 2026-10-21 (journals 0174 and 0175):* the round-2 domain-rename
+(R2-5, issue 110) and concurrent index-budget refusal (R2-7, issue 111)
+defects were reproduced on an unfixed module, corrected, and validated in the
+complete native VM suite over ext4, btrfs and XFS. The corrected kernel/layer
+code passed KASAN/UBSAN/lockdep on the dedicated host. The combined
+[PR 126](https://github.com/studiomoob/llmoobfs/pull/126) is open; published-head CI,
+review and merge remain separate gates. Neither correction provides S9 fair
+budget sharing or completes the broader S14–S21 work below.
+
 *Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.
+
+*Separate stabilization note, 2026-10-20:* independent review 0144 identified
+two file/index correctness defects outside the F1–F12 list. Corrections
+([0149](history/0149-sync-backing-file-flags.md),
+[0150](history/0150-propagate-index-xattr-read-errors.md)) passed the integrated
+full VM suite and local KASAN/UBSAN/lockdep gate at `49098aa`.
+Pull-request CI is still a separate pre-merge gate. The S9 fair-share
+gap and outside-human-review gap remain unchanged. A further review ([0151](history/0151-review-d110d4e.md))
+found a permission defect: a chmod during the first build of a domain left the file in `QUERY2`
+answers to users who can no longer read it. Fixed in [0152](history/0152-chmod-during-build-fixed.md)
+through a private advisory.
 
 > Note from 2026-10-11 (entry 0030), measured on the Azure host: `QUERY` time grows by about
 > 1.15 µs per entry from another owner that matches the query (18 µs with none, 28 ms with
@@ -112,6 +134,19 @@ by fuzzing image and syscalls together. The current libFuzzer covers only the en
   A fourth, on 2026-10-19 with F2 and F4 (journal 0138): 625 124 executions, no report; the
   handlers at 78.6 % of their PCs; two harness gaps fixed (attribute calls on a layer file,
   coverage fetched in time).
+  A fifth, on 2026-10-19/20 with richer descriptions (journal 0143): 540 919 executions, no
+  report; the handlers at **88.7 %** of their PCs, above the threshold below.
+- **Clarification, 2026-10-20 (journal 0146):** the fifth run reaches the aggregate PC target,
+  but `moobl_xattr_get()` still has 0 of 4 PCs, without an established explanation. The separate
+  requirement below to exercise every reachable function is therefore not yet demonstrated.
+  Keep this evidence gap distinct from the maintainer's stabilization milestone.
+- **Update, 2026-10-20 (journal 0154):** the 0 of 4 is explained by the corpus, not by the
+  function. Of the fifth run's 1 082 programs, 40 read an attribute and 14 of those mount the
+  layer, and in most of them the read cannot reach it. A replay of the seeds in a disposable
+  guest, with per-call KCOV coverage, gives 3 of the 4 PCs to every read that reaches the layer.
+  The fourth is the `security.*` branch, which the LSM answers itself for `security.selinux`.
+  Three new seeds end in such a read. The per-function criterion is demonstrated when the next
+  run's report shows the function covered.
 - **Threshold, set on 2026-10-15** (journal 0109): the ioctl and attribute handlers (from
   `moobl_root_ioctl()` through `query_run()`, `results_to_user()`, `moobl_xattr_get/set()` and the
   validation in `common/attr.c`) at 85 % of their PCs or more, measured by the manager's
@@ -255,6 +290,47 @@ Accepted by the maintainer on 2026-10-13, small, to arrive with the second half 
 *Note, 2026-10-14 (journal 0102).* Done: four events (build, release, file read again, index
 incomplete); the suite enables and reads them; `scan_retries` is replaced, `scan_delay_us` stays
 because it changes timing.
+
+Targeted test-gap follow-up (journal 0172): decisive search/truncation checks,
+attributed-directory comparisons, 18 independent fixed encoding fixtures and
+unprivileged queries across index release. These bounded scenarios do not
+complete S14/S15 below. Allocation-fault query coverage remains root-only (T9).
+
+### S14 to S21. Making the tests find what reviews found (added 2026-10-20, journal 0156)
+
+Planned, not started. Rounds 1 and 2 of the independent review found defects no test could see.
+The tests checked the end state, not the windows in between, and the same assistants wrote the
+code and its tests. These items make the test suite itself find that kind of defect. ADR-0017
+(accepted on 2026-10-20) refers to S14 and S15; these commitments remain planned.
+
+- **S14. Mutation testing of the homogeneity rule.** A CI job removes, one at a time, each check
+  of `reach_ok()`, `target_ok()`, `ext_acl()`, `place_dentry_above()` and the scan's
+  `inner_ok`, and requires some suite marker to fail. Done when every check has a failing
+  marker, as T2, T3 and T4 now do by hand.
+- **S15. Randomized differential test of permissions.** Random trees and sequences of chmod,
+  chown, setfacl, rename, link and unlink, from several uids, with and without a build in
+  progress (`scan_delay_us`). Every `QUERY2` answer is compared with what `open(2)` and
+  `getxattr(2)` say as that uid. Done when it runs in the suite with a fixed seed set and a
+  longer run in the nightly job.
+- **S16. A test-only consistency mode in the module.** A module parameter that, after each
+  update hook and each build, compares the index with the lower filesystem for the files it
+  touched, and warns on a difference. It would have caught R2-2, R2-3 and R2-8 when they
+  happened. Done when the suite runs with it on and stays silent.
+- **S17. Branch coverage of the suite.** gcov of `layer/` under `make vm-test`, published with
+  each batch: the branches no test reaches. Done when the report is produced in CI.
+- **S18. Nightly fuzzing.** syzkaller every night on the benchmark host with the current
+  descriptions and seeds, its report kept. Done when a week of nightly runs is recorded.
+- **S19. Static analysis.** `sparse`, `smatch`, Coccinelle and the clang analyzer in CI, the
+  tools kernel maintainers run on patches. Done when they run on every pull request and their
+  findings are fixed or justified.
+- **S20. Writing the tests apart from the code.** For a change to the permission rule or the
+  index protocol, a second model writes the test from the specification without seeing the
+  implementation. Also a checklist item in `CONTRIBUTING.md`: "a value computed before a
+  registration, a lock drop, a retry or a sleep, and used after it". Done when the checklist
+  is in place and one change has gone through the procedure.
+- **S21. A model of the loader and hook protocol.** A TLA+ model of `index_load()`'s
+  registration and retry against the update hooks, checked for every interleaving. Heavier
+  than the others; after S14 to S16.
 
 ## Out of scope for this list
 

@@ -88,3 +88,5 @@ advisory when it is a vulnerability under `SECURITY.md`; older versions are not 
   a new pre-release `v0.3.0-experimental` carries every fix (journal 0087).
 - 2026-10-19: `v0.4.0-experimental` carries the fixes made since, F2 (ADR-0016) and F4 among them
   (journal 0135).
+- 2026-10-20: `v0.4.1-experimental` fixes the query slowdown of `v0.4.0-experimental` (journal 0139) and
+  adds the tests of journals 0140 and 0141 (journal 0142).

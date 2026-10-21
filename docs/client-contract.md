@@ -83,6 +83,12 @@ correct). Clients should set permissions when they create a domain and leave the
   than X or absent" (§6), which is how an optional expiry is expressed.
 - `moobfs-attr` sets and reads them from a shell; any language can use `setxattr` with the
   encoding above.
+- Generic xattr tools see the stored bytes, type byte included: `getfattr`, fselect, Recoll and
+  KFileMetaData read a string as `\x01decision`, and integers and the other fixed-size types as
+  raw little-endian bytes (fselect's `xattr(user.moob.kind) = 'decision'` matches nothing). A
+  plain-text value written by such a tool under `user.moob.*` is refused with `EINVAL`; prefixing
+  the type byte works (`setfattr -v 0x0168656c6c6f`). Other `user.*` names pass through
+  unchanged. Journal 0140, `vm/interop-guest.sh`.
 
 ## 5. Identity and provenance
 
@@ -128,6 +134,14 @@ not atomic as a group; rewrite the file when that matters.
   results per call and a cursor to continue;
 - up to eight requests in one `MOOB_IOC_QUERY2_BATCH`, each with its own answer. "Attribute in a
   set" is one request per value; the union is the client's.
+
+For `QUERY2_BATCH`, consume outputs only after a zero return. On any error,
+discard all results and output counts, truncation flags and cursors from that
+call: an earlier result array may have been written without its header, and
+the header copy itself can fail partway. There is no usable partial-success
+prefix. Reinitialize the output fields before retrying; use fresh requests or
+cursors saved from previous successful calls, not output from the failed call
+(spec-query-v2 §4.3, journal 0173). This preserves the existing UAPI.
 
 A result is an inode number and a path of up to 256 bytes relative to the domain; a longer path is
 flagged as truncated. Answers reflect the index at the time of the call and are not a snapshot

@@ -7,6 +7,10 @@ production readiness. Nothing here is a compatibility commitment.
 
 ## Done, with evidence
 
+The early rows describe the milestone when it was tested; their "What was not" cells are
+historical gaps, some closed by later rows or the completed work below. Current security gaps
+are tracked in [security-roadmap](docs/security-roadmap.md).
+
 | Item | What was tested | What was not | Evidence |
 | --- | --- | --- | --- |
 | M0 — Project memory | Versioned journal, ADRs, shared AI instructions, Git history, GitHub replica | — | [0001](docs/history/0001-origin.md), [0002](docs/history/0002-native-read-milestone.md), [0003](docs/history/0003-open-source-github.md) |
@@ -25,19 +29,55 @@ production readiness. Nothing here is a compatibility commitment.
 | First real-client test, stage 1 (ai-memory, unchanged) | Its own 1 147 tests pass inside the layer as on ext4, after a layer bug they exposed was fixed (rename over a just-deleted name); LongMemEval-S retrieval, 50 questions, identical results per question | Repeated runs and the 500 questions; `QUERY2` with its data (stage 2) | [0054](docs/history/0054-real-client-plan.md), [0057](docs/history/0057-rename-over-deleted-name.md), [plan](docs/client-test-plan.md) |
 | Tooling and static analysis | checkpatch clean and failing the CI Lint job on any finding; sparse and `W=1` report nothing on both modules; CodeQL triaged; KASAN job reproducible on a local KVM host | sparse and `W=1` in CI | [0045](docs/history/0045-codeql-triage.md), [0050](docs/history/0050-dx-code-items.md), [0056](docs/history/0056-sparse-w1.md), [0058](docs/history/0058-kasan-local.md) |
 
-## Planned
+## Agreed sequence: completed work and follow-ups
 
-No dates. Each item starts with an issue or ADR and ends with a journal entry.
-Listed in the order they are worked on (agreed on 2026-10-12).
+Updated on 2026-10-21. This keeps the order agreed on 2026-10-12 and records what subsequently
+finished. New features wait for project review and the maintainer's decision.
 
-| Item | Scope | Reference |
+| Item | Current evidence | Remaining work |
 | --- | --- | --- |
-| 1. S1 — Threat and credential model | ADR: the adversary (unprivileged local user with access to the mount point, a process writing to the lower tree from outside, the lower tree's content on disk), what the layer promises and what it does not, `FS_USERNS_MOUNT` off, the unprivileged surfaces, and the open points left by journals 0028 and 0030. Then community action 15 (review requests to independent reviewers); also a condition of distribution stage 2 | [security-roadmap](docs/security-roadmap.md) |
-| 2. Real-client test, stage 2 | `QUERY2` with ai-memory's data and query shapes: a sidecar mirrors front matter into `user.moob.*`, its structured recalls are replayed through `QUERY2`, answers and latency compared, write cost of the sidecar measured | [client-test-plan](docs/client-test-plan.md) |
-| 3. Remaining M3 (done) | Phase 3a: [client-contract](docs/client-contract.md) (journal 0070). Phase 3c (journal 0072): batch read of content dropped, change cursor stays in the client, attribute values with results proposed. Original scope: phase 3c: revisit `READ_BATCH` and the change cursor with the M4 numbers | [spec-m3](docs/spec-m3.md) §2, §4, §5, §6 |
-| 4. S4 and S2 | S4: the lower tree as hostile input (attributes written from outside treated as untrusted at the mount scan and in `getxattr`, a fuzz target of adversarial lower trees, the behaviour on an invalid attribute decided in the S1 ADR); S2: fstests over the layer, group `quick`, per lower filesystem | [security-roadmap](docs/security-roadmap.md) |
-| 5. Community actions 17–18 and the rest of S6 | `MOOB_ONLY` to run a single suite step; the supported-kernel and UAPI compatibility policy (S6; `SECURITY.md` with contact and response targets is done); KASAN as a required status check in branch protection (today it runs on every `layer/` and `vm/` PR and the process requires a green run, but only "Tools and sanitizers" and "Native Linux VM" are enforced) | [community-plan](docs/community-plan.md) §8, §11 |
-| M4 report (done as a pilot-grade report, journal 0088) | The four questions answered with what was measured, including where the layer loses. Not run: repetitions with confidence intervals, three profiles, 1 to 100 processes, the budget-saturation series, and the comparison with an index in user space (journal 0092, in progress) | [0088](docs/history/0088-m4-report.md), [benchmark-plan](docs/benchmark-plan.md) |
+| 1. S1 — Threat and credential model | [ADR-0011](docs/decisions/0011-threat-and-credential-model.md), findings F1 to F12 fixed except fair sharing of the index budget | Outside human review; S9 fair shares |
+| 2. Real-client test, stage 2 | Structured query equivalence and latency from 150 to 60 000 memories, live mirror cost ([0068](docs/history/0068-client-stage2-scale.md), [0071](docs/history/0071-client-stage2-live-mirror.md)) | Current-module rerun with intervals; broader client workloads |
+| 3. Remaining M3 | Client contract ([0070](docs/history/0070-client-contract.md)); batch content read dropped, change cursor stays in the client ([0072](docs/history/0072-m3-phase-3c.md)) | Attribute-value projection accepted in ADR-0014 but not implemented |
+| 4. S4 and S2 | Hostile-lower tests ([0073](docs/history/0073-s4-hostile-lower.md)); fstests `quick` passes on ext4, btrfs and XFS with exclusions ([0091](docs/history/0091-s2-fstests-clean-with-exclusions.md)) | Full fstests `auto` group |
+| 5. S6 and test infrastructure | Compatibility policy and `MOOB_ONLY` ([0084](docs/history/0084-s6-moob-only-kasan-required.md)); required KASAN job runs the suite when module/test inputs change | Other kernel series and distribution work remain under the security roadmap |
+| Review round 2, R2-5 and R2-7 | Domain-rename and concurrent index-budget corrections reproduced negatively and validated in the complete native VM suite on ext4, btrfs and XFS; the unchanged kernel/layer code passed KASAN/UBSAN/lockdep ([0174](docs/history/0174-root-path-race.md), [0175](docs/history/0175-over-budget-build-race.md)); combined [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) is open | Published-head CI, review and merge decision; then reconcile issues 110 and 111. This does not implement S9 fair budget shares or the broader S14–S21 test plan |
+| M4 report | Pilot complete ([0088](docs/history/0088-m4-report.md)); user-space index comparison measured ([0094](docs/history/0094-userspace-baseline-measured.md)); module comparisons with 40 repetitions and intervals ([0143](docs/history/0143-syzkaller-fifth-run-threshold-met.md)) | Fresh SQLite/client comparisons with intervals, other profiles/hosts, concurrency scaling and default-budget saturation |
+| ADR-0012 — On-demand, reclaimable index | Domain build ([0098](docs/history/0098-index-on-demand.md)), releases ([0101](docs/history/0101-domains-released.md)), tracepoints ([0102](docs/history/0102-index-tracepoints.md)); steady-state cost measured ([0139](docs/history/0139-query-buffer-regression.md)) | Fair budget shares; performance residual investigation |
+| S3 — syzkaller | Five six-hour runs; fifth has no report and 88.7 % aggregate handler coverage ([0143](docs/history/0143-syzkaller-fifth-run-threshold-met.md)) | `moobl_xattr_get` was at 0 PCs in the fifth run's report: the corpus kept almost no attribute read inside a mounted layer. Replayed with per-call coverage, the seeds reach 3 of its 4 PCs ([0154](docs/history/0154-xattr-get-coverage-explained.md)); the next run, with three new seeds, has to show it in the report |
+
+Stabilization update, 2026-10-20: a third finding, from the review of
+[0151](docs/history/0151-review-d110d4e.md) (a chmod during the first build of a domain left the
+file in `QUERY2` answers), is fixed in [0152](docs/history/0152-chmod-during-build-fixed.md).
+The two correctness findings of the
+[independent review](docs/history/0144-independent-review.md) have corrections
+in [0149](docs/history/0149-sync-backing-file-flags.md) and
+[0150](docs/history/0150-propagate-index-xattr-read-errors.md). Their integrated
+full VM suite and local KASAN/UBSAN/lockdep run passed at `49098aa`;
+pull-request CI is still a separate pre-merge gate, and publication awaits the
+maintainer's approval. This
+does not close the S3 per-function coverage gap or the performance residual.
+
+Pause checkpoint, 2026-10-21: the combined correction of issues 110 and 111
+is published as [PR 126](https://github.com/studiomoob/llmoobfs/pull/126); pause new implementation. Resume by checking
+required CI on the exact published head, reviewing the PR and its recorded
+limits, deciding whether to merge, and only then reconciling the two issues.
+Issue 112's batch-error contract was merged by PR 125 and its issue closed;
+issue 114 remains partial because unprivileged allocation-fault coverage
+(T9) is deferred.
+The separate Dependabot PR 75 updates `ossf/scorecard-action`; its old checks
+passed, but its branch is behind `main` and must be refreshed and rechecked
+before a maintainer decides on that merge. This dependency PR is not part of
+the correction batch.
+
+Planned from ADR-0017 (accepted 2026-10-20, journal 0156), the answers to the design objections of
+review round 2:
+- **Per-result checks as the default?** Measure every query answered with per-result permission
+  checks (the fallback mode) against the homogeneous partition, by the method of
+  `docs/benchmark-plan.md`. If the difference is small, per-result checks become the default.
+- **The user-space comparison, extended.** The `udx` baseline (journals 0092, 0094) under
+  concurrent writes and renames, right after permission changes, and with a `fanotify` mark;
+  publish what each side gets right and wrong.
 
 ## Depends on validation
 
@@ -46,13 +86,12 @@ on the security roadmap, and a negative result may cancel it.
 
 | Item | Condition | Reference |
 | --- | --- | --- |
-| Index built per domain on demand, releasable under memory pressure | Decided in [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md) after the M4 report and the user-space comparison; the maintainer chose on 2026-10-13 to remove the module's mount and memory costs with kernel techniques. Accepted on 2026-10-13; to be implemented after fault injection is in the suite, with tests of a build racing with writes | [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md), journals 0088, 0094 |
 | Index persistence (surviving remount) | M4 must show that rebuild time or memory at the target scale justifies an on-disk structure, and a format and compatibility ADR must exist | [spec-m3](docs/spec-m3.md) §1, [value-assessment](docs/value-assessment.md) §9 |
-| Attribute values with query results | Measured in journal 0072: reading the attributes of results costs 2 to 16 µs per file against 0.9 µs per result for the query. A projection answered from the index needs an ADR (it changes the UAPI) and a check that more than one surveyed system needs it. The batch read of content (`READ_BATCH`) is dropped | [spec-m3](docs/spec-m3.md) §4, journal 0072 |
+| Attribute values with query results | Measured in journal 0072: reading the attributes of results costs 2 to 16 µs per file against 0.9 µs per result for the query. Projection is accepted in ADR-0014, not implemented; it remains paused pending project review and the maintainer’s decision. The batch read of content (`READ_BATCH`) is dropped | [spec-m3](docs/spec-m3.md) §4, journal 0072 |
 | Change cursor ("changes since revision") | Decision deferred; needs a client with a measured benefit and answers to the open questions in spec-m3 §5 | [spec-m3](docs/spec-m3.md) §5 |
 | Own filesystem as a lower (the pre-ADR-0007 path) | Returns only as an alternative implementation of the same interface, and only with evidence that the mature lower filesystems are the bottleneck | [ADR-0007](docs/decisions/0007-stacked-memory-layer.md) |
 | Public release (DKMS, `.deb`, kernel matrix) | Stage 2 (technical preview) needs S1, S4, S5, S6, S2 results and S10; stage 3 (public) needs M4 published and S1–S6, S8–S10 done | [distribution-strategy](docs/distribution-strategy.md) §8 |
-| Security roadmap, remaining items | S3 syzkaller, S7 continuous fuzzing, S8 runtime hardening, S9 resource limits and denial of service, S10 module signing and distribution, S11 M3/M4 surfaces | [security-roadmap](docs/security-roadmap.md) |
+| Security roadmap, remaining items | S3 remaining function-coverage investigation, S7 continuous fuzzing, S8 runtime hardening, S9 resource limits and denial of service, S10 module signing and distribution, S11 M3/M4 surfaces | [security-roadmap](docs/security-roadmap.md) |
 
 The [original architecture](docs/native-mvp.md) explores the full transactional
 MVP; the [M1 format](docs/format-m1.md) intentionally does not implement it, and

@@ -57,5 +57,9 @@ difference of 8 to 15 %. Under the revised method (`docs/benchmark-plan.md`), th
 needs at least 30 repetitions, `bench/compare.py` (confidence interval and test) and the CPU
 frequency held still; until then no difference, in either direction, is claimed.
 
+*Note, 2026-10-19 (journal 0139).* Rerun that way (40 repetitions): 0102 is 7.4 %, 9.9 % and
+12.3 % slower than 0084 on the three filtered shapes, intervals clear of zero. The difference was
+real. See `../2026-10-19-macmini-steady/`.
+
 Files: `release/times.txt`, `steady-*/times.txt` (each script's own log), `*/environment.txt`,
 `steady-*/results.csv` (from `bench/report.py`). The raw per-call records stay on the host.

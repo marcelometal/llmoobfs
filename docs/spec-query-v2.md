@@ -146,6 +146,18 @@ per query. Union and duplicate removal are left to the client. Covers "or" acros
 - All requests are validated before any execution; an invalid request refuses the whole
   batch with `EINVAL` and nothing is written back. The requests run in order, each under its
   own acquisition of the index lock: the batch is not a single snapshot.
+- **Runtime errors (clarification, 2026-10-21, issue 112, journal 0173).** Only
+  a zero return makes the batch's output usable. Result arrays are copied as
+  requests complete; the output headers are copied after all requests succeed.
+  A later execution error can therefore leave earlier results written without
+  their output counts or cursors. A fault during the final header copy may also
+  leave partially written headers. There is no rollback or partial-success
+  protocol. On any error, discard every result, output count, truncation flag
+  and cursor from that call; none identifies a usable completed prefix. After
+  addressing the cause, reinitialize the output fields and retry as fresh
+  requests or from cursors retained from previous successful calls. This
+  clarifies existing behavior without changing the UAPI; the no-output promise
+  above applies to validation failures before execution.
 - `MOOB_TERM_MISSING_OK` lives in the term's flags byte (formerly `reserved[0]`, renamed
   `flags`). v1 refuses any flag (`EINVAL`). `EXISTS` with the flag is refused ("exists or
   missing" would match everything). An attribute present with another type, invalid or raw (`raw`) counts
@@ -294,7 +306,11 @@ query answers does not change.
   or between 8 attempts to start; the caller may retry), `EINTR`, and any error
   the lower filesystem returned to the scan. After a failed build nothing of the domain is left
   in the index, and the next query tries again. A build never answers with part of a domain: an
-  ACL or a name that could not be read fails it.
+  ACL or a name that could not be read fails it. One exception, by decision (journal 0156): a file
+  whose attribute list is longer than `XATTR_LIST_MAX` (64 KiB, reachable on btrfs with many
+  non-typed `user.*` names) is left out of the index, and `moobfs-check` reports it. Failing the
+  build would let any user who can write such a file in a shared domain make the domain
+  unanswerable for everyone.
 - **`GET_INFO`.** New flag `MOOB_FLAG_ON_DEMAND` (0x40), set whenever the index is on. New
   fields in space that was reserved or padding: `domains_built` (`__u32`, "outside" included),
   `domain_builds` (`__u32`, builds completed since mount) and `domain_releases` (`__u32`, built

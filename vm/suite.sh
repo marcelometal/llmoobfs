@@ -18,19 +18,33 @@
 #   release             built domains released by the budget and by the shrinker (journal 0101)
 #   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
 #   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
+#   permgaps            decisive search, truncation, directory and encoding checks (0172)
+#   rootpath            a domain directory renamed while a build waits to start (issue #110)
+#   overbudget          builds over the budget while other domains are built (issue #111)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
+#   xattrread           a listed typed value that fails getxattr must fail a build or invalidate
+#                       a built domain; an attribute removed between list/get is skipped
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
+# Capture the producer status before displaying its output: POSIX pipelines return
+# the last command's status. A failed log read also makes the check fail.
+run_logged() (
+    log=$1; shift
+    rc=0
+    "$@" > "$log" || rc=$?
+    cat "$log" || return 1
+    return "$rc"
+)
 want() {
     [ -z "${MOOB_ONLY:-}" ] && return 0
     case " $MOOB_ONLY " in *" $1 "*) return 0 ;; esac
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -48,6 +62,11 @@ run_lower() {
     grep -q 'moobfs_layer' /proc/mounts || fail "layer-proc-mounts-$fs"
     mount -t moobfs_layer -o lower="$LAYER" none /mnt && fail "layer-stack-on-itself-$fs"
     "$BIN/layer" "$LAYER" "$LOWER" "$reflink" links || fail "layer-tests-$fs"
+    "$BIN/fcntl-flags" "$LAYER/fcntl-flags" || fail "fcntl-flags-$fs"
+    rm "$LAYER/fcntl-flags" || fail "fcntl-flags-cleanup-$fs"
+    # every refusal of a typed attribute write with its errno, and the limit of 64 per file,
+    # paths a syzkaller seed reaches poorly (journal 0141); prints TYPED_LIMITS_PASS
+    "$BIN/layer" typed "$LAYER" "$LOWER" || fail "typed-limits-$fs"
     # typed attribute tools: write through the layer, check the lower tree
     echo memo > "$LAYER/typed.md" || fail "typed-create-$fs"
     "$BIN/moobfs-attr" set "$LAYER/typed.md" kind string decision || fail "attr-set-$fs"
@@ -382,12 +401,40 @@ run_lower() {
     mv "$LAYER/dshared/m3.md" "$LAYER/da/m9.md" && chown 1001:1001 "$LAYER/da/m9.md" && chmod 0600 "$LAYER/da/m9.md" || fail "q2-move-file-$fs"
     q2cmp 1001 da 5 moved-in
     q2cmp 1001 dshared 2 moved-out
+    # V6 (journal 0155): RENAME_WHITEOUT would create a device node; the layer refuses it
+    echo w > "$LAYER/dshared/wo.src" || fail "v6-file-$fs"
+    [ "$("$BIN/query" "$LAYER" whiteout "$LAYER/dshared/wo.src" "$LAYER/dshared/wo.dst")" = "whiteout 22" ] || fail "v6-rename-whiteout-not-refused-$fs"
+    rm "$LAYER/dshared/wo.src" || fail "v6-clean-$fs"
+    # T3 (journal 0155): an extended ACL on the domain directory itself. dacl is 0750 and 1001's,
+    # its file 0640: without the ACL only 1001 and its group traverse and read it. The ACL lets
+    # 1002 traverse, so the file must leave the homogeneous answers, or 1002 would receive it.
+    # Set before the remount, so that the build decides, not a hook (the hook sets the fallback).
+    mkdir -m 0750 "$LAYER/dacl" && echo t3 > "$LAYER/dacl/f.md" && chmod 0640 "$LAYER/dacl/f.md" || fail "t3-mk-$fs"
+    "$BIN/moobfs-attr" set "$LAYER/dacl/f.md" kind string note >/dev/null || fail "t3-attr-$fs"
+    chown -R 1001:1001 "$LAYER/dacl" && "$TOOLS/setfacl" -m u:1002:rx "$LAYER/dacl" || fail "t3-acl-$fs"
     # a remount rebuilds the same partitions and clears the fallback
     umount "$LAYER" && mount -t moobfs_layer -o lower="$LOWER" none "$LAYER" || fail "q2-remount-$fs"
     "$BIN/query" "$LAYER" info | grep -q 'fallback_domains=0' || fail "q2-fallback-cleared-$fs"
     q2cmp 1001 da 5 remount-a
     q2cmp 1002 db 3 remount-b
     q2cmp 1002 dshared 2 remount-shared
+    "$BIN/query" --uid 1002 "$LAYER" open dacl/f.md | grep -q 'Permission denied' || fail "t3-precondition-$fs"
+    "$BIN/query" --uid 1002 "$LAYER/dacl" q2 kind eq string note > /tmp/k.txt || fail "t3-query-$fs"
+    [ ! -s /tmp/k.txt ] || { cat /tmp/k.txt; fail "t3-acl-on-domain-directory-leaks-$fs"; }
+    "$BIN/query" "$LAYER" info | grep -q 'fallback_domains=0' || fail "t3-fallback-$fs"
+    # T4 (journal 0155): writes under a private directory inside a built domain. What a write or
+    # a rename puts below dshared/priv (0700, root's) must stay out of 1001's homogeneous
+    # answers, decided by the write paths, while the domain stays out of fallback mode.
+    # modes from umask, not chmod: a chmod of a directory in the domain would set the fallback
+    ( umask 077 && mkdir "$LAYER/dshared/priv" ) || fail "t4-mkdir-$fs"
+    ( umask 022 && echo t4 > "$LAYER/dshared/priv/w.md" ) || fail "t4-file-$fs"
+    "$BIN/moobfs-attr" set "$LAYER/dshared/priv/w.md" kind string note >/dev/null || fail "t4-attr-$fs"
+    mv "$LAYER/dshared/m1.md" "$LAYER/dshared/priv/r.md" || fail "t4-rename-$fs"
+    "$BIN/query" "$LAYER" info | grep -q 'fallback_domains=0' || fail "t4-fallback-$fs"
+    "$BIN/query" --uid 1001 "$LAYER/dshared" q2 kind eq string note > /tmp/k.txt || fail "t4-query-$fs"
+    grep -q 'priv/' /tmp/k.txt && { cat /tmp/k.txt; fail "t4-private-directory-leaks-$fs"; }
+    mv "$LAYER/dshared/priv/r.md" "$LAYER/dshared/m1.md" && rm -rf "$LAYER/dshared/priv" "$LAYER/dacl" || fail "t4-clean-$fs"
+    echo "HOMOGENEITY_GAPS_PASS: $fs, ACL on the domain directory (T3), writes under a private directory (T4)"
     # QUERY2 ordering and cursor (phase Q2b, spec test 7): 30 files in domain da with a time
     # attribute (ties included), two of them with an int64 under the same name, and string
     # titles, ten of them longer than the cursor's inline space
@@ -427,6 +474,14 @@ run_lower() {
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --limit 9 --cursor-in /tmp/c1 kind eq string note)" = "q2 0" ] || fail "q2b-cursor-other-limit-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --cursor-in /tmp/c1 kind exists x x)" = "q2 116" ] || fail "q2b-cursor-other-query-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --cursor-in /tmp/c1 --order created time asc kind eq string note)" = "q2 116" ] || fail "q2b-cursor-other-order-$fs"
+    # T2 (journal 0155): the MAC alone must refuse a cursor whose fields changed while its query
+    # hash (offset 16 of struct moobl_cursor) stayed valid: the pad (5), the high byte of the
+    # inode (15) and the last inline value byte (119), all zero in this cursor
+    for off in 5 15 119; do
+        cp /tmp/c1 /tmp/ct && printf '\377' | dd of=/tmp/ct bs=1 seek=$off conv=notrunc 2>/dev/null || fail "t2-patch-$fs"
+        cmp -s /tmp/c1 /tmp/ct && fail "t2-patch-changed-nothing-$off-$fs"
+        [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --limit 3 --cursor-in /tmp/ct kind eq string note)" = "q2 116" ] || fail "t2-tampered-cursor-accepted-at-$off-$fs"
+    done
     chmod 0700 "$LAYER/da/sub" || fail "q2b-fallback-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --limit 3 --cursor-in /tmp/c1 kind eq string note)" = "q2 116" ] || fail "q2b-cursor-fallback-$fs"
     q2ord fallback-pages 14 --order created time desc --limit 4 --pages kind eq string note -- --order created time desc "$LOWER/da" kind eq string note
@@ -492,6 +547,7 @@ run_lower() {
         [ "$(wc -l < /tmp/kb.txt)" -eq 29 ] || { cat /tmp/kb.txt; fail "q2d-batch-count-$1-$fs"; }
     }
     q2batchcmp plain
+    "$BIN/batch-errors" "$LAYER/da" || fail "q2-batch-errors-plain-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/db" q2batcherrno -- kind exists x x)" = "q2batch 13" ] || fail "q2d-batch-isolation-$fs"
     [ "$("$BIN/query" "$LAYER/da/sub" q2batcherrno -- kind exists x x)" = "q2batch 25" ] || fail "q2d-batch-enotty-$fs"
     [ "$("$BIN/query" "$LAYER/da" q2batcherrno -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x -- kind exists x x)" = "q2batch 22" ] || fail "q2d-batch-nine-$fs"
@@ -501,6 +557,7 @@ run_lower() {
     chmod 0700 "$LAYER/da/sub" || fail "q2c-fallback-$fs"
     q2ord leap-fallback 5 --limit 2 --pages ns eq string n1 kind eq string note -- "$LOWER/da" ns eq string n1 kind eq string note
     set -f; q2batchcmp fallback; set +f
+    "$BIN/batch-errors" "$LAYER/da" || fail "q2-batch-errors-fallback-$fs"
     echo "QUERY2_LEAPFROG_PASS: $fs"
     # QUERY2 under concurrency (phase Q2e, spec test 8): mode changes, renames, unlink and
     # recreate, files moving to another domain and back, and chmod of the domain directory
@@ -528,7 +585,8 @@ run_lower() {
           [ $(( n % 7 )) -eq 0 ] && { chmod 0711 "$LAYER/dr"; chmod 0755 "$LAYER/dr"; }
       done ) &
     racer=$!
-    "$BIN/query" --uid 1001 "$LAYER/dr" race2 5 | tee /tmp/q2e.txt || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
+    # two processes on one open file: one finds its result buffer lent (journal 0139)
+    MOOB_RACE2_FORK=1 run_logged /tmp/q2e.txt "$BIN/query" --uid 1001 "$LAYER/dr" race2 5 || { rm -f /tmp/q2e.go; wait $racer; fail "q2e-race-$fs"; }
     rm -f /tmp/q2e.go; wait $racer
     grep -q '^race2: [1-9]' /tmp/q2e.txt || fail "q2e-no-iterations-$fs"
     # a rename or move cut by the end of the race may leave t<i>.md behind or r<i>.md in dr2
@@ -567,7 +625,7 @@ run_lower() {
           [ $(( n % 7 )) -eq 0 ] && { mv "$LAYER/ns/race" "$LAYER/ns/race2" 2>/dev/null; mv "$LAYER/ns/race2" "$LAYER/ns/race" 2>/dev/null; }
       done ) &
     racer=$!
-    "$BIN/query" --uid 1001 "$LAYER" race 5 | tee /tmp/race.txt || { rm -f /tmp/race.go; wait $racer; fail "race-query-$fs"; }
+    run_logged /tmp/race.txt "$BIN/query" --uid 1001 "$LAYER" race 5 || { rm -f /tmp/race.go; wait $racer; fail "race-query-$fs"; }
     rm -f /tmp/race.go; wait $racer
     grep -q '^race: [1-9]' /tmp/race.txt || fail "race-no-iterations-$fs"
     chmod 0644 "$LAYER/ns/race/"*.md || fail "race-final-mode-$fs"
@@ -599,7 +657,8 @@ run_lower() {
     rm -f /tmp/bench-base.db*
     SQLITE=$TOOLS/sqlite3 sh "$BIN/bench-sqlbase.sh" init /tmp/bench-base.db || fail "bench-sqlbase-init-$fs"
     SQLITE=$TOOLS/sqlite3 sh "$BIN/bench-sqlbase.sh" load /tmp/bench-base.db /tmp/bench-m.txt "$LAYER/bench" || fail "bench-sqlbase-load-$fs"
-    env SQLITE="$TOOLS/sqlite3" SQLBASE="$BIN/bench-sqlbase.sh" BIN="$BIN" sh "$BIN/bench-equiv.sh" "$BIN/bench-queries-w3.txt" /tmp/bench-base.db "$LOWER/bench" "$LAYER" | tee /tmp/bench-equiv.txt | tail -1 | grep -q '^EQUIV_PASS: 9 shapes (kernel' || { cat /tmp/bench-equiv.txt; fail "bench-equiv-$fs"; }
+    run_logged /tmp/bench-equiv.txt env SQLITE="$TOOLS/sqlite3" SQLBASE="$BIN/bench-sqlbase.sh" BIN="$BIN" sh "$BIN/bench-equiv.sh" "$BIN/bench-queries-w3.txt" /tmp/bench-base.db "$LOWER/bench" "$LAYER" || fail "bench-equiv-$fs"
+    tail -1 /tmp/bench-equiv.txt | grep -q '^EQUIV_PASS: 9 shapes (kernel' || fail "bench-equiv-marker-$fs"
     tail -1 /tmp/bench-equiv.txt
     "$BIN/bench-load" --manifest /tmp/bench-m.txt --target "$LAYER/bench" --workload W4 --out /tmp/bench-w4 || fail "bench-w4-$fs"
     [ "$(cat /tmp/bench-w1.*.rec /tmp/bench-w2.*.rec /tmp/bench-w3.*.rec /tmp/bench-w4.*.rec | wc -c)" -eq $(( (300 + 300 + 9 + 600) * 32 )) ] || fail "bench-records-$fs"
@@ -999,7 +1058,7 @@ for fs in ext4 btrfs xfs; do
     # ever finished (EAGAIN for ever), which is the starvation journal 0098 records as a limit.
     tr_on moobfs_scan_reread || fail "br-trace-on-$fs"
     echo 40 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail "br-delay-$fs"
-    "$BIN/buildrace" "$LAYER" 24 60 | tee /tmp/br.txt; rc=$?
+    run_logged /tmp/br.txt "$BIN/buildrace" "$LAYER" 24 60; rc=$?
     echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
     [ $rc -eq 0 ] || fail "br-run-$fs"
     grep -q '^BUILDRACE_DONE' /tmp/br.txt || fail "br-done-$fs"
@@ -1035,8 +1094,22 @@ for fs in ext4 btrfs xfs; do
     br_cmp || fail "br-index-differs-after-build-all-$fs"
     f=$("$BIN/query" "$LAYER" info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
     [ $(( f & 8 )) -eq 0 ] || fail "br-index-incomplete-$fs"
+    # A chmod to 0600 while the first build of a new domain reads the file (journal 0152): the
+    # reading is repeated, and the file's own homogeneity must be decided again with it, or the
+    # file stays in the answers to a caller that can no longer read it. The scan sleeps one
+    # second per file so that the chmod, 0.3 s in, lands inside the reading.
+    tr_on moobfs_scan_reread || fail "br-chmod-trace-on-$fs"
+    echo 1000000 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail "br-chmod-delay-$fs"
+    "$BIN/chmodrace" "$LAYER/chmodrace" 300000 > /tmp/br-chmod.txt; rc=$?
+    echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
+    cr_retries=$(tr_count moobfs_scan_reread)
+    tr_off moobfs_scan_reread
+    cat /tmp/br-chmod.txt
+    [ $rc -ne 1 ] || fail "br-chmod-during-build-still-answered-$fs"
+    [ $rc -eq 0 ] || fail "br-chmod-run-$fs"
+    [ "$cr_retries" -gt 0 ] || fail "br-chmod-not-in-the-window-$fs (the test proved nothing)"
     umount "$LAYER" && rm -rf "$LOWER/br" && umount "$LOWER" || fail "br-cleanup-$fs"
-    echo "BUILD_RACE_PASS: $fs, $(cut -d' ' -f2- /tmp/br.txt) readings_repeated=$retries; every domain equal to the oracle"
+    echo "BUILD_RACE_PASS: $fs, $(cut -d' ' -f2- /tmp/br.txt) readings_repeated=$retries; every domain equal to the oracle; chmod during a build: absent"
 done
 fi
 if want release; then
@@ -1187,6 +1260,7 @@ for fs in ext4 btrfs xfs; do
         "$BIN/moobfs-index" --domain "$LOWER/rl/$d" kind exists - - | cut -f2 | sort > /tmp/rl.o || fail "rl-race-oracle-$fs"
         cmp -s /tmp/rl.k /tmp/rl.o || fail "rl-race-differs-$d-$fs"
     done
+    "$BIN/permission-gaps" release "$LAYER" "$LOWER/rl" || fail "rl-unprivileged-$fs"
     umount "$LAYER" && rm -rf "$LOWER/rl" && umount "$LOWER" || fail "rl-cleanup-$fs"
     echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
@@ -1358,6 +1432,91 @@ done
 rm -rf "$LOWER/pmx" && umount "$LOWER" || fail "pm-cleanup"
 echo "PERMMATRIX_STEP_PASS: 12 seeds, no answer the lower would refuse; $pm_wrong answers the rule before journal 0116 gave wrongly"
 fi
+if want permgaps; then
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "pg-lower-$fs"
+    rm -rf "$LOWER/pg" && mkdir -m 755 "$LOWER/pg" || fail "pg-directory-$fs"
+    "$BIN/permission-gaps" plant "$LOWER/pg" || fail "pg-plant-$fs"
+    mount -t moobfs_layer -o lower="$LOWER/pg" none "$LAYER" || fail "pg-mount-$fs"
+    "$BIN/permission-gaps" check "$LAYER" "$LOWER/pg" q2 || fail "pg-query2-$fs"
+    umount "$LAYER" || fail "pg-unmount-$fs"
+    mount -t moobfs_layer -o lower="$LOWER/pg",domain_depth=0 none "$LAYER" || fail "pg-v1-mount-$fs"
+    "$BIN/permission-gaps" check "$LAYER" "$LOWER/pg" v1 || fail "pg-v1-$fs"
+    umount "$LAYER" && rm -rf "$LOWER/pg" && umount "$LOWER" || fail "pg-cleanup-$fs"
+    echo "PERMISSION_GAPS_PASS: $fs (T5/T6/T8, independent T10 fixtures)"
+done
+fi
+if want rootpath; then
+# Issue #110 (R2-5 of journal 0155): QUERY2 takes the name of the domain directory before the
+# build records the generation of renames. tests/rootpath-race.c holds the domain's build mutex
+# with a mount-wide QUERY, makes a QUERY2 wait for it, and renames the domain directory
+# meanwhile; the mount-wide QUERY after that must find every attributed file under the new
+# name. The files are planted on the lower and the caches dropped, so that the build is slow
+# and the layer has no inode of them: the answer comes from the names the build recorded.
+rp_files=${ROOTPATH_FILES:-10000}; rp_every=200
+rp_expect=$(( (rp_files + rp_every - 1) / rp_every ))
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "rp-lower-$fs"
+    rm -rf "$LOWER/rp" && mkdir -p "$LOWER/rp/d" || fail "rp-directory-$fs"
+    "$BIN/rootpath-race" plant "$LOWER/rp/d" "$rp_files" "$rp_every" || fail "rp-plant-$fs"
+    sync && echo 3 > /proc/sys/vm/drop_caches
+    mount -t moobfs_layer -o lower="$LOWER/rp",domain_depth=1 none "$LAYER" || fail "rp-mount-$fs"
+    rp_ok=0
+    for attempt in 1 2 3; do
+        run_logged /tmp/rp.txt "$BIN/rootpath-race" run "$LAYER" d e "$rp_expect"; rc=$?
+        [ $rc -eq 0 ] && { rp_ok=1; break; }
+        [ $rc -eq 3 ] || fail "rootpath-race-$fs"
+        echo "rootpath: $fs attempt $attempt did not reach the interleaving"
+        # the interleaving was not reached: put the name back and start from a cold mount
+        umount "$LAYER" || fail "rp-unmount-$fs"
+        [ -d "$LOWER/rp/e" ] && { mv "$LOWER/rp/e" "$LOWER/rp/d" || fail "rp-rename-back-$fs"; }
+        sync && echo 3 > /proc/sys/vm/drop_caches
+        mount -t moobfs_layer -o lower="$LOWER/rp",domain_depth=1 none "$LAYER" || fail "rp-remount-$fs"
+    done
+    [ $rp_ok -eq 1 ] || fail "rootpath-race-inconclusive-$fs"
+    umount "$LAYER" && rm -rf "$LOWER/rp" && umount "$LOWER" || fail "rp-cleanup-$fs"
+    echo "ROOTPATH_PASS: $fs"
+done
+fi
+if want overbudget; then
+# Issue #111 (R2-7 of journal 0155): a build over the budget releases the domain queried least
+# recently and tries again. The flag that told it so was mount-wide and cleared by every build,
+# so a build of another domain in between made it fail with ENOMEM instead. Domains x and y fit
+# the budget alone, not together; tests/overbudget-race.c queries them in turn while churners
+# rebuild four domains without attributes without pause. No query of x or y may fail. The race
+# is not widened: the test counts over many turns.
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "ob-lower-$fs"
+    rm -rf "$LOWER/ob" && mkdir -p "$LOWER/ob/x" "$LOWER/ob/y" || fail "ob-directory-$fs"
+    "$BIN/overbudget-race" plant "$LOWER/ob/x" 650 && "$BIN/overbudget-race" plant "$LOWER/ob/y" 650 || fail "ob-plant-$fs"
+    for k in 0 1 2 3; do
+        # no attribute: a build of z<k> clears the old flag but charges nothing, so it never
+        # releases a domain itself; the only releases are those of x and y
+        mkdir -p "$LOWER/ob/z$k/s" && : > "$LOWER/ob/z$k/f" || fail "ob-small-$fs"
+    done
+    mount -t moobfs_layer -o lower="$LOWER/ob",domain_depth=1 none "$LAYER" || fail "ob-mount-$fs"
+    ob_one=$("$BIN/overbudget-race" used "$LAYER" x) || fail "ob-measure-$fs"
+    umount "$LAYER" || fail "ob-unmount-$fs"
+    ob_budget=$((ob_one * 3 / 2 + 65536)); [ "$ob_budget" -ge 1048576 ] || fail "ob-domain-too-small-$fs ($ob_one)"
+    mount -t moobfs_layer -o lower="$LOWER/ob",domain_depth=1,index_budget=$ob_budget none "$LAYER" || fail "ob-budget-mount-$fs"
+    tr_on moobfs_domain_build moobfs_domain_release || fail "ob-trace-$fs"
+    run_logged /tmp/ob.txt "$BIN/overbudget-race" run "$LAYER" 10 4; rc=$?
+    tr_off moobfs_domain_build moobfs_domain_release
+    if [ $rc -ne 0 ]; then
+        # the builds of x and y that failed with ENOMEM, and what was released around them
+        ob_x=$(stat -c %i "$LOWER/ob/x"); ob_y=$(stat -c %i "$LOWER/ob/y")
+        grep -E "domain=($ob_x|$ob_y) err=-12" $TR/trace | head -5
+        echo "ob: builds $(tr_count moobfs_domain_build), releases $(tr_count moobfs_domain_release)"
+        grep " moobfs_domain_release: " $TR/trace | tail -5
+        fail "overbudget-race-$fs"
+    fi
+    umount "$LAYER" && rm -rf "$LOWER/ob" && umount "$LOWER" || fail "ob-cleanup-$fs"
+    echo "OVERBUDGET_PASS: $fs, one domain $ob_one bytes, budget $ob_budget"
+done
+fi
 if want stall && [ ! -c /dev/fuse ]; then
     echo "STALL_SKIPPED: this kernel has no /dev/fuse (the KASAN harness has FUSE built in)"
 elif want stall; then
@@ -1427,6 +1586,45 @@ done
 [ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
 umount "$LAYER" && rm -rf "$LOWER/bdx" && umount "$LOWER" || fail "bd-cleanup"
 echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
+fi
+if want xattrread; then
+# The test-only knob returns one error after listxattr finds a typed attribute. A failed
+# first build must return EIO and the next query must rebuild it. A failed adoption into
+# a built domain must invalidate it so that the next query finds the moved file.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail "xr-lower-mount"
+mkdir "$LOWER/xattr-read-0150" || fail "xr-root"
+mkdir "$LOWER/xattr-read-0150/source" "$LOWER/xattr-read-0150/incoming" \
+      "$LOWER/xattr-read-0150/target" "$LOWER/xattr-read-0150/memory" \
+      "$LOWER/xattr-read-0150/removed" || fail "xr-domains"
+: > "$LOWER/xattr-read-0150/source/file" || fail "xr-file"
+: > "$LOWER/xattr-read-0150/incoming/file" || fail "xr-incoming-file"
+: > "$LOWER/xattr-read-0150/memory/file" || fail "xr-memory-file"
+: > "$LOWER/xattr-read-0150/removed/file" || fail "xr-removed-file"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/source/file" kind string note || fail "xr-attr"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/incoming/file" kind string note || fail "xr-incoming-attr"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/memory/file" kind string note || fail "xr-memory-attr"
+"$BIN/moobfs-attr" set "$LOWER/xattr-read-0150/removed/file" kind string note || fail "xr-removed-attr"
+mount -t moobfs_layer -o lower="$LOWER/xattr-read-0150",domain_depth=1 none "$LAYER" || fail "xr-layer-mount"
+knob=/sys/module/moobfs_layer/parameters/scan_getxattr_errno_once
+echo 5 > "$knob" || fail "xr-arm-eio"
+got=$("$BIN/query" "$LAYER/source" q2errno kind eq string note) || fail "xr-build-query"
+[ "$got" = 'q2 5' ] || { echo "XR_BUILD_EIO: $got"; fail "xr-build-eio"; }
+[ "$("$BIN/query" "$LAYER/source" q2 kind eq string note | cut -f2)" = file ] || fail "xr-retry"
+echo 12 > "$knob" || fail "xr-arm-enomem"
+[ "$("$BIN/query" "$LAYER/memory" q2errno kind eq string note)" = 'q2 12' ] || fail "xr-build-enomem"
+[ "$("$BIN/query" "$LAYER/memory" q2 kind eq string note | cut -f2)" = file ] || fail "xr-enomem-retry"
+[ "$("$BIN/query" "$LAYER/target" q2errno kind eq string note)" = 'q2 0' ] || fail "xr-target-build"
+echo 5 > "$knob" || fail "xr-arm-adopt-eio"
+mv "$LAYER/incoming/file" "$LAYER/target/link" || fail "xr-rename"
+"$BIN/query" "$LAYER/target" q2 kind eq string note > /tmp/xr-adopt.txt || fail "xr-adopt-query"
+[ "$(cut -f2 /tmp/xr-adopt.txt)" = link ] || { cat /tmp/xr-adopt.txt; fail "xr-adopt-rebuild"; }
+# ENODATA means that the listed name disappeared before its value was fetched; it is
+# permitted to skip that value. The test knob simulates that race without another writer.
+echo 61 > "$knob" || fail "xr-arm-enodata"
+[ "$("$BIN/query" "$LAYER/removed" q2errno kind eq string note)" = 'q2 0' ] || fail "xr-enodata"
+[ "$(cat "$knob")" = 0 ] || fail "xr-disarmed"
+umount "$LAYER" && umount "$LOWER" || fail "xr-unmount"
+echo "XATTRREAD_PASS: EIO/ENOMEM build errors, retry, adoption rebuild and ENODATA race"
 fi
 rmmod moobfs_layer || fail layer-unload
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in

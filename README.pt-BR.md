@@ -8,14 +8,22 @@
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/studiomoob/llmoobfs/badge)](https://scorecard.dev/viewer/?uri=github.com/studiomoob/llmoobfs)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
+[![DOI Zenodo: snapshot experimental](https://zenodo.org/badge/DOI/10.5281/zenodo.23514721.svg)](https://doi.org/10.5281/zenodo.23514721)
 
 > Este arquivo é um espelho de cortesia do [README em inglês](README.md), que prevalece em caso
 > de diferença ([ADR-0010](docs/decisions/0010-english-everywhere.md)).
 
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
-> diários 0111 e 0114). A última tag, `v0.4.0-experimental` (2026-10-19), tem todas as correções
-> feitas até essa data; as seguintes entram na `main`. Detalhes em [Estado](#estado).
+> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
+> código anterior a este lote de revisão. Os dois achados da
+> [revisão atual](docs/history/0144-independent-review.md) têm correções no lote de revisão,
+> que passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.
+> A CI do pull request é uma etapa separada e obrigatória antes do merge.
+> A `v0.4.1-experimental` ainda contém
+> ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
+> construção do índice que deixava o arquivo nas respostas do `QUERY2`; corrigido no diário 0152.
+> Veja [Limitações](#limitações).
 
 ## O problema
 
@@ -44,6 +52,10 @@ tem três partes:
 
 Ele guarda e encontra memórias. Escolher o que é relevante, embeddings, ranqueamento e montagem do
 prompt ficam na aplicação.
+
+Nas consultas em lote, use as saídas somente após sucesso; descarte todos os resultados
+e cursores de saída em caso de erro ([contrato do cliente](docs/client-contract.md#6-writing-and-querying),
+[escopo do teste](docs/testing.md), diário 0173).
 
 ## Quatro números
 
@@ -113,24 +125,31 @@ na sua própria execução, veja [Experimente numa VM](#experimente-numa-vm).
 
 ## Estado
 
-**Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.0-experimental`
-(2026-10-19), tem todas as correções até essa data: os achados F1 a F12 do ADR-0011, exceto a parte
-de cotas justas do F2. Não é para produção.** Fatos em 2026-10-19:
+**Experimental. Só tags de pré-lançamento do código-fonte; a última, `v0.4.1-experimental`
+(2026-10-20), contém as correções dos achados F1 a F12 do ADR-0011, exceto a parte
+de cotas justas do F2. Não é para produção.** Três achados posteriores a afetam e estão corrigidos só
+na `main`: flags de estado do arquivo desatualizadas depois de `F_SETFL` e erros de leitura de
+atributo tomados como "sem atributo" ao indexar (revisão [0144](docs/history/0144-independent-review.md),
+R1 e R2), e um chmod durante a primeira construção de um domínio, que podia deixar o arquivo nas
+respostas do `QUERY2` para usuários que já não conseguem lê-lo (diários
+[0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Fatos em 2026-10-20:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
   arquivos de baixo ext4, btrfs e XFS apenas. Os testes da codificação de atributos também passam em
-  s390x big-endian, com emulação; execuções em arm64 estão sendo medidas ([diário 0124](docs/history/0124-big-endian-pass-arm64-without-kvm.md)).
+  s390x big-endian, com emulação. O módulo também roda em arm64 com emulação, sem KVM, num job
+  exploratório: os passos de ext4, btrfs e XFS passaram sob KASAN ([diário 0137](docs/history/0137-arm64-guest-boots-under-emulation.md)).
 - **Testado com** injeção de falhas dentro do módulo, o grupo `quick` do fstests nos três sistemas
-  de arquivos de baixo, syzkaller (quatro rodadas de seis horas; um defeito achado e corrigido), uma
+  de arquivos de baixo, syzkaller (cinco rodadas de seis horas; um defeito achado e corrigido), uma
   primeira rodada do KCSAN (nenhuma corrida no módulo) e SELinux em modo enforcing (diários 0091,
-  0096, 0104, 0109, 0112, 0115, 0133, 0138).
+  0096, 0104, 0109, 0112, 0115, 0133, 0138, 0143).
 - **Ainda sem revisão humana externa.** Foi pedida em 2026-10-13. Duas revisões independentes do
   código, feitas por assistentes de IA ([diário 0111](docs/history/0111-review-5582e06.md),
   [diário 0114](docs/history/0114-second-inspection-of-5582e06.md)) e conferidas contra o kernel,
   acharam quatro defeitos de segurança (achados F9 a F12 do ADR-0011), relatados como avisos de
   segurança privados e corrigidos nos diários 0116 e 0117; nossos próprios testes e revisões
-  acharam outros antes. As tags até a `v0.3.0-experimental` carregam defeitos corrigidos depois
+  acharam outros antes. As tags até a `v0.4.0-experimental` carregam defeitos corrigidos depois
   ([changelog](CHANGELOG.md)).
 - **As medições são de nível piloto**, de uma máquina; o relatório que as reúne é o
   [diário 0088](docs/history/0088-m4-report.md). Não são uma afirmação geral de velocidade.
@@ -151,7 +170,8 @@ O projeto tem um mantenedor e ainda nenhuma revisão humana externa. O que mais 
 quanto conhecimento de kernel exige, está em **[docs/help-wanted.md](docs/help-wanted.md)**: uma
 revisão do modelo de credenciais ou das travas do índice, se você conhece o VFS; uma verificação
 de se o seu sistema de memória se encaixa, se você constrói um; uma rodada dos testes na sua
-máquina ou em outro kernel; e algumas issues que não exigem conhecimento de kernel. As regras para
+máquina ou em outro kernel; e correções de documentação ou de reprodutibilidade que não exigem
+conhecimento de kernel. As regras para
 mudanças estão em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
@@ -217,22 +237,41 @@ responde a cada um: [adoption-risks.md](docs/adoption-risks.md).
 **Como conferir qualquer afirmação daqui.** Rode `make vm-test` e leia `build/vm/console.log`
 ([guia de testes](docs/testing.md)); prepare o ambiente com
 [docs/development.md](docs/development.md).
+Exija os marcadores finais e ausência de `MOOBFS_VM_FAIL`; QEMU sair com código 0 não basta.
+`CASEFOLD_SKIPPED`, `STALL_SKIPPED` e um lower idmapped marcado `not tested`
+continuam sendo lacunas de cobertura. `ipc` é compilado, mas não invocado pela suíte.
+
+Para conferir permissões e casos fixos de codificação com expectativas independentes,
+use `MOOB_ONLY=permgaps make vm-test` ([diário 0172](docs/history/0172-permission-test-gaps.md)).
+O passo de liberação também consulta como uid 1001; a injeção de falhas ainda consulta apenas como root.
+
 
 ## O que foi medido
 
-O relatório que responde às quatro perguntas do [plano de benchmark](docs/benchmark-plan.md) é o
-[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). Toda campanha é de nível piloto:
-uma semente de dados, no máximo três repetições, muitas vezes uma só rodada, e um ruído entre
-rodadas de cerca de 20 a 25 % em valores de dezenas de microssegundos. Números de máquinas
-diferentes não são comparados entre si. O código do índice mudou depois da maior parte dessas
-medições (diários [0082](docs/history/0082-index-lock-and-reclaim.md),
-[0083](docs/history/0083-index-inspection-fixes.md)); só as duas campanhas abaixo rodaram depois.
+O [relatório M4](docs/history/0088-m4-report.md) reúne as campanhas iniciais: uma semente de
+dados, no máximo três repetições, muitas vezes uma só rodada, e ruído entre rodadas de cerca de
+20 a 25 % em valores de dezenas de microssegundos. São resultados históricos dos módulos
+indicados em cada diário, não novas medições desta tag. Números de máquinas diferentes não são
+comparados entre si.
 
-O que a camada acrescenta por operação, no módulo atual (10 000 memórias, medianas, sistema de
-baixo puro contra a camada): uma leitura por caminho vai de 8,5 para 11,0 µs no ext4 (10,1 para
-12,0 no btrfs, 9,8 para 15,0 no XFS); gravar um atributo, de 8,9 para 21,7 µs (8,9 para 21,3; 6,0
-para 11,6); criar uma memória de forma durável não muda dentro do ruído, porque os flushes do
-dispositivo levam 12 a 14 ms.
+A comparação posterior entre módulos usa 40 repetições, frequência de CPU fixa, ordem dos
+módulos alternada e intervalos bootstrap de 95 %
+([método](docs/history/0134-measurement-method-review.md),
+[diário 0139](docs/history/0139-query-buffer-regression.md),
+[confirmação](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). Ela encontrou e corrigiu
+uma regressão de aproximadamente 2x nas consultas. O módulo corrigido continua 1 a 3 % mais
+lento na latência mediana (p50) que o módulo 0102 em três formatos filtrados; o desenho sob demanda do 0102 custa 7,6 a
+12,5 % contra o módulo anterior, que construía o índice na montagem. A causa dos 1 a 3 % restantes
+segue sem explicação. É uma máquina e um conjunto de dados; essa comparação não repete as
+medições contra SQLite nem com o cliente real. A latência de cauda difere mais em alguns
+formatos: a mediana dos p99 de cada rodada na consulta de duas igualdades ficou 54 % acima do
+módulo 0102 nessa confirmação (intervalo de 95 %: +51 a +55 %).
+
+O que a camada acrescentou por operação na campanha do relatório M4 (10 000 memórias, medianas,
+sistema de baixo puro contra a camada): uma leitura por caminho passou de 8,5 para 11,0 µs no
+ext4 (10,1 para 12,0 no btrfs, 9,8 para 15,0 no XFS); gravar um atributo, de 8,9 para 21,7 µs
+(8,9 para 21,3; 6,0 para 11,6); criar uma memória de forma durável não mudou dentro do ruído,
+porque os flushes do dispositivo levavam 12 a 14 ms.
 
 O que um banco ao lado custa na escrita, que este projeto supunha e nunca tinha medido: quase
 nada. Publicar uma memória de forma durável leva 6,6 a 8,5 ms só com o arquivo, e 6,6 a 8,7 ms com
@@ -275,7 +314,8 @@ Onde perde, empata ou custa:
   (diários [0031](docs/history/0031-remount-time.md), [0055](docs/history/0055-measurement-gaps.md)).
 - **Memória.** Cerca de 0,5 a 0,6 KiB de memória do kernel por arquivo, que não vai para o swap,
   pela contagem do próprio índice, que subconta. O orçamento padrão de 128 MiB nunca foi atingido
-  num teste.
+  num teste. Os buffers de consulta são adicionais: até cerca de 1,1 MB fica retido por arquivo
+  aberto que consultou com o limite máximo de resultados, até fechar (diário 0139).
 - **As escritas do cliente real** ficaram cerca de 10 % mais lentas numa rodada, e uma página que
   ele escreve fica consultável cerca de 11 ms depois, não quando a escrita retorna: um processo à
   parte copia os campos para atributos ([diário 0071](docs/history/0071-client-stage2-live-mirror.md)).
@@ -284,8 +324,8 @@ Onde perde, empata ou custa:
   pequena para arquivos pequenos: 6,7 % no btrfs e 13,6 % no XFS num conjunto em que 15 % dos
   arquivos são cópias, nenhuma no ext4 ([diário 0085](docs/history/0085-m4-question-3-space.md)).
 
-Não medido: CPU e memória por consulta, concorrência, a latência de um segundo cliente,
-repetições com intervalos de confiança. Resultados brutos: [bench/results/](bench/results/README.md).
+Ainda faltam: CPU e memória por consulta, vazão sob concorrência, latência de um segundo
+cliente e repetição das comparações com SQLite e com o cliente com intervalos de confiança. Resultados brutos: [bench/results/](bench/results/README.md).
 
 ## Experimente numa VM
 
@@ -363,10 +403,29 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
 
 ## Limitações
 
+- **O lote de revisão passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.**
+  A `v0.4.1-experimental` contém ambos os defeitos da
+  [revisão 0144](docs/history/0144-independent-review.md): flags desatualizadas no arquivo de baixo
+  após `F_SETFL` e erros de `getxattr` ignorados silenciosamente durante a indexação. R1
+  sincroniza flags mutáveis antes de delegar a E/S ([0149](docs/history/0149-sync-backing-file-flags.md));
+  limpar e ativar append passaram em ext4, btrfs e XFS na rodada integrada do commit `49098aa`.
+  R2 propaga erros operacionais de leitura e preserva as exclusões existentes de atributos
+  ausentes, grandes demais ou malformados ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
+  uma terceira revisão ([0151](docs/history/0151-review-d110d4e.md)) achou que um chmod durante a
+  primeira construção de um domínio podia deixar o arquivo nas respostas do `QUERY2` para quem já não
+  consegue lê-lo, corrigido no [0152](docs/history/0152-chmod-during-build-fixed.md);
+  a mesma rodada completa em VM passou na regressão com erros injetados e nas suítes de
+  aceitação e da camada. As negativas detectaram ambos os defeitos originais. Injetar o
+  resultado de leitura não reproduz uma falha real de E/S do sistema de baixo. A rodada local
+  completa sob sanitizers no commit `49098aa` registrou `XATTRREAD_PASS`,
+  `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` e `MOOBFS_KASAN_PASS` no Linux 6.12.112.
+  A CI do pull request é uma etapa separada e obrigatória antes do merge.
+
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
-  APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. O
-  módulo não rodou em outra arquitetura; só os testes da codificação, em espaço de usuário, rodaram
-  em big-endian.
+  APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em
+  outra arquitetura, o módulo só rodou no job exploratório de arm64 (com emulação, três sistemas de
+  arquivos de baixo, diário 0137); os testes da codificação, em espaço de usuário, também rodaram em
+  big-endian.
 - O índice é só em RAM, não vai para o swap e é limitado por `index_budget` (padrão 128 MiB). Cada
   domínio é construído por uma varredura linear na primeira consulta depois da montagem, e de novo
   depois de ser liberado ou de ter um diretório renomeado dentro dele; o orçamento e o shrinker só
@@ -375,8 +434,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   e idmapped são recusadas, assim como uma montagem idmapped como `lower=`; não há contêineres sem
   root.
 - As UAPIs v1 e v2 podem mudar, sem promessa de compatibilidade ([compatibility.md](docs/compatibility.md)); as tags `-experimental` são instantâneos do código-fonte, sem binários, empacotamento nem suporte.
-- Só existem números de nível piloto: duas máquinas, uma semente de dados, no máximo três
-  repetições (diários 0025 a 0085). Nenhuma afirmação de velocidade ou eficiência além das
+- Os números iniciais contra SQLite e com o cliente são pilotos: duas máquinas, uma semente de
+  dados, no máximo três repetições (diários 0025 a 0085). Comparações posteriores entre módulos
+  usam 40 repetições e intervalos (diários 0139 e 0143). Nenhuma afirmação de velocidade ou eficiência além das
   condições descritas em [O que foi medido](#o-que-foi-medido) pode ser feita a partir deles; não
   existe comparação com FUSE, e a comparação com o sistema de arquivos de baixo puro no módulo atual
   está pendente.
@@ -384,17 +444,22 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   (diários [0111](docs/history/0111-review-5582e06.md) e [0114](docs/history/0114-second-inspection-of-5582e06.md)),
   e os testes do próprio projeto acharam e corrigiram defeitos do lado do kernel, alguns de
   segurança; os achados estão no [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
-  (F1 a F12), e os defeitos anteriores nos diários [0015](docs/history/0015-phase-2e-investigation.md),
+  (F1 a F14), e os defeitos anteriores nos diários [0015](docs/history/0015-phase-2e-investigation.md),
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md) e
-  [0083](docs/history/0083-index-inspection-fixes.md). As tags até a `v0.3.0-experimental` carregam
-  defeitos corrigidos depois; as correções posteriores à `v0.4.0-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
-  ([vm/fstests/](vm/fstests/README.md)); o syzkaller rodou quatro rodadas de seis horas; a última
-  medição ficou abaixo do limiar de cobertura do item S3 do [roteiro de segurança](docs/security-roadmap.md). O SELinux em
+  [0083](docs/history/0083-index-inspection-fixes.md). As tags até a `v0.4.0-experimental` carregam
+  defeitos corrigidos depois; as correções posteriores à `v0.4.1-experimental` entram na `main`. O fstests rodou só com o grupo `quick`
+  ([vm/fstests/](vm/fstests/README.md)); o syzkaller rodou cinco rodadas de seis horas; a última
+  medição ficou acima do limiar agregado de PCs do item S3 do [roteiro de segurança](docs/security-roadmap.md),
+  e o `moobl_xattr_get` ficou com 0 PCs no relatório dessa rodada, porque o corpus quase não guardou
+  leituras de atributo dentro de uma camada montada; reexecutadas com cobertura por chamada, as
+  sementes chegam nela (diário 0154). O SELinux em
   modo enforcing foi exercitado uma vez (diário 0104); AppArmor e Smack não foram.
-- A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU); falsos negativos
-  possíveis depois de renomear um diretório, até remontar ([spec-m3](docs/spec-m3.md) §3.1).
+- A autorização do `QUERY` vale só no momento da consulta (contrato TOCTOU). Renomear um
+  diretório pela camada torna o domínio desatualizado e a próxima consulta o reconstrói;
+  mudanças diretas na árvore de baixo continuam sem rastreamento
+  ([spec-m3](docs/spec-m3.md) §3.1 e sua nota de correção).
 - A atomicidade entre arquivo e metadados é uma convenção do cliente; durabilidade, reflink e
   dedupe são do sistema de arquivos de baixo. A aceitação rodou só sobre ext4.
 - Os números de inode são os do sistema de baixo, e um arquivo é identificado por esse número. Um
@@ -406,6 +471,12 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   ext4 só vão para quem o ext4 os daria num acesso direto (achado F4, diário 0132).
 - `noatime`, `relatime` e `strictatime` na montagem da camada não têm efeito; os tempos de acesso
   seguem as opções de montagem do sistema de arquivos de baixo.
+- `sync_file_range(2)` pela camada dá sucesso e não grava nada: as páginas ficam no cache do arquivo
+  de baixo, que ele não alcança (V2 do diário 0155; o overlayfs tem a mesma lacuna). Use `fsync` ou
+  `fdatasync`.
+- Com domínios ligados, nada a mais de 64 componentes abaixo da raiz da montagem é indexado nem
+  respondido pelo `QUERY2`: os caminhos de escrita não conseguem localizar nomes mais fundos
+  (achado F14, diário 0156). Os arquivos continuam sendo lidos e gravados normalmente.
 
 ## O que está implementado, com evidência
 
@@ -431,7 +502,7 @@ experimento M1 está congelado e roda como regressão na mesma VM.
 | Índice construído por domínio na primeira consulta, liberado sob pressão de memória ou acima do orçamento (shrinker); tracepoints | [0098](docs/history/0098-index-on-demand.md), [0101](docs/history/0101-domains-released.md), [0102](docs/history/0102-index-tracepoints.md), [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 | SELinux em modo enforcing; checagem por resultado quando um LSM rotula os inodes da camada | [0104](docs/history/0104-selinux-investigation.md) | 6.12.112 com a política de referência do Debian |
 | SQL sobre um domínio por uma tabela virtual do SQLite (protótipo) | [0108](docs/history/0108-sqlite-virtual-table-prototype.md), [ADR-0013](docs/decisions/0013-user-space-query-library.md) | KASAN 6.12.112; ext4 |
-| Descrições do syzkaller para a montagem, as ioctls e os atributos; quatro rodadas de seis horas | [0109](docs/history/0109-syzkaller-first-runs.md), [0112](docs/history/0112-mount-leak-and-sql-omit.md), [0133](docs/history/0133-syzkaller-third-run.md), [0138](docs/history/0138-syzkaller-fourth-run.md) | 6.12.112 upstream com KCOV |
+| Descrições do syzkaller para a montagem, as ioctls e os atributos; cinco rodadas de seis horas | [0109](docs/history/0109-syzkaller-first-runs.md), [0112](docs/history/0112-mount-leak-and-sql-omit.md), [0133](docs/history/0133-syzkaller-third-run.md), [0138](docs/history/0138-syzkaller-fourth-run.md), [0143](docs/history/0143-syzkaller-fifth-run-threshold-met.md) | 6.12.112 upstream com KCOV |
 | Correções de segurança dos achados F9 a F12 (regra de homogeneidade, checagens sem o semáforo de consulta, acesso de escrita na montagem de baixo, lower idmapped recusado), cada uma com teste e rodada negativa | [0116](docs/history/0116-homogeneity-classes-and-checks-without-query-sem.md), [0117](docs/history/0117-lower-mount-write-access.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 
 Não implementado: índice persistente, montagens em namespace de usuário ou idmapped, leituras em
@@ -517,9 +588,30 @@ revisão). Perguntas vão para o GitHub Discussions ou para uma issue. Contribui
 IA são bem-vindas com revisão humana e evidência de teste precisa. Não coloque detalhes privados
 de vulnerabilidade em issues públicas; use o [contato de segurança](SECURITY.md).
 
+## Registros externos do projeto
+
+Registros conferidos em 20/10/2026. Os links descrevem acompanhamento de versões e descoberta
+do código; veja [Estado](#estado) para o comportamento testado e as limitações.
+
+| Serviço | Registro |
+| --- | --- |
+| [Anitya](https://release-monitoring.org/project/392843/) | Acompanha as pré-releases experimentais; sem mapeamento para pacote de distribuição. |
+| [Open Hub](https://openhub.net/p/moobfs) | Ficha pública do projeto; a análise de código ainda não foi concluída. |
+| [XERJ Corpus Hub](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Snapshot do código selecionado; a revisão de licença está pendente, portanto o corpus ainda não pode ser instalado. |
+| [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory) | Incluído em **Emerging projects** como projeto experimental de armazenamento de memória para agentes. |
+
 ## Como citar
 
-Os metadados de citação estão em [CITATION.cff](CITATION.cff).
+Para citar o snapshot experimental de código-fonte arquivado no commit
+[`02381fba`](https://github.com/studiomoob/llmoobfs/commit/02381fba3f0a908623cac52180a39f24e02e98a6), use:
+
+> Studio Moob. (2026). *MoobFS: experimental Linux filesystem layer for LLM-agent memory — source snapshot 02381fba*
+> (Version `0.4.1-experimental+git.02381fba`) [Computer software]. Zenodo.
+> [https://doi.org/10.5281/zenodo.23514721](https://doi.org/10.5281/zenodo.23514721)
+
+Esse arquivo é posterior à tag `v0.4.1-experimental`. O DOI identifica esse
+snapshot fixo; o `main` pode conter mudanças posteriores. Os metadados de citação
+da tag permanecem em [CITATION.cff](CITATION.cff).
 
 ## Licença
 

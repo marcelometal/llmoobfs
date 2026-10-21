@@ -8,11 +8,17 @@
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/studiomoob/llmoobfs/badge)](https://scorecard.dev/viewer/?uri=github.com/studiomoob/llmoobfs)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
+[![Zenodo DOI: experimental snapshot](https://zenodo.org/badge/DOI/10.5281/zenodo.23514721.svg)](https://doi.org/10.5281/zenodo.23514721)
 
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
-> tag, `v0.4.0-experimental` (2026-10-19), has every fix made up to that date; later ones land on
-> `main`. Details under [Status](#status).
+> tag, `v0.4.1-experimental` (2026-10-20), is a source snapshot before this review batch.
+> The two findings of the [current review](docs/history/0144-independent-review.md)
+> have corrections in the review batch, which passed the full integrated VM suite.
+> The local batch KASAN/UBSAN/lockdep suite also passed; pull-request CI is a separate pre-merge gate.
+> `v0.4.1-experimental` still contains both defects. A later review (journal 0151) found a third,
+> a chmod during an index build that left the file in `QUERY2` answers; fixed in journal 0152.
+> See [Limitations](#limitations).
 
 ## The problem
 
@@ -39,6 +45,10 @@ directory of ext4, btrfs or XFS and moves those two jobs into the filesystem. It
 
 It stores and finds memories. Choosing what is relevant, embeddings, ranking and building the
 prompt stay in the application.
+
+For batch queries, use output only after success; discard every result and output
+cursor on error ([client contract](docs/client-contract.md#6-writing-and-querying),
+[regression scope](docs/testing.md), journal 0173).
 
 ## Four numbers
 
@@ -106,23 +116,29 @@ from your own run, see [Try it in a VM](#try-it-in-a-vm).
 
 ## Status
 
-**Experimental. Source pre-release tags only; the last one, `v0.4.0-experimental` (2026-10-19), has
-every fix up to that date: findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
-production.** Facts as of 2026-10-19:
+**Experimental. Source pre-release tags only; the last one, `v0.4.1-experimental` (2026-10-20), has
+the fixes of findings F1 to F12 of ADR-0011 except the fair-shares part of F2. Not for
+production.** Three later findings affect it and are fixed on `main` only: stale file-status flags
+after `F_SETFL` and attribute-read errors taken as "no attribute" while indexing (review
+[0144](docs/history/0144-independent-review.md), R1 and R2), and a chmod during the first build of a
+domain that could leave the file in `QUERY2` answers to users who can no longer read it (journals
+[0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
+Facts as of 2026-10-20:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
   filesystems ext4, btrfs and XFS only. The attribute encoding's tests also pass on big-endian
-  s390x under emulation; arm64 runs are being measured ([journal 0124](docs/history/0124-big-endian-pass-arm64-without-kvm.md)).
+  s390x under emulation. The module also runs on arm64 under emulation, without KVM, in an
+  exploratory job: the ext4, btrfs and XFS steps passed under KASAN ([journal 0137](docs/history/0137-arm64-guest-boots-under-emulation.md)).
 - **Tested with** fault injection inside the module, fstests' `quick` group on the three lower
-  filesystems, syzkaller (four six-hour runs; one defect found and fixed), a first KCSAN run (no
-  race in the module) and SELinux enforcing (journals 0091, 0096, 0104, 0109, 0112, 0115, 0133, 0138).
+  filesystems, syzkaller (five six-hour runs; one defect found and fixed), a first KCSAN run (no
+  race in the module) and SELinux enforcing (journals 0091, 0096, 0104, 0109, 0112, 0115, 0133, 0138, 0143).
 - **No outside human review yet.** It was requested on 2026-10-13. Two independent source reviews
   made by AI assistants ([journal 0111](docs/history/0111-review-5582e06.md),
   [journal 0114](docs/history/0114-second-inspection-of-5582e06.md)) and verified against the
   kernel found four security defects (findings F9 to F12 of ADR-0011), reported as private
   advisories and fixed in journals 0116 and 0117; our own tests and reviews found others before.
-  Tags up to `v0.3.0-experimental` carry defects fixed since ([changelog](CHANGELOG.md)).
+  Tags up to `v0.4.0-experimental` carry defects fixed since ([changelog](CHANGELOG.md)).
 - **The measurements are pilot-grade**, from one host; the report that gathers them is
   [journal 0088](docs/history/0088-m4-report.md). They are not a general speed claim.
 - The index lives **in RAM only** and cannot be paged out. It is built per domain by the first
@@ -141,8 +157,8 @@ For anything beyond a disposable VM, SQLite or plain files remain the recommenda
 The project has one maintainer and no outside human review yet. What would help most, by how much
 kernel knowledge it takes, is in **[docs/help-wanted.md](docs/help-wanted.md)**: a review of the
 credential model or of the index locking, if you know the VFS; a check of whether your memory
-system fits, if you build one; a run of the tests on your machine or on another kernel; and a
-few issues that need no kernel knowledge. Rules for changes are in
+system fits, if you build one; a run of the tests on your machine or on another kernel; and
+documentation or reproducibility corrections that need no kernel knowledge. Rules for changes are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
@@ -207,21 +223,37 @@ each: [adoption-risks.md](docs/adoption-risks.md).
 **How to check any claim here.** Run `make vm-test` and read `build/vm/console.log`
 ([testing guide](docs/testing.md)); set up the environment with
 [docs/development.md](docs/development.md).
+Require the final markers and no `MOOBFS_VM_FAIL`; QEMU exit 0 alone is insufficient.
+`CASEFOLD_SKIPPED`, `STALL_SKIPPED` and an idmapped lower marked `not tested`
+remain coverage exclusions. `ipc` is built but not invoked by the suite.
+
+For targeted permission and fixed independent-encoding checks, use
+`MOOB_ONLY=permgaps make vm-test` ([journal 0172](docs/history/0172-permission-test-gaps.md)).
+The release step also queries as uid 1001; allocation-fault queries remain root-only.
+
 
 ## What was measured
 
-The report that answers the four questions of the [benchmark plan](docs/benchmark-plan.md) is
-[docs/history/0088-m4-report.md](docs/history/0088-m4-report.md). Every campaign is pilot-grade: one data-set seed, three repetitions at
-most, often one run, and a run-to-run noise of about 20 to 25 % on values of tens of
-microseconds. Numbers from different hosts are not compared with each other. The index code
-changed after most of these measurements (journals
-[0082](docs/history/0082-index-lock-and-reclaim.md),
-[0083](docs/history/0083-index-inspection-fixes.md)); only the two campaigns below were run after.
+The [M4 report](docs/history/0088-m4-report.md) gathers the early campaigns: one data-set seed,
+three repetitions at most, often one run, and run-to-run noise of about 20 to 25 % on values of
+tens of microseconds. Those are historical results for the modules named in each journal, not
+fresh measurements of this tag. Numbers from different hosts are not compared with each other.
 
-What the layer adds per operation, on the current module (10 000 memories, medians, bare lower
-against the layer): a read by path goes from 8.5 to 11.0 µs on ext4 (10.1 to 12.0 on btrfs, 9.8
-to 15.0 on XFS); setting one attribute from 8.9 to 21.7 µs (8.9 to 21.3; 6.0 to 11.6); creating a
-memory durably is unchanged within noise, because the device flushes take 12 to 14 ms.
+The later module-to-module comparison uses 40 repetitions, held CPU frequency, rotated module
+order and 95 % bootstrap intervals ([method](docs/history/0134-measurement-method-review.md),
+[journal 0139](docs/history/0139-query-buffer-regression.md),
+[confirmation](docs/history/0143-syzkaller-fifth-run-threshold-met.md)). It found and fixed a
+roughly 2x query regression. The fixed module remains 1 to 3 % slower in median latency (p50) than module 0102 on three
+filtered shapes; the on-demand design in 0102 costs 7.6 to 12.5 % against the earlier module
+that built its index at mount. The cause of the remaining 1 to 3 % is unresolved. This is one
+host and one data set; it does not rerun the comparisons with SQLite or the real client.
+Tail latency differs more on some shapes: the median of per-run p99 for the two-equality
+query is 54 % above module 0102 in that confirmation (95 % interval: +51 to +55 %).
+
+What the layer added per operation in the M4 report's campaign (10 000 memories, medians, bare
+lower against the layer): a read by path went from 8.5 to 11.0 µs on ext4 (10.1 to 12.0 on btrfs,
+9.8 to 15.0 on XFS); setting one attribute from 8.9 to 21.7 µs (8.9 to 21.3; 6.0 to 11.6);
+creating a memory durably was unchanged within noise, because device flushes took 12 to 14 ms.
 
 What a side database costs at write time, which this project had assumed and never measured:
 almost nothing. Publishing a memory durably takes 6.6 to 8.5 ms with the file alone, and 6.6 to
@@ -264,7 +296,8 @@ Where it loses, ties or costs:
   [0031](docs/history/0031-remount-time.md), [0055](docs/history/0055-measurement-gaps.md)).
 - **Memory.** About 0.5 to 0.6 KiB of kernel memory per file that cannot be paged out, by the
   index's own accounting, which undercounts. The 128 MiB default budget was never reached in a
-  test.
+  test. Query buffers are additional: up to about 1.1 MB is retained per open file that queried
+  with the maximum result limit, until close (journal 0139).
 - **Writes of the real client** were about 10 % slower in one run, and a page it writes is
   queryable about 11 ms later, not when the write returns: a separate process copies its fields
   into attributes ([journal 0071](docs/history/0071-client-stage2-live-mirror.md)). The client
@@ -273,8 +306,8 @@ Where it loses, ties or costs:
   small for small files: 6.7 % on btrfs and 13.6 % on XFS on a set where 15 % of the files are
   copies, none on ext4 ([journal 0085](docs/history/0085-m4-question-3-space.md)).
 
-Not measured: CPU and memory per query, concurrency, a second client's latency, repetitions
-with confidence intervals. Raw results: [bench/results/](bench/results/README.md).
+Still missing: CPU and memory per query, throughput under concurrency, a second client's
+latency, and a repeat of the SQLite/client comparisons with confidence intervals. Raw results: [bench/results/](bench/results/README.md).
 
 ## Try it in a VM
 
@@ -351,9 +384,27 @@ KASAN harness runs the layer suite), and no benchmark exists.
 
 ## Limitations
 
+- **The review batch passed the full integrated VM suite and local KASAN/UBSAN/lockdep.**
+  `v0.4.1-experimental` contains both defects identified in
+  [review 0144](docs/history/0144-independent-review.md): stale backing-file flags after
+  `F_SETFL`, and lower `getxattr` errors silently skipped during indexing. R1 synchronizes
+  mutable flags before delegated I/O ([0149](docs/history/0149-sync-backing-file-flags.md));
+  clearing and setting append both passed on ext4, btrfs and XFS in the integrated run at
+  `49098aa`. R2 propagates operational read errors and preserves the existing exclusions for
+  missing, oversized and malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md));
+  the same full VM run passed its injected-error regression and the acceptance/layer suites.
+  A third review ([0151](docs/history/0151-review-d110d4e.md)) found that a chmod during the
+  first build of a domain could leave the file in `QUERY2` answers to users who can no longer read
+  it; fixed in [0152](docs/history/0152-chmod-during-build-fixed.md), with a suite test and a negative round.
+  Negative rounds detected both original defects. Injecting the read result does not reproduce
+  an actual lower-filesystem I/O failure. The full local sanitizer run at `49098aa`
+  reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` and
+  `MOOBFS_KASAN_PASS` on Linux 6.12.112. Pull-request CI remains a separate pre-merge gate.
+
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
-  kernel APIs are version-specific and the pinned test target is not a compatibility promise. The
-  module has not run on another architecture; only the user-space encoding tests ran on big-endian.
+  kernel APIs are version-specific and the pinned test target is not a compatibility promise. On
+  another architecture the module ran only in the exploratory arm64 job (emulated, three lower
+  filesystems, journal 0137); the user-space encoding tests also ran on big-endian.
 - The index is RAM only, non-pageable and bounded by `index_budget` (default 128 MiB). Each
   domain is built by a linear scan on its first query after mount, and again after it was
   released or a directory in it was renamed; the budget and the shrinker were tested on small
@@ -361,25 +412,28 @@ KASAN harness runs the layer suite), and no benchmark exists.
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
   mounts are refused, and so is an idmapped mount as `lower=`; no rootless containers.
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
-- Only pilot-grade figures exist: two hosts, one data-set seed, three repetitions at most
-  (journals 0025 to 0085). No speed or efficiency claim beyond the conditions stated in
+- Early SQLite/client figures are pilots: two hosts, one data-set seed, three repetitions at
+  most (journals 0025 to 0085). Later module comparisons use 40 repetitions and intervals
+  (journals 0139 and 0143). No speed or efficiency claim beyond the conditions stated in
   [What was measured](#what-was-measured) may be made from them; no comparison with FUSE
   exists, and the comparison with the bare lower filesystem on the current module is pending.
 - No outside human review. Two independent source reviews by AI assistants (journals
   [0111](docs/history/0111-review-5582e06.md) and [0114](docs/history/0114-second-inspection-of-5582e06.md))
   and the project's own tests found and fixed kernel-side defects, security ones among them; the
-  findings are listed in [ADR-0011](docs/decisions/0011-threat-and-credential-model.md) (F1 to F12),
+  findings are listed in [ADR-0011](docs/decisions/0011-threat-and-credential-model.md) (F1 to F14),
   the earlier defects in journals [0015](docs/history/0015-phase-2e-investigation.md),
   [0016](docs/history/0016-kasan-lockdep-harness.md),
   [0035](docs/history/0035-phase-q2a-domain-query.md),
   [0082](docs/history/0082-index-lock-and-reclaim.md) and
-  [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.3.0-experimental` carry
-  defects fixed later; fixes after `v0.4.0-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
-  syzkaller ran for four six-hour rounds, last measured below the coverage threshold of
-  [security roadmap](docs/security-roadmap.md) S3. SELinux enforcing was exercised once (journal
+  [0083](docs/history/0083-index-inspection-fixes.md). Tags up to `v0.4.0-experimental` carry
+  defects fixed later; fixes after `v0.4.1-experimental` land on `main`. fstests ran as the `quick` group only ([vm/fstests/](vm/fstests/README.md));
+  syzkaller ran for five six-hour rounds, above the aggregate PC threshold of
+  [security roadmap](docs/security-roadmap.md) S3; `moobl_xattr_get` was at 0 PCs in that run's report, because the corpus kept almost no
+  attribute read inside a mounted layer; replayed with per-call coverage, its seeds reach it (journal 0154). SELinux enforcing was exercised once (journal
   0104); AppArmor and Smack were not.
-- `QUERY` authorization holds at query time only (TOCTOU contract); possible false negatives
-  after a directory rename until remount ([spec-m3](docs/spec-m3.md) §3.1).
+- `QUERY` authorization holds at query time only (TOCTOU contract). A directory rename through
+  the layer makes its domain stale and the next query rebuilds it; direct lower-tree changes
+  remain untracked ([spec-m3](docs/spec-m3.md) §3.1 and its correction note).
 - File/metadata atomicity is a client convention; durability, reflink and dedupe are the lower
   filesystem's. Acceptance ran over ext4 only.
 - Inode numbers are the lower's, and a file is identified by that number. A btrfs subvolume or
@@ -391,6 +445,12 @@ KASAN harness runs the layer suite), and no benchmark exists.
   them directly (finding F4, journal 0132).
 - `noatime`, `relatime` and `strictatime` on the layer's mount have no effect; access times
   follow the mount options of the lower filesystem.
+- `sync_file_range(2)` through the layer succeeds and writes nothing: the pages live in the
+  lower file's cache, which it does not reach (V2 of journal 0155; overlayfs has the same gap).
+  Use `fsync` or `fdatasync`.
+- With domains on, nothing more than 64 components below the mount root is indexed or answered by
+  `QUERY2`: the write paths cannot place deeper names (finding F14, journal 0156). The files are
+  still read and written normally.
 
 ## What is implemented, with evidence
 
@@ -416,7 +476,7 @@ as a regression in the same VM.
 | Index built per domain by the first query, released under memory pressure or over its budget (shrinker); tracepoints | [0098](docs/history/0098-index-on-demand.md), [0101](docs/history/0101-domains-released.md), [0102](docs/history/0102-index-tracepoints.md), [ADR-0012](docs/decisions/0012-index-on-demand-and-reclaimable.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 | SELinux enforcing; per-result checks when an LSM labels the layer's inodes | [0104](docs/history/0104-selinux-investigation.md) | 6.12.112 with the Debian reference policy |
 | SQL over a domain through a SQLite virtual table (prototype) | [0108](docs/history/0108-sqlite-virtual-table-prototype.md), [ADR-0013](docs/decisions/0013-user-space-query-library.md) | KASAN 6.12.112; ext4 |
-| syzkaller descriptions of the mount, ioctls and attributes; four six-hour runs | [0109](docs/history/0109-syzkaller-first-runs.md), [0112](docs/history/0112-mount-leak-and-sql-omit.md), [0133](docs/history/0133-syzkaller-third-run.md), [0138](docs/history/0138-syzkaller-fourth-run.md) | upstream 6.12.112 with KCOV |
+| syzkaller descriptions of the mount, ioctls and attributes; five six-hour runs | [0109](docs/history/0109-syzkaller-first-runs.md), [0112](docs/history/0112-mount-leak-and-sql-omit.md), [0133](docs/history/0133-syzkaller-third-run.md), [0138](docs/history/0138-syzkaller-fourth-run.md), [0143](docs/history/0143-syzkaller-fifth-run-threshold-met.md) | upstream 6.12.112 with KCOV |
 | Security fixes of findings F9 to F12 (homogeneity rule, checks without the query semaphore, write access on the lower mount, idmapped lower refused), each with a test and a negative round | [0116](docs/history/0116-homogeneity-classes-and-checks-without-query-sem.md), [0117](docs/history/0117-lower-mount-write-access.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 
 Not implemented: a persistent index, user-namespace or idmapped mounts, batch reads, a change
@@ -498,9 +558,30 @@ Questions go to GitHub Discussions or an issue. AI-assisted contributions are we
 human review and accurate test evidence. Do not put private vulnerability details in public
 issues; use the [security contact](SECURITY.md).
 
+## External project records
+
+Records checked on 2026-10-20. These links describe release tracking and source discovery;
+see [Status](#status) for tested behavior and limitations.
+
+| Service | Record |
+| --- | --- |
+| [Anitya](https://release-monitoring.org/project/392843/) | Tracks the experimental pre-releases; no distribution package mapping. |
+| [Open Hub](https://openhub.net/p/moobfs) | Public project entry; code analysis is not complete. |
+| [XERJ Corpus Hub](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Source snapshot selected; license review is pending, so the corpus is not installable yet. |
+| [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory) | Listed under **Emerging projects** as an experimental agent-memory storage project. |
+
 ## Citing
 
-Citation metadata is in [CITATION.cff](CITATION.cff).
+To cite the archived experimental source snapshot at commit
+[`02381fba`](https://github.com/studiomoob/llmoobfs/commit/02381fba3f0a908623cac52180a39f24e02e98a6), use:
+
+> Studio Moob. (2026). *MoobFS: experimental Linux filesystem layer for LLM-agent memory — source snapshot 02381fba*
+> (Version `0.4.1-experimental+git.02381fba`) [Computer software]. Zenodo.
+> [https://doi.org/10.5281/zenodo.23514721](https://doi.org/10.5281/zenodo.23514721)
+
+This archive is newer than the `v0.4.1-experimental` tag. The DOI identifies that
+fixed snapshot; `main` may contain later changes. The tag's citation metadata
+remains in [CITATION.cff](CITATION.cff).
 
 ## License
 

@@ -37,9 +37,11 @@
  *                                                    openable unless it was concurrently removed
  */
 #include <time.h>
+#include <sys/syscall.h>
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
 #include <inttypes.h>
@@ -83,6 +85,10 @@ int main(int argc, char **argv)
 	}
 	if (argc >= 5 && !strcmp(argv[2], "rename")) {
 		printf("rename %d\n", rename(argv[3], argv[4]) ? errno : 0);
+		return 0;
+	}
+	if (argc >= 5 && !strcmp(argv[2], "whiteout")) {	/* refused by the layer (V6, 0155) */
+		printf("whiteout %d\n", syscall(SYS_renameat2, AT_FDCWD, argv[3], AT_FDCWD, argv[4], 1u << 2 /* RENAME_WHITEOUT */) ? errno : 0);
 		return 0;
 	}
 	if (argc >= 6 && !strcmp(argv[2], "xset")) {	/* typed string: type byte, then UTF-8 */
@@ -295,6 +301,88 @@ int main(int argc, char **argv)
 			free(bq);
 		}
 		Q2BAD(strcpy(q2.terms[0].name, "Kind"));
+		/*
+		 * term_check and the header, case by case (journal 0141): each refusal next to the valid
+		 * request it differs from by one field. Q2EQ sets an equality term of the given type.
+		 */
+#define Q2OK(stmt) do { memset(&q2, 0, sizeof q2); q2.version = MOOB_QUERY2_VERSION; q2.nterms = 1; \
+	q2.limit = 10; q2.results = (__u64)(uintptr_t)res; strcpy(q2.terms[0].name, "kind"); \
+	q2.terms[0].op = MOOB_OP_EXISTS; stmt; errno = 0; CHECK(!ioctl(fd, MOOB_IOC_QUERY2, &q2)); } while (0)
+#define Q2EQ(ty, n, bytes) (q2.terms[0].op = MOOB_OP_EQ, q2.terms[0].type = (ty), q2.terms[0].len = (n), \
+	memcpy(q2.terms[0].value, bytes, n))
+		Q2BAD(q2.terms[0].type = MOOB_T_STRING);		/* EXISTS carries no value */
+		Q2BAD(q2.terms[0].len = 1);
+		Q2BAD(q2.terms[0].op = 0);
+		Q2BAD(q2.terms[0].op = MOOB_OP_EXISTS + 1);
+		Q2BAD(q2.terms[0].name[0] = 0);			/* empty name */
+		Q2BAD(memset(q2.terms[0].name, 'a', sizeof q2.terms[0].name));	/* not NUL-terminated */
+		Q2OK(memset(q2.terms[0].name, 'a', MOOB_QUERY_NAME_MAX); q2.terms[0].name[MOOB_QUERY_NAME_MAX] = 0);
+		Q2BAD(strcpy(q2.terms[0].name, "a..b"));
+		Q2BAD(strcpy(q2.terms[0].name, ".kind"));
+		Q2BAD(strcpy(q2.terms[0].name, "kind."));
+		Q2BAD(strcpy(q2.terms[0].name, "a-b"));
+		Q2BAD(q2.terms[0].pad[1] = 1);
+		Q2BAD(q2.terms[0].pad[2] = 1);
+		Q2BAD(q2.pad[0] = 1);
+		Q2BAD(q2.reserved[0] = 1);
+		Q2BAD(q2.nterms = 2; strcpy(q2.terms[1].name, "Kind"); q2.terms[1].op = MOOB_OP_EXISTS);	/* second term */
+		Q2BAD(q2.nterms = 2; strcpy(q2.terms[1].name, "kind"); q2.terms[1].op = 42);
+		Q2OK(q2.nterms = 2; strcpy(q2.terms[1].name, "kind"); q2.terms[1].op = MOOB_OP_EXISTS);
+		Q2BAD(q2.nterms = 4; strcpy(q2.terms[3].name, "kind"); q2.terms[3].op = MOOB_OP_EXISTS;
+		      strcpy(q2.terms[1].name, "kind"); q2.terms[1].op = MOOB_OP_EXISTS;
+		      strcpy(q2.terms[2].name, "kind"); q2.terms[2].op = MOOB_OP_EXISTS; q2.terms[3].pad[0] = 1);	/* last term */
+		/* types: raw and unknown types cannot be queried; fixed sizes; PREFIX on strings only */
+		Q2BAD(Q2EQ(MOOB_T_RAW, 1, "x"));
+		Q2BAD(Q2EQ(0, 1, "x"));
+		Q2BAD(Q2EQ(MOOB_T_RAW + 1, 1, "x"));
+		Q2OK(Q2EQ(MOOB_T_INT64, 8, "\0\0\0\0\0\0\0\0"));
+		Q2BAD(Q2EQ(MOOB_T_INT64, 7, "\0\0\0\0\0\0\0"));
+		Q2BAD(Q2EQ(MOOB_T_INT64, 9, "\0\0\0\0\0\0\0\0\0"));
+		Q2OK(Q2EQ(MOOB_T_TIME, 8, "\0\0\0\0\0\0\0\0"); q2.terms[0].op = MOOB_OP_GE);
+		Q2BAD(Q2EQ(MOOB_T_TIME, 0, ""));
+		Q2BAD(Q2EQ(MOOB_T_TIME, 8, "\0\0\0\0\0\0\0\0"); q2.terms[0].op = MOOB_OP_PREFIX);
+		Q2OK(Q2EQ(MOOB_T_DOUBLE, 8, "\0\0\0\0\0\0\xf0\x7f"));		/* +infinity */
+		Q2BAD(Q2EQ(MOOB_T_DOUBLE, 8, "\0\0\0\0\0\0\xf8\x7f"));		/* NaN */
+		Q2BAD(Q2EQ(MOOB_T_DOUBLE, 8, "\x01\0\0\0\0\0\xf0\xff"));		/* negative signalling NaN */
+		Q2BAD(Q2EQ(MOOB_T_DOUBLE, 4, "\0\0\x80\x3f"));
+		Q2BAD(Q2EQ(MOOB_T_DOUBLE, 8, "\0\0\0\0\0\0\0\0"); q2.terms[0].op = MOOB_OP_PREFIX);
+		Q2OK(Q2EQ(MOOB_T_BOOL, 1, "\x01"));
+		Q2BAD(Q2EQ(MOOB_T_BOOL, 1, "\x02"));
+		Q2BAD(Q2EQ(MOOB_T_BOOL, 0, ""));
+		Q2BAD(Q2EQ(MOOB_T_BOOL, 2, "\x01\x00"));
+		Q2BAD(Q2EQ(MOOB_T_BOOL, 1, "\x01"); q2.terms[0].op = MOOB_OP_PREFIX);
+		Q2OK(Q2EQ(MOOB_T_STRING, 1, "n"); q2.terms[0].op = MOOB_OP_PREFIX);
+		Q2OK(Q2EQ(MOOB_T_STRING, 0, ""));
+		Q2OK(Q2EQ(MOOB_T_STRING, 0, ""); memset(q2.terms[0].value, 'a', MOOB_QUERY_VALUE_MAX);
+		     q2.terms[0].len = MOOB_QUERY_VALUE_MAX);
+		Q2BAD(Q2EQ(MOOB_T_STRING, 0, ""); memset(q2.terms[0].value, 'a', MOOB_QUERY_VALUE_MAX);
+		      q2.terms[0].len = MOOB_QUERY_VALUE_MAX + 1);		/* longer than value[] */
+		Q2BAD(Q2EQ(MOOB_T_STRING, 0, ""); q2.terms[0].len = 0xffff);
+		Q2BAD(Q2EQ(MOOB_T_STRING, 3, "a\0b"));				/* NUL */
+		Q2BAD(Q2EQ(MOOB_T_STRING, 2, "\xc0\x80"));			/* overlong */
+		Q2BAD(Q2EQ(MOOB_T_STRING, 3, "\xed\xa0\x80"));			/* surrogate */
+		Q2BAD(Q2EQ(MOOB_T_STRING, 4, "\xf4\x90\x80\x80"));		/* above U+10FFFF */
+		Q2BAD(Q2EQ(MOOB_T_STRING, 2, "a\xe2"));				/* cut by the end */
+		Q2BAD(Q2EQ(MOOB_T_STRING, 1, "\x80"));
+		/* an "or missing" term on a type check that fails is refused like a plain one */
+		Q2BAD(q2.nterms = 2; strcpy(q2.terms[1].name, "kind"); q2.terms[1].op = MOOB_OP_LT;
+		      q2.terms[1].type = MOOB_T_BOOL; q2.terms[1].len = 1; q2.terms[1].value[0] = 2;
+		      q2.terms[1].flags = MOOB_TERM_MISSING_OK);
+		Q2OK(q2.nterms = 2; strcpy(q2.terms[1].name, "kind"); q2.terms[1].op = MOOB_OP_EQ;
+		     q2.terms[1].type = MOOB_T_BOOL; q2.terms[1].len = 1; q2.terms[1].value[0] = 1;
+		     q2.terms[1].flags = MOOB_TERM_MISSING_OK);
+		/* order fields: the name follows the attribute alphabet; nterms 0 needs order_by */
+		Q2BAD(strcpy(q2.order_by, "a..b"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_TIME);
+		Q2BAD(strcpy(q2.order_by, "created."); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_TIME);
+		Q2BAD(strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_DESC; q2.order_type = MOOB_T_RAW + 1);
+		Q2OK(q2.nterms = 0; strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_STRING);
+		Q2OK(q2.nterms = 0; strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_INT64);
+		Q2OK(q2.nterms = 0; strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_DOUBLE);
+		Q2BAD(q2.nterms = 0; strcpy(q2.order_by, "created"); q2.order = MOOB_ORDER_ASC; q2.order_type = MOOB_T_STRING;
+		      q2.limit = 0);
+		Q2BAD(q2.limit = 0xffffffffU);
+#undef Q2OK
+#undef Q2EQ
 		/* a cursor not issued by this mount for this query is refused with ESTALE */
 		memset(&q2, 0, sizeof q2); q2.version = MOOB_QUERY2_VERSION; q2.nterms = 1; q2.limit = 10;
 		q2.results = (__u64)(uintptr_t)res; strcpy(q2.terms[0].name, "kind"); q2.terms[0].op = MOOB_OP_EXISTS;
@@ -354,7 +442,11 @@ int main(int argc, char **argv)
 		unsigned long stale = 0, closed = 0, closed_tries = 0;
 		int was_closed = 0;
 		double secs = atof(argv[3]);
+		/* MOOB_RACE2_FORK: a second process queries the same open file at the same time, so
+		 * one of them finds the file's result buffer lent (moobl_qbuf_get, journal 0139) */
+		pid_t child = getenv("MOOB_RACE2_FORK") ? fork() : -1;
 
+		CHECK(child != -1 || !getenv("MOOB_RACE2_FORK"));
 		clock_gettime(CLOCK_MONOTONIC, &t0);
 		for (;;) {
 			struct moob_query2 q2;
@@ -422,9 +514,19 @@ int main(int argc, char **argv)
 			clock_gettime(CLOCK_MONOTONIC, &t1);
 			if ((t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9 >= secs) break;
 		}
+		if (child == 0)
+			_exit(pages ? 0 : 1);
+		if (child > 0) {
+			int st;
+
+			CHECK(waitpid(child, &st, 0) == child);
+			CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0);
+		}
+		CHECK(pages > 0);
 		printf("race2: %lu complete paginations, %lu pages, %lu openable, %lu replaced, %lu vanished, %lu denied, %lu stale restarts, %lu domain-closed episodes (%lu refused calls)\n",
 		       iters, pages, hits, replaced, gone, denied, stale, closed, closed_tries);
-		return pages ? 0 : 1;
+		fflush(stdout);
+		return 0;
 	}
 	if (argc >= 4 && !strcmp(argv[2], "race")) {
 		struct timespec t0, t1;
@@ -478,6 +580,17 @@ int main(int argc, char **argv)
 		q.terms[0].op = MOOB_OP_EQ; q.terms[0].type = MOOB_T_STRING; q.terms[0].len = 1; q.terms[0].value[0] = 0xff; errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
 		q.terms[0].value[0] = 'x'; q.terms[0].pad[0] = 1; errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
 		q.terms[0].pad[0] = 0; CHECK(!run_query(fd, &q, res, 10));
+		/* more of do_query's header and term checks (journal 0141); each restores the baseline */
+		q.nterms = 0; errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
+		q.nterms = 1; q.limit = MOOB_QUERY_MAX_LIMIT + 1; errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
+		q.limit = 10; q.reserved[0] = 1; errno = 0; CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
+		q.reserved[0] = 0; q.terms[0].flags = MOOB_TERM_MISSING_OK; errno = 0;	/* a QUERY2 flag in v1 */
+		CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
+		q.terms[0].flags = 0; q.nterms = 2; strcpy(q.terms[1].name, "kind"); q.terms[1].op = MOOB_OP_EQ;
+		q.terms[1].type = MOOB_T_BOOL; q.terms[1].len = 1; q.terms[1].value[0] = 2; errno = 0;	/* second term */
+		CHECK(ioctl(fd, MOOB_IOC_QUERY, &q) == -1 && errno == EINVAL);
+		q.terms[1].value[0] = 1; CHECK(!run_query(fd, &q, res, 10));
+		q.nterms = 1; CHECK(!run_query(fd, &q, res, 10));
 		errno = 0; CHECK(ioctl(fd, _IOR(MOOB_IOC_MAGIC, 9, int), &q) == -1 && errno == ENOTTY);
 		/* the ioctls only answer on the mount root */
 		{

@@ -1,6 +1,6 @@
 # Frequently asked questions
 
-Short, factual answers about MoobFS as of 2026-10-18. Each answer names the file it is taken
+Short, factual answers about MoobFS as of 2026-10-20. Each answer names the file it is taken
 from; when a file and this page disagree, the file wins and this page needs a correction.
 Rendered copy: [studiomoob.github.io/llmoobfs/faq.html](https://studiomoob.github.io/llmoobfs/faq.html).
 
@@ -8,8 +8,8 @@ Rendered copy: [studiomoob.github.io/llmoobfs/faq.html](https://studiomoob.githu
 MoobFS is an experimental GPL-2.0 Linux kernel module, stacked over ext4, btrfs or XFS, that
 passes POSIX operations to the lower filesystem and adds typed `user.moob.*` attributes, an
 in-memory attribute index and query ioctls. It is a research project: the tags are source
-pre-releases, and the last one, `v0.4.0-experimental` (2026-10-19), has every fix made up to that
-date; later ones land on `main`.
+pre-releases, and the last one, `v0.4.1-experimental` (2026-10-20), is a source
+snapshot before the corrections in review 0144.
 [`README.md`; `docs/research-originality.md` §9]
 
 ## 2. What problem does it target?
@@ -65,9 +65,11 @@ results; no outside human review has taken place.
 
 A result is not a grant of access. Authorization is checked when the query runs; permissions
 or names may change afterwards, so a client must call `open()` normally and accept `EACCES`
-or `ENOENT`. There is no guarantee of the absence of a time-of-check/time-of-use window. A known limitation is possible false negatives after a directory rename until the
-next mount.
-[`docs/spec-m3.md` §3.1]
+or `ENOENT`. There is no guarantee of the absence of a time-of-check/time-of-use window. A directory
+rename through the layer marks its domain stale; the next query rebuilds it, and may fail if
+concurrent changes keep preventing a stable build. Direct writes to the lower tree bypass
+this tracking and require remount for guaranteed resynchronization.
+[`docs/spec-m3.md` §3.1 and its dated note; `layer/index.c`: `moobl_index_renamed`, `domain_pin`]
 
 ## 8. What is implemented today?
 A stacked pass-through layer over ext4, btrfs and XFS (`fsx`, fstests' `quick` group), typed
@@ -76,7 +78,10 @@ under memory pressure, `QUERY2` with ordering, cursors and batches, the first `Q
 administrators, `GET_INFO`, delegated reflink and dedupe, tracepoints, and acceptance runs with
 git, concurrent WAL-mode SQLite, `dm-log-writes` power-loss replay and `dm-flakey` error
 injection. A SQLite virtual table over `QUERY2` exists as a prototype. Everything is tested in a
-VM, under KASAN, UBSAN and lockdep on every pull request, with fault injection and syzkaller.
+VM. The KASAN, UBSAN and lockdep suite runs for pull requests that change module or test
+inputs; documentation-only changes pass the required job without executing the suite. Fault
+injection and syzkaller provide additional coverage.
+[`.github/workflows/kasan.yml`]
 [`README.md` "What is implemented"; `ROADMAP.md`; `CHANGELOG.md`]
 
 ## 9. What is not implemented?
@@ -114,27 +119,49 @@ Prior art in agent filesystems such as YoloFS (2026) is acknowledged.
 Shown in the author's VM runs: answers equal to the oracle, isolation between users and domains
 on three lower filesystems, git and SQLite acceptance, and the suite under KASAN, UBSAN and
 lockdep on kernel 6.12.112. Measured, pilot-grade, on one host: against SQLite with composite
-indexes, `QUERY2` was 1.1 to 5.8 times faster on filtered conjunctions and SQLite 4 to 6 times
-faster on "the N most recent" ordered traversals; against a real memory client's database, equal
-answers from 150 to 60 000 memories. Still hypotheses: any advantage on other hardware or
-workloads, behaviour near the index budget, long-running operation. There is no independent
-reproduction yet (issue #68 asks for one).
-[`README.md` "What was measured"; journals 0047, 0088; `docs/benchmark-plan.md`]
+indexes, `QUERY2` was 1.1 to 6 times faster on the five synthetic shapes after the optimization
+of journal 0048 (the low end is a tie). Earlier, SQLite was 4 to 6 times faster on "N most
+recent"; that result predates the optimization. The real client's long ordered traversal still
+lost, while answers matched from 150 to 60 000 memories. A later 40-repetition module comparison
+with confidence intervals found and fixed a roughly 2x regression; a residual 1 to 3 % in p50
+against module 0102 remains unexplained, with larger differences in some p99 results. It did not repeat the SQLite comparison. Small-budget recovery
+is tested, but default-budget saturation at scale, long-running operation and performance on
+other hardware remain open. There is no independent reproduction yet (issue #68 asks for one).
+[`README.md` "What was measured"; journals 0047, 0048, 0088, 0130, 0139, 0143; `docs/benchmark-plan.md`]
 
 ## 14. Which kernels are supported?
 One series: Debian kernel 6.12.111 in a QEMU VM, and upstream 6.12.112 with KASAN, UBSAN and
-lockdep on every pull request that touches the module and weekly. x86-64 only for the module;
-the attribute encoding's user-space tests also run on big-endian s390x under emulation. Kernel
+lockdep on every pull request that touches the module and weekly. x86-64 for the module, plus an
+exploratory arm64 job under emulation where the ext4, btrfs and XFS steps pass under KASAN
+(journal 0137); the attribute encoding's user-space tests also run on big-endian s390x under
+emulation. Kernel
 APIs change between versions; compatibility with other kernels is not promised.
 [`README.md`; `docs/testing.md` §1; journal 0124]
 
 ## 15. Is it production-ready? Is there a release?
-No, and no. It is a research project with source pre-release tags only, the last of which,
-`v0.4.0-experimental` (2026-10-19), has every fix made up to that date; later ones land on `main`. A module bug can cause a
+It is not production-ready. It is a research project with source pre-release tags only, the last of which,
+`v0.4.1-experimental` (2026-10-20), is a source snapshot before the corrections in review 0144. A module bug can cause a
 kernel panic or data loss; the project's tests and two source reviews by AI assistants found
-kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011, all but the fairness
+kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011, all but the fairness
 part of F2 fixed). Run it only in a disposable VM with synthetic data.
-[`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`]
+
+The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md)
+found stale backing-file flags after `F_SETFL` and silently skipped lower `getxattr` errors.
+Both defects remain in `v0.4.1-experimental`; corrections are implemented in the review batch.
+R1 synchronizes mutable flags before delegated I/O, and R2 propagates operational read errors.
+The full integrated VM suite at `49098aa` passed: clearing and setting append on ext4, btrfs
+and XFS, R2 injected-error regression, and acceptance/layer suites. Negative rounds detected
+both original defects. The local batch KASAN/UBSAN/lockdep suite also passed on Linux 6.12.112;
+pull-request CI is a separate pre-merge gate. An injected value-read error does
+not establish behavior under a real lower-filesystem I/O fault.
+A later review ([0151](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0151-review-d110d4e.md))
+found that a chmod during the first build of a domain could leave the file in `QUERY2` answers to
+users who can no longer read it; it is fixed in
+[0152](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0152-chmod-during-build-fixed.md),
+with a suite test that fails without the fix.
+See [R1 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0149-sync-backing-file-flags.md)
+and [R2 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0150-propagate-index-xattr-read-errors.md).
+[`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`; journal 0144]
 
 ## 16. How can I try it?
 

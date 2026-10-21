@@ -24,7 +24,7 @@ project's journal with credit, if the person wants it.
 | --- | --- |
 | Check whether your system fits: one file per memory, fields as typed attributes, scopes as directories | [client-contract.md](client-contract.md), section 1 |
 | Tell us which of your structured queries do not fit four ANDed comparisons with one ordering | [research-client-query-patterns.md](research-client-query-patterns.md) |
-| Try an adapter. The second client being written is the LangGraph store; the first was ai-memory, unmodified | [journal 0081](history/0081-second-client-and-outside-review.md) |
+| Try the existing LangGraph store adapter, whose answers were compared with its reference store; the first client was ai-memory, unmodified | [journal 0089](history/0089-second-client-langgraph-adapter.md) |
 
 ## If you want to try it or test it
 
@@ -36,9 +36,10 @@ project's journal with credit, if the person wants it.
 
 ## If you do not touch kernels
 
-The issues labelled [good first issue](https://github.com/studiomoob/llmoobfs/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-need none: manual pages, documented exit codes, a compiler warning matrix, an accessibility
-audit of the site, an SPDX check.
+Documentation review and reproducing the documented tool commands need no kernel knowledge.
+Manual pages, exit codes, a compiler warning matrix, the accessibility audit and the SPDX check
+were completed in [journal 0125](history/0125-seven-issues-closed.md). Report a concrete gap if
+you find one; those completed tasks are not reserved for future contributors.
 
 ## How to report
 

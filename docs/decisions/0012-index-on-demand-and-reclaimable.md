@@ -6,6 +6,10 @@ implementation departs from the sketch below; items 3 and 4 are not implemented.
 order: fault injection in the test suite first (journal 0095), then this. It changes how
 [ADR-0009](0009-query-role-and-user-space-index.md) builds the index, not what it answers.
 
+*Status correction, 2026-10-20 (journal 0146):* the opening status is stale: items 3 and 4
+were implemented in journal 0101, as the dated implementation note below already records.
+All six items are implemented; the measured steady-state cost remains as recorded below.
+
 ## Context
 
 Two costs of the layer come from one design choice, the index built whole at mount and kept
@@ -153,3 +157,10 @@ module with releases matches the one without; both have medians 8 to 15 % above 
 built at mount on three filtered shapes, with ranges that overlap. A budget smaller than the
 working set, queried in a loop, rebuilds a domain on every query (the known weakness of
 least-recently-used order); no other policy was adopted.
+
+## Note of 2026-10-19: steady state measured with a test (journal 0139)
+
+With 40 repetitions and the method of journal 0134, the module with releases (0102) is 7 to 12 %
+slower than the module built at mount on filtered shapes and about 4 % on the "newest 20" ones,
+all outside the confidence intervals. "Steady-state query latency must not get worse" does not
+hold; the cost is the on-demand design's, measured, and kept.

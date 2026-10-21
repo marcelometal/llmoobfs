@@ -38,3 +38,55 @@ Every tag so far carries defects
 Todas as tags até agora carregam defeitos
 syzkaller (three six-hour runs
 three six-hour runs, the second and third
+arm64 runs are being measured
+em arm64 estão sendo medidas
+module has not run on another architecture
+x86-64 only for the module
+módulo não rodou em outra arquitetura
+`v0.4.0-experimental` (2026-10-19), has every fix
+the last one is `v0.4.0-experimental`
+Tags up to `v0.3.0-experimental` carry
+Tags up to v0.3.0-experimental carry
+As tags até a `v0.3.0-experimental`
+syzkaller (four six-hour runs
+last measured below the coverage threshold
+medição ficou abaixo do limiar de cobertura
+
+# Documentation audit, 2026-10-20 (journal 0146).
+speed not measured
+magnitude unknown
+near the budget, answers can be
+until these runs exist
+Every number published so far comes from one host and few repetitions
+Todos os números publicados até agora vêm de uma máquina e poucas repetições
+the second client being written
+latency per operation on the current module is pending
+all but two fixed
+has every fix made up to that date
+tem todas as correções até essa data
+feitas até essa data; as seguintes entram na `main`
+
+# Review corrections prepared locally; source tag remains affected (0149/0150).
+Neither finding is fixed yet
+Nenhum dos dois achados foi corrigido ainda
+Two findings remain unfixed
+Unfixed findings from the current review
+Achados sem correção da revisão atual
+
+# Integrated review-batch VM run at 49098aa completed on 2026-10-20.
+integrated validation and publication are pending
+validação integrada e a publicação estão pendentes
+still awaits the integrated run
+ativa append aguarda a rodada integrada
+
+# Local review-batch KASAN run at 49098aa completed on 2026-10-20.
+Batch KASAN/lockdep remains pending
+batch KASAN/lockdep is pending
+KASAN/lockdep do lote continua pendente
+KASAN/lockdep está pendente
+sanitizer gate remains pending
+verificação separada do lote com sanitizers continua pendente
+
+# Harness inventory corrected on 2026-10-21 (journal 0171).
+The QEMU phase is bounded by a 600-second timeout
+boots the disposable Linux VM that runs every test

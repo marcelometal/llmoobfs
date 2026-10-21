@@ -61,7 +61,7 @@ struct moobl_index {
 	u32 domains_built;		/* domains in state built, the outside part included */
 	u32 builds;			/* builds completed since mount */
 	u32 releases;			/* built domains released since mount */
-	bool over_budget;		/* charge() refused an allocation (index lock) */
+	u64 refusals;			/* allocations charge() refused since mount (index lock) */
 	unsigned int idle;		/* seconds a used domain is kept from the shrinker */
 	struct shrinker *shrinker;	/* releases built domains under memory pressure */
 	dev_t dev;			/* the layer's anonymous device, for tracepoints */
@@ -113,6 +113,9 @@ static inline struct dentry *moobl_lower_dentry(struct dentry *dentry)
 /* main.c */
 struct inode *moobl_find_inode(struct super_block *sb, struct inode *lower);
 int moobl_other_device(struct super_block *sb, struct dentry *lower);
+struct moob_query_result;
+struct moob_query_result *moobl_qbuf_get(struct file *file, u32 n);
+void moobl_qbuf_put(struct file *file, struct moob_query_result *buf);
 bool moobl_casefolded(struct dentry *lower);
 
 /* index.c */

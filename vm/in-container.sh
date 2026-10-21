@@ -6,6 +6,7 @@ KERNEL=6.12.111+deb13-amd64
 test -d "/lib/modules/$KERNEL/build"
 make tools BUILD=build/linux
 MOOB_BUILD_DIR=build/linux python3 tests/test_images.py
+python3 tests/test_harness_verdicts.py
 make module KDIR="/lib/modules/$KERNEL/build"
 make layer KDIR="/lib/modules/$KERNEL/build"
 mkdir -p build/vm
@@ -109,7 +110,9 @@ cp "/boot/config-$KERNEL" build/vm/kernel.config
 } > build/vm/environment.txt
 (cd "$STAGE" && find . -print0 | sort -z | cpio --null -o --format=newc 2>/dev/null | gzip -n) > build/vm/initramfs.cpio.gz
 set +e
-timeout 600 qemu-system-x86_64 \
+# A guard against a hung guest, not a time budget. The complete suite reached the previous
+# 1200 s guard during the btrfs release step under TCG after adding rootpath and overbudget.
+timeout 2400 qemu-system-x86_64 \
     -machine q35 -accel tcg -cpu max -m 512M -smp 2 \
     -drive file=build/vm/lower-ext4.img,format=raw,if=virtio \
     -drive file=build/vm/lower-btrfs.img,format=raw,if=virtio \

@@ -57,3 +57,67 @@ four seed programs: exit 0. shellcheck of `vm/syzkaller-local.sh`: clean.
   cursor (`query2_exec`, 41 of 75), `value_cmp` (12 of 24), `leap_collect` (27 of 43) and the
   error paths of `query_run` and `moobl_xattr_set`.
 - Next: a run with these descriptions (and the casefold change), measuring the same set.
+
+## Descriptions for the weak handlers (not yet run)
+
+2026-10-19. Status: descriptions and seeds written and checked locally (below); no fuzzing run
+with them yet. Test work only: no change under `layer/`.
+
+Each change and the code it targets (`vm/syzkaller/moobfs.txt`, `vm/syzkaller/seeds/`):
+
+- **`query2_exec`, `cursor_decode`, `first_after`, `last_before` (the `QUERY2` cursor).** The
+  cursor carries a MAC keyed per mount, so random or fixed bytes never continue a query. Its 16
+  words are now 16 resources: `ioctl$MOOB_IOC_QUERY2` returns them, and the new
+  `ioctl$MOOB_IOC_QUERY2_NEXT` (same command, cursor sent) takes words returned earlier and
+  returns the next ones; words of different queries mixed give `ESTALE`. Two calls because
+  syzkaller's compiler does not let an optional resource be created, and a required one that
+  only the same call creates would disable it. Seeds: `query2-pages` (ordered ascending and
+  descending pages over equal values, plain-scan pages, a `MISSING_OK` first term that the scan
+  swaps out), `long-cursor` (string keys of 100 bytes, longer than the cursor's 96 inline bytes,
+  in ordered and prefix scans; then the keys change under a cursor), `cursor-errors` (a cursor
+  with the magic byte and a wrong MAC).
+- **`value_cmp`, `entry_matches`, `seek_first`, `past_end` (every type and operator).** Terms
+  are now a union: a string, int64, time, double or bool term with a valid length and a value
+  from a short list, an `EXISTS` term, or the previous any-bytes term for the shapes `term_check`
+  refuses. Values written as attributes come from the same lists (shared string prefixes, equal
+  integers, double bit patterns for 0, -0, 1, -1, 2, both infinities, NaN, a denormal, the
+  largest finite), so files and terms often hold equal or ordered values. Seed `value-types`:
+  doubles, times and bools on three files, one name with three types, every comparison
+  operator, a NaN term and a NaN attribute (both refused), ordered scans by a double and a time.
+- **`leap_collect`, `seek_eq` (the equality plan).** Seed `leap-pages`: two equalities whose
+  second run is the shorter (it leads), paged with the cursor; three equalities with a bool; an
+  equality on a name the domain lacks; an empty run.
+- **`query_run`, `query_repin` (v1 partitions, per-result checks).** Seed `query-checks`: a v1
+  `QUERY` over two domains and the part outside them with a limit below the matches; a mode
+  change on the domain directory, after which `QUERY2` checks each result, paged.
+- **`moobl_xattr_set`, `moobl_xattr_get`.** `security.capability` added to the names (its
+  removal takes the mounter's credentials), and `tag`. Seed `xattr-flags`: `XATTR_CREATE` on a
+  new and on an existing name, `XATTR_REPLACE` on a missing name, a replacement with another
+  type, the reserved name, a bad name, an empty value, writes by path and on the domain
+  directory, reads of `user.moob.*` and `security.*`, a read with a short buffer, removals
+  (present, absent, capability, reserved, bad), a write after the domain is built.
+- `limit` takes 0, 1, 2, 4, 4096 or 4097, so pages are short. The four earlier seeds are
+  rewritten in the new syntax (same programs; files opened with `openat$moobfs_file`): syzkaller
+  parses seeds non-strictly, and in the old syntax their terms were silently dropped.
+- `vm/syzkaller-local.sh` enables `ioctl$MOOB_IOC_QUERY2_NEXT`.
+
+Not reachable from one program: the per-file limit (`ENOSPC` at 64 typed attributes) needs 64
+writes, and syzkaller loads no seed longer than 40 calls (`prog.MaxCalls`); the suite covers it.
+The `ENOMEM` paths need slab fault injection, which `vm/syzkaller/kernel.config` does not enable.
+
+Checks, on macOS with syzkaller at 8fb0ae89890497b4 and Go 1.26.0 (not on the benchmark host):
+
+- `syz-sysgen` with `moobfs.txt` and `moobfs.txt.const`: exit 0, no error; no new constant.
+- A local Go program over the generated target (not in the repository): sizes 1098 (every
+  term option), 4440, 4656 (both `QUERY2` variants), 32, 272, cursor 128 at offset 104, terms
+  at 264, term value at 70; the manager's call list enabled, `utimensat` excepted (it needs
+  `clock_gettime`, unrelated to these descriptions); the ten seeds parse non-strictly, are at
+  most 32 calls and encode for the executor; their re-serialization shows the terms and cursor
+  links kept; 2 000 generated and five times mutated programs round-trip and encode, with 2 254
+  `QUERY2_NEXT` calls and 18 205 cursor words linked to an earlier call.
+- The C layout, compiled for x86_64 with `clang -fsyntax-only` and static assertions on the same
+  sizes and offsets: pass.
+- `go test ./prog/ -short` (generation, mutation, serialization tests over every target): ok.
+
+Next: on the host, `vm/syzkaller-local.sh 60 descriptions` (syz-extract, then the build) and a
+six-hour run, measuring the same set of handlers.
