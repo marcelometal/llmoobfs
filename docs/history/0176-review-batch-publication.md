@@ -25,6 +25,13 @@ documentation update.
 `ROADMAP.md` now names the completed local evidence, the published-head CI
 gate and the order on resumption. `docs/security-roadmap.md` distinguishes
 the two targeted fixes from S9 fair sharing and the wider S14–S21 test plan.
+After the documentation edits, `make test` passed 60 attribute checks and
+nine image tests; `make checkpatch`, `scripts/check-spdx.sh`,
+`scripts/check-retired-claims.sh`, `scripts/check-site.py` and
+`scripts/site-faq.py --check` passed. A complete local `make lint` was not
+available because this host has no `shellcheck`; the standalone SPDX check
+ran, and PR CI must supply the ShellCheck verdict. No module, test or harness
+source changed after the complete integrated VM run in journal 0175.
 The separate Dependabot PR 75 has nine passing checks on an older head but is
 behind `main` under strict status checks; its update is a distinct maintainer
 decision. Issue 112 was merged by PR 125 and closed after its body recorded
