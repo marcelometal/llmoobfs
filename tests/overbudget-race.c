@@ -11,6 +11,9 @@
  *   overbudget-race used <layer mount> <domain>  QUERY2 on <domain>, then prints index_used
  *   overbudget-race run <layer mount> <seconds> <churners>
  *
+ * run lasts at least <seconds> and until the alternating process made 30 queries, at most six
+ * times <seconds>: a slow guest (KASAN, a loaded btrfs) answers fewer per second.
+ *
  * run: domains x and y each fit the budget alone and not together. One process queries x and y
  * in turn, so that every query builds its domain over the budget and releases the other. Each
  * churner renames a directory inside its own domain z<k>, which has no attribute, and queries
@@ -121,7 +124,7 @@ static int run(const char *mnt, int seconds, int churners)
 	unsigned long turns = 0, again = 0, nomem = 0, other = 0;
 	int x = open_dir(mnt, "x"), y = open_dir(mnt, "y"), k, last = 0;
 	struct timespec ts;
-	double end;
+	double start, end, cap;
 	pid_t pid[16];
 
 	if (x < 0 || y < 0 || churners < 1 || churners > 16) {
@@ -129,17 +132,21 @@ static int run(const char *mnt, int seconds, int churners)
 		return 2;
 	}
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	end = ts.tv_sec + ts.tv_nsec / 1e9 + seconds;
+	start = ts.tv_sec + ts.tv_nsec / 1e9;
+	end = start + seconds;
+	cap = start + 6.0 * seconds;
 	for (k = 0; k < churners; k++) {
 		pid[k] = fork();
 		if (!pid[k])
-			churn(mnt, k, end);
+			churn(mnt, k, cap);
 	}
 	for (;;) {
+		double t;
 		int err;
 
 		clock_gettime(CLOCK_MONOTONIC, &ts);
-		if (ts.tv_sec + ts.tv_nsec / 1e9 >= end)
+		t = ts.tv_sec + ts.tv_nsec / 1e9;
+		if (t >= cap || (t >= end && turns >= 30))
 			break;
 		err = q2(turns & 1 ? y : x);
 		turns++;
@@ -150,18 +157,25 @@ static int run(const char *mnt, int seconds, int churners)
 		else if (err)
 			other++, last = err;
 	}
+	for (k = 0; k < churners; k++)
+		kill(pid[k], SIGTERM);	/* they would run until the cap */
 	for (k = 0; k < churners; k++) {
 		int st;
 
-		if (waitpid(pid[k], &st, 0) != pid[k] || !WIFEXITED(st) || WEXITSTATUS(st)) {
+		if (waitpid(pid[k], &st, 0) != pid[k] ||
+		    !((WIFEXITED(st) && !WEXITSTATUS(st)) || (WIFSIGNALED(st) && WTERMSIG(st) == SIGTERM))) {
 			printf("OVERBUDGET_RACE_FAIL: churner %d ended with status %d\n", k, st);
 			return 1;
 		}
 	}
 	printf("overbudget-race: %lu queries of x and y, %lu EAGAIN, %lu ENOMEM, %lu other (last %d)\n",
 	       turns, again, nomem, other, last);
-	if (nomem || other || turns < 20) {
+	if (nomem || other) {
 		printf("OVERBUDGET_RACE_FAIL: a domain that fits alone was refused\n");
+		return 1;
+	}
+	if (turns < 30) {
+		printf("OVERBUDGET_RACE_FAIL: only %lu queries before the time cap\n", turns);
 		return 1;
 	}
 	printf("OVERBUDGET_RACE_PASS: every query of a domain that fits alone was answered\n");
