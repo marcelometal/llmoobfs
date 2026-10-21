@@ -1256,6 +1256,7 @@ for fs in ext4 btrfs xfs; do
         "$BIN/moobfs-index" --domain "$LOWER/rl/$d" kind exists - - | cut -f2 | sort > /tmp/rl.o || fail "rl-race-oracle-$fs"
         cmp -s /tmp/rl.k /tmp/rl.o || fail "rl-race-differs-$d-$fs"
     done
+    "$BIN/permission-gaps" release "$LAYER" "$LOWER/rl" || fail "rl-unprivileged-$fs"
     umount "$LAYER" && rm -rf "$LOWER/rl" && umount "$LOWER" || fail "rl-cleanup-$fs"
     echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done

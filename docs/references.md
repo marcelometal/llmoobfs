@@ -338,3 +338,14 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   `tests/test_harness_verdicts.py` to control ioctl replies and child exit status.
   It exercises the real fork/wait path without a module; it does not emulate
   the filesystem or prove query correctness. Thanks to the Linux man-pages maintainers.
+
+## 7. Permission and independent-oracle regressions (journal 0172)
+
+- Linux v6.12.112, [`fs/proc/base.c`](https://raw.githubusercontent.com/gregkh/linux/v6.12.112/fs/proc/base.c),
+  GPL-2.0: exact `proc_fail_nth_write`/read handlers consulted for the child-owned
+  control descriptor in the unprivileged fault tests. The query fd is opened
+  after dropping credentials; retaining the control fd does not authorize queries.
+- Existing specifications [spec-m2.md](spec-m2.md) §3/§8 and
+  [spec-query-v2.md](spec-query-v2.md) §3/§4 define the expected fixture bytes,
+  directory authorization and filtered results. `tests/permission-gaps.c` uses
+  fixed expectations and lower-kernel access, without linking `common/attr.c`.

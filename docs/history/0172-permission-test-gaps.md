@@ -53,3 +53,24 @@ T10 uses 18 fixed byte/mode/owner fixtures without linking the common validator.
 Strict static compilation in the pinned Debian test image passed with
 `gcc -static -O2 -Wall -Wextra -Werror -Iinclude tests/permission-gaps.c`.
 This is compilation only. Dedicated-VM and mutation results remain pending.
+
+## Initial targeted VM result and T9 extension
+
+Frozen snapshot `ccdedd5` passed `MOOB_ONLY=permgaps make vm-test`, exit 0,
+with `PERMISSION_GAPS_PASS` on ext4, btrfs and XFS. The snapshot's tracked
+source hashes are unchanged after execution. This was a targeted run ending
+in `MOOBFS_ONLY_PASS`, not a complete-suite or sanitizer result.
+
+Extend T9 with uid 1001 queries before a real shrinker release and after the
+rebuild, plus six unprivileged fail-nth sweeps (fresh/built domain, plain,
+ordered and batch queries). Every fault child opens its own thread's control
+fd as root, then irreversibly drops groups/uid/gid before opening the domain
+and issuing any query. Error, success and disarmed retry must agree with the
+actual lower's access decision. A sweep must inject faults and terminate.
+
+The exact Linux 6.12.112 `proc_fail_nth_write` implementation was consulted:
+it uses the task named by the open descriptor and has no write-time capability
+check. This differs from the adjacent `make-it-fail` handler. Source access on
+the dedicated host timed out; the pinned stable maintainer's source mirror
+provided the exact implementation. No host address is recorded here.
+T9's new runtime paths and all negative mutations remain unvalidated.
