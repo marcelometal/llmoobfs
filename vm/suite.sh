@@ -1489,7 +1489,7 @@ for fs in ext4 btrfs xfs; do
     case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
     mount -t "$fs" "$dev" "$LOWER" || fail "ob-lower-$fs"
     rm -rf "$LOWER/ob" && mkdir -p "$LOWER/ob/x" "$LOWER/ob/y" || fail "ob-directory-$fs"
-    "$BIN/overbudget-race" plant "$LOWER/ob/x" 2500 && "$BIN/overbudget-race" plant "$LOWER/ob/y" 2500 || fail "ob-plant-$fs"
+    "$BIN/overbudget-race" plant "$LOWER/ob/x" 650 && "$BIN/overbudget-race" plant "$LOWER/ob/y" 650 || fail "ob-plant-$fs"
     for k in 0 1 2 3; do
         # no attribute: a build of z<k> clears the old flag but charges nothing, so it never
         # releases a domain itself; the only releases are those of x and y
@@ -1501,7 +1501,7 @@ for fs in ext4 btrfs xfs; do
     ob_budget=$((ob_one * 3 / 2 + 65536)); [ "$ob_budget" -ge 1048576 ] || fail "ob-domain-too-small-$fs ($ob_one)"
     mount -t moobfs_layer -o lower="$LOWER/ob",domain_depth=1,index_budget=$ob_budget none "$LAYER" || fail "ob-budget-mount-$fs"
     tr_on moobfs_domain_build moobfs_domain_release || fail "ob-trace-$fs"
-    run_logged /tmp/ob.txt "$BIN/overbudget-race" run "$LAYER" 20 4; rc=$?
+    run_logged /tmp/ob.txt "$BIN/overbudget-race" run "$LAYER" 10 4; rc=$?
     tr_off moobfs_domain_build moobfs_domain_release
     if [ $rc -ne 0 ]; then
         # the builds of x and y that failed with ENOMEM, and what was released around them

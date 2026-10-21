@@ -7,7 +7,7 @@
  * check, and the first build then failed with ENOMEM instead of releasing a domain.
  *
  *   overbudget-race plant <dir> <files>          creates <files> files in <dir> on the lower
- *                                                filesystem, user.moob.kind a 400-byte string
+ *                                                filesystem, user.moob.kind a 1000-byte string
  *   overbudget-race used <layer mount> <domain>  QUERY2 on <domain>, then prints index_used
  *   overbudget-race run <layer mount> <seconds> <churners>
  *
@@ -64,10 +64,10 @@ static int open_dir(const char *mnt, const char *name)
 
 static int plant(const char *dir, int files)
 {
-	char path[4096], v[401];
+	char path[4096], v[1001];
 	int i, fd;
 
-	/* a long value: each entry costs the budget about 400 bytes, so few files fill it */
+	/* a long value: each entry costs the budget about 1000 bytes, so few files fill it */
 	memset(v, 'k', sizeof v);
 	v[0] = MOOB_T_STRING;
 
