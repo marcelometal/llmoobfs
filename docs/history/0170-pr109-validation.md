@@ -131,3 +131,22 @@ Next: maintainer review of the signed local continuation. Before an authorized
 push, recheck both `main` and remote `review2-batch`; update the existing PR
 without rewriting history or touching its original checkout. Required PR CI
 must run on that later published head. No push or GitHub merge has been made.
+
+## 2026-10-21 — Authorized publication and merge gate
+
+The maintainer authorized updating the existing PR 109, then integrating it only
+after its current checks pass. Rechecked `main` at `d797a68` and remote
+`review2-batch` at `09fc102`: neither advanced since preparation. Both are
+ancestors of the signed continuation. The original checkouts retain their
+branches, commits and pre-existing changes.
+
+Publish by a normal fast-forward of `review2-batch` from this isolated worktree;
+do not rewrite history or move the original checkout's local branch. The module
+and executed tests are unchanged since the complete local runs recorded above;
+this addendum is documentation only. The green checks on `09fc102` are historical,
+not validation of the continuation. Require new PR CI, including the full
+KASAN/lockdep suite, and a clean merge state before integration. Advisory
+publication and unrelated PRs remain outside this authorization.
+
+Publication, current-head CI and merge receipts are retained with the local
+evidence package. No fresh kernel run is claimed for this dated addendum.
