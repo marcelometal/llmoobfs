@@ -1465,6 +1465,7 @@ for fs in ext4 btrfs xfs; do
         run_logged /tmp/rp.txt "$BIN/rootpath-race" run "$LAYER" d e "$rp_expect"; rc=$?
         [ $rc -eq 0 ] && { rp_ok=1; break; }
         [ $rc -eq 3 ] || fail "rootpath-race-$fs"
+        echo "rootpath: $fs attempt $attempt did not reach the interleaving"
         # the interleaving was not reached: put the name back and start from a cold mount
         umount "$LAYER" || fail "rp-unmount-$fs"
         [ -d "$LOWER/rp/e" ] && { mv "$LOWER/rp/e" "$LOWER/rp/d" || fail "rp-rename-back-$fs"; }
