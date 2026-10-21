@@ -559,6 +559,7 @@ see [Status](#status) for tested behavior and limitations.
 | [Anitya](https://release-monitoring.org/project/392843/) | Tracks the experimental pre-releases; no distribution package mapping. |
 | [Open Hub](https://openhub.net/p/moobfs) | Public project entry; code analysis is not complete. |
 | [XERJ Corpus Hub](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Source snapshot selected; license review is pending, so the corpus is not installable yet. |
+| [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory) | Listed under **Emerging projects** as an experimental agent-memory storage project. |
 
 ## Citing
 

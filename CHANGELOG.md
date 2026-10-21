@@ -12,6 +12,9 @@
 - Validation (journal 0170): reconcile PR 109 with current documentation and add
   VM regressions for failed rename-path allocation and removal during an index scan.
 
+- Documentation (journal 0169): add the confirmed TeleAI Awesome Agent Memory listing
+  to both READMEs' external records, preserving all five existing badges.
+
 - Documentation (journal 0168): add the Zenodo version DOI badge and full archived-snapshot
   citation to both READMEs, distinguishing commit `02381fba` from the earlier source tag.
 
