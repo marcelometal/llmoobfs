@@ -110,7 +110,6 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     "$BIN/deadscan" "$LAYER/r210" || fail r210-dead-directory
     echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
     echo "DEADSCAN_PASS: removal after listing does not fail the domain query"
-    "$BIN/permission-gaps" faults "$LAYER" "$LOWER/fi" || fail fi-unprivileged-permissions
     umount "$LAYER" && rm -rf "$LOWER/fi" && umount "$LOWER" || fail fi-cleanup
     # a reference the layer kept on a lower dentry shows only here, when the lower goes
     # ("Dentry still in use", found by syzkaller after a failed mount, journal 0112)

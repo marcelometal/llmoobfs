@@ -74,3 +74,32 @@ check. This differs from the adjacent `make-it-fail` handler. Source access on
 the dedicated host timed out; the pinned stable maintainer's source mirror
 provided the exact implementation. No host address is recorded here.
 T9's new runtime paths and all negative mutations remain unvalidated.
+
+## Scope adjustment: dedicated host unavailable
+
+The maintainer is away from the dedicated host and directed this continuation
+to work only on what can be validated locally. Stop SSH attempts. Preserve the
+unprivileged fault-injection candidate at local branch
+`codex/issue114-unprivileged-faults-draft` (`1e77ad5`); remove its unexecuted
+entry point and KASAN invocation from the review batch without deleting its
+history. Retain the release/rebuild coverage, which runs in the local VM.
+T9 remains partial until the fault candidate is validated later. This batch
+must not claim all of issue 114 closed or a new sanitizer result.
+
+The native VM launched from `1e77ad5` was interrupted to validate the smaller,
+final source snapshot instead. Preserve the interrupted log; it is not a passed
+run or negative evidence. No frozen execution source was edited.
+
+## Local-only review scope and public surfaces
+
+Final review scope retains T5/T6/T8, bounded independent T10 fixtures and T9's
+release/rebuild queries. No production module, common validator, UAPI or
+configuration change. The deferred fault candidate is preserved separately.
+
+Update the testing/development guides, both READMEs, site guide, security
+roadmap and changelog to distinguish fixed independent fixtures from the
+randomized shared-validator oracle, and unprivileged release from root-only
+fault injection. S14/S15 stay planned. No new milestone, compatibility,
+support, disclosure or research position changes the generated journey pages,
+FAQ, SECURITY, ADRs, main roadmap or help requests; retain their state and
+check the site/FAQ rather than inventing a new claim of stabilization.

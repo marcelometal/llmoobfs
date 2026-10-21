@@ -149,6 +149,11 @@ pass marker; the complete run remains the validation gate (see
 [`testing.md`](testing.md), section 5). Correction dated 2026-10-20: the former
 claim that this switch was still planned had become stale.
 
+The `permgaps` step (journal 0172) runs decisive directory-search, filtered
+truncation, attributed-directory and fixed independent-encoding checks over
+all three lowers. The `release` step also checks uid 1001 before a real index
+release and after rebuild. Allocation-fault queries remain root-only.
+
 ## 5. Adding a test
 
 1. **Guest-side logic** goes into `vm/suite.sh`, inside `run_lower` when it must

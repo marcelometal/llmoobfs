@@ -343,8 +343,8 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 
 - Linux v6.12.112, [`fs/proc/base.c`](https://raw.githubusercontent.com/gregkh/linux/v6.12.112/fs/proc/base.c),
   GPL-2.0: exact `proc_fail_nth_write`/read handlers consulted for the child-owned
-  control descriptor in the unprivileged fault tests. The query fd is opened
-  after dropping credentials; retaining the control fd does not authorize queries.
+  control descriptor in the deferred unprivileged-fault candidate, preserved
+  locally (journal 0172). It is not active coverage of this review batch.
 - Existing specifications [spec-m2.md](spec-m2.md) §3/§8 and
   [spec-query-v2.md](spec-query-v2.md) §3/§4 define the expected fixture bytes,
   directory authorization and filtered results. `tests/permission-gaps.c` uses
