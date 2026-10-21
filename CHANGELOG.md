@@ -11,6 +11,7 @@
 
 - Validation (journal 0170): reconcile PR 109 with current documentation and add
   VM regressions for failed rename-path allocation and removal during an index scan.
+  Record its completed merge and successful published-head CI in a dated note.
 
 - Documentation (journal 0169): add the confirmed TeleAI Awesome Agent Memory listing
   to both READMEs' external records, preserving all five existing badges.
