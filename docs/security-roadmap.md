@@ -39,6 +39,14 @@ Suggested order by cost-benefit. Each item has a verifiable done-when criterion.
 with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (journal 0084).
 *Update, 2026-10-20 (journal 0156):* findings F13 (review round 1, journal 0151) and F14 (round 2, journal 0155) recorded and fixed; the other defects of round 2 are fixed or recorded as issues, and S14 to S21 below plan the tests that would have found them.
 
+*Update, 2026-10-21 (journals 0174 and 0175):* the round-2 domain-rename
+(R2-5, issue 110) and concurrent index-budget refusal (R2-7, issue 111)
+defects were reproduced on an unfixed module, corrected, and validated in the
+complete native VM suite over ext4, btrfs and XFS. The corrected kernel/layer
+code passed KASAN/UBSAN/lockdep on the dedicated host. Published-head CI,
+review and merge remain separate gates. Neither correction provides S9 fair
+budget sharing or completes the broader S14–S21 work below.
+
 *Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.

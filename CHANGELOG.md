@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Documentation (journal 0176): record the locally validated issue 110/111
+  correction batch, its publication gate and the paused follow-up order in
+  the roadmap and security roadmap; reconcile issue 112 as completed and keep
+  issue 114's remaining T9 gap visible.
+
 - Fix (journal 0175, issue 111, R2-7 of journal 0155): concurrent domain
   builds can no longer erase the budget-refusal signal before the failing build
   tries to release an older domain. The new `overbudget` suite step checks this
