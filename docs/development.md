@@ -92,7 +92,7 @@ Inside the container, `vm/in-container.sh`:
   `dm-log-writes`, `dm-flakey`), the dynamically linked clients copied with their
   libraries (`git`, `sqlite3`, `dmsetup`, `mke2fs`, `e2fsck`, `setfacl`,
   `getfacl`) and the statically linked test binaries (`mounted`, `layer`,
-  `query`, `ipc`, `idmap`, `fsx`, `replay-log`, `moobfs-attr`, `moobfs-check`,
+  `query`, `batch-errors`, `ipc`, `idmap`, `fsx`, `replay-log`, `moobfs-attr`, `moobfs-check`,
   `moobfs-index`);
 - creates sparse lower images (`lower-ext4.img` 64 MiB, `lower-btrfs.img`
   256 MiB, `lower-xfs.img` 300 MiB) and two blank disks (`scratch.img`,

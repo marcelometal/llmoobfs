@@ -188,5 +188,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0169 — Confirmed TeleAI discovery link in the READMEs](0169-teleai-readme.md)
 - [0170 — PR 109: integration and remaining validation](0170-pr109-validation.md)
 - [0171 — Preserve harness verdicts and state the actual test inventory](0171-harness-verdict-inventory.md)
-
 - [0172 — Permission and independent-oracle gaps of issue 114](0172-permission-test-gaps.md)
+- [0173 — QUERY2_BATCH runtime-error contract (issue 112)](0173-batch-runtime-error-contract.md)

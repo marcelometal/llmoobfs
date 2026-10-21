@@ -46,6 +46,10 @@ directory of ext4, btrfs or XFS and moves those two jobs into the filesystem. It
 It stores and finds memories. Choosing what is relevant, embeddings, ranking and building the
 prompt stay in the application.
 
+For batch queries, use output only after success; discard every result and output
+cursor on error ([client contract](docs/client-contract.md#6-writing-and-querying),
+[regression scope](docs/testing.md), journal 0173).
+
 ## Four numbers
 
 All four are pilot-grade and from one host (a dedicated machine with a SATA SSD, Debian 13,

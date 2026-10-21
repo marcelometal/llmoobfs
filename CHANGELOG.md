@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Contract/tests (journal 0173, issue 112): specify that all QUERY2_BATCH output
+  must be discarded on error; there is no partial-success or rollback protocol.
+  Add dedicated-VM controls for validation-before-execution, a later result-copy
+  fault, a final header-copy fault and successful reuse, without module/UAPI changes.
+
 - Tests (journal 0172, issue 114 T5/T6/T8/T10 and part of T9): make the QUERY2
   execute check decisive after a successful directory open; assert filtered
   counts and truncation; compare attributed directories with lower permissions;
