@@ -47,6 +47,18 @@ Do not push, merge the GitHub PR or publish an advisory in this preparation.
   permissions could reuse it without the allocation this check needed to fail.
   Give each chmod attempt a fresh built domain. This retains the public syscall
   scenario while requiring the transition to allocate its new partition's node.
+- R2-8 retry at `219840c`, with the revised test: fault 2 drops one entry but
+  leaves the inode count unchanged. The test reports `unexpected=1`; the harness
+  fails. This closes the earlier false negative of the shared-domain fixture.
+- R2-4 mutation `c0be08b` is detected by the create and mkdir agreement checks
+  (faults 5 and 12): each leaves a name visible on only one side. Link's error
+  recovery is not independently isolated by that negative run.
+- R2-6 mutation `c10969f` preserves the old path after the confirmed fault and
+  dentry eviction (`path=a flags=0`); the test fails with `r26-stale-path`.
+  Its positive control returns `b`; the fixed fault case returns `PATH_UNKNOWN`.
+- R2-10 mutation `7a8bd7f`: the observed removal is followed by query failure
+  (`errno=ENOENT`), and the harness fails at `r210-dead-directory`. The fixed
+  run returns success and zero results after the same observed scan/removal.
 
 ## Limitations and next step
 

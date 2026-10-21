@@ -2,6 +2,12 @@
 
 Date: 2026-10-20. Status: done; pull request 109, merge awaiting the maintainer.
 
+*Dated clarification, 2026-10-20 (journal 0170):* the table and limitations below
+retain earlier checkpoints. ADR-0017 was subsequently accepted in `7a5adda`,
+and the fail-nth tests subsequently ran in CI. The follow-up at the end records
+the later local validation and supersedes the earlier next-step order. None of
+this follow-up has been pushed yet.
+
 ## Goal
 
 Take in the round-2 review of `3627172` (journal 0155, branch `review-round2`), verify it, fix
@@ -122,3 +128,37 @@ KASAN run for the whole batch.
 
 Merge, then publish the F14 advisory. Then a negative round for the new `failnth` checks in the
 KASAN harness, and the round-3 review request (filled in outside the repository).
+
+## 2026-10-20 — Validation follow-up in a separate worktree
+
+The latest CI on head `09fc102`, run `39472813146`, executed the sanitizer suite:
+`MOOBFS_KASAN_PASS`, homogeneity checks on ext4/btrfs/XFS, and 22 fail-nth
+operations, 322 calls, 300 faults, `unexpected=0`. Its create fault count is 9,
+not the 8 in the earlier run above. These are separate executions.
+
+The later local work is recorded in journal 0170:
+
+- R2-3: removing the whole-record cleanup makes `setxattr-then-move` miss the
+  moved file in its new domain; the negative run fails.
+- R2-4: removing recovery/revalidation makes create and mkdir leave names
+  visible on only one side; the negative run fails. This does not independently
+  isolate link's recovery branch.
+- R2-8: the original shared-domain test missed the mutation. A fresh built
+  domain per chmod attempt requires a new partition node and detects the leaked
+  empty record when cleanup is removed.
+- R2-6 and R2-10 now have dedicated VM regressions and negative mutations.
+  The former checks rename after a confirmed allocation failure and dentry
+  eviction; the latter removes a directory after its names were listed, using
+  function tracing to synchronize the race. Both are ext4/root scenarios.
+- ADR-0017 is accepted; its measurement, consistency-mode and differential-test
+  commitments remain planned. Issues 110–119 remain deferred and open.
+
+The historical table's "test not run yet", "untested" for R2-6/R2-10 and
+"ADR-0017 is a proposal" no longer describe this local preparation. Journal
+0170 distinguishes all positive, negative and complete-suite results and their
+limits. No new production-code change is made to the PR's module.
+
+Current next step: review the local continuation before authorizing push, then
+run the required PR CI on the published head. Merge and advisory publication
+still need their own authorization; the earlier merge-before-negative order
+does not apply to this preparation.
