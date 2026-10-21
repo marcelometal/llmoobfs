@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+- Documentation (journal 0171, issue 114 T11): clarify QEMU verdict markers,
+  explicit coverage skips, the 1200-second guard and compiled-only test programs.
+
+- Harness (journal 0171, issue 114 T7): preserve failing producer statuses in
+  logged race, buildrace and oracle checks; print race2 statistics only after
+  validating the forked child. Add controlled failure and success regressions.
+
 - Validation (journal 0170): reconcile PR 109 with current documentation and add
   VM regressions for failed rename-path allocation and removal during an index scan.
+  Record its completed merge and successful published-head CI in a dated note.
+
+- Documentation (journal 0169): add the confirmed TeleAI Awesome Agent Memory listing
+  to both READMEs' external records, preserving all five existing badges.
 
 - Documentation (journal 0168): add the Zenodo version DOI badge and full archived-snapshot
   citation to both READMEs, distinguishing commit `02381fba` from the earlier source tag.

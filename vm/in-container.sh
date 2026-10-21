@@ -6,6 +6,7 @@ KERNEL=6.12.111+deb13-amd64
 test -d "/lib/modules/$KERNEL/build"
 make tools BUILD=build/linux
 MOOB_BUILD_DIR=build/linux python3 tests/test_images.py
+python3 tests/test_harness_verdicts.py
 make module KDIR="/lib/modules/$KERNEL/build"
 make layer KDIR="/lib/modules/$KERNEL/build"
 mkdir -p build/vm

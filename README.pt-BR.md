@@ -233,6 +233,9 @@ responde a cada um: [adoption-risks.md](docs/adoption-risks.md).
 **Como conferir qualquer afirmação daqui.** Rode `make vm-test` e leia `build/vm/console.log`
 ([guia de testes](docs/testing.md)); prepare o ambiente com
 [docs/development.md](docs/development.md).
+Exija os marcadores finais e ausência de `MOOBFS_VM_FAIL`; QEMU sair com código 0 não basta.
+`CASEFOLD_SKIPPED`, `STALL_SKIPPED` e um lower idmapped marcado `not tested`
+continuam sendo lacunas de cobertura. `ipc` é compilado, mas não invocado pela suíte.
 
 ## O que foi medido
 
@@ -586,6 +589,7 @@ do código; veja [Estado](#estado) para o comportamento testado e as limitaçõe
 | [Anitya](https://release-monitoring.org/project/392843/) | Acompanha as pré-releases experimentais; sem mapeamento para pacote de distribuição. |
 | [Open Hub](https://openhub.net/p/moobfs) | Ficha pública do projeto; a análise de código ainda não foi concluída. |
 | [XERJ Corpus Hub](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Snapshot do código selecionado; a revisão de licença está pendente, portanto o corpus ainda não pode ser instalado. |
+| [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory) | Incluído em **Emerging projects** como projeto experimental de armazenamento de memória para agentes. |
 
 ## Como citar
 

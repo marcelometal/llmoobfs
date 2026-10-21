@@ -19,7 +19,7 @@ disposable QEMU guest; that is the only supported way to run the module.
 Disk and time: `build/` grows to several GiB with the kernel tree for KASAN.
 Measured wall-clock times per machine are not recorded yet; the CI timeouts are
 35 minutes for the VM job and 150 minutes for KASAN, and the QEMU phase of
-`make vm-test` is bounded by `timeout 600`.
+`make vm-test` is bounded by `timeout 1200`.
 
 ## 2. Targets
 
@@ -43,8 +43,10 @@ host headers silently.
 ## 3. Markers and what they mean
 
 A run is read from the console log. Success markers are printed only after the
-checks they summarize; a failure prints exactly one `MOOBFS_VM_FAIL: <step>` and
-stops. Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
+checks they summarize; a detected failure prints `MOOBFS_VM_FAIL: <step>` and
+ends the run. A full-suite marker covers the steps that ran, including any
+explicitly reported skips below; it does not imply every optional case ran.
+Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
 `vm/suite.sh` and the test binaries it calls (layer), `vm/kasan-guest.sh` (KASAN).
 
 ### M1 regression (`vm/init`, Debian harness only)
@@ -75,14 +77,14 @@ stops. Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
 | `DEADSCAN_PASS` | `tests/deadscan.c`, KASAN faults step | Function tracing observes the first file read after a subdirectory's listing; removing its files and then the directory leaves the domain query successful and empty (R2-10, journal 0170) | ext4, root, one synchronized removal; not every concurrent namespace operation |
 | `QUERY2_LEAPFROG_PASS: <fs>` | `vm/suite.sh` | `QUERY2` with two or three equality terms, mixed with `EXISTS` and range terms, equals `moobfs-index --domain`, including empty intersections and a type mismatch; paging with limits 1 and 2 returns the full answer, also in fallback mode; the plan check: with a non-equality first term whose values fall as inodes rise, the answer comes in rising inode order, which only the intersection produces | Speed against the plain scan (measured on the benchmark host by loading the Q2b and Q2c modules in turn) |
 | `QUERY2_MISSING_BATCH_PASS: <fs>` | `vm/suite.sh` | Terms with `MOOB_TERM_MISSING_OK` (`gt?`, `le?`, `eq?`) equal `moobfs-index --domain` when combined with a plain term in either position, with `order_by` alone, across a type mismatch (not missing) and when paged; `QUERY2_BATCH` with three requests equals the oracle per request, also in fallback mode; a batch on a domain the caller cannot open, on a subdirectory, with nine requests or with one invalid request is refused; `q2invalid` covers term flags, empty and oversized batches, header fields, a batch that must not run when one request is invalid, and a bad pointer, and (journal 0141) each term check next to the valid request it differs from: `EXISTS` with a value, unknown operators, empty, unterminated and malformed names, pad bytes, an invalid second or last term, raw and unknown types, wrong lengths, NaN, bool outside 0/1, `PREFIX` on non-strings, strings longer than the value buffer or with NUL or invalid UTF-8, an "or missing" term that fails its own check, malformed order names and types | Batches under concurrent changes; response time |
-| `QUERY2_RACE_PASS: <fs>` | `vm/suite.sh`, `tests/query.c race2` | For 5 s, mode changes, renames, unlink and recreate, files moving to another domain and back, and `chmod` of the domain directory race paged `QUERY2` (limit 7) as uid 1001, cycling the plain, equality and ordered plans: every result is well formed (NUL-terminated, relative, length consistent) and openable unless removed, recreated or denied after the answer; `ESTALE` when the domain switches to fallback restarts paging; afterwards the domain is in fallback, and the answer, paged by 3 or not, equals `moobfs-index --domain` | Absence of all races (5 s of one interleaving per run); duplicates across pages while keys change, which keyset paging allows |
+| `QUERY2_RACE_PASS: <fs>` | `vm/suite.sh`, `tests/query.c race2` | Two query processes share one open file; only the parent prints statistics after validating the child exit status (journal 0171). For 5 s, mode changes, renames, unlink and recreate, files moving to another domain and back, and `chmod` of the domain directory race paged `QUERY2` (limit 7) as uid 1001, cycling the plain, equality and ordered plans: every result is well formed (NUL-terminated, relative, length consistent) and openable unless removed, recreated or denied after the answer; `ESTALE` when the domain switches to fallback restarts paging; afterwards the domain is in fallback, and the answer, paged by 3 or not, equals `moobfs-index --domain` | Absence of all races (5 s of one interleaving per run); duplicates across pages while keys change, which keyset paging allows |
 | `LAYER_LOWER_PASS: <fs> reflink=<yes|no>` | `vm/suite.sh`, once per lower filesystem | Everything in `run_lower` for that filesystem: mount contract (no `lower=`, bad `lower=`, stacking on itself all refused), pass-through tests, typed attribute tools (`moobfs-attr`, `moobfs-check` with a planted invalid encoding), index and `QUERY` equal to `moobfs-index` for ten predicates and after rename, directory rename, unlink, removexattr and remount, `noindex` and `index_budget=1M`, isolation, three `fsx` seeds (9000 operations) with the result compared to the lower copy, `nolinks` remount, clean unmount | Durability (that is the lower filesystem's), performance, behaviour with the budget exhausted on large trees |
 | `DEMO_PASS: ...` and the `DEMO| ` lines before it | `vm/suite.sh`, once over ext4 after the three lower filesystems | The README demonstration ran as printed: under the default mount options, attributes written through the layer are readable on the lower tree; `QUERY2` as uid 1001 returns its own domain's file and, in a shared domain, only the file every visitor can read; another user's domain gives `EACCES` at `open`; the v1 `QUERY` gives `EPERM` to that user and answers root with all four files; `GET_INFO` counts one heterogeneous file and no fallback domain | Anything beyond those four files; the `DEMO| ` lines are a transcript, not an extra check |
 | `SQLITE_RESULT <label>: rows=... integrity=... reads=... missing=[...]` and `SQLITE_VARIANTS: lower=.. alone=.. layer=.. rollback=.. excl=.. again=..` | `vm/suite.sh` | Per-variant counts are printed before any verdict: control on the lower filesystem, WAL alone, WAL with a concurrent reader (twice), rollback journal, `unix-excl` VFS; each exit code is 0 when 200 of 200 rows survive with `integrity_check` ok | Behaviour of SQLite builds or page sizes other than the Debian package in the image |
 | `SQLITE_CONCURRENT_OK` | `vm/suite.sh` | The control, the WAL-alone run and both WAL-with-reader runs kept all rows (this is the regression for the phase 2e data-loss bug) | Other concurrency patterns |
 | `ACCEPTANCE_CLIENTS_PASS` | `vm/suite.sh` | git (three commits, `fsck --strict`, clean status), SQLite as above and the memory-client convention (`remember`) work on the layer over ext4, and `moobfs-check` finds no problem afterwards | The same over btrfs or XFS (acceptance runs over ext4 only) |
 | `POWER_LOSS_REPLAY_PASS: marks mkfs m1 m2 m4 end` | `vm/suite.sh` | With the lower ext4 on `dm-log-writes`, replaying the log to each mark on a zeroed disk, running `e2fsck -fn` and mounting the layer shows every memory synced before the mark whole and later ones absent, with `QUERY` counts matching | Crash consistency without the client's `sync` of the parent directory; other lower filesystems; barriers under real hardware |
-| `CASEFOLD_REFUSED_PASS` | `vm/suite.sh`, `tests/layer.c cfsetup/cfcheck` | On an ext4 made with `-O casefold`, a casefolded lower directory and every name in it are refused through the layer with `EOPNOTSUPP` (in either case), ordinary directories next to it work, an index build skips it, and a casefolded lower root refuses the mount (issue #95); `CASEFOLD_SKIPPED` when the kernel lacks casefolding | f2fs and tmpfs lowers; a directory casefolded after the layer looked it up |
+| `CASEFOLD_REFUSED_PASS` | `vm/suite.sh`, `tests/layer.c cfsetup/cfcheck` | On an ext4 made with `-O casefold`, a casefolded lower directory and every name in it are refused through the layer with `EOPNOTSUPP` (in either case), ordinary directories next to it work, an index build skips it, and a casefolded lower root refuses the mount (issue #95); `CASEFOLD_SKIPPED` when the kernel or `mke2fs` cannot prepare casefolding | f2fs and tmpfs lowers; a directory casefolded after the layer looked it up |
 | `IO_ERROR_INJECTION_PASS` | `vm/suite.sh` | With `dm-flakey error_writes` under the lower ext4, write errors reach the caller, nothing crashes, and after the device heals `e2fsck` and `moobfs-check` are clean and the earlier memory is intact | Read-error paths; errors on btrfs or XFS |
 | `MOOBFS_ACCEPTANCE_PASS: ...` | `vm/suite.sh` | The whole acceptance block plus module unload and a clean `dmesg` scan | See the rows above |
 | `MOOBFS_LAYER_PASS: ...` | `vm/suite.sh` | The three `LAYER_LOWER_PASS` lines, acceptance, unload, clean `dmesg` | KASAN/lockdep when printed by the Debian harness |
@@ -149,9 +151,32 @@ Expected noise that is **not** a failure:
   nonzero exit code are printed for information; the verdict uses `lower`,
   `alone`, `layer` and `again` only.
 
-A failure is: `MOOBFS_VM_FAIL:`, a missing final marker, QEMU exiting nonzero
-(including the 600-second timeout), or in KASAN any of the `dmesg` patterns
-above.
+A failure is: `MOOBFS_VM_FAIL:`, a missing required final marker, QEMU exiting
+nonzero (including the 1200-second timeout), or in KASAN any of the `dmesg`
+patterns above. **QEMU exit 0 alone does not prove success:** `vm/init` powers
+off on both failure and success. `vm/in-container.sh` requires exit 0, all three
+full-run markers (`MOOBFS_VM_PASS`, `MOOBFS_LAYER_PASS`,
+`MOOBFS_ACCEPTANCE_PASS`) and no `MOOBFS_VM_FAIL`; a requested partial run
+requires `MOOBFS_ONLY_PASS` in place of the two layer/acceptance markers.
+
+Read these coverage exclusions even when the aggregate marker passes:
+
+| Console result | Coverage actually obtained |
+| --- | --- |
+| `CASEFOLD_SKIPPED` | No casefold-refusal test: kernel or `mke2fs` cannot prepare the fixture |
+| `STALL_SKIPPED` | No stalled-FUSE test: `/dev/fuse` is unavailable; KASAN has FUSE built in |
+| `LOWERRO_PASS: ... idmapped lower: not tested ...` | Read-only/freeze checks ran, but an idmapped bind lower could not be created; only `idmapped lower: refused` proves that case |
+| `ipc` binary present | Built/staged only, not invoked by the suite; no `IPC_PRIMITIVES_PASS` evidence |
+
+`tests/landlock_run.c` and `tests/notify.c` are standalone investigation helpers,
+not built by `vm/build-tests.sh` or invoked by this suite. `faults` is exclusive
+to the KASAN harness; a full Debian run does not execute `failnth`,
+`renamepath-fault` or `deadscan` scenarios merely because their binaries compile.
+
+Correction dated 2026-10-21 (journal 0171, issue 114 T11): clarify the guest
+poweroff verdict and optional skips; the QEMU guard has been 1200 seconds since
+journal 0153. `ipc` is compiled by the shared build list, as already recorded
+above; it is execution that is absent.
 
 ## 5. Running a single test
 
@@ -205,8 +230,9 @@ statement, and prints each plan. Marker: `SQLEXT_PASS`. It is part of the comple
 `MOOB_ONLY=lowerro make vm-test` (journal 0117) gives the layer a read-only bind mount as lower
 (every change must fail with `EROFS`, the lower unchanged), freezes the lower ext4 (a create, a
 `chmod` and an attribute set must wait for the thaw with no kernel warning) and gives it an
-idmapped bind mount (refused at mount; skipped where `mount` cannot create one, as in the
-busybox initramfs). Marker: `LOWERRO_PASS`. It is part of the complete run.
+idmapped bind mount (refused at mount when one can be created; otherwise the
+marker explicitly says `idmapped lower: not tested`). Marker: `LOWERRO_PASS`.
+It is part of the complete run; inspect the idmap suffix independently.
 
 ### SELinux
 

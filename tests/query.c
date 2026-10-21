@@ -514,9 +514,6 @@ int main(int argc, char **argv)
 			clock_gettime(CLOCK_MONOTONIC, &t1);
 			if ((t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9 >= secs) break;
 		}
-		printf("race2: %lu complete paginations, %lu pages, %lu openable, %lu replaced, %lu vanished, %lu denied, %lu stale restarts, %lu domain-closed episodes (%lu refused calls)\n",
-		       iters, pages, hits, replaced, gone, denied, stale, closed, closed_tries);
-		fflush(stdout);
 		if (child == 0)
 			_exit(pages ? 0 : 1);
 		if (child > 0) {
@@ -525,7 +522,11 @@ int main(int argc, char **argv)
 			CHECK(waitpid(child, &st, 0) == child);
 			CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0);
 		}
-		return pages ? 0 : 1;
+		CHECK(pages > 0);
+		printf("race2: %lu complete paginations, %lu pages, %lu openable, %lu replaced, %lu vanished, %lu denied, %lu stale restarts, %lu domain-closed episodes (%lu refused calls)\n",
+		       iters, pages, hits, replaced, gone, denied, stale, closed, closed_tries);
+		fflush(stdout);
+		return 0;
 	}
 	if (argc >= 4 && !strcmp(argv[2], "race")) {
 		struct timespec t0, t1;

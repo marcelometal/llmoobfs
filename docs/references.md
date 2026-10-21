@@ -319,6 +319,7 @@ kernel review or a compatibility test.
 | [MoobFS on Open Hub](https://openhub.net/p/moobfs) | Public project metadata; code analysis is not complete. |
 | [MoobFS candidate corpus on XERJ](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Selection of a source snapshot; license review is pending and the corpus is not installable yet. |
 | [MoobFS experimental source snapshot on Zenodo](https://doi.org/10.5281/zenodo.23514721) | Citation metadata and the official version DOI badge for commit `02381fba`, archive version `0.4.1-experimental+git.02381fba` (journal 0168). |
+| [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory/blob/749a08cfe25ad23dda05565d1a11b444608b7786/README.md) | Verified MoobFS entry under **Emerging projects**, described as experimental agent-memory storage; source for the discovery link in both READMEs (journal 0169, checked 2026-10-20). This listing is not a kernel review or a compatibility test. |
 
 ## Not included
 
@@ -326,3 +327,14 @@ Works surveyed but not used in a decision (most of `docs/research-academic-surve
 originality matrix), and tools only planned (syzkaller, LTP, sqlite-vec, USearch). They stay in the
 research documents. Two page ranges could not be confirmed and are omitted: Büttcher and Clarke
 (FAST 2005) and the SC22 article number of GUFI.
+
+## 6. Harness verdict regression (journal 0171)
+
+- Linux man-pages [`wait(2)`](https://man7.org/linux/man-pages/man2/waitpid.2.html):
+  child waiting and `WIFEXITED`/`WEXITSTATUS`, used by `tests/query.c` before
+  printing its race2 summary.
+- Linux man-pages [`ld.so(8)`](https://man7.org/linux/man-pages/man8/ld.so.8.html):
+  `LD_PRELOAD` symbol interposition, used only in the disposable Linux container's
+  `tests/test_harness_verdicts.py` to control ioctl replies and child exit status.
+  It exercises the real fork/wait path without a module; it does not emulate
+  the filesystem or prove query correctness. Thanks to the Linux man-pages maintainers.

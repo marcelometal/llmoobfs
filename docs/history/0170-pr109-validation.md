@@ -1,6 +1,6 @@
 # 0170 — PR 109: integration and remaining validation
 
-Date: 2026-10-20. Status: complete locally; awaiting maintainer review before push.
+Date: 2026-10-20. Status updated 2026-10-21: published and merged; see the dated completion note below.
 
 Validation window: approximately 22:42–23:50 America/Sao_Paulo on 2026-10-20.
 Elapsed calendar time including builds and waits, not measured labor effort.
@@ -150,3 +150,18 @@ publication and unrelated PRs remain outside this authorization.
 
 Publication, current-head CI and merge receipts are retained with the local
 evidence package. No fresh kernel run is claimed for this dated addendum.
+
+## 2026-10-21 — Publication and integration completed
+
+Dated status correction: the preparation and pending-publication statements above
+record earlier stages. [PR 109](https://github.com/studiomoob/llmoobfs/pull/109)
+was merged at 09:23:48 UTC on 2026-10-21 as `2d15455`, after all 11 checks
+succeeded on published head `f5c131a`. The merge retains that head's file tree.
+The [CI run](https://github.com/studiomoob/llmoobfs/actions/runs/39571198695)
+and [KASAN/lockdep run](https://github.com/studiomoob/llmoobfs/actions/runs/39571198859)
+are evidence for PR 109, separate from the later issue 114 harness batch.
+
+The original checkouts' branches, commits and pre-existing changes were
+preserved. Integration does not close issues 110–119, implement ADR-0017's
+planned mechanisms, publish an advisory or establish production readiness.
+The preparation limits and failed experiments above remain part of the record.

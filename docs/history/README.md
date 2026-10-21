@@ -185,4 +185,6 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0156 — Round 2 review batch: corrections, tests and remaining limitations](0156-round-2-review-batch.md)
 - [0167 — Verified external project records in the READMEs](0167-readme-external-records.md)
 - [0168 — Zenodo snapshot DOI badge and citation in the READMEs](0168-zenodo-doi-readme.md)
+- [0169 — Confirmed TeleAI discovery link in the READMEs](0169-teleai-readme.md)
 - [0170 — PR 109: integration and remaining validation](0170-pr109-validation.md)
+- [0171 — Preserve harness verdicts and state the actual test inventory](0171-harness-verdict-inventory.md)
