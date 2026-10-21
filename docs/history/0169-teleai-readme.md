@@ -58,3 +58,14 @@ This listing does not change the project's experimental or review status.
 Present the signed local commit for maintainer review. Recheck public `main`
 before any later authorized push. No push, pull
 request, merge or message is authorized by this preparation.
+
+## 2026-10-20 — Publication follow-up
+
+The maintainer authorized pushing the branch and opening a pull request; merge
+still requires separate authorization. Public `main` was reconfirmed at
+`d797a68`, the preparation base. The isolated branch was clean and no pull request
+already used it. Only the six expected documentation files differ; the reviewed
+README text, five badges and Zenodo citation remain unchanged. No other session's
+checkout or uncommitted work is included. The documentation checks above remain
+valid for the unchanged content. Next: publish the branch and open the pull
+request for review; do not merge.
