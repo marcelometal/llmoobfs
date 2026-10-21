@@ -1,6 +1,6 @@
 # 0173 — QUERY2_BATCH runtime-error contract (issue 112)
 
-Date: 2026-10-21. Status: investigation in progress; local preparation only.
+Date: 2026-10-21. Status: locally validated; review before publication. No new KASAN result.
 Started: 2026-10-21T12:47:52.803847+00:00. Calendar time, not measured labor effort.
 
 ## Goal and scope
@@ -65,3 +65,35 @@ SECURITY and generated journey pages remain unchanged because this clarifies
 an existing error contract, without a feature, support or milestone change.
 No new external source or mechanism is introduced; evidence is this repository's
 implementation and journal 0038, not a new third-party algorithm.
+
+## Complete native-VM result and final local state
+
+The frozen `d51ec27` snapshot passed `make vm-test` on the pinned Debian
+6.12.111+deb13-amd64 guest: exit 0, 2026-10-21T12:50:27.535792Z to
+2026-10-21T12:59:47.608748Z, 560.073 seconds (9 min 20 s). All 1,530 archived
+source hashes were unchanged after execution. M1, acceptance and layer final
+markers are present, with no `MOOBFS_VM_FAIL`. Modules ran only in the guest.
+
+Each of `BATCH_VALIDATION_ATOMIC_PASS`, `BATCH_LATE_RESULT_FAULT_PASS`,
+`BATCH_HEADER_FAULT_PASS` and `BATCH_RUNTIME_ERRORS_PASS` appears six times:
+before and after fallback on ext4, btrfs and XFS. The positive single-query
+reference was nonempty, so an empty result could not hide the copy errors.
+The valid reinitialized batch succeeded after the two copy failures.
+
+`make test` passed 60 attribute checks and nine image tests; ShellCheck 0.10.0,
+SPDX, `make checkpatch`, retired claims, the 12-page site and FAQ consistency
+passed. Casefold and stalled-FUSE tests executed; idmapped lower remains a
+coverage exclusion in this native harness. No allocator injection, concurrent
+batch-copy campaign or new KASAN result is claimed. This unit does not change
+the production module and is not an external audit.
+
+Only this journal changed after the executed snapshot; rerun documentation
+checks, not the full VM, for this evidence completion. PR 124 remains unchanged
+and its CI does not validate this new unit. Keep the prepared branch local and
+issue 112 open until review and authorized publication/integration. Before a
+future push, reconcile main (including PR 124 if merged) without overwriting
+the other sessions, then run the applicable combined checks. Private manifests,
+console log, receipt and PR draft are retained outside Git.
+
+Locally completed: 2026-10-21T12:59:47.608748Z (test completion; calendar time,
+not measured labor effort). Publication and merge are not authorized for this unit.
