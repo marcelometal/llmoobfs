@@ -190,3 +190,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0171 — Preserve harness verdicts and state the actual test inventory](0171-harness-verdict-inventory.md)
 
 - [0172 — Permission and independent-oracle gaps of issue 114](0172-permission-test-gaps.md)
+- [0174 — A domain renamed while its build waits no longer stays fresh under the old name (issue 110)](0174-root-path-race.md)

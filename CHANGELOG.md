@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fix (journal 0174, issue 110, R2-5 of journal 0155): a domain directory
+  renamed between the moment a build took its name and the moment the build
+  recorded the rename generation no longer leaves the domain fresh under the
+  old name, which made the v1 QUERY omit its uncached files until another
+  rebuild. The build records the generation sampled before the name, and
+  QUERY2 reads the name from the lower dentry. New suite step `rootpath`.
+
 - Tests (journal 0172, issue 114 T5/T6/T8/T10 and part of T9): make the QUERY2
   execute check decisive after a successful directory open; assert filtered
   counts and truncation; compare attributed directories with lower permissions;

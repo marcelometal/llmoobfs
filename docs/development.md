@@ -154,6 +154,10 @@ truncation, attributed-directory and fixed independent-encoding checks over
 all three lowers. The `release` step also checks uid 1001 before a real index
 release and after rebuild. Allocation-fault queries remain root-only.
 
+The `rootpath` step (issue 110, journal 0174) renames a domain directory
+while a QUERY2 waits for that domain's build mutex, then checks that the
+mount-wide QUERY finds every file under the new name on all three lowers.
+
 ## 5. Adding a test
 
 1. **Guest-side logic** goes into `vm/suite.sh`, inside `run_lower` when it must

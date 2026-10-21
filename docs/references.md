@@ -259,7 +259,7 @@ set. Read on 2026-10-14.
 | `drop_caches` | `Documentation/admin-guide/sysctl/vm.rst` (`drop_caches`: writing 2 frees reclaimable slab objects through every shrinker), Linux 6.12.112 | how the suite asks the shrinker for everything (journal 0101) |
 | `list_lru` | `include/linux/list_lru.h`, as used in `fs/dcache.c` and `fs/inode.c`, Linux 6.12.112 | considered for the least-recently-used order of built partitions (ADR-0012); not used, a walk of the domains was enough (journal 0101) |
 | btrfs extent-map shrinker | `fs/btrfs/extent_map.c` (`btrfs_extent_map_shrinker_worker`), Linux 6.12.112 | precedent for a filesystem dropping a map of its own and rebuilding it on demand (ADR-0012) |
-| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | reading where a file is (its depth and domain directory) consistently against renames, as path lookup does (`where_is()` in `layer/index.c`, journal 0098) |
+| Sequence counters | `include/linux/seqlock.h`; `rename_lock` in `fs/dcache.c`, Linux 6.12.112 | reading where a file is (its depth and domain directory) consistently against renames, as path lookup does (`where_is()` in `layer/index.c`, journal 0098); the same sample-then-read order for the rename generation a build records (`rename_gen()`, issue 110, journal 0174) |
 | POSIX permission check | `acl_permission_check()` and `generic_permission()` in `fs/namei.c`, Linux 6.12.112 | the owner judged by the owner bits and a member of the group by the group bits, never by those of others: condition 1 of the homogeneity rule (journal 0116, finding F9) |
 | Reader-writer semaphores | `rwsem_read_trylock()` and `rwsem_down_read_slowpath()` in `kernel/locking/rwsem.c`, Linux 6.12.112 | a reader queues behind a waiting writer, so one stalled reader of `query_sem` stops every query once a writer waits (journals 0105 and 0116) |
 | FUSE request wait | `request_wait_answer()` in `fs/fuse/dev.c`, Linux 6.12.112 | a request the daemon has read is waited for without interruption: the stall of finding F10, and the daemon of `tests/fusestall.c` (journal 0116) |
@@ -349,3 +349,16 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   [spec-query-v2.md](spec-query-v2.md) §3/§4 define the expected fixture bytes,
   directory authorization and filtered results. `tests/permission-gaps.c` uses
   fixed expectations and lower-kernel access, without linking `common/attr.c`.
+
+## 8. Domain renamed while a build waits to start (issue 110, journal 0174)
+
+- Linux v6.12.112, `fs/namei.c` `vfs_rename()`, GPL-2.0: the filesystem's
+  `->rename()` runs before `d_move()`/`d_exchange()` of the VFS dentries. The
+  layer's rename hook therefore raises the generation after the lower rename
+  and before its own dentries move, which is why the fix reads the domain's
+  name from the lower dentry. Read in the source tree the KASAN harness builds.
+- Linux v6.12.112, `include/linux/sched.h` (`TASK_KILLABLE`) and
+  `fs/proc/array.c` (state letters), GPL-2.0: `mutex_lock_killable()` sleeps in
+  `TASK_KILLABLE`, shown as `D` in `/proc/<pid>/stat`, which `tests/rootpath-race.c`
+  uses to see the QUERY2 waiting; `/proc/<pid>/stack` and `wchan` gave no
+  function names in the guest kernel.
