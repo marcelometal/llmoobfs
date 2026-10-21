@@ -114,6 +114,24 @@ fixed independent fixtures supplement it; they do not make its oracle independen
 `FAULT_INJECTION_PASS` remains root-only. The unprivileged-fault candidate is
 not enabled or claimed tested in this batch while the dedicated host is unavailable.
 
+### Domain renamed while a build waits to start (issue 110, journal 0174)
+
+`MOOB_ONLY=rootpath make vm-test` runs `tests/rootpath-race.c` on ext4, btrfs
+and XFS; the full suite includes it too. A mount-wide QUERY holds a domain's
+build mutex while a QUERY2 on that domain waits for it, and the domain
+directory is renamed meanwhile. The files are planted on the lower and the
+caches dropped, so the answer of the next mount-wide QUERY comes from the
+names the build recorded. Up to three attempts per lower; an attempt that
+misses the interleaving is inconclusive, never a pass.
+
+| Marker | Proves | Does not prove |
+| --- | --- | --- |
+| `ROOTPATH_RACE_PASS` | After that interleaving (QUERY2 seen in `D` state while the holder builds, rename before the holder returned, a build by the waiter counted), the mount-wide QUERY returns every attributed file, under the new name, each resolving to its inode | The unwidened microsecond window, or renames of a directory above the domain |
+| `ROOTPATH_PASS: <fs>` | The check above passed on that lower | A complete suite by itself |
+
+The holder may fail with `EAGAIN`, the documented answer of a v1 QUERY whose
+domain is taken down while it checks results (`query_repin()`).
+
 ### KASAN harness (`vm/kasan-guest.sh`)
 
 | Marker | Proves | Does not prove |
