@@ -1,8 +1,8 @@
 # 0175 — A concurrent build no longer hides an index-budget refusal (issue 111)
 
-Date: 2026-10-21. Status: **in progress**. The correction, decisive negative
-round and a complete local VM run have finished; KASAN and the integrated
-`main` run are pending.
+Date: 2026-10-21. Status: **local correction complete; unpublished**. The
+decisive negative round, corrected VM suite on the integrated branch and
+KASAN/UBSAN/lockdep run have finished.
 
 ## Goal and decision
 
@@ -35,10 +35,11 @@ allocation for another reason; it cannot make an incomplete answer successful.
   an otherwise progressing complete run reached the old guard during the btrfs
   release step. The timeout remains a hung-guest guard, not a pass condition.
 
-The branch includes the issue 110 correction in its ancestry. Its separate journal
-is 0174; the combined suite exercises both regressions.
+The branch includes the issue 110 correction in its ancestry and integrates
+current `main`, including the issue 112 batch-error tests. Their separate
+journals are 0174 and 0173; the final combined suite exercises all three.
 
-## Evidence so far
+## Evidence
 
 | Run | Result |
 | --- | --- |
@@ -46,7 +47,10 @@ is 0174; the combined suite exercises both regressions.
 | Corrected branch, targeted `MOOB_ONLY=overbudget make vm-test` before the fork guard | ext4 30, btrfs 30 and XFS 31 alternating queries, zero `ENOMEM` or other errors; `OVERBUDGET_PASS` on all three, `MOOBFS_ONLY_PASS`, exit 0. |
 | First complete local `make vm-test` | Guest reached `RELEASE_PASS: ext4`, then the 1,200-second QEMU guard expired during btrfs release. Launcher exit 2. This is **not** a complete pass or a kernel failure diagnosis. |
 | Complete local `make vm-test` with the 2,400-second guard, before integrating current `main` | Launcher exit 0; `MOOBFS_VM_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS`; `ROOTPATH_PASS` and `OVERBUDGET_PASS` on ext4, btrfs and XFS. For issue 111, each lower answered 30 alternating queries with zero `EAGAIN`, `ENOMEM` or other errors. |
+| Clean integrated `make vm-test` at `b91be9b` | Ran 2026-10-21 17:56:39–18:14:28 -0300; launcher exit 0; all three full-run markers, `ROOTPATH_PASS` and `OVERBUDGET_PASS` on ext4, btrfs and XFS, plus six `BATCH_RUNTIME_ERRORS_PASS` markers. Issue 111 answered 32/30/49 alternating queries on ext4/btrfs/XFS, with zero `EAGAIN`, `ENOMEM` or other errors. No `MOOBFS_VM_FAIL` or environment-fail marker. All 1,536 tracked-file hashes in the pre-run source manifest matched after completion. |
+| Dedicated-host KASAN/UBSAN/lockdep, archived `ed9e273` snapshot | Launcher exit 0; `ROOTPATH_PASS` and `OVERBUDGET_PASS` on all three lowers; `MOOBFS_KASAN_PASS`, no diagnostic matched in `dmesg.txt`. The kernel and layer sources are identical between `ed9e273` and the integrated `b91be9b`; the later tree additionally contains the batch-error tests from `main` and test/harness documentation edits. |
 | `make checkpatch` after the fork and timeout guard edits | Exit 0. `git diff --check` and `sh -n vm/in-container.sh` also passed. |
+| Integrated static/documentation checks | `make checkpatch`, `scripts/check-retired-claims.sh` and `scripts/check-site.py` exited 0; the latter reported 12 valid HTML pages. |
 
 The detailed local logs and source manifests are under
 `MoobFS-local/revisao/issue111-0175/`, outside Git. The negative round uses the
@@ -58,15 +62,17 @@ start, then stopped; the inherited run continued alone. The hashes of
 `layer/`, the relevant test and the VM scripts matched its recorded source
 manifest after completion. Five documentation hashes changed because the
 already tested issue 110 journal was merged into this branch at the end of the
-run; the tested code did not change. A clean integrated run is still needed.
+run; the tested code did not change. The subsequent integrated run had no
+concurrent local VM and its complete tracked-file manifest matched.
 
 ## Limits and next step
 
 The race is sampled across repeated queries, not forced by a scheduler hook.
 The negative round proves it can occur on ext4 in this VM and this fixture;
 the positive finite runs do not prove it cannot recur under every schedule.
-No performance comparison or broad review was done. A local sanitizer result
-for the final combined tree has not been recorded yet. The KASAN/UBSAN/lockdep
-run uses the `ed9e273` code snapshot and remains in progress. Reconcile the
-current `main` and run the complete suite on the integrated code before marking
-this journal complete. Publication and issue closure need separate authorization.
+No performance comparison or broad review was done. KASAN tested the same
+kernel/layer code as the integrated branch but did not include its later
+batch-error test; that test passed the clean integrated native VM suite and
+the published issue 112 CI before this work. A GitHub PR, PR CI on the final
+commit, merge and issue closure have not been performed. Publication and issue
+closure need separate authorization.
