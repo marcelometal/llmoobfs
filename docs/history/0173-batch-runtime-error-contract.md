@@ -1,6 +1,6 @@
 # 0173 — QUERY2_BATCH runtime-error contract (issue 112)
 
-Date: 2026-10-21. Status: locally validated; review before publication. No new KASAN result.
+Date: 2026-10-21. Status: locally validated; push and PR authorized with GitHub CI KASAN pending. Merge requires separate authorization.
 Started: 2026-10-21T12:47:52.803847+00:00. Calendar time, not measured labor effort.
 
 ## Goal and scope
@@ -97,3 +97,17 @@ console log, receipt and PR draft are retained outside Git.
 
 Locally completed: 2026-10-21T12:59:47.608748Z (test completion; calendar time,
 not measured labor effort). Publication and merge are not authorized for this unit.
+
+## Publication authorization — 2026-10-21
+
+After local review, the maintainer explicitly authorized pushing this unit and
+opening its PR, using GitHub CI for KASAN. This supersedes the earlier local-only
+publication restriction for this batch; no new sanitizer result is claimed.
+KASAN and other CI must validate the new published head. Merge is reserved
+for separate authorization. Preserve PR 124's head and other sessions.
+
+The pre-publication fetch found main still at `712e0dd`; no remote branch or
+PR already existed for `codex/issue112-batch-errors`. The production source
+and executed tests remain identical to the full native-VM snapshot `d51ec27`;
+only this journal changed afterward. Recheck remote refs before the single
+normal push. Issue 112 remains open pending authorized integration.
