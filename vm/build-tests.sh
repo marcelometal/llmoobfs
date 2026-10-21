@@ -17,6 +17,8 @@ t layer      tests/layer.c
 t fcntl-flags tests/fcntl-flags.c
 t mounted    tests/mounted.c
 t failnth    -Iinclude tests/failnth.c
+t renamepath-fault -Iinclude tests/renamepath-fault.c
+t deadscan   -Iinclude tests/deadscan.c
 t hostile    tests/hostile.c
 t buildrace  -Iinclude tests/buildrace.c -lpthread
 t chmodrace  -Iinclude tests/chmodrace.c

@@ -99,6 +99,17 @@ if [ -z "${MOOB_ONLY:-}" ] || case " ${MOOB_ONLY:-} " in *" faults "*) true ;; *
     umount "$LAYER" || fail fi-umount
     mount -t moobfs_layer -o lower="$LOWER/fi",domain_depth=1 none "$LAYER" || fail fi-remount
     fi_cmp '*' || fail fi-index-differs-after-remount
+    # R2-6: a failed path allocation must not retain the pre-rename name after eviction.
+    "$BIN/renamepath-fault" "$LAYER/r26-control" 0 || fail r26-control
+    "$BIN/renamepath-fault" "$LAYER/r26-fault" 1 || fail r26-stale-path
+    echo "RENAMEPATH_FAULT_PASS: control and injected rename after dentry eviction"
+    # R2-10: remove a directory after the scan has listed its names. Function tracing
+    # observes the actual scan; the existing delay parameter keeps the window open.
+    mountpoint -q /sys/kernel/tracing || mount -t tracefs tracefs /sys/kernel/tracing || fail r210-tracefs
+    echo 2000000 > /sys/module/moobfs_layer/parameters/scan_delay_us
+    "$BIN/deadscan" "$LAYER/r210" || fail r210-dead-directory
+    echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us
+    echo "DEADSCAN_PASS: removal after listing does not fail the domain query"
     umount "$LAYER" && rm -rf "$LOWER/fi" && umount "$LOWER" || fail fi-cleanup
     # a reference the layer kept on a lower dentry shows only here, when the lower goes
     # ("Dentry still in use", found by syzkaller after a failed mount, journal 0112)
