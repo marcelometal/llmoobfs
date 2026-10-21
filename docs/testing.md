@@ -164,7 +164,7 @@ Read these coverage exclusions even when the aggregate marker passes:
 | Console result | Coverage actually obtained |
 | --- | --- |
 | `CASEFOLD_SKIPPED` | No casefold-refusal test: kernel or `mke2fs` cannot prepare the fixture |
-| `STALL_SKIPPED` | No stalled-FUSE test: `/dev/fuse` is unavailable (normally the Debian initramfs); KASAN has FUSE built in |
+| `STALL_SKIPPED` | No stalled-FUSE test: `/dev/fuse` is unavailable; KASAN has FUSE built in |
 | `LOWERRO_PASS: ... idmapped lower: not tested ...` | Read-only/freeze checks ran, but an idmapped bind lower could not be created; only `idmapped lower: refused` proves that case |
 | `ipc` binary present | Built/staged only, not invoked by the suite; no `IPC_PRIMITIVES_PASS` evidence |
 

@@ -61,9 +61,20 @@ make vm-test
 
 The same first command in the negative worktree must fail all five groups for
 those runtime signatures. The container stage of `make vm-test` now invokes the
-regressions before the module build. The full VM run already underway began
-before that invocation was added; the identical regression file is separately
-executed above, and the staged `query.c`/suite correction is unchanged.
+regressions before the module build. The first full VM run began before that invocation was added. Editing the
+launcher while its shell was blocked in QEMU shifted the unread tail: the guest
+printed every success marker, then the outer shell reported an unterminated
+quote and `make vm-test` returned 2. Both macOS and Debian `sh -n` accept the
+saved file. This is a preparation error, not a passing full command or negative
+module evidence. Preserve its console/launcher logs and repeat `make vm-test`
+with the launcher frozen for the entire execution. Do not reuse guest markers
+to call the failed outer command a pass. A second attempt began with the scripts
+unchanged at `ab8b71a`, then was stopped early when the execution procedure was
+improved: run a `git archive` snapshot of a signed commit in an exclusive
+directory outside the checkout. Preserve this interrupted attempt too; it is
+not a failed-module negative or a completed suite. Compare tracked source hashes
+with that commit before and after execution. Do not edit the running snapshot.
+The final repetition below uses this frozen source.
 
 Raw logs and the reverse patch are outside Git in
 `MoobFS-local/revisao/issue114-0171/`. Both negative commits are local only.
