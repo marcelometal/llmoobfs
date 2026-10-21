@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Documentation (journal 0168): add the Zenodo version DOI badge and full archived-snapshot
+  citation to both READMEs, distinguishing commit `02381fba` from the earlier source tag.
+
+- Documentation (journal 0167): add verified external project records to both READMEs,
+  with the scope and current limits of each record; preserve the four existing badges.
+
 - Coverage (journal 0154): `moobl_xattr_get` at 0 of 4 PCs in the fifth syzkaller run is explained
   by its corpus, which kept almost no attribute read inside a mounted layer. Replayed with
   per-call coverage, every such read reaches 3 of the 4 PCs. Three new seeds
