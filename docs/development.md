@@ -99,7 +99,7 @@ Inside the container, `vm/in-container.sh`:
   `log.img`, 64 MiB each) for dm-log-writes and dm-flakey;
 - boots `qemu-system-x86_64 -machine q35 -accel tcg -cpu max -m 512M -smp 2`
   with the five images as virtio disks, `rdinit=/init`, no network, under
-  `timeout 1200`;
+  `timeout 2400`;
 - requires QEMU to exit 0 and the console to contain `MOOBFS_VM_PASS:`,
   `MOOBFS_LAYER_PASS:` and `MOOBFS_ACCEPTANCE_PASS:` and no `MOOBFS_VM_FAIL:`.
   QEMU exit 0 alone is insufficient: the guest also powers off on failure.
@@ -121,8 +121,10 @@ Logs and evidence land in `build/vm/`:
 CI uploads `console.log`, `image-report.json`, `environment.txt` and
 `kernel.config` as the `native-vm-evidence` artifact for 30 days.
 
-Duration: the CI job has a 35-minute timeout and the QEMU phase a 1200-second
-timeout. On Apple Silicon everything runs under x86 emulation and takes
+Duration: the CI job has a 35-minute timeout and the QEMU phase a 2400-second
+timeout. The CI timeout applies to its faster runner; a full local run under
+TCG reached the former 1200-second guest guard (journal 0175). On Apple Silicon
+everything runs under x86 emulation and takes
 noticeably longer than on a Linux x86-64 host; measured times on specific
 machines are not recorded yet, so treat any figure you see elsewhere as
 approximate until a journal entry records a measurement.
@@ -153,6 +155,14 @@ The `permgaps` step (journal 0172) runs decisive directory-search, filtered
 truncation, attributed-directory and fixed independent-encoding checks over
 all three lowers. The `release` step also checks uid 1001 before a real index
 release and after rebuild. Allocation-fault queries remain root-only.
+
+The `rootpath` step (issue 110, journal 0174) renames a domain directory
+while a QUERY2 waits for that domain's build mutex, then checks that the
+mount-wide QUERY finds every file under the new name on all three lowers.
+
+The `overbudget` step (issue 111, journal 0175) alternates queries between two
+domains that fit the index budget individually but not together, while other
+domains are rebuilt after renames. It rejects `ENOMEM` on ext4, btrfs and XFS.
 
 ## 5. Adding a test
 

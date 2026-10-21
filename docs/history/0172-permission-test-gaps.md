@@ -1,6 +1,6 @@
 # 0172 — Permission and independent-oracle gaps of issue 114
 
-Date: 2026-10-21. Status: locally validated within the restricted scope; push and PR authorized. T9 remains partial; batch KASAN is pending GitHub CI. Merge requires separate authorization.
+Date: 2026-10-21. Status: PR 124 merged after CI; T9 remains partial (dated update below).
 Started: 2026-10-21T12:10:07.953095+00:00. Elapsed calendar time, not measured labor effort.
 
 ## Scope and decisions
@@ -190,3 +190,11 @@ Preserve the recorded interrupted attempt and deferred allocation-fault candidat
 T9 is still partial, issue 114 stays open, and the PR references rather than
 closes it. Recheck the remote main, remote branch and duplicate PRs before
 publication; preserve the other sessions' worktrees and uncommitted files.
+
+## Integration update — 2026-10-21
+
+PR [124](https://github.com/studiomoob/llmoobfs/pull/124) passed its published-head
+checks and was merged as `4b3a3282e469c989b2b21ed87fcc5dcdd0b56c81`.
+T5, T6, T7, T8, T10 and T11 have implemented checks or corrected documentation;
+T9 remains partial because unprivileged allocation-fault queries are deferred.
+Issue 114 remains open for that gap; the PR merge does not imply T9 passed.

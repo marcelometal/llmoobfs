@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Documentation (journal 0176): record the locally validated issue 110/111
+  correction batch in PR 126, its publication gate and the paused follow-up order in
+  the roadmap and security roadmap; reconcile issue 112 as completed and keep
+  issue 114's remaining T9 gap visible.
+
+- Fix (journal 0175, issue 111, R2-7 of journal 0155): concurrent domain
+  builds can no longer erase the budget-refusal signal before the failing build
+  tries to release an older domain. The new `overbudget` suite step checks this
+  on ext4, btrfs and XFS. Raise the emulated guest's hung-run guard to 2400 s
+  after the expanded full suite reached the previous 1200 s guard.
+
+- Fix (journal 0174, issue 110, R2-5 of journal 0155): a domain directory
+  renamed between the moment a build took its name and the moment the build
+  recorded the rename generation no longer leaves the domain fresh under the
+  old name, which made the v1 QUERY omit its uncached files until another
+  rebuild. The build records the generation sampled before the name, and
+  QUERY2 reads the name from the lower dentry. New suite step `rootpath`.
 - Contract/tests (journal 0173, issue 112): specify that all QUERY2_BATCH output
   must be discarded on error; there is no partial-success or rollback protocol.
   Add dedicated-VM controls for validation-before-execution, a later result-copy

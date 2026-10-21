@@ -190,3 +190,6 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0171 — Preserve harness verdicts and state the actual test inventory](0171-harness-verdict-inventory.md)
 - [0172 — Permission and independent-oracle gaps of issue 114](0172-permission-test-gaps.md)
 - [0173 — QUERY2_BATCH runtime-error contract (issue 112)](0173-batch-runtime-error-contract.md)
+- [0174 — A domain renamed while its build waits no longer stays fresh under the old name (issue 110)](0174-root-path-race.md)
+- [0175 — A concurrent build no longer hides an index-budget refusal (issue 111)](0175-over-budget-build-race.md)
+- [0176 — Publish the review batch and preserve its pause checkpoint](0176-review-batch-publication.md)

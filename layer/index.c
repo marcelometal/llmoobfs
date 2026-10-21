@@ -167,7 +167,7 @@ static int entry_cmp(const struct moobl_ix_entry *e, u8 type, const u8 *v, u16 l
 static int charge(struct moobl_index *ix, size_t bytes)
 {
 	if (ix->used + bytes > ix->budget) {
-		ix->over_budget = true;
+		ix->refusals++;	/* never reset: concurrent builds compare samples (issue #111) */
 		return -ENOMEM;
 	}
 	ix->used += bytes;
@@ -1564,15 +1564,32 @@ static int scan_moved(struct scan_job *job, struct list_head *todo, struct dentr
 }
 
 /*
+ * The generation of renames of domain directories and those above them, to sample before a
+ * name is taken. The rename hook raises it under the lock after the lower rename, so a name
+ * read from the lower tree after this sample is the new one or the build ends stale.
+ */
+static u64 rename_gen(struct moobl_index *ix)
+{
+	unsigned int nofs = ix_read_lock(ix);
+	u64 gen = ix->top_gen;
+
+	ix_read_unlock(ix, nofs);
+	return gen;
+}
+
+/*
  * Makes sure the domain whose directory is lower (mount-relative path) is built, building it
  * if it is not; domain 0 is what belongs to no domain, read from the lower root down to the
  * domain directories. Callers of a domain being built wait for it. When the build does not fit
  * the index budget and may_release is set, the domains queried least recently are released
  * until it fits. Returns -EAGAIN when the domain kept changing under the build, -ENOMEM also
  * when it does not fit the budget; after a failure nothing of the domain is left in the index.
+ * gen is ix->top_gen as sampled before path was taken (rename_gen()): a rename of the domain
+ * directory or one above it after that sample leaves the build stale, never fresh under the
+ * old name (issue #110).
  */
 static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domain, const char *path,
-			 bool may_release)
+			 u64 gen, bool may_release)
 {
 	struct moobl_sb *sbi = MOOBL_SB(sb);
 	struct moobl_index *ix = &sbi->index;
@@ -1580,7 +1597,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	const struct cred *old;
 	struct scan_job job;
 	unsigned int nofs, released = 0;
-	u64 t0, used0;
+	u64 t0, used0, refused = 0;
 	int tries, err;
 
 	if (!dom)
@@ -1619,9 +1636,9 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 
 		nofs = ix_write_lock(ix);
 		WRITE_ONCE(dom->state, MOOBL_DOM_BUILDING);
-		ix->over_budget = false;
+		refused = ix->refusals;	/* a build of another domain cannot clear what follows */
 		dom->restart = false;
-		dom->top_gen = ix->top_gen;
+		dom->top_gen = gen;
 		ix_write_unlock(ix, nofs);
 		err = scan_start(&job, lower, path, domain ? ix->domain_depth : 0, domain != 0);
 		if (!err)
@@ -1653,7 +1670,7 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 			ix->builds++;
 		}
 		/* over the budget: make room by releasing what was queried least recently */
-		if (err == -ENOMEM && ix->over_budget && may_release &&
+		if (err == -ENOMEM && ix->refusals != refused && may_release &&
 		    released < MOOBL_BUDGET_RELEASES) {
 			ix_write_unlock(ix, nofs);
 			moved_list_free(&todo);
@@ -1687,10 +1704,11 @@ static int domain_ensure_all(struct super_block *sb)
 	const struct cred *old;
 	struct scan_job job;
 	struct scan_dir *sd;
+	u64 gen = rename_gen(ix);	/* before the scan reads the names of the domains */
 	int err;
 
 	/* no release over the budget: this query needs every domain at once */
-	err = domain_ensure(sb, sbi->lower.dentry, 0, "", false);
+	err = domain_ensure(sb, sbi->lower.dentry, 0, "", gen, false);
 	if (err || !ix->domain_depth)
 		return err;
 	err = scan_job_init(&job, sb);
@@ -1706,7 +1724,7 @@ static int domain_ensure_all(struct super_block *sb)
 	list_for_each_entry(sd, &job.found, list) {
 		if (err)
 			break;
-		err = domain_ensure(sb, sd->dentry, d_inode(sd->dentry)->i_ino, sd->path, false);
+		err = domain_ensure(sb, sd->dentry, d_inode(sd->dentry)->i_ino, sd->path, gen, false);
 	}
 	scan_list_free(&job.found);
 	attr_buf_free(&job.buf);
@@ -3180,6 +3198,28 @@ static int order_check(const struct moob_query2 *q)
 }
 
 /*
+ * The name of lower relative to the lower root, in buf (two pages). The layer's own dentry is
+ * moved by the VFS only after the rename hook has raised the generation, so its name may still
+ * be the old one after the sample; the lower dentry was moved before.
+ */
+static char *lower_rel_path(struct super_block *sb, struct dentry *lower, char *buf)
+{
+	char *root = dentry_path_raw(MOOBL_SB(sb)->lower.dentry, buf + PAGE_SIZE, PAGE_SIZE);
+	char *p = dentry_path_raw(lower, buf, PAGE_SIZE);
+	size_t n;
+
+	if (IS_ERR(root))
+		return root;
+	if (IS_ERR(p))
+		return p;
+	n = strcmp(root, "/") ? strlen(root) : 0;
+	if (strncmp(p, root, n) || (p[n] != '/' && p[n]))
+		return ERR_PTR(-ESTALE);	/* no longer below the lower root */
+	p += n;
+	return *p == '/' ? p + 1 : p;
+}
+
+/*
  * QUERY2 on a domain directory (docs/spec-query-v2.md §4): the caller must be able to read
  * and traverse the domain directory now; results come from the domain's homogeneous
  * partition without per-result checks, unless a permission change inside the domain made
@@ -3194,24 +3234,26 @@ static int order_check(const struct moob_query2 *q)
 static long query2_pin(struct super_block *sb, struct file *file, u64 domain)
 {
 	struct moobl_index *ix = IX(sb);
+	struct dentry *lower = moobl_lower_dentry(file->f_path.dentry);
 	struct moobl_domain *dom;
 	char *buf, *p;
 	long err = 0;
 	int tries;
+	u64 gen;
 
 	for (tries = 0; tries < 8; tries++) {
 		dom = xa_load(&ix->domains, (unsigned long)domain);
 		if (!dom || !domain_fresh(ix, dom)) {
-			buf = (char *)__get_free_page(GFP_KERNEL);
+			buf = (char *)__get_free_pages(GFP_KERNEL, 1);
 			if (!buf)
 				return -ENOMEM;
-			p = dentry_path_raw(file->f_path.dentry, buf, PAGE_SIZE);
+			gen = rename_gen(ix);
+			p = lower_rel_path(sb, lower, buf);
 			if (IS_ERR(p))
 				err = PTR_ERR(p);
 			else
-				err = domain_ensure(sb, moobl_lower_dentry(file->f_path.dentry),
-						    domain, *p == '/' ? p + 1 : p, true);
-			free_page((unsigned long)buf);
+				err = domain_ensure(sb, lower, domain, p, gen, true);
+			free_pages((unsigned long)buf, 1);
 			if (err)
 				return err;
 			dom = xa_load(&ix->domains, (unsigned long)domain);

@@ -1,6 +1,6 @@
 # 0173 — QUERY2_BATCH runtime-error contract (issue 112)
 
-Date: 2026-10-21. Status: original-head CI passed; merges authorized. Integration with PR 124 assembled; combined-head CI pending.
+Date: 2026-10-21. Status: PR 125 merged after combined-head CI (dated update below).
 Started: 2026-10-21T12:47:52.803847+00:00. Calendar time, not measured labor effort.
 
 ## Goal and scope
@@ -144,3 +144,15 @@ groups in the pinned Linux container; whitespace, retired claims, all 12 site
 pages and FAQ consistency. The two helper sources are byte-identical to their
 individually validated heads. The full combined VM/KASAN result is still pending
 GitHub CI; these checks do not substitute for it.
+
+## Combined-head result — 2026-10-21
+
+PR [125](https://github.com/studiomoob/llmoobfs/pull/125) passed the required
+checks on its combined head `cf6b773`, including KASAN/lockdep with
+`BATCH_RUNTIME_ERRORS_PASS` and the permission/release checks inherited from
+PR 124. The retained console ended in `MOOBFS_KASAN_PASS` without a VM or
+environment failure marker. The maintainer-authorized normal merge created
+`f214bd26f7c2588fda5cae8ac8061736f39e0251` on `main`. Issue 112 was
+still open immediately after the merge; it was reconciled and closed on
+2026-10-21 after the maintainer requested issue updates. This result does
+not alter the API's discard-on-error contract.
