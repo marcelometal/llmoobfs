@@ -1,9 +1,9 @@
 # 0170 — PR 109: integration and remaining validation
 
-Date: 2026-10-20. Status: in progress locally; no push authorized.
+Date: 2026-10-20. Status: complete locally; awaiting maintainer review before push.
 
-Started: 22:42 America/Sao_Paulo on 2026-10-20. End pending.
-Calendar time, not measured labor effort.
+Validation window: approximately 22:42–23:50 America/Sao_Paulo on 2026-10-20.
+Elapsed calendar time including builds and waits, not measured labor effort.
 
 ## Goal and scope
 
@@ -75,10 +75,59 @@ Do not push, merge the GitHub PR or publish an advisory in this preparation.
 - `make test` on macOS: all nine host tests pass. This is separate from Linux
   module execution. Checkpatch, shell syntax, retired claims, site (12 pages),
   FAQ/source consistency, whitespace and preservation comparisons pass.
+- Full `sh vm/kasan-local.sh` at test source `b969623`: exit 0,
+  `MOOBFS_KASAN_PASS`, Linux 6.12.112 with KASAN/UBSAN/lockdep in a dedicated
+  x86-64 KVM VM (two CPUs, 3 GiB). The three lower filesystems, construction
+  races, domain release/rebuild, client acceptance, power-loss replay, I/O
+  errors, 12 permission-matrix seeds and the remaining suite steps passed.
+  No kernel diagnostic was reported by the harness.
+- Final fault step: `operations=22 calls=321 faults=299 unexpected=0`;
+  `RENAMEPATH_FAULT_PASS` and `DEADSCAN_PASS`. In the injected rename, the
+  post-eviction result has an empty path and `flags=1` (`PATH_UNKNOWN`); the
+  control returns `b`. The synchronized directory-removal query returns
+  `rc=0 errno=0 count=0`. These are positive results on the final fixture,
+  including the revised R2-8 chmod preparation.
+- Eight executed source/configuration files were SHA-256 compared with the
+  local preparation and matched. Module/UAPI/common sources remain identical
+  to PR 109 at `09fc102`. Main's five badge lines, external records, Zenodo
+  citation and `CITATION.cff` are preserved. Public `main` and PR 109's branch
+  were reconfirmed at `d797a68` and `09fc102` after execution.
+
+## Reproduction and evidence
+
+On a dedicated Linux host with the pinned environment, at test source `b969623`:
+
+```sh
+MOOB_ONLY=faults sh vm/kasan-local.sh  # focused positive run; not a full suite
+sh vm/kasan-local.sh                 # full sanitizer suite
+make vm-test                        # full Debian/QEMU suite; requires Docker
+```
+
+For a negative round, use a separate worktree at the mutation commit listed
+above and run `MOOB_ONLY=faults sh vm/kasan-local.sh`. Expect a nonzero exit and
+the specific regression signature; a build error or unrelated failure is not
+evidence. The negative commits are retained locally pending publication review.
+
+Raw logs, source hashes, module hashes and the evidence manifest are retained
+outside Git in `MoobFS-local/revisao/pr109-validation-0170/`. Versioned evidence
+is this summary and the executable regressions; no credentials or environment
+dump is committed. Later commits in this unit only close the documentation.
 
 ## Limitations and next step
 
-Finish the positive/negative runs, reconcile journal 0156 and the public records,
-then run the complete VM and local sanitizer suites for the final test changes.
-Retain the existing deferred issues; this unit does not implement ADR-0017's
-planned mechanisms or claim a new security review. Review before any push.
+The five pending regression cases now have positive and negative evidence with
+the hard-link boundary explained above. The new R2-6/R2-10 scenarios are ext4,
+root, on one kernel; they do not cover every rename failure, namespace race or
+architecture. Tests are evidence under those conditions, not a security proof.
+
+Issues 110–119, ADR-0017's planned mechanisms and the separate syzkaller coverage
+investigation remain open. No new security review, performance measurement,
+release, advisory publication or CI run on this unpublished continuation is
+claimed. Site/FAQ and security/compatibility text retain the PR's existing
+technical state; only the test inventory, status reconciliation and references
+needed changes. README metadata from `main` is preserved by the merge.
+
+Next: maintainer review of the signed local continuation. Before an authorized
+push, recheck both `main` and remote `review2-batch`; update the existing PR
+without rewriting history or touching its original checkout. Required PR CI
+must run on that later published head. No push or GitHub merge has been made.
