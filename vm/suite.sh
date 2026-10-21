@@ -18,6 +18,7 @@
 #   release             built domains released by the budget and by the shrinker (journal 0101)
 #   sqlext              the moobfs SQLite virtual table against an ordinary table (journal 0108)
 #   permmatrix          QUERY2 against the lower's own permission decision, random modes (0116)
+#   permgaps            decisive search, truncation, directory and encoding checks (0172)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -41,7 +42,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1255,6 +1256,7 @@ for fs in ext4 btrfs xfs; do
         "$BIN/moobfs-index" --domain "$LOWER/rl/$d" kind exists - - | cut -f2 | sort > /tmp/rl.o || fail "rl-race-oracle-$fs"
         cmp -s /tmp/rl.k /tmp/rl.o || fail "rl-race-differs-$d-$fs"
     done
+    "$BIN/permission-gaps" release "$LAYER" "$LOWER/rl" || fail "rl-unprivileged-$fs"
     umount "$LAYER" && rm -rf "$LOWER/rl" && umount "$LOWER" || fail "rl-cleanup-$fs"
     echo "RELEASE_PASS: $fs, one domain $one bytes, budget $budget; shrinker, idle floor and cursors across a release; releases during buildrace: $rl_race_releases; every answer equal to the oracle"
 done
@@ -1425,6 +1427,21 @@ done
 [ $pm_wrong -gt 0 ] || fail "pm-no-case-of-the-old-rule (the matrix proved nothing)"
 rm -rf "$LOWER/pmx" && umount "$LOWER" || fail "pm-cleanup"
 echo "PERMMATRIX_STEP_PASS: 12 seeds, no answer the lower would refuse; $pm_wrong answers the rule before journal 0116 gave wrongly"
+fi
+if want permgaps; then
+for fs in ext4 btrfs xfs; do
+    case $fs in ext4) dev=$DEV_EXT4 ;; btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "pg-lower-$fs"
+    rm -rf "$LOWER/pg" && mkdir -m 755 "$LOWER/pg" || fail "pg-directory-$fs"
+    "$BIN/permission-gaps" plant "$LOWER/pg" || fail "pg-plant-$fs"
+    mount -t moobfs_layer -o lower="$LOWER/pg" none "$LAYER" || fail "pg-mount-$fs"
+    "$BIN/permission-gaps" check "$LAYER" "$LOWER/pg" q2 || fail "pg-query2-$fs"
+    umount "$LAYER" || fail "pg-unmount-$fs"
+    mount -t moobfs_layer -o lower="$LOWER/pg",domain_depth=0 none "$LAYER" || fail "pg-v1-mount-$fs"
+    "$BIN/permission-gaps" check "$LAYER" "$LOWER/pg" v1 || fail "pg-v1-$fs"
+    umount "$LAYER" && rm -rf "$LOWER/pg" && umount "$LOWER" || fail "pg-cleanup-$fs"
+    echo "PERMISSION_GAPS_PASS: $fs (T5/T6/T8, independent T10 fixtures)"
+done
 fi
 if want stall && [ ! -c /dev/fuse ]; then
     echo "STALL_SKIPPED: this kernel has no /dev/fuse (the KASAN harness has FUSE built in)"

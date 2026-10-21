@@ -282,6 +282,11 @@ Accepted by the maintainer on 2026-10-13, small, to arrive with the second half 
 incomplete); the suite enables and reads them; `scan_retries` is replaced, `scan_delay_us` stays
 because it changes timing.
 
+Targeted test-gap follow-up (journal 0172): decisive search/truncation checks,
+attributed-directory comparisons, 18 independent fixed encoding fixtures and
+unprivileged queries across index release. These bounded scenarios do not
+complete S14/S15 below. Allocation-fault query coverage remains root-only (T9).
+
 ### S14 to S21. Making the tests find what reviews found (added 2026-10-20, journal 0156)
 
 Planned, not started. Rounds 1 and 2 of the independent review found defects no test could see.
