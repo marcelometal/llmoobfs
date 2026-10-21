@@ -1,6 +1,6 @@
 # 0176 — Publish the review batch and preserve its pause checkpoint
 
-Date: 2026-10-21. Status: **in progress**.
+Date: 2026-10-21. Status: **published for review; exact-head CI pending**.
 
 ## Goal and decision
 
@@ -40,6 +40,18 @@ it remains open with T9's unprivileged allocation-fault check pending.
 
 ## Publication and issue state
 
-Pending push, PR creation, updates to issues 110/111 and exact-head CI. Record the
-actual PR URL, head, checks and any limitations here when known. Pause new
-implementation after the requested publication and status updates.
+The normal push created remote branch `codex/issue111-over-budget` at initial
+published head `44fff3e`; [PR 126](https://github.com/studiomoob/llmoobfs/pull/126)
+targets `main` at `f214bd2`. The bodies of issues 110 and 111 now link the
+PR and local evidence; both remain open. Issue 112 was closed as completed
+after PR 125, while issue 114's body marks T5/T6/T7/T8/T10/T11 complete
+and leaves T9 unchecked and the issue open. The PR 75 dependency update was
+read-only in this batch; its branch remains behind `main` and its prior nine
+green checks are not a verdict on a refreshed head.
+
+At PR creation, required CI had begun on `44fff3e`; the documentation-only
+follow-up that records this PR and pause checkpoint will start a new exact-head
+run. Do not attribute either prior local KASAN or an earlier CI run to that
+final head. No merge, issue 110/111 closure or new implementation is part of
+this publication. Resume by checking exact-head CI, reviewing the PR and
+deciding the merge; keep issue 114 T9 and PR 75 as separate future work.

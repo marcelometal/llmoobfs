@@ -1,8 +1,8 @@
 # 0174 — A domain renamed while its build waits no longer stays fresh under the old name (issue 110)
 
-Date: 2026-10-21. Status: reproduced, fixed and validated locally, including a complete
+Date: 2026-10-21. Original local status: reproduced, fixed and validated locally, including a complete
 KASAN/UBSAN/lockdep run on the dedicated host; ready for the maintainer's review. No push, pull
-request, merge or issue edit.
+request, merge or issue edit at that point. See the publication update below.
 
 ## Goal
 
@@ -124,3 +124,13 @@ The maintainer's review of branch `codex/issue110-root-path-race`. Publication, 
 and the merge need explicit authorization; GitHub CI (KASAN included) must pass on the published
 head, which this local run does not replace; the issue is closed only after the merge. Issue 111
 was worked in parallel on a branch stacked on this one (journal 0175).
+
+## Publication update — 2026-10-21
+
+The maintainer authorized one combined push and PR for issues 110 and 111.
+This correction is included in [PR 126](https://github.com/studiomoob/llmoobfs/pull/126)
+from `codex/issue111-over-budget`, together with journal 0175. Issue 110's
+body now links the PR, negative reproduction and positive local VM/KASAN
+evidence. The issue remains open; required checks on the published head,
+review and the merge decision remain pending. The original local-only status
+above records the state before publication.

@@ -1,6 +1,6 @@
 # 0175 — A concurrent build no longer hides an index-budget refusal (issue 111)
 
-Date: 2026-10-21. Status: **local correction complete; unpublished**. The
+Date: 2026-10-21. Original local status: **correction complete; unpublished at that point**. The
 decisive negative round, corrected VM suite on the integrated branch and
 KASAN/UBSAN/lockdep run have finished.
 
@@ -76,3 +76,13 @@ batch-error test; that test passed the clean integrated native VM suite and
 the published issue 112 CI before this work. A GitHub PR, PR CI on the final
 commit, merge and issue closure have not been performed. Publication and issue
 closure need separate authorization.
+
+## Publication update — 2026-10-21
+
+The maintainer authorized the push and one combined PR for issues 110 and
+111. The correction and its regression are in
+[PR 126](https://github.com/studiomoob/llmoobfs/pull/126); issue 111's body
+now links the PR, negative reproduction and local VM/KASAN evidence. The
+issue remains open while required checks on the published head and review
+are pending. No PR merge, issue closure or additional implementation is
+claimed by this update.

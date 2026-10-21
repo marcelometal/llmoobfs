@@ -43,7 +43,8 @@ with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (
 (R2-5, issue 110) and concurrent index-budget refusal (R2-7, issue 111)
 defects were reproduced on an unfixed module, corrected, and validated in the
 complete native VM suite over ext4, btrfs and XFS. The corrected kernel/layer
-code passed KASAN/UBSAN/lockdep on the dedicated host. Published-head CI,
+code passed KASAN/UBSAN/lockdep on the dedicated host. The combined
+[PR 126](https://github.com/studiomoob/llmoobfs/pull/126) is open; published-head CI,
 review and merge remain separate gates. Neither correction provides S9 fair
 budget sharing or completes the broader S14–S21 work below.
 
