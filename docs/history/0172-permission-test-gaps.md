@@ -1,6 +1,6 @@
 # 0172 — Permission and independent-oracle gaps of issue 114
 
-Date: 2026-10-21. Status: locally validated within the restricted scope; review before push. T9 fault coverage and batch KASAN remain deferred.
+Date: 2026-10-21. Status: locally validated within the restricted scope; push and PR authorized. T9 remains partial; batch KASAN is pending GitHub CI. Merge requires separate authorization.
 Started: 2026-10-21T12:10:07.953095+00:00. Elapsed calendar time, not measured labor effort.
 
 ## Scope and decisions
@@ -174,3 +174,19 @@ and integrated. Other sessions' branches, commits and pre-existing files are
 checked against the initial preservation receipt.
 
 Locally completed: 2026-10-21T12:38:11.754431+00:00. Calendar time, not measured labor effort.
+
+## Publication authorization — 2026-10-21
+
+After the local review, the maintainer explicitly authorized pushing this batch
+and opening a PR, with T9 partial and KASAN supplied by GitHub CI on the new
+published head. This supersedes the preparation-stage local-only restriction
+and the requirement to wait for local KASAN before publication for this batch.
+The dedicated Linux host remains out of scope. No new KASAN result is claimed;
+CI must validate the published head. Merge remains subject to separate approval.
+
+The executed source snapshot remains `866257f`; only this journal changed
+after its complete positive VM run and the five decisive mutation controls.
+Preserve the recorded interrupted attempt and deferred allocation-fault candidate.
+T9 is still partial, issue 114 stays open, and the PR references rather than
+closes it. Recheck the remote main, remote branch and duplicate PRs before
+publication; preserve the other sessions' worktrees and uncommitted files.
