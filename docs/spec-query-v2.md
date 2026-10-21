@@ -146,6 +146,18 @@ per query. Union and duplicate removal are left to the client. Covers "or" acros
 - All requests are validated before any execution; an invalid request refuses the whole
   batch with `EINVAL` and nothing is written back. The requests run in order, each under its
   own acquisition of the index lock: the batch is not a single snapshot.
+- **Runtime errors (clarification, 2026-10-21, issue 112, journal 0173).** Only
+  a zero return makes the batch's output usable. Result arrays are copied as
+  requests complete; the output headers are copied after all requests succeed.
+  A later execution error can therefore leave earlier results written without
+  their output counts or cursors. A fault during the final header copy may also
+  leave partially written headers. There is no rollback or partial-success
+  protocol. On any error, discard every result, output count, truncation flag
+  and cursor from that call; none identifies a usable completed prefix. After
+  addressing the cause, reinitialize the output fields and retry as fresh
+  requests or from cursors retained from previous successful calls. This
+  clarifies existing behavior without changing the UAPI; the no-output promise
+  above applies to validation failures before execution.
 - `MOOB_TERM_MISSING_OK` lives in the term's flags byte (formerly `reserved[0]`, renamed
   `flags`). v1 refuses any flag (`EINVAL`). `EXISTS` with the flag is refused ("exists or
   missing" would match everything). An attribute present with another type, invalid or raw (`raw`) counts

@@ -53,6 +53,10 @@ tem três partes:
 Ele guarda e encontra memórias. Escolher o que é relevante, embeddings, ranqueamento e montagem do
 prompt ficam na aplicação.
 
+Nas consultas em lote, use as saídas somente após sucesso; descarte todos os resultados
+e cursores de saída em caso de erro ([contrato do cliente](docs/client-contract.md#6-writing-and-querying),
+[escopo do teste](docs/testing.md), diário 0173).
+
 ## Quatro números
 
 Os quatro são de nível piloto e de uma só máquina (dedicada, com SSD SATA, Debian 13, kernel
