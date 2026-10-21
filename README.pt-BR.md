@@ -241,6 +241,11 @@ Exija os marcadores finais e ausência de `MOOBFS_VM_FAIL`; QEMU sair com códig
 `CASEFOLD_SKIPPED`, `STALL_SKIPPED` e um lower idmapped marcado `not tested`
 continuam sendo lacunas de cobertura. `ipc` é compilado, mas não invocado pela suíte.
 
+Para conferir permissões e casos fixos de codificação com expectativas independentes,
+use `MOOB_ONLY=permgaps make vm-test` ([diário 0172](docs/history/0172-permission-test-gaps.md)).
+O passo de liberação também consulta como uid 1001; a injeção de falhas ainda consulta apenas como root.
+
+
 ## O que foi medido
 
 O [relatório M4](docs/history/0088-m4-report.md) reúne as campanhas iniciais: uma semente de

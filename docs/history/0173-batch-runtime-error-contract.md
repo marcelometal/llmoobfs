@@ -1,6 +1,6 @@
 # 0173 — QUERY2_BATCH runtime-error contract (issue 112)
 
-Date: 2026-10-21. Status: locally validated; push and PR authorized with GitHub CI KASAN pending. Merge requires separate authorization.
+Date: 2026-10-21. Status: original-head CI passed; merges authorized. Integration with PR 124 assembled; combined-head CI pending.
 Started: 2026-10-21T12:47:52.803847+00:00. Calendar time, not measured labor effort.
 
 ## Goal and scope
@@ -111,3 +111,36 @@ PR already existed for `codex/issue112-batch-errors`. The production source
 and executed tests remain identical to the full native-VM snapshot `d51ec27`;
 only this journal changed afterward. Recheck remote refs before the single
 normal push. Issue 112 remains open pending authorized integration.
+
+## Integration with PR 124 — 2026-10-21
+
+The maintainer authorized merging PRs 124 and 125 once CI and KASAN pass.
+All 12 checks passed on each original head: `7b2b798` (124) and `9fa6103`
+(125). Their KASAN/lockdep runs 39601849588 and 39604618943 completed with
+the final full-suite marker, no VM/environment failure marker, and the expected
+new permission/release or batch-copy checks respectively. The repository's
+`kdiag` check also passed on both retained dmesg captures. Configuration flags
+were verified in job logs; the artifact itself did not retain `.config`. CPU
+mitigation notices containing WARNING inside their text are distinguished
+from kernel warnings by the existing checker; no checker change was made.
+
+PR 124 was merged normally as `4b3a3282e469c989b2b21ed87fcc5dcdd0b56c81`.
+Issue 114 remains partial: unprivileged allocation faults are still deferred.
+Strict main protection requires PR 125 to include that updated base. Merge
+it normally into this branch, preserving the signed commits and both test
+sets. Resolve only overlapping changelog, history-index and site-guide additions
+by retaining both contributions; back up the conflicts before resolving them.
+No production source, UAPI, format or sanitizer configuration changes.
+
+The original-head KASAN results are historical evidence, not a result for the
+combined integration. After the integration push, require new complete CI
+on the combined head before merging 125, without an admin bypass. Preserve
+other worktrees and their pre-existing changes. No local dedicated-host run
+is attempted; use the authorized GitHub CI for this publication/integration.
+
+Integration pre-push checks passed: strict static Linux compilation of both
+`batch-errors` and `permission-gaps`; five existing harness-verdict regression
+groups in the pinned Linux container; whitespace, retired claims, all 12 site
+pages and FAQ consistency. The two helper sources are byte-identical to their
+individually validated heads. The full combined VM/KASAN result is still pending
+GitHub CI; these checks do not substitute for it.

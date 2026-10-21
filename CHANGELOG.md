@@ -7,6 +7,13 @@
   Add dedicated-VM controls for validation-before-execution, a later result-copy
   fault, a final header-copy fault and successful reuse, without module/UAPI changes.
 
+- Tests (journal 0172, issue 114 T5/T6/T8/T10 and part of T9): make the QUERY2
+  execute check decisive after a successful directory open; assert filtered
+  counts and truncation; compare attributed directories with lower permissions;
+  add fixed encoding expectations independent of the shared validator, and
+  unprivileged checks before index release and after rebuilding. Unprivileged
+  allocation-fault coverage remains deferred.
+
 - Documentation (journal 0171, issue 114 T11): clarify QEMU verdict markers,
   explicit coverage skips, the 1200-second guard and compiled-only test programs.
 

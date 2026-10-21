@@ -95,6 +95,26 @@ coherence between two processes) is built and staged but is not currently
 invoked by `vm/suite.sh`; it was used during the phase 2e investigation
 (journal 0015).
 
+### Decisive permission and independent-oracle checks (journal 0172)
+
+`MOOB_ONLY=permgaps make vm-test` runs `tests/permission-gaps.c` on ext4,
+btrfs and XFS; the full suite includes it too. Child processes drop all uid/gid
+slots and supplementary groups before opening query descriptors.
+
+| Marker | Proves | Does not prove |
+| --- | --- | --- |
+| `TARGET_EXEC_PASS` | uid 1001 opens a readable/non-searchable domain successfully, then QUERY2 and QUERY2_BATCH return EACCES; a searchable domain succeeds | Every ACL or namespace configuration |
+| `TRUNCATED_PERMISSION_PASS` | With 70 potentially matching hidden candidates, counts and `truncated` reflect readable results only; zero, exact-limit and overflow controls in v1, QUERY2 plain/intersection/ordered asc/desc | Timing channels; arbitrary concurrent permission changes |
+| `ATTRIBUTED_DIRECTORY_PASS` | Attributed directories, including a readable/non-searchable final component, agree with lower `getxattr` before and after fallback | Every directory/ACL shape |
+| `INDEPENDENT_ENCODING_PASS` | 18 fixed byte/mode/owner fixtures have the expected membership without calling `common/attr.c`; both v1 and QUERY2, uid 1001 | An independent validator of every encoding or randomized hostile input |
+| `PERMISSION_GAPS_PASS: <fs>` | The four checks above completed on that lower | A complete suite by itself |
+| `UNPRIV_RELEASE_PASS` | The release step queries as uid 1001 before a verified shrinker release and after rebuild, comparing public/hidden controls with the lower | Unprivileged allocation-fault injection: the remaining part of T9 |
+
+`HOSTILE_LOWER_PASS` retains its randomized shared-validator comparison. The
+fixed independent fixtures supplement it; they do not make its oracle independent.
+`FAULT_INJECTION_PASS` remains root-only. The unprivileged-fault candidate is
+not enabled or claimed tested in this batch while the dedicated host is unavailable.
+
 ### KASAN harness (`vm/kasan-guest.sh`)
 
 | Marker | Proves | Does not prove |

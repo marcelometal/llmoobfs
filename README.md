@@ -227,6 +227,11 @@ Require the final markers and no `MOOBFS_VM_FAIL`; QEMU exit 0 alone is insuffic
 `CASEFOLD_SKIPPED`, `STALL_SKIPPED` and an idmapped lower marked `not tested`
 remain coverage exclusions. `ipc` is built but not invoked by the suite.
 
+For targeted permission and fixed independent-encoding checks, use
+`MOOB_ONLY=permgaps make vm-test` ([journal 0172](docs/history/0172-permission-test-gaps.md)).
+The release step also queries as uid 1001; allocation-fault queries remain root-only.
+
+
 ## What was measured
 
 The [M4 report](docs/history/0088-m4-report.md) gathers the early campaigns: one data-set seed,
