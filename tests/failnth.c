@@ -14,6 +14,12 @@
  * Here a failed call must fail cleanly: an error return, never a signal, and never success with
  * a different result. Prints one line per operation and FAILNTH_DONE with the totals; exits 1
  * if any call returned an error that an allocation failure does not explain.
+ *
+ * Since journal 0156 some operations also check the state a fault leaves behind, not only the
+ * return value: a name created, made or linked on the lower is visible through the layer, or
+ * absent from both (R2-4); a record whose entry was dropped is dropped too (R2-8); a file whose
+ * attribute update failed and that is then renamed into another built domain is answered there
+ * with the value the lower holds (R2-3).
  */
 #define _GNU_SOURCE
 #include <sys/ioctl.h>
@@ -87,6 +93,30 @@ static void fresh(char *rel, size_t cap, const char *dom, int with_attr)
 	close(fd);
 }
 
+/* the layer and the lower agree on whether rel exists (journal 0156, R2-4) */
+static int agree(const char *rel)
+{
+	char lp[1100];
+	struct stat a, b;
+	int u, l;
+
+	snprintf(lp, sizeof lp, "%s/%s", low, rel);
+	u = lstat(up(rel), &a) == 0;
+	l = lstat(lp, &b) == 0;
+	return u == l;
+}
+
+static int info_of(struct moob_info *info)
+{
+	int d = open(mnt, O_RDONLY | O_DIRECTORY), r;
+
+	if (d < 0) { perror("root"); exit(2); }
+	memset(info, 0, sizeof *info);
+	r = ioctl(d, MOOB_IOC_GET_INFO, info);
+	close(d);
+	return r;
+}
+
 static void q2_fill(struct moob_query2 *q, struct moob_query_result *res, __u32 limit)
 {
 	memset(q, 0, sizeof *q);
@@ -103,12 +133,13 @@ static void q2_fill(struct moob_query2 *q, struct moob_query_result *res, __u32 
 
 enum { OP_SET_NEW, OP_SET_REPLACE, OP_SET_RAW_OVER, OP_REMOVE, OP_CREATE, OP_MKDIR, OP_RENAME_OVER,
        OP_UNLINK, OP_QUERY2, OP_QUERY2_ORDER, OP_BATCH, OP_INFO, OP_CHMOD_DIR, OP_READ, OP_LOOKUP,
-       OP_FIEMAP, OP_SYNCFS, OP_BUILD, OP_MOUNT, OP_COUNT };
+       OP_FIEMAP, OP_SYNCFS, OP_BUILD, OP_MOUNT, OP_LINK, OP_CHMOD_FILE, OP_REPLACE_THEN_MOVE,
+       OP_COUNT };
 static const char *const names[OP_COUNT] = {
 	"setxattr-new", "setxattr-replace", "setxattr-raw-over-typed", "removexattr", "create",
 	"mkdir", "rename-over-indexed", "unlink-indexed", "query2", "query2-ordered", "query2-batch",
 	"get-info", "chmod-directory", "open-read", "lookup-cold", "fiemap", "syncfs",
-	"query2-first-on-a-domain", "mount",
+	"query2-first-on-a-domain", "mount", "link", "chmod-file", "setxattr-then-move",
 };
 
 int main(int argc, char **argv)
@@ -151,6 +182,8 @@ int main(int argc, char **argv)
 			struct moob_info info;
 			struct fiemap fm;
 			struct stat st;
+			struct moob_info i0, i1;
+			char tag[16];
 			int fd = -1, dfd = -1, r = 0, e, hit;
 
 			/* preparation, disarmed */
@@ -162,6 +195,27 @@ int main(int argc, char **argv)
 			case OP_CREATE: snprintf(a, sizeof a, "da/c%06d", seq++); break;
 			case OP_MKDIR: snprintf(a, sizeof a, "da/d%06d", seq++); break;
 			case OP_LOOKUP: fresh(a, sizeof a, "db", 1); break;
+			case OP_LINK: fresh(b, sizeof b, "da", 1); snprintf(a, sizeof a, "da/l%06d", seq++); break;
+			case OP_CHMOD_FILE:	/* one entry; 0600 moves it to the heterogeneous partition */
+				/* A fresh domain has no existing heterogeneous name node to reuse.
+				 * Otherwise a previous operation can make this update allocate nothing,
+				 * and a negative round misses the empty-record defect (journal 0170). */
+				snprintf(b, sizeof b, "p%06d", seq++);
+				if (mkdir(up(b), 0755)) { perror("chmod domain"); return 2; }
+				fresh(a, sizeof a, b, 1);
+				dfd = open(up(b), O_RDONLY | O_DIRECTORY);
+				q2_fill(&q[0], res, 64);
+				if (dfd < 0 || ioctl(dfd, MOOB_IOC_QUERY2, &q[0]) || q[0].count != 1) {
+					perror("chmod domain build"); return 2;
+				}
+				if (info_of(&i0)) { perror("info"); return 2; }
+				break;
+			case OP_REPLACE_THEN_MOVE:	/* kind is replaced under the fault, tag is not */
+				fresh(a, sizeof a, "da", 1);
+				tag[0] = MOOB_T_STRING;
+				snprintf(tag + 1, sizeof tag - 1, "t%06d", seq++);
+				if (setxattr(up(a), "user.moob.tag", tag, 8, 0)) { perror("tag"); return 2; }
+				break;
 			case OP_BUILD:	/* a domain nobody has queried: the armed query builds it */
 				snprintf(b, sizeof b, "e%06d", seq++);
 				if (mkdir(up(b), 0755)) { perror("domain"); return 2; }
@@ -227,9 +281,55 @@ int main(int argc, char **argv)
 				r = mount("none", "/tmp/failnth-mnt", "moobfs_layer", 0, opts);
 				break;
 			}
+			case OP_LINK:
+				r = link(up(b), up(a)); break;
+			case OP_CHMOD_FILE:
+				r = chmod(up(a), 0600); break;
+			case OP_REPLACE_THEN_MOVE:
+				r = setxattr(up(a), "user.moob.kind", v, 5, 0); break;
 			}
 			e = errno;
 			hit = fired();
+			/* the state a fault leaves behind, checked disarmed (journal 0156) */
+			if (hit && (op == OP_CREATE || op == OP_MKDIR || op == OP_LINK) && !agree(a)) {
+				printf("  %s: fault %d left %s visible on one side only\n", names[op], n, a);
+				unexpected++;
+			}
+			if (hit && op == OP_CHMOD_FILE && !info_of(&i1) &&
+			    i0.index_entries - i1.index_entries != i0.index_inodes - i1.index_inodes) {
+				printf("  %s: fault %d left a record without its entry (entries %u->%u, inodes %u->%u)\n",
+				       names[op], n, i0.index_entries, i1.index_entries, i0.index_inodes,
+				       i1.index_inodes);
+				unexpected++;
+			}
+			if (hit && op == OP_REPLACE_THEN_MOVE) {
+				char to[256], lp[1100], kv[64];
+				ssize_t kl;
+				int d;
+
+				snprintf(to, sizeof to, "db/m%06d", seq++);
+				snprintf(lp, sizeof lp, "%s/%s", low, to);
+				if (rename(up(a), up(to))) { perror("move"); return 2; }
+				kl = getxattr(lp, "user.moob.kind", kv, sizeof kv);
+				d = open(up("db"), O_RDONLY | O_DIRECTORY);
+				if (kl < 2 || d < 0) { perror("move check"); return 2; }
+				q2_fill(&q[0], res, 64);
+				q[0].terms[0].type = (__u8)kv[0];
+				q[0].terms[0].len = (__u16)(kl - 1);
+				memcpy(q[0].terms[0].value, kv + 1, (size_t)kl - 1);
+				q[0].nterms = 2;
+				snprintf(q[0].terms[1].name, sizeof q[0].terms[1].name, "tag");
+				q[0].terms[1].op = MOOB_OP_EQ;
+				q[0].terms[1].type = MOOB_T_STRING;
+				q[0].terms[1].len = 7;
+				memcpy(q[0].terms[1].value, tag + 1, 7);
+				if (ioctl(d, MOOB_IOC_QUERY2, &q[0]) || q[0].count != 1) {
+					printf("  %s: fault %d: %s not answered in db with the lower's value (count %u)\n",
+					       names[op], n, to, q[0].count);
+					unexpected++;
+				}
+				close(d);
+			}
 			if (op == OP_MOUNT && !r)
 				umount("/tmp/failnth-mnt");	/* disarmed: only the mount is under test */
 			if (fd >= 0) close(fd);

@@ -259,6 +259,23 @@ later) and its verification against Linux 6.12.112 (journals 0116 and 0117):
   Reachable only by an administrator's choice of `lower=`, and already noted as R5 of
   `docs/project-review-2026-10-10.md` without a fix. **Fixed** in journal 0117 by refusing such
   a lower at mount (compatibility decision below).
+- **F13 — a chmod during the first build of a domain left the file in its answers.** The scan
+  computed a file's homogeneity before its loader registered, and stored it after a re-read
+  caused by a chmod that found no record to update. A file made 0600 stayed in the homogeneous
+  partition, and `QUERY2` returned its name and confirmed its values to users whose `getxattr`
+  fails with `EACCES`. It broke promise 3. Found by the independent review of journal 0151.
+  **Fixed** in journal 0152 (pull request 106): the check runs inside the loader, after the
+  registration and at every re-read. Advisory GHSA-5vmj-wjqc-7gx6, published.
+  *Dated note, 2026-10-20 (journal 0156): recorded here late; at the time it was cited only by
+  review and journal.*
+- **F14 — a directory more than 64 components deep was placed nowhere by the write paths.**
+  `where_is()` stops at `MOOBL_MAX_DEPTH`, so a chmod of such a directory set no fallback and a
+  value change below it was not applied, while the scan indexed the files below it in their
+  domain. `QUERY2` kept answering files under a directory made private, with their old values.
+  It broke promise 3; any user with a writable directory can build such a tree. Found by the
+  round-2 review (journal 0155, R2-1) and reproduced in the VM. **Fixed** in journal 0156: with
+  domains on, nothing more than 64 components below the mount root is indexed, a limit now
+  stated in `README.md` and `docs/when-not-to-use.md`.
 *Compatibility decision, 2026-10-15 (journal 0117).* An idmapped mount as `lower=` is refused
 with `EINVAL`. Supporting it would mean passing `mnt_idmap(lower mount)` to every delegated call
 and to the index's permission rule; that is left for a later decision with its own tests. No

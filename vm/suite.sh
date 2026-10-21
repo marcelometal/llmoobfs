@@ -389,12 +389,40 @@ run_lower() {
     mv "$LAYER/dshared/m3.md" "$LAYER/da/m9.md" && chown 1001:1001 "$LAYER/da/m9.md" && chmod 0600 "$LAYER/da/m9.md" || fail "q2-move-file-$fs"
     q2cmp 1001 da 5 moved-in
     q2cmp 1001 dshared 2 moved-out
+    # V6 (journal 0155): RENAME_WHITEOUT would create a device node; the layer refuses it
+    echo w > "$LAYER/dshared/wo.src" || fail "v6-file-$fs"
+    [ "$("$BIN/query" "$LAYER" whiteout "$LAYER/dshared/wo.src" "$LAYER/dshared/wo.dst")" = "whiteout 22" ] || fail "v6-rename-whiteout-not-refused-$fs"
+    rm "$LAYER/dshared/wo.src" || fail "v6-clean-$fs"
+    # T3 (journal 0155): an extended ACL on the domain directory itself. dacl is 0750 and 1001's,
+    # its file 0640: without the ACL only 1001 and its group traverse and read it. The ACL lets
+    # 1002 traverse, so the file must leave the homogeneous answers, or 1002 would receive it.
+    # Set before the remount, so that the build decides, not a hook (the hook sets the fallback).
+    mkdir -m 0750 "$LAYER/dacl" && echo t3 > "$LAYER/dacl/f.md" && chmod 0640 "$LAYER/dacl/f.md" || fail "t3-mk-$fs"
+    "$BIN/moobfs-attr" set "$LAYER/dacl/f.md" kind string note >/dev/null || fail "t3-attr-$fs"
+    chown -R 1001:1001 "$LAYER/dacl" && "$TOOLS/setfacl" -m u:1002:rx "$LAYER/dacl" || fail "t3-acl-$fs"
     # a remount rebuilds the same partitions and clears the fallback
     umount "$LAYER" && mount -t moobfs_layer -o lower="$LOWER" none "$LAYER" || fail "q2-remount-$fs"
     "$BIN/query" "$LAYER" info | grep -q 'fallback_domains=0' || fail "q2-fallback-cleared-$fs"
     q2cmp 1001 da 5 remount-a
     q2cmp 1002 db 3 remount-b
     q2cmp 1002 dshared 2 remount-shared
+    "$BIN/query" --uid 1002 "$LAYER" open dacl/f.md | grep -q 'Permission denied' || fail "t3-precondition-$fs"
+    "$BIN/query" --uid 1002 "$LAYER/dacl" q2 kind eq string note > /tmp/k.txt || fail "t3-query-$fs"
+    [ ! -s /tmp/k.txt ] || { cat /tmp/k.txt; fail "t3-acl-on-domain-directory-leaks-$fs"; }
+    "$BIN/query" "$LAYER" info | grep -q 'fallback_domains=0' || fail "t3-fallback-$fs"
+    # T4 (journal 0155): writes under a private directory inside a built domain. What a write or
+    # a rename puts below dshared/priv (0700, root's) must stay out of 1001's homogeneous
+    # answers, decided by the write paths, while the domain stays out of fallback mode.
+    # modes from umask, not chmod: a chmod of a directory in the domain would set the fallback
+    ( umask 077 && mkdir "$LAYER/dshared/priv" ) || fail "t4-mkdir-$fs"
+    ( umask 022 && echo t4 > "$LAYER/dshared/priv/w.md" ) || fail "t4-file-$fs"
+    "$BIN/moobfs-attr" set "$LAYER/dshared/priv/w.md" kind string note >/dev/null || fail "t4-attr-$fs"
+    mv "$LAYER/dshared/m1.md" "$LAYER/dshared/priv/r.md" || fail "t4-rename-$fs"
+    "$BIN/query" "$LAYER" info | grep -q 'fallback_domains=0' || fail "t4-fallback-$fs"
+    "$BIN/query" --uid 1001 "$LAYER/dshared" q2 kind eq string note > /tmp/k.txt || fail "t4-query-$fs"
+    grep -q 'priv/' /tmp/k.txt && { cat /tmp/k.txt; fail "t4-private-directory-leaks-$fs"; }
+    mv "$LAYER/dshared/priv/r.md" "$LAYER/dshared/m1.md" && rm -rf "$LAYER/dshared/priv" "$LAYER/dacl" || fail "t4-clean-$fs"
+    echo "HOMOGENEITY_GAPS_PASS: $fs, ACL on the domain directory (T3), writes under a private directory (T4)"
     # QUERY2 ordering and cursor (phase Q2b, spec test 7): 30 files in domain da with a time
     # attribute (ties included), two of them with an int64 under the same name, and string
     # titles, ten of them longer than the cursor's inline space
@@ -434,6 +462,14 @@ run_lower() {
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --limit 9 --cursor-in /tmp/c1 kind eq string note)" = "q2 0" ] || fail "q2b-cursor-other-limit-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --cursor-in /tmp/c1 kind exists x x)" = "q2 116" ] || fail "q2b-cursor-other-query-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --cursor-in /tmp/c1 --order created time asc kind eq string note)" = "q2 116" ] || fail "q2b-cursor-other-order-$fs"
+    # T2 (journal 0155): the MAC alone must refuse a cursor whose fields changed while its query
+    # hash (offset 16 of struct moobl_cursor) stayed valid: the pad (5), the high byte of the
+    # inode (15) and the last inline value byte (119), all zero in this cursor
+    for off in 5 15 119; do
+        cp /tmp/c1 /tmp/ct && printf '\377' | dd of=/tmp/ct bs=1 seek=$off conv=notrunc 2>/dev/null || fail "t2-patch-$fs"
+        cmp -s /tmp/c1 /tmp/ct && fail "t2-patch-changed-nothing-$off-$fs"
+        [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --limit 3 --cursor-in /tmp/ct kind eq string note)" = "q2 116" ] || fail "t2-tampered-cursor-accepted-at-$off-$fs"
+    done
     chmod 0700 "$LAYER/da/sub" || fail "q2b-fallback-$fs"
     [ "$("$BIN/query" --uid 1001 "$LAYER/da" q2errno --limit 3 --cursor-in /tmp/c1 kind eq string note)" = "q2 116" ] || fail "q2b-cursor-fallback-$fs"
     q2ord fallback-pages 14 --order created time desc --limit 4 --pages kind eq string note -- --order created time desc "$LOWER/da" kind eq string note

@@ -344,6 +344,20 @@ static void entry_free(struct moobl_index *ix, struct moobl_ix_entry *e)
 	kfree(e);
 }
 
+/*
+ * A record that lost part of its file's attributes is dropped whole (journal 0156): with no
+ * record, rec_whole() cannot vouch for it, and a rename or a link reads the file again from
+ * the lower filesystem instead of carrying the partial record into another built domain.
+ */
+static void rec_drop(struct moobl_index *ix, struct moobl_ix_inode *rec)
+{
+	struct moobl_ix_entry *e, *tmp;
+
+	list_for_each_entry_safe(e, tmp, &rec->entries, by_ino)
+		entry_free(ix, e);
+	inode_rec_put_if_empty(ix, rec);
+}
+
 static struct moobl_ix_entry *entry_find(struct moobl_ix_inode *rec, const char *name)
 {
 	struct moobl_ix_entry *e;
@@ -425,8 +439,12 @@ static int rec_set_partition(struct moobl_index *ix, struct moobl_ix_inode *rec,
 	}
 	rec->domain = pl->domain;
 	rec->hetero = pl->hetero;
-	if (err)
+	if (err) {
+		/* the entries that moved go too: the caller frees the record (rec_drop) */
+		while (!list_empty(&rec->entries))
+			entry_free(ix, list_first_entry(&rec->entries, struct moobl_ix_entry, by_ino));
 		domain_lost(ix, pl->domain, err);
+	}
 	return err;
 }
 
@@ -438,6 +456,7 @@ static int index_put(struct moobl_index *ix, u64 ino, const struct moobl_place *
 	struct moobl_ix_name *nm;
 	struct moobl_ix_entry *e, *old;
 	u16 len = (u16)(size - 1);
+	int err;
 
 	lockdep_assert_held_write(&ix->lock);
 	if (value[0] == MOOB_T_RAW)
@@ -445,25 +464,29 @@ static int index_put(struct moobl_index *ix, u64 ino, const struct moobl_place *
 	rec = inode_rec_get(ix, ino);
 	if (IS_ERR(rec))
 		return PTR_ERR(rec);
-	rec_set_partition(ix, rec, pl);
+	err = rec_set_partition(ix, rec, pl);
+	if (err) {
+		inode_rec_put_if_empty(ix, rec);
+		return err;
+	}
 	old = entry_find(rec, name);
 	if (old)
 		entry_free(ix, old);	/* before name_get: freeing may drop the name node */
 	nm = name_get(ix, name, rec->domain, rec->hetero);
 	if (IS_ERR(nm)) {
-		inode_rec_put_if_empty(ix, rec);
+		rec_drop(ix, rec);	/* the old value is gone, the new one not stored */
 		return PTR_ERR(nm);
 	}
 	if (charge(ix, sizeof(*e) + len)) {
 		name_put_if_empty(ix, nm);
-		inode_rec_put_if_empty(ix, rec);
+		rec_drop(ix, rec);
 		return -ENOMEM;
 	}
 	e = kmalloc(sizeof(*e) + len, GFP_KERNEL);
 	if (!e) {
 		uncharge(ix, sizeof(*e) + len);
 		name_put_if_empty(ix, nm);
-		inode_rec_put_if_empty(ix, rec);
+		rec_drop(ix, rec);
 		return -ENOMEM;
 	}
 	e->name = nm;
@@ -1096,11 +1119,27 @@ static int index_replace(struct moobl_index *ix, u64 ino, const struct moobl_pla
 static void record_dentry_path(struct moobl_index *ix, struct moobl_ix_inode *rec,
 			       struct dentry *dentry);
 
+/* Whether dentry still has the last component of path as its name (the rename takes d_lock). */
+static bool name_is(struct dentry *dentry, const char *path)
+{
+	const char *base = strrchr(path, '/');
+	size_t len;
+	bool same;
+
+	base = base ? base + 1 : path;
+	len = strlen(base);
+	spin_lock(&dentry->d_lock);
+	same = dentry->d_name.len == len && !memcmp(dentry->d_name.name, base, len);
+	spin_unlock(&dentry->d_lock);
+	return same;
+}
+
 /*
  * Brings the index to what the lower filesystem holds for one file or directory, placed at
  * pl. A dentry that was removed meanwhile is skipped, and so is one that left parent, the
- * lower directory its name was read from (when given): the write path that removed or moved
- * it has updated the index. The name comes from path (the scan) or from where (a layer dentry).
+ * lower directory its name was read from (when given), and one whose name is no longer the last
+ * component of path: the write path that removed, moved or renamed it has updated the index.
+ * The name comes from path (the scan) or from where (a layer dentry).
  * With dom (the lower domain directory), the file's own homogeneity is not taken from pl but
  * decided here at every reading, after the loader is registered: a change of permissions that
  * completed before is seen by the reading, one that runs after makes the reading be done
@@ -1130,6 +1169,8 @@ static int index_load(struct super_block *sb, struct dentry *lower, struct dentr
 			break;	/* removed */
 		if (parent && READ_ONCE(lower->d_parent) != parent)
 			break;	/* renamed away */
+		if (path && !IS_ROOT(lower) && !name_is(lower, path))
+			break;	/* renamed within its directory: the rename hook adopted it (0156) */
 		if (dom && !pl->hetero) {
 			cur.hetero = !target_ok(li, dom, &err);
 			if (err)	/* an ACL that could not be read is not an answer */
@@ -1340,8 +1381,8 @@ static int scan_child(struct scan_job *job, struct scan_dir *cur, struct scan_na
 	char *cpath;
 	int err = 0;
 
-	if (IS_ERR(child))
-		return PTR_ERR(child);
+	if (IS_ERR(child))	/* ENOENT: the directory died after its names were read (R2-10) */
+		return PTR_ERR(child) == -ENOENT ? 0 : PTR_ERR(child);
 	if (d_really_is_negative(child) || !(d_is_dir(child) || d_is_reg(child)))
 		goto out;
 	if (!job->index && !d_is_dir(child))
@@ -1355,6 +1396,16 @@ static int scan_child(struct scan_job *job, struct scan_dir *cur, struct scan_na
 	}
 	if (moobl_casefolded(child))	/* refused by lookups, so out of the answers too */
 		goto out;
+	if (IX(job->sb)->domain_depth && cur->depth >= MOOBL_MAX_DEPTH) {
+		/*
+		 * Beyond the depth where_is() can walk, the write paths place nothing: a chmod there
+		 * sets no fallback and a write is not applied. What they cannot keep current is not
+		 * indexed either (journal 0156).
+		 */
+		pr_info_once("moobfs_layer: names more than %d components below the mount root are left out of the index\n",
+			     MOOBL_MAX_DEPTH);
+		goto out;
+	}
 	cpath = kasprintf(GFP_KERNEL, "%s%s%.*s", cur->path, cur->path[0] ? "/" : "", sn->len,
 			  sn->name);
 	if (!cpath) {
@@ -1805,15 +1856,18 @@ static void record_dentry_path(struct moobl_index *ix, struct moobl_ix_inode *re
 			       struct dentry *dentry)
 {
 	char *buf = (char *)__get_free_page(GFP_KERNEL);
-	char *p;
+	char *p = buf ? dentry_path_raw(dentry, buf, PAGE_SIZE) : ERR_PTR(-ENOMEM);
 
 	lockdep_assert_held_write(&ix->lock);
-	if (!buf)
-		return;
-	p = dentry_path_raw(dentry, buf, PAGE_SIZE);
-	if (!IS_ERR(p))
-		index_set_path(ix, rec, *p == '/' ? p + 1 : p);
-	free_page((unsigned long)buf);
+	if (IS_ERR(p) || index_set_path(ix, rec, *p == '/' ? p + 1 : p)) {
+		/* no name rather than the old one: QUERY then takes the dentry cache or none (0156) */
+		if (rec->path)
+			uncharge(ix, strlen(rec->path) + 1);
+		kfree(rec->path);
+		rec->path = NULL;
+	}
+	if (buf)
+		free_page((unsigned long)buf);
 }
 
 int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *name,
@@ -2052,7 +2106,8 @@ void moobl_index_renamed(struct super_block *sb, struct dentry *moved, struct de
 		}
 	} else if (rec && rec_whole(ix, rec)) {
 		record_dentry_path(ix, rec, where);
-		rec_set_partition(ix, rec, &pl);
+		if (rec_set_partition(ix, rec, &pl))
+			inode_rec_put_if_empty(ix, rec);	/* emptied: nothing else frees it (R2-8) */
 	} else {
 		/*
 		 * No record, or one that may hold only part of the file: in a domain being built
@@ -2115,8 +2170,8 @@ void moobl_index_perm_changed(struct super_block *sb, struct dentry *dentry)
 	nofs = place_and_lock(ix, dentry, &pl);
 	index_touched(ix, d_inode(dentry)->i_ino);
 	rec = xa_load(&ix->inodes, d_inode(dentry)->i_ino);
-	if (rec)
-		rec_set_partition(ix, rec, &pl);
+	if (rec && rec_set_partition(ix, rec, &pl))
+		inode_rec_put_if_empty(ix, rec);	/* emptied: nothing else frees it (R2-8) */
 	ix_write_unlock(ix, nofs);
 }
 

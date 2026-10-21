@@ -11,7 +11,7 @@ a problem and what to expect; the longer-term plan is in
 | Version | Supported |
 | --- | --- |
 | `main` | Use this. Fixes land here only; there are no backports and no maintenance branches. |
-| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: fixes F1 to F12 except fair shares of F2, but contains review 0144 R1/R2 and the stale-homogeneity defect of review 0151; their corrections (journals 0149, 0150, 0152) are newer than this tag and land on `main` only. |
+| `v0.4.1-experimental` | Source snapshot of 2026-10-20, not supported: fixes F1 to F12 except fair shares of F2, but contains review 0144 R1/R2, F13 (review 0151) and F14 with the other defects of review round 2 (journal 0155); their corrections (journals 0149, 0150, 0152, 0156) are newer than this tag and land on `main` only. |
 | `v0.4.0-experimental` | Source snapshot, not supported. Its queries are about twice as slow as they should be (a buffer allocated per query, journal 0139). |
 | `v0.3.0-experimental` | Source snapshot, not supported. It carries defects fixed since, security ones included (findings F6 to F12 of ADR-0011; see `CHANGELOG.md`). |
 | `v0.1.0-experimental`, `v0.2.0-experimental` | Source snapshots, not supported; they carry more of the same defects. |
@@ -136,5 +136,5 @@ left the file in the domain's `QUERY2` answers to callers who can no longer read
 the VM and fixed in journal 0152, with a suite test and a negative round. The threat and credential
 model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
 (accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and the
-findings F1 to F12, of which part of F2 (fair shares of the index budget) is open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
+findings F1 to F14, of which part of F2 (fair shares of the index budget) is open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
 fstests, syzkaller, hostile-lower handling and the other open items.

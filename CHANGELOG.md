@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Validation (journal 0170): reconcile PR 109 with current documentation and add
+  VM regressions for failed rename-path allocation and removal during an index scan.
+
 - Documentation (journal 0168): add the Zenodo version DOI badge and full archived-snapshot
   citation to both READMEs, distinguishing commit `02381fba` from the earlier source tag.
 
@@ -46,6 +49,14 @@
   removal; much of Q1's p99 difference is associated with the first cycle.
   Reproducible analysis of existing data, not a new benchmark or a causal attribution.
 
+- Independent review of 3627172, round 2 (journal 0155): twelve findings, two of them
+  reproduced in the VM with `tests/review-3627172-vm.sh`: a directory 65 or more components
+  below the mount root is placed nowhere by the write paths, so its chmod sets no fallback and
+  a value change below it is not indexed (R2-1); a file renamed inside its directory while the
+  scan reads it keeps the scan's listing name (R2-2). Ten more findings from reading the code
+  (partial records carried across domains, a failed upper-inode creation, and lesser ones) and
+  eleven test gaps, two of them high (no test exercises an ACL on the domain directory, nor a
+  write under a private intermediate directory).
 - syzkaller (journal 0143): a fifth six-hour run, no report; the ioctl and attribute handlers at
   88.7 % of their PCs, above the 85 % threshold of security roadmap S3. The fix of journal 0139
   confirmed with 40 repetitions: within 1 to 3 % of module 0102 on filtered queries.

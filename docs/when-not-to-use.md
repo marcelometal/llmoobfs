@@ -46,6 +46,13 @@ and query evidence (journals [0088](history/0088-m4-report.md) and
 
 ## 3. When MoobFS is probably not worth it
 
+- **Deep trees with domains.** Nothing more than 64 components below the mount root is indexed
+  or answered by `QUERY2`; the files themselves still work (finding F14, journal 0156). A memory
+  store laid out deeper than that gets no queries for those files.
+- **Round 2 of the review** ([0155](history/0155-review-3627172-round-2.md)) found further defects
+  in `v0.4.1-experimental`, F14 among them. They are fixed in journal 0156 or recorded as issues;
+  the tag still carries them.
+
 The two defects from [review 0144](history/0144-independent-review.md) remain in
 `v0.4.1-experimental`, and so does a third, from [review 0151](history/0151-review-d110d4e.md): a
 chmod during the first build of a domain could leave the file in `QUERY2` answers to users who can
@@ -92,7 +99,7 @@ These limits update the cases discussed in the value assessment, §9.6.
   retain about 1.1 MB per open file until close (journal 0139), outside the index budget.
 - **You need it in production today, or in any critical setting.** Only source pre-release tags exist; the
   module is one author's code; its own tests and two source reviews by AI assistants found
-  kernel-side defects, security ones among them (findings F1 to F12 of ADR-0011); there is no
+  kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011); there is no
   outside human review; fstests ran as its `quick` group only and syzkaller for five six-hour
   rounds. A module bug can mean a kernel panic or data loss.
 - **The team cannot maintain an out-of-tree kernel module** across kernel updates, signing

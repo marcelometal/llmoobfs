@@ -57,6 +57,15 @@ pull-request CI is still a separate pre-merge gate, and publication awaits the
 maintainer's approval. This
 does not close the S3 per-function coverage gap or the performance residual.
 
+Planned from ADR-0017 (accepted 2026-10-20, journal 0156), the answers to the design objections of
+review round 2:
+- **Per-result checks as the default?** Measure every query answered with per-result permission
+  checks (the fallback mode) against the homogeneous partition, by the method of
+  `docs/benchmark-plan.md`. If the difference is small, per-result checks become the default.
+- **The user-space comparison, extended.** The `udx` baseline (journals 0092, 0094) under
+  concurrent writes and renames, right after permission changes, and with a `fanotify` mark;
+  publish what each side gets right and wrong.
+
 ## Depends on validation
 
 These are deliberately **not** scheduled: each is conditioned on M4 results or
