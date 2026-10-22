@@ -1,6 +1,6 @@
 # 0179 — Concurrent budget release under native KVM
 
-Date: 2026-10-22. Status: **locally validated; unpublished**.
+Date: 2026-10-22. Status: **locally validated; PR 127 open, remote CI pending**.
 
 ## Goal and evidence
 
@@ -71,3 +71,14 @@ evidence, not a literal `make vm-test` invocation. A finite KVM/KASAN sample
 cannot prove the absence of every race. No PR, remote CI, merge or issue
 reopening/closure is claimed. The next stabilization units are the resource-
 cost investigations of issues 116 and 118, after publication is authorized.
+
+## Publication update — 2026-10-22
+
+The three signed commits on `codex/overbudget-kvm-0179` were pushed and
+[PR 127](https://github.com/studiomoob/llmoobfs/pull/127) was opened against
+`main`. GitHub reported the branch mergeable and its checks queued or in
+progress at publication. The prior local validation remains the evidence for
+the technical result; remote checks have not yet been counted as passed. No
+merge or issue state change was performed. The next work is to inspect the PR
+checks and review, then reconcile the journal and issue states after any
+authorized integration.

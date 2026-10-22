@@ -1,6 +1,6 @@
 # 0178 — Unprivileged queries under allocation faults (issue 114, T9)
 
-Date: 2026-10-22. Status: **locally validated; unpublished**.
+Date: 2026-10-22. Status: **locally validated; PR 127 open, remote CI pending**.
 Estimated effort: M (one to three days). Work started on 2026-10-22; exact
 labor time has not yet been measured.
 
@@ -117,3 +117,10 @@ as a successful literal `make lint` invocation.
 Reconcile issue 114 only after the tested work is integrated. Investigate the
 KVM over-budget failure as a separate stabilization unit before claiming the
 budget race closed across native KVM schedules.
+
+## Publication update — 2026-10-22
+
+The signed T9 commit `935e8a0` was pushed as part of
+[PR 127](https://github.com/studiomoob/llmoobfs/pull/127), alongside the
+follow-up recorded in journal 0179. GitHub checks were pending when this note
+was added. This publication does not establish a merge or close issue 114.
