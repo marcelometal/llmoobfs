@@ -13,12 +13,18 @@
 > **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
 > human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
 > tag, `v0.4.1-experimental` (2026-10-20), is a source snapshot before this review batch.
-> The two findings of the [current review](docs/history/0144-independent-review.md)
-> have corrections in the review batch, which passed the full integrated VM suite.
-> The local batch KASAN/UBSAN/lockdep suite also passed; pull-request CI is a separate pre-merge gate.
+> The two findings of the [independent review](docs/history/0144-independent-review.md)
+> have corrections on `main`; the review batch passed the full integrated VM suite
+> and local KASAN/UBSAN/lockdep. The required pull-request checks passed before merge.
 > `v0.4.1-experimental` still contains both defects. A later review (journal 0151) found a third,
 > a chmod during an index build that left the file in `QUERY2` answers; fixed in journal 0152.
 > See [Limitations](#limitations).
+
+The later domain-rename and concurrent index-budget corrections were merged
+through [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) after its
+11 reported checks passed; issues 110 and 111 were closed. This does not
+resolve the remaining resource-cost questions in issues 116 and 118 or the
+unprivileged allocation-fault test gap in issue 114 ([roadmap](ROADMAP.md)).
 
 ## The problem
 

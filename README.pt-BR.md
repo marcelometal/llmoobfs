@@ -17,13 +17,19 @@
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
 > diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
 > código anterior a este lote de revisão. Os dois achados da
-> [revisão atual](docs/history/0144-independent-review.md) têm correções no lote de revisão,
-> que passou na suíte completa integrada em VM e na KASAN/UBSAN/lockdep local.
-> A CI do pull request é uma etapa separada e obrigatória antes do merge.
+> [revisão independente](docs/history/0144-independent-review.md) têm correções no lote de revisão,
+> já integrado à `main`. Ele passou na suíte completa integrada em VM e na
+> KASAN/UBSAN/lockdep local; as verificações obrigatórias do PR passaram antes do merge.
 > A `v0.4.1-experimental` ainda contém
 > ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
 > construção do índice que deixava o arquivo nas respostas do `QUERY2`; corrigido no diário 0152.
 > Veja [Limitações](#limitações).
+
+As correções posteriores para renomeação de domínio e orçamento do índice
+foram integradas pela [PR 126](https://github.com/studiomoob/llmoobfs/pull/126)
+após suas 11 verificações passarem; as issues 110 e 111 foram fechadas. Isso
+não resolve as questões de custo de recursos das issues 116 e 118 nem a lacuna
+do teste de falha de alocação sem privilégios da issue 114 ([roadmap](ROADMAP.md)).
 
 ## O problema
 

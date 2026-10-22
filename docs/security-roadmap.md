@@ -44,9 +44,14 @@ with findings F1 to F5 added since. Outside review was requested on 2026-10-13 (
 defects were reproduced on an unfixed module, corrected, and validated in the
 complete native VM suite over ext4, btrfs and XFS. The corrected kernel/layer
 code passed KASAN/UBSAN/lockdep on the dedicated host. The combined
-[PR 126](https://github.com/studiomoob/llmoobfs/pull/126) is open; published-head CI,
-review and merge remain separate gates. Neither correction provides S9 fair
+[PR 126](https://github.com/studiomoob/llmoobfs/pull/126) was open at that
+checkpoint; published-head CI, review and merge were separate gates. Neither correction provides S9 fair
 budget sharing or completes the broader S14–S21 work below.
+
+*Status correction, 2026-10-22 (journal 0177):* the preceding update describes
+the pre-merge state. All 11 reported checks on PR 126 passed; it was merged
+on 2026-10-21, and issues 110 and 111 were closed. S9 fair sharing and the
+S14–S21 test plan remain separate work.
 
 *Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with

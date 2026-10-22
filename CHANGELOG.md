@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Documentation (journal 0177): reconcile the merged PR 126 and PR 75,
+  closed issues 110/111 and successful pull-request checks in current-state
+  roadmaps and both READMEs; preserve the dated pre-merge records.
+
 - Documentation (journal 0176): record the locally validated issue 110/111
   correction batch in PR 126, its publication gate and the paused follow-up order in
   the roadmap and security roadmap; reconcile issue 112 as completed and keep
