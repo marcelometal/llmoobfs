@@ -92,6 +92,14 @@ budget test on ext4, although the reference Docker VM and full KASAN runs
 passed. Investigate that KVM finding before treating the budget race as fully
 stabilized; journal 0178 records the exact results and limits.
 
+*Local follow-up, 2026-10-22 ([0179](docs/history/0179-kvm-overbudget-race-followup.md)):*
+The dedicated-host KVM failure reproduced in an isolated run. The local
+correction tries the next eligible built domain if the oldest one's build
+mutex is busy. The targeted KVM case and the full Docker VM, native KVM and
+KASAN/UBSAN/lockdep suites passed on the changed module, including budget
+checks on ext4, btrfs and XFS. This remains unpublished; PR CI and integration
+are separate gates. Issues 116 and 118 remain next in the stabilization order.
+
 Planned from ADR-0017 (accepted 2026-10-20, journal 0156), the answers to the design objections of
 review round 2:
 - **Per-result checks as the default?** Measure every query answered with per-result permission

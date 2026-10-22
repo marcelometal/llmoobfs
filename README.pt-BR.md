@@ -31,6 +31,11 @@ após suas 11 verificações passarem; as issues 110 e 111 foram fechadas. Isso
 não resolve as questões de custo de recursos das issues 116 e 118 nem conclui
 a validação e integração da correção para falha de alocação sem privilégios da
 issue 114 ([roadmap](ROADMAP.md)).
+Um acompanhamento ainda não publicado encontrou uma recusa de orçamento
+concorrente sob KVM nativo na máquina dedicada. Tentar outro domínio elegível
+quando o mutex de construção do mais antigo está ocupado passou nas suítes
+completas de VM Docker, KVM nativo e KASAN local; a CI do PR e a integração
+ainda estão pendentes ([diário 0179](docs/history/0179-kvm-overbudget-race-followup.md)).
 
 ## O problema
 
@@ -255,6 +260,9 @@ agora testa consultas sem privilégios com falhas de alocação injetadas. As
 rodadas KASAN direcionada e completa e a suíte nativa `make vm-test` passaram
 localmente; publicação e conciliação da issue ainda estão pendentes
 ([diário 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)).
+O acompanhamento da corrida de orçamento foi reproduzido antes da correção
+local e passou nas suítes completas de VM Docker, KVM na máquina dedicada e
+KASAN depois dela ([diário 0179](docs/history/0179-kvm-overbudget-race-followup.md)).
 
 
 ## O que foi medido

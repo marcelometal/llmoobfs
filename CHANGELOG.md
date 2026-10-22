@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fix (journal 0179): when the least-recently-used domain is being built,
+  try another eligible built domain before refusing an index-budget build.
+  The native KVM concurrency test on the dedicated host failed before this
+  change and passed on ext4, btrfs and XFS after it. The full reference Docker
+  VM suite, full native KVM run and full local KASAN/UBSAN/lockdep run passed.
+  Publication and PR CI remain pending.
+
 - Fix/tests (journal 0178, issue 114 T9): propagate `ENOMEM` when a per-result
   permission lookup cannot decide under an injected allocation failure,
   instead of returning a successful answer that silently omits a readable

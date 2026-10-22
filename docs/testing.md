@@ -144,6 +144,10 @@ btrfs and XFS; the full suite includes it too. The fixture alternates queries
 between two domains that each fit the budget alone but cannot coexist, while
 four other domains are rebuilt after renames. It makes at least 30 alternating
 queries per lower, subject to a sixfold time cap.
+Journal 0179 records a native KVM negative reproduction and a local correction
+for a busy oldest release candidate, followed by passing complete Docker VM,
+native KVM and KASAN runs. The KVM wrapper was a dedicated-host cross-check;
+`make vm-test` remains the reference invocation.
 
 | Marker | Proves | Does not prove |
 | --- | --- | --- |

@@ -26,6 +26,11 @@ through [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) after its
 resolve the remaining resource-cost questions in issues 116 and 118 or the
 complete validation and integration of the unprivileged allocation-fault
 correction for issue 114 ([roadmap](ROADMAP.md)).
+An unpublished follow-up found a remaining concurrent-budget refusal under
+native KVM on the dedicated host. Trying another eligible domain when the
+oldest one's build mutex is busy passed the full Docker VM, native KVM and
+local KASAN suites; PR CI and integration are still pending
+([journal 0179](docs/history/0179-kvm-overbudget-race-followup.md)).
 
 ## The problem
 
@@ -240,6 +245,9 @@ The release step also queries as uid 1001. The KASAN fault step now tests
 unprivileged queries under injected allocation failures. Its targeted and
 full KASAN runs and the native `make vm-test` suite passed locally; publication
 and issue reconciliation remain pending ([journal 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)).
+The budget-race follow-up was reproduced before its local fix and passed in
+the complete Docker VM, dedicated-host KVM and KASAN suites afterward
+([journal 0179](docs/history/0179-kvm-overbudget-race-followup.md)).
 
 
 ## What was measured

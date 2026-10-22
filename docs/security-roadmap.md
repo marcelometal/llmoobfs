@@ -53,6 +53,13 @@ the pre-merge state. All 11 reported checks on PR 126 passed; it was merged
 on 2026-10-21, and issues 110 and 111 were closed. S9 fair sharing and the
 S14–S21 test plan remain separate work.
 
+*Local follow-up, 2026-10-22 (journal 0179):* a direct native KVM run exposed
+a repeatable remaining budget refusal under concurrent builds. The local
+correction skips a busy release candidate and tries the next eligible domain.
+Its negative control failed on ext4; targeted KVM, complete Docker VM, native
+KVM and KASAN/UBSAN/lockdep runs passed on the corrected module. PR CI and
+integration remain pending; this does not provide S9 fair sharing.
+
 *Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.
