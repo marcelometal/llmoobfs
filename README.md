@@ -24,7 +24,8 @@ The later domain-rename and concurrent index-budget corrections were merged
 through [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) after its
 11 reported checks passed; issues 110 and 111 were closed. This does not
 resolve the remaining resource-cost questions in issues 116 and 118 or the
-unprivileged allocation-fault test gap in issue 114 ([roadmap](ROADMAP.md)).
+complete validation and integration of the unprivileged allocation-fault
+correction for issue 114 ([roadmap](ROADMAP.md)).
 
 ## The problem
 
@@ -235,7 +236,10 @@ remain coverage exclusions. `ipc` is built but not invoked by the suite.
 
 For targeted permission and fixed independent-encoding checks, use
 `MOOB_ONLY=permgaps make vm-test` ([journal 0172](docs/history/0172-permission-test-gaps.md)).
-The release step also queries as uid 1001; allocation-fault queries remain root-only.
+The release step also queries as uid 1001. The KASAN fault step now tests
+unprivileged queries under injected allocation failures. Its targeted and
+full KASAN runs and the native `make vm-test` suite passed locally; publication
+and issue reconciliation remain pending ([journal 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)).
 
 
 ## What was measured

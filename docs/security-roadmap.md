@@ -299,7 +299,10 @@ because it changes timing.
 Targeted test-gap follow-up (journal 0172): decisive search/truncation checks,
 attributed-directory comparisons, 18 independent fixed encoding fixtures and
 unprivileged queries across index release. These bounded scenarios do not
-complete S14/S15 below. Allocation-fault query coverage remains root-only (T9).
+complete S14/S15 below. Journal 0178 adds a separate unprivileged
+allocation-fault test for T9 and fixes a silent omission when a permission
+lookup runs out of memory. Full local KASAN and native Docker VM suites passed;
+integration remains pending.
 
 ### S14 to S21. Making the tests find what reviews found (added 2026-10-20, journal 0156)
 

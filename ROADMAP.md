@@ -80,6 +80,18 @@ There are no open pull requests at this checkpoint. Resume with issue 114's
 remaining T9 test gap, then investigate the resource-cost issues 116 and 118;
 the pause did not imply production readiness or complete S9 fair sharing.
 
+*Local progress, 2026-10-22 ([0178](docs/history/0178-unprivileged-allocation-fault-queries.md)):*
+The T9 fault test found that an allocation failure during a per-result
+permission lookup could produce a successful but incomplete QUERY2 answer.
+The local correction makes that query return `ENOMEM` and adds unprivileged
+fault cases. The full local KASAN and native Docker VM suites passed;
+publication and issue reconciliation are pending. Issues 116 and 118 remain the next
+resource-cost investigations after this step. A separate direct KVM run on the
+dedicated Mac mini repeatedly returned `ENOMEM` in the issue 111 concurrent
+budget test on ext4, although the reference Docker VM and full KASAN runs
+passed. Investigate that KVM finding before treating the budget race as fully
+stabilized; journal 0178 records the exact results and limits.
+
 Planned from ADR-0017 (accepted 2026-10-20, journal 0156), the answers to the design objections of
 review round 2:
 - **Per-result checks as the default?** Measure every query answered with per-result permission

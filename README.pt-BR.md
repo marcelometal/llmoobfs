@@ -28,8 +28,9 @@
 As correções posteriores para renomeação de domínio e orçamento do índice
 foram integradas pela [PR 126](https://github.com/studiomoob/llmoobfs/pull/126)
 após suas 11 verificações passarem; as issues 110 e 111 foram fechadas. Isso
-não resolve as questões de custo de recursos das issues 116 e 118 nem a lacuna
-do teste de falha de alocação sem privilégios da issue 114 ([roadmap](ROADMAP.md)).
+não resolve as questões de custo de recursos das issues 116 e 118 nem conclui
+a validação e integração da correção para falha de alocação sem privilégios da
+issue 114 ([roadmap](ROADMAP.md)).
 
 ## O problema
 
@@ -249,7 +250,11 @@ continuam sendo lacunas de cobertura. `ipc` é compilado, mas não invocado pela
 
 Para conferir permissões e casos fixos de codificação com expectativas independentes,
 use `MOOB_ONLY=permgaps make vm-test` ([diário 0172](docs/history/0172-permission-test-gaps.md)).
-O passo de liberação também consulta como uid 1001; a injeção de falhas ainda consulta apenas como root.
+O passo de liberação também consulta como uid 1001. O passo de falhas sob KASAN
+agora testa consultas sem privilégios com falhas de alocação injetadas. As
+rodadas KASAN direcionada e completa e a suíte nativa `make vm-test` passaram
+localmente; publicação e conciliação da issue ainda estão pendentes
+([diário 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)).
 
 
 ## O que foi medido
