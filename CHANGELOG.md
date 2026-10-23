@@ -6,7 +6,9 @@
   unprivileged `QUERY2` on a 1,000-file ext4 domain observed a first build
   and seven post-rename rebuilds, with no build on paired warm queries.
   The first build took 14.181 ms and post-rename queries 5.818–8.868 ms
-  wall time on that host; I/O and larger-scale costs remain unmeasured.
+  wall time on that host; an opt-in 7,500-file probe observed 156.833 ms
+  for the first build and 50.992–70.107 ms after renames. Process and
+  device read counters stayed at zero, so lower-I/O cost remains unmeasured.
   No module policy or production behavior changed.
 
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and

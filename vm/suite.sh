@@ -1622,8 +1622,9 @@ umount "$LAYER" && rm -rf "$LOWER/bdx" && umount "$LOWER" || fail "bd-cleanup"
 echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
 fi
 if want buildcost || { [ -n "${MOOB_ONLY:-}" ] && want buildcostlarge; }; then
-# Exploratory issue 118 probe in a disposable VM: one domain with 1000 files, one
-# cold first build, then seven directory renames with a warm query after each.
+# Exploratory issue 118 probe in a disposable VM: one domain with 1000 files,
+# one first build after drop_caches, then seven directory renames with a query
+# over the already-built index after each rebuild.
 # Counters and the build tracepoint make a missed invalidation or an accidental
 # extra build visible. The opt-in large scale uses 7500 files; it never runs as
 # part of the full suite. The probe reports only bounded per-ioctl observations.
@@ -1637,7 +1638,7 @@ bc_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).
 tr_on moobfs_domain_build || fail bc-trace-on
 sync; echo 3 > /proc/sys/vm/drop_caches || fail bc-drop-caches
 bc_before=$(bc_builds)
-"$BIN/query-build-cost" "$LAYER/d" 1001 first-cold || fail bc-first
+"$BIN/query-build-cost" "$LAYER/d" 1001 first-after-drop-caches || fail bc-first
 [ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-first-build-count
 "$BIN/query-build-cost" "$LAYER/d" 1001 first-warm || fail bc-warm
 [ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-warm-built-again

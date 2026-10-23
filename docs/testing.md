@@ -47,7 +47,8 @@ KASAN kernel used here has `CONFIG_MEMCG` disabled, so its full suite prints
 `MEMCG_SKIPPED` and tests memory safety, not cgroup charging.
 
 `MOOB_ONLY=buildcost make vm-test` runs the bounded issue 118 probe on ext4:
-1,000 attributed files in one domain, one cold first build, seven directory
+1,000 attributed files in one domain, one first build after requesting a guest
+cache drop, seven directory
 renames and a built-domain query after each build. The query process drops to
 uid/gid 1001. The Debian QEMU TCG guest checks build counters and prints
 per-ioctl wall time, process CPU time, `/proc/self/io` read-byte deltas and
@@ -57,7 +58,8 @@ per-process attribution.
 Those numbers are exploratory; only native KVM on a dedicated host is used
 for performance conclusions. In the first such run (journal 0182), the
 `read_bytes` delta was zero even for the cache-dropped first build, so this
-process counter is not treated as a measure of the lower-filesystem I/O.
+process counter is not treated as a measure of the lower-filesystem I/O. The
+first sample is not claimed to have incurred physical reads.
 `MOOB_ONLY=buildcostlarge` opts into the same probe with 7,500 files; it is
 excluded from the full suite to keep its default run bounded.
 

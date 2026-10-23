@@ -1,6 +1,6 @@
 # 0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118)
 
-Date: 2026-10-23. Status: **in progress; first bounded native-KVM probe passed**.
+Date: 2026-10-23. Status: **in progress; bounded size probes passed; policy pending**.
 Estimated effort: M (one to three days) for the investigation; started
 2026-10-23, with labor time not yet measured. A mitigation, if selected,
 needs its own effort estimate after the evidence is reviewed.
@@ -30,10 +30,12 @@ PR for journal 0181. No production module behavior has been changed.
 
 Measure before choosing a mitigation. A bounded guest step uses ext4 with one
 domain containing 1,000 attributed files, a `QUERY2` issued after dropping
-to uid/gid 1001, and the same query arguments for a cold first build, an
+to uid/gid 1001, and the same query arguments for a first build after
+requesting a cache drop, an
 already-built query, and seven directory renames each followed by a rebuild
 and another already-built query. The helper measures the ioctl's wall time,
-process user/system CPU time and `/proc/self/io` `read_bytes` delta. The
+process user/system CPU time and `/proc/self/io` `read_bytes` delta. A
+later run also sampled the ext4 device's sectors-read counter. The
 existing `moobfs_domain_build` tracepoint and `GET_INFO` counters must show
 exactly one first build and seven post-rename builds, with no build on the
 warm queries. The run is limited to a dedicated VM and this small dataset;
@@ -54,10 +56,12 @@ not been claimed as passed. The native-KVM results are recorded below.
 
 ## Next step
 
-Extend the bounded measurement to a larger domain and obtain an I/O measure
-that includes lower-filesystem work. Then weigh an explicit resource policy
-against the cost of refusing otherwise valid queries. Any selected behavior
-change needs its own regression and negative run.
+Determine why cache dropping still yielded zero device-read sectors, then
+measure lower-filesystem I/O in a controlled cold-cache setup. Use the
+bounded CPU observations below to weigh an explicit resource policy against
+the cost of refusing otherwise valid queries. Any selected behavior change
+needs its own regression and negative run. No issue-closure decision has
+been made.
 
 ## First native-KVM attempt — 2026-10-23
 
@@ -97,8 +101,8 @@ one first build and seven rebuilds, with no build on the warm queries.
 first one after `drop_caches`. This is an observed counter value, **not**
 evidence that the subtree walk performed no lower-filesystem I/O: it may
 not attribute kernel work to this process, and no block-device counter was
-measured. The one cold first build and subsequent warm-cache renames also
-are not comparable as a controlled cold-versus-warm experiment. This run
+measured. The first build after requesting a cache drop and subsequent
+renames are not comparable as a controlled cold-versus-warm experiment. This run
 does not establish a stable latency distribution, a production severity,
 cross-user eviction, or a safe CPU/I/O budget. The module's behavior was
 unchanged; no mitigation or regression-negative run is claimed.
@@ -119,6 +123,21 @@ before/after comparison with the previous run, and no lower-I/O conclusion
 can be drawn from zero counters. Log: `build/buildcost-0182-v3.log` on the
 dedicated host; the prior guest output is preserved in `build/vm-attempt2`.
 
-An opt-in `buildcostlarge` guest step now runs the same sequence with 7,500
+An opt-in `buildcostlarge` guest step runs the same sequence with 7,500
 files. The full suite retains the 1,000-file step. Its targeted native-KVM
-run is pending, so no size-scaling result is claimed yet.
+run at `d19fdb5` exited 0 with `MOOBFS_ONLY_PASS: steps buildcostlarge`.
+The first query after the cache-drop request took 156.833 ms wall and
+156.903 ms system CPU. The seven post-rename queries took 50.992–70.107 ms
+wall and about 49.9–70.0 ms system CPU, while paired queries over the built
+index took 0.020–0.104 ms wall. All eight build tracepoints returned error
+0 and reported 8,482,620 bytes of index data; `GET_INFO` again showed one
+first build, seven post-rename rebuilds and no warm-query rebuilds. Process
+read bytes and device sectors read remained zero throughout. This supports
+that a larger subtree raises CPU cost on this host, but it does not establish
+a scaling law, cold-device I/O cost or behavior under concurrent users.
+Log: `build/buildcost-0182-v4-large.log` on the dedicated host; the previous
+guest output is preserved in `build/vm-attempt3`.
+
+The phase label `first-cold` in these three run logs describes the requested
+cache drop, not verified physical reads. The script now uses the more precise
+label `first-after-drop-caches`; only this label changed after the large run.
