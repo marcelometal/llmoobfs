@@ -449,6 +449,15 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   domínio é construído por uma varredura linear na primeira consulta depois da montagem, e de novo
   depois de ser liberado ou de ter um diretório renomeado dentro dele; o orçamento e o shrinker só
   foram testados em árvores pequenas (diário 0101).
+- `index_budget` não limita CPU nem E/S no sistema de arquivos inferior durante uma construção.
+  Uma medição delimitada em KVM nativo do módulo atual observou 160 KiB e 1,90 MiB de leituras
+  nas primeiras consultas de domínios ext4 com 1.000 e 7.500 arquivos; a consulta de um uid
+  também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
+  compartilhado pequeno ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  São observações de uma rodada, não uma garantia de latência. A issue 118 segue
+  aberta; a [ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)
+  propõe limites, ainda não implementados. Não exponha uma montagem multiusuário a consultas
+  não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).

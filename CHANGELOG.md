@@ -8,7 +8,12 @@
   The first build took 14.181 ms and post-rename queries 5.818–8.868 ms
   wall time on that host; an opt-in 7,500-file probe observed 156.833 ms
   for the first build and 50.992–70.107 ms after renames. Process and
-  device read counters stayed at zero, so lower-I/O cost remains unmeasured.
+  device read counters stayed at zero until a remount-based cold-cache
+  control observed 160 KiB and 1.90 MiB read on first builds of 1,000 and
+  7,500 files. A two-uid probe demonstrated shared-budget eviction and
+  rebuilding across private domains. The maintainer selected a resource-limit
+  design; ADR-0019 proposes cumulative scan-work and rebuild-frequency
+  bounds, with numerical thresholds and implementation still pending.
   No module policy or production behavior changed.
 
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and

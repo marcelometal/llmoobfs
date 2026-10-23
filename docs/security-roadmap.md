@@ -241,6 +241,15 @@ turning that rule on, and the build-time check of an unlisted kernel.
 
 ### S9. Resource limits and denial of service
 
+*Local measurement, 2026-10-23 (journal 0182, issue 118):* bounded native-KVM
+probes measured first-build CPU and lower-device reads on 1,000- and
+7,500-file ext4 domains, repeated CPU work after seven directory renames,
+and budget eviction between private domains queried by two unprivileged
+uids. This is evidence of the existing cost, not a new CPU/I/O limit or a
+decision to accept the risk. The maintainer chose to design work and rebuild
+frequency limits ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md));
+threshold selection, implementation, validation and issue closure remain open.
+
 - Issue 116 / ADR-0018 accounts user-triggered query and index allocations to
   the allocating task's memory cgroup; journal 0180 records negative controls,
   full native-KVM and integrated KASAN/UBSAN/lockdep passes. The local branch

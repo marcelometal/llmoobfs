@@ -97,6 +97,13 @@ These limits update the cases discussed in the value assessment, §9.6.
   the budget fails with `ENOMEM`. Users still compete for the shared budget and can force
   repeated releases and scans; fair shares are not implemented. A query buffer can additionally
   retain about 1.1 MB per open file until close (journal 0139), outside the index budget.
+- **Untrusted users share a mount.** An authorized `QUERY2` can scan its
+  entire domain on first use and after directory renames. The memory budget
+  does not limit that scan's CPU or lower I/O, and one uid's query can release
+  another uid's built domain. Bounded native-KVM examples and their limits
+  are in [journal 0182](history/0182-query-build-resource-cost-investigation.md);
+  issue 118 remains open; [ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)
+  proposes limits that are not yet implemented.
 - **You need it in production today, or in any critical setting.** Only source pre-release tags exist; the
   module is one author's code; its own tests and two source reviews by AI assistants found
   kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011); there is no

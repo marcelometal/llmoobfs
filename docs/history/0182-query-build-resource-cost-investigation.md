@@ -1,6 +1,6 @@
 # 0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118)
 
-Date: 2026-10-23. Status: **in progress; bounded size probes passed; policy pending**.
+Date: 2026-10-23. Status: **measurement complete; resource-limit direction chosen, design pending validation**.
 Estimated effort: M (one to three days) for the investigation; started
 2026-10-23, with labor time not yet measured. A mitigation, if selected,
 needs its own effort estimate after the evidence is reviewed.
@@ -56,12 +56,11 @@ not been claimed as passed. The native-KVM results are recorded below.
 
 ## Next step
 
-Determine why cache dropping still yielded zero device-read sectors, then
-measure lower-filesystem I/O in a controlled cold-cache setup. Use the
-bounded CPU observations below to weigh an explicit resource policy against
-the cost of refusing otherwise valid queries. Any selected behavior change
-needs its own regression and negative run. No issue-closure decision has
-been made.
+Use the bounded CPU, I/O and cross-user observations below to choose an
+explicit resource policy with the maintainer. A behavior change needs its
+own ADR, regression and negative run. If the current behavior is accepted
+for experimental deployments, the public limitations must say so clearly.
+No issue-closure decision has been made.
 
 ## First native-KVM attempt — 2026-10-23
 
@@ -193,4 +192,62 @@ domain's retained size, then mounts with a budget that fits one but not
 both. Queries under 1001, 1002 and 1001 in that order must show three builds
 and budget releases in `GET_INFO` and tracepoints. This distinguishes
 cross-user eviction from the already demonstrated same-domain rename cost.
-The guest result is pending; no eviction result is claimed yet.
+The targeted `MOOB_ONLY=buildcostevict` KVM run at `cb019c7` exited 0.
+The measured first domain used 1,131,120 index bytes; the test chose a
+1,762,216-byte mount budget, enough for one of the private domains but not
+both. Three successful unprivileged queries ran as uid 1001 on `a`, uid
+1002 on `b`, then uid 1001 on `a` again. `GET_INFO` counted three builds
+and at least two releases; the tracepoint recorded `by=budget` releases of
+the 1,131,120-byte `a` and `b` domains in turn. The three queries took
+19.334, 29.243 and 23.703 ms wall time respectively in this one warm-cache
+run. The module did not change. This directly demonstrates cross-user
+eviction and repeated CPU cost under a shared mount budget, not its
+frequency or severity in production. Log:
+`build/buildcost-0182-v7-cross-user.log` on the dedicated host.
+
+## Alternatives and decision gate
+
+The existing on-demand design deliberately performs a full synchronous
+domain scan (ADR-0012), and ADR-0011 does not promise fair budget shares or
+other resource limits. The evidence above makes the cost and cross-user
+effect concrete; it does not by itself choose a policy.
+
+- Retain the current query behavior and explicitly limit deployment to
+  trusted or single-user mounts until S9. This avoids denying a valid query
+  but leaves CPU, I/O and cross-user eviction under user control. Documenting
+  the risk would be acceptance, not a fix.
+- Cap work per build and rate-limit repeated builds per caller and mount.
+  A request that crosses a cap must return an error without partial results;
+  otherwise callers can simply repeat the same scan. The cap, error and
+  fairness rules would be new observable query behavior, requiring an ADR,
+  regression and negative tests, and a benchmark of normal workloads.
+- Rework directory-rename invalidation to update index paths instead of
+  rescanning. This could reduce the measured post-rename work but leaves the
+  first-build and budget-eviction problems. It is not a complete response
+  to issue 118 and carries concurrency and correctness risk.
+
+The investigation recommends keeping issue 118 open. No mitigation,
+regression-negative test or issue closure has been performed. Controlled
+latency distributions, slower lower devices and concurrent-user load remain
+unmeasured.
+
+## Decision and design round — 2026-10-23
+
+After reviewing the measured CPU/I/O cost and cross-user eviction, the
+maintainer chose to design limits on scan work and reconstruction frequency,
+accepting that queries above the eventual limit may return an error. This
+selects the resource-limit alternative above; it does not authorize a claim
+that a numerical threshold is already validated. ADR-0019 records the
+proposed admission and cumulative-work mechanism. The design counts all
+attempts and retries, fails explicitly without a partial result and
+distinguishes a work-operation cap from a strict CPU-time or physical-I/O
+cap. The latter is not established by the current observations.
+
+The next round is to select and validate concrete thresholds and the errno
+contract, then implement the guard and test it negatively and in the full
+VM/KASAN suite. No production source was changed in this design round.
+The public-limit text was reconciled in both READMEs, SECURITY, the security
+roadmap, the when-not-to-use guide and the site guide. `make test` passed 60
+attribute checks and nine image tests; the retired-claim checker, site-link
+checker, FAQ synchronizer and `git diff --check` passed. No module VM or
+KASAN run was made for this documentation-only round.
