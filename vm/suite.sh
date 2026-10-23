@@ -1687,7 +1687,7 @@ umount "$LAYER" || fail bce-measure-unmount
 [ -n "$bce_one" ] || fail bce-missing-used-counter
 bce_budget=$((bce_one * 3 / 2 + 65536))
 [ "$bce_budget" -ge 1048576 ] || fail bce-budget-below-minimum
-mount -t moobfs_layer -o lower="$LOWER/bce",domain_depth=1,index_budget="$bce_budget" none "$LAYER" || fail bce-budget-mount
+mount -t moobfs_layer -o "lower=$LOWER/bce,domain_depth=1,index_budget=$bce_budget" none "$LAYER" || fail bce-budget-mount
 tr_on moobfs_domain_build moobfs_domain_release || fail bce-trace-on
 bce_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
 bce_releases() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_releases=\([0-9]*\).*/\1/p'; }
