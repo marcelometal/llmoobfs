@@ -1,6 +1,6 @@
 # 0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118)
 
-Date: 2026-10-23. Status: **in progress; bounded probe prepared, VM result pending**.
+Date: 2026-10-23. Status: **in progress; first bounded native-KVM probe passed**.
 Estimated effort: M (one to three days) for the investigation; started
 2026-10-23, with labor time not yet measured. A mitigation, if selected,
 needs its own effort estimate after the evidence is reviewed.
@@ -46,20 +46,18 @@ measured. No policy or architectural decision has yet been made.
 
 ## Validation and limitations
 
-The targeted native-KVM run and its exact output are pending. The static
-helper compiled with `gcc -static -O2 -Wall -Wextra -Werror` against the
-project's current UAPI header on the dedicated Linux host. `sh -n` passed
-for `vm/suite.sh` and `vm/build-tests.sh`; `git diff --check` passed locally.
-ShellCheck was unavailable in the local environment and has not been claimed
-as passed. No claim of a reproduced severity, a measured new cost, or a fix
-is made at this checkpoint.
+The static helper compiled with `gcc -static -O2 -Wall -Wextra -Werror`
+against the project's current UAPI header on the dedicated Linux host.
+`sh -n` passed for `vm/suite.sh` and `vm/build-tests.sh`; `git diff --check`
+passed locally. ShellCheck was unavailable in the local environment and has
+not been claimed as passed. The native-KVM results are recorded below.
 
 ## Next step
 
-Compile and run the targeted guest probe on the dedicated Mac mini after
-checking it is free. Review raw trace and CPU/I/O measurements, then decide
-whether to extend the scales and lower filesystems or develop a bounded
-mitigation with a negative regression test.
+Extend the bounded measurement to a larger domain and obtain an I/O measure
+that includes lower-filesystem work. Then weigh an explicit resource policy
+against the cost of refusing otherwise valid queries. Any selected behavior
+change needs its own regression and negative run.
 
 ## First native-KVM attempt — 2026-10-23
 
@@ -77,5 +75,39 @@ The working hypothesis is Linux's dumpability change on `setuid`, which
 restricts reading the task's `/proc/self/io`. The helper now calls
 `prctl(PR_SET_DUMPABLE, 1)` after dropping privileges and before opening the
 domain or measuring the ioctl. The program has no secret material, and this
-change is confined to the disposable test guest. The repeat run is pending;
-until it succeeds, the explanation remains a hypothesis.
+change is confined to the disposable test guest. The repeat run at `497fb8f`
+succeeded, which supports this explanation; the original `/proc` access
+failure was not separately instrumented.
+
+## Second native-KVM attempt — 2026-10-23
+
+`MOOB_ONLY=buildcost sh build/native-kvm.sh` exited 0 on the dedicated
+Debian 6.12.111 KVM host. The guest printed `MOOBFS_ONLY_PASS: steps
+buildcost (not a complete run)`. For the 1,000-file ext4 domain, the first
+unprivileged `QUERY2` took 14.181 ms wall time and 13.681 ms system CPU.
+The seven queries after directory renames took 5.818–8.868 ms wall time and
+5.826–8.882 ms system CPU, apart from one sample with 2.001 ms user and
+5.849 ms system CPU. The paired already-built queries took 0.026–0.041 ms
+wall time. The eight `moobfs_domain_build` trace records all returned error
+0 and reported 1,131,120 bytes of index data each; their build durations
+were 5.405–14.077 ms. `GET_INFO` and the trace count confirmed exactly
+one first build and seven rebuilds, with no build on the warm queries.
+
+`/proc/self/io` reported `read_bytes=0` for every ioctl, including the
+first one after `drop_caches`. This is an observed counter value, **not**
+evidence that the subtree walk performed no lower-filesystem I/O: it may
+not attribute kernel work to this process, and no block-device counter was
+measured. The one cold first build and subsequent warm-cache renames also
+are not comparable as a controlled cold-versus-warm experiment. This run
+does not establish a stable latency distribution, a production severity,
+cross-user eviction, or a safe CPU/I/O budget. The module's behavior was
+unchanged; no mitigation or regression-negative run is claimed.
+
+Log: `~/moobfs-issue118-git-20261023/build/buildcost-0182-v2.log` and
+guest console `build/vm/console.log` on the dedicated host. The first
+failed attempt was preserved in `build/vm-attempt1`.
+
+The zero process `read_bytes` prompted a follow-up probe: the helper also
+samples the ext4 lower device's `/sys/block/vda/stat` sectors-read field
+around each ioctl. This can include unrelated guest reads and is not exact
+per-query attribution. A repeat VM run with that instrument is pending.

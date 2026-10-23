@@ -50,9 +50,14 @@ KASAN kernel used here has `CONFIG_MEMCG` disabled, so its full suite prints
 1,000 attributed files in one domain, one cold first build, seven directory
 renames and a built-domain query after each build. The query process drops to
 uid/gid 1001. The Debian QEMU TCG guest checks build counters and prints
-per-ioctl wall time, process CPU time and `/proc/self/io` read-byte deltas.
+per-ioctl wall time, process CPU time, `/proc/self/io` read-byte deltas and
+`/sys/block/vda/stat` sectors-read deltas. The device counter includes all
+guest reads during the ioctl, so it is an approximate rather than a
+per-process attribution.
 Those numbers are exploratory; only native KVM on a dedicated host is used
-for performance conclusions.
+for performance conclusions. In the first such run (journal 0182), the
+`read_bytes` delta was zero even for the cache-dropped first build, so this
+process counter is not treated as a measure of the lower-filesystem I/O.
 
 ## 3. Markers and what they mean
 
@@ -72,7 +77,7 @@ Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
 
 | Issue 118 probe marker | Proves | Does not prove |
 | --- | --- | --- |
-| `QUERY_BUILD_COST` | The helper issued one unprivileged `QUERY2` and recorded its wall, CPU and read-byte deltas | A stable performance distribution or a resource limit |
+| `QUERY_BUILD_COST` | The helper issued one unprivileged `QUERY2` and recorded its wall, CPU, process read-byte and ext4-device sectors-read deltas | A stable performance distribution, precise per-query disk attribution or a resource limit |
 | `BUILD_COST_OBSERVED` | Build counters and tracepoints saw one first build and seven post-rename rebuilds, with no extra build on the paired warm queries | Severity on other scales, lower filesystems, kernels or concurrent workloads |
 
 ### M1 regression (`vm/init`, Debian harness only)

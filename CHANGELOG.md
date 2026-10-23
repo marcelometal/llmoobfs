@@ -2,9 +2,12 @@
 
 ## Unreleased
 
-- Investigation (journal 0182, issue 118): prepare a bounded VM probe of
-  unprivileged first-build and post-rename `QUERY2` cost. No module policy or
-  production behavior changes; native-KVM observations are pending.
+- Investigation (journal 0182, issue 118): a bounded native-KVM probe of
+  unprivileged `QUERY2` on a 1,000-file ext4 domain observed a first build
+  and seven post-rename rebuilds, with no build on paired warm queries.
+  The first build took 14.181 ms and post-rename queries 5.818–8.868 ms
+  wall time on that host; I/O and larger-scale costs remain unmeasured.
+  No module policy or production behavior changed.
 
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and
   merged the unprivileged allocation-fault test/fix and concurrent budget

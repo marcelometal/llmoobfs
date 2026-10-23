@@ -40,6 +40,21 @@ static int read_bytes(unsigned long long *out)
 	return 0;
 }
 
+/* The bounded ext4 probe mounts /dev/vda; device stats include kernel I/O. */
+static int device_read_sectors(unsigned long long *out)
+{
+	unsigned long long reads, merged;
+	FILE *f = fopen("/sys/block/vda/stat", "r");
+	int ok;
+
+	if (!f)
+		return -1;
+	ok = fscanf(f, "%llu %llu %llu", &reads, &merged, out) == 3;
+	if (fclose(f) || !ok)
+		return -1;
+	return 0;
+}
+
 static long long time_us(struct timeval t)
 {
 	return (long long)t.tv_sec * 1000000 + t.tv_usec;
@@ -57,6 +72,7 @@ int main(int argc, char **argv)
 	struct rusage before, after;
 	struct timespec start, end;
 	unsigned long long io_before, io_after;
+	unsigned long long sectors_before, sectors_after;
 	unsigned long uid;
 	char *stop;
 	int fd;
@@ -91,7 +107,8 @@ int main(int argc, char **argv)
 	q.results = (__u64)(uintptr_t)&result;
 	strcpy(q.terms[0].name, "kind");
 	q.terms[0].op = MOOB_OP_EXISTS;
-	if (read_bytes(&io_before) || getrusage(RUSAGE_SELF, &before) ||
+	if (read_bytes(&io_before) || device_read_sectors(&sectors_before) ||
+	    getrusage(RUSAGE_SELF, &before) ||
 	    clock_gettime(CLOCK_MONOTONIC, &start)) {
 		perror("measurement before ioctl");
 		return 1;
@@ -101,19 +118,20 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	if (clock_gettime(CLOCK_MONOTONIC, &end) ||
-	    getrusage(RUSAGE_SELF, &after) || read_bytes(&io_after)) {
+	    getrusage(RUSAGE_SELF, &after) || read_bytes(&io_after) ||
+	    device_read_sectors(&sectors_after)) {
 		perror("measurement after ioctl");
 		return 1;
 	}
-	if (q.count != 1 || io_after < io_before) {
+	if (q.count != 1 || io_after < io_before || sectors_after < sectors_before) {
 		fprintf(stderr, "query-build-cost: unexpected result or I/O counter\n");
 		return 1;
 	}
-	printf("QUERY_BUILD_COST phase=%s wall_ns=%llu user_us=%lld sys_us=%lld read_bytes=%llu count=%u\n",
+	printf("QUERY_BUILD_COST phase=%s wall_ns=%llu user_us=%lld sys_us=%lld read_bytes=%llu dev_read_sectors=%llu count=%u\n",
 	       argv[3], time_ns(end) - time_ns(start),
 	       time_us(after.ru_utime) - time_us(before.ru_utime),
 	       time_us(after.ru_stime) - time_us(before.ru_stime),
-	       io_after - io_before, q.count);
+	       io_after - io_before, sectors_after - sectors_before, q.count);
 	close(fd);
 	return 0;
 }
