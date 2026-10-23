@@ -1713,7 +1713,7 @@ if [ -n "${MOOB_ONLY:-}" ] && want buildlimit; then
 "$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 40000 "$DEV_EXT4" || fail bl-format
 mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bl-lower-mount
 mkdir -p "$LOWER/blwork/d/s" "$LOWER/blrate/d/s" || fail bl-mkdir
-"$BIN/overbudget-race" plant "$LOWER/blwork/d/s" 17000 || fail bl-plant-work
+"$BIN/query-build-limit" plant "$LOWER/blwork/d/s" 17000 || fail bl-plant-work
 "$BIN/overbudget-race" plant "$LOWER/blrate/d/s" 1 || fail bl-plant-rate
 mount -t moobfs_layer -o lower="$LOWER/blwork",domain_depth=1 none "$LAYER" || fail bl-work-mount
 "$BIN/query-build-limit" "$LAYER/d" 1001 work || fail bl-work-errno-or-output

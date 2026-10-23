@@ -12,6 +12,29 @@
 #include <unistd.h>
 #include "moobfs_ioctl.h"
 
+static int plant_empty(const char *dir, const char *count)
+{
+	unsigned long n, i;
+	char *end;
+	char path[PATH_MAX];
+	int fd;
+
+	errno = 0;
+	n = strtoul(count, &end, 10);
+	if (errno || *end || !n || n > 100000)
+		return 64;
+	for (i = 0; i < n; i++) {
+		if (snprintf(path, sizeof(path), "%s/f%05lu", dir, i) >= (int)sizeof(path))
+			return 1;
+		fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0644);
+		if (fd < 0 || close(fd)) {
+			perror("plant empty file");
+			return 1;
+		}
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	struct moob_query_result result, before;
@@ -21,9 +44,11 @@ int main(int argc, char **argv)
 	int fd, want, got;
 
 	if (argc != 4) {
-		fprintf(stderr, "usage: query-build-limit DOMAIN UID ok|quota|work\n");
+		fprintf(stderr, "usage: query-build-limit plant DIR COUNT | DOMAIN UID ok|quota|work\n");
 		return 64;
 	}
+	if (!strcmp(argv[1], "plant"))
+		return plant_empty(argv[2], argv[3]);
 	errno = 0;
 	uid = strtoul(argv[2], &end, 10);
 	if (errno || *end || !uid || uid > UINT_MAX) {
