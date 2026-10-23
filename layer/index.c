@@ -1741,7 +1741,8 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 		mutex_unlock(&dom->build);
 		return 0;
 	}
-	err = build_admit(ix);
+	/* The legacy whole-mount QUERY without domains keeps its existing admission contract. */
+	err = domain ? build_admit(ix) : 0;
 	if (err) {
 		mutex_unlock(&dom->build);
 		return err;
