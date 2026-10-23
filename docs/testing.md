@@ -58,6 +58,8 @@ Those numbers are exploratory; only native KVM on a dedicated host is used
 for performance conclusions. In the first such run (journal 0182), the
 `read_bytes` delta was zero even for the cache-dropped first build, so this
 process counter is not treated as a measure of the lower-filesystem I/O.
+`MOOB_ONLY=buildcostlarge` opts into the same probe with 7,500 files; it is
+excluded from the full suite to keep its default run bounded.
 
 ## 3. Markers and what they mean
 

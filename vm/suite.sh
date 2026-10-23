@@ -23,6 +23,7 @@
 #   overbudget          builds over the budget while other domains are built (issue #111)
 #   memcg               account a retained QUERY2 buffer to the calling memory cgroup (#116)
 #   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
+#   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -46,7 +47,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1620,14 +1621,17 @@ done
 umount "$LAYER" && rm -rf "$LOWER/bdx" && umount "$LOWER" || fail "bd-cleanup"
 echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
 fi
-if want buildcost; then
+if want buildcost || { [ -n "${MOOB_ONLY:-}" ] && want buildcostlarge; }; then
 # Exploratory issue 118 probe in a disposable VM: one domain with 1000 files, one
 # cold first build, then seven directory renames with a warm query after each.
 # Counters and the build tracepoint make a missed invalidation or an accidental
-# extra build visible. The probe reports only bounded, per-ioctl observations.
+# extra build visible. The opt-in large scale uses 7500 files; it never runs as
+# part of the full suite. The probe reports only bounded per-ioctl observations.
+bc_files=1000
+if [ -n "${MOOB_ONLY:-}" ] && want buildcostlarge; then bc_files=7500; fi
 mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bc-lower-mount
 mkdir -p "$LOWER/bc/d/s" || fail bc-directory
-"$BIN/overbudget-race" plant "$LOWER/bc/d/s" 1000 || fail bc-plant
+"$BIN/overbudget-race" plant "$LOWER/bc/d/s" "$bc_files" || fail bc-plant
 mount -t moobfs_layer -o lower="$LOWER/bc",domain_depth=1 none "$LAYER" || fail bc-layer-mount
 bc_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
 tr_on moobfs_domain_build || fail bc-trace-on
@@ -1653,7 +1657,7 @@ bc_traced=$(tr_count moobfs_domain_build)
 grep ' moobfs_domain_build: ' "$TR/trace" | sed 's/^.* moobfs_domain_build: /QUERY_BUILD_TRACE /'
 tr_off moobfs_domain_build
 umount "$LAYER" && rm -rf "$LOWER/bc" && umount "$LOWER" || fail bc-cleanup
-echo "BUILD_COST_OBSERVED: one first build, seven rename rebuilds, and no warm-query rebuilds"
+echo "BUILD_COST_OBSERVED: files=$bc_files one first build, seven rename rebuilds, and no warm-query rebuilds"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed

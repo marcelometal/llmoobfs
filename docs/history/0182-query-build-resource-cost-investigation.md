@@ -110,4 +110,15 @@ failed attempt was preserved in `build/vm-attempt1`.
 The zero process `read_bytes` prompted a follow-up probe: the helper also
 samples the ext4 lower device's `/sys/block/vda/stat` sectors-read field
 around each ioctl. This can include unrelated guest reads and is not exact
-per-query attribution. A repeat VM run with that instrument is pending.
+per-query attribution. The repeat at `80b29d0` exited 0 and again counted
+one first build and seven post-rename rebuilds, but both process `read_bytes`
+and device sectors-read deltas were zero for every ioctl. The first query
+took 42.298 ms wall/40.537 ms system CPU; the seven post-rename queries
+took 13.871–20.491 ms wall time. These are distinct samples, not a controlled
+before/after comparison with the previous run, and no lower-I/O conclusion
+can be drawn from zero counters. Log: `build/buildcost-0182-v3.log` on the
+dedicated host; the prior guest output is preserved in `build/vm-attempt2`.
+
+An opt-in `buildcostlarge` guest step now runs the same sequence with 7,500
+files. The full suite retains the 1,000-file step. Its targeted native-KVM
+run is pending, so no size-scaling result is claimed yet.
