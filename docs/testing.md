@@ -46,6 +46,14 @@ requires that controller and fails if it is missing. The upstream 6.12.112
 KASAN kernel used here has `CONFIG_MEMCG` disabled, so its full suite prints
 `MEMCG_SKIPPED` and tests memory safety, not cgroup charging.
 
+`MOOB_ONLY=buildcost make vm-test` runs the bounded issue 118 probe on ext4:
+1,000 attributed files in one domain, one cold first build, seven directory
+renames and a built-domain query after each build. The query process drops to
+uid/gid 1001. The Debian QEMU TCG guest checks build counters and prints
+per-ioctl wall time, process CPU time and `/proc/self/io` read-byte deltas.
+Those numbers are exploratory; only native KVM on a dedicated host is used
+for performance conclusions.
+
 ## 3. Markers and what they mean
 
 A run is read from the console log. Success markers are printed only after the
@@ -61,6 +69,11 @@ Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
 | `MEMCG_INDEX_RESULT` | Building a bounded attributed domain raises the calling cgroup's unreclaimable slab charge | Fair sharing of the mount-wide index budget or charges to file owners |
 | `MEMCG_ACCOUNT_PASS` | Both accounting assertions passed in a guest with the memory controller enabled | Every allocation path or every kernel configuration |
 | `MEMCG_SKIPPED` | The guest lacks the memory controller; no accounting assertion ran | Accounting correctness; the Debian harness treats this as a failure |
+
+| Issue 118 probe marker | Proves | Does not prove |
+| --- | --- | --- |
+| `QUERY_BUILD_COST` | The helper issued one unprivileged `QUERY2` and recorded its wall, CPU and read-byte deltas | A stable performance distribution or a resource limit |
+| `BUILD_COST_OBSERVED` | Build counters and tracepoints saw one first build and seven post-rename rebuilds, with no extra build on the paired warm queries | Severity on other scales, lower filesystems, kernels or concurrent workloads |
 
 ### M1 regression (`vm/init`, Debian harness only)
 

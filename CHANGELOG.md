@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Investigation (journal 0182, issue 118): prepare a bounded VM probe of
+  unprivileged first-build and post-rename `QUERY2` cost. No module policy or
+  production behavior changes; native-KVM observations are pending.
+
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and
   merged the unprivileged allocation-fault test/fix and concurrent budget
   release correction. Issue 114's final T9 item was checked and the issue

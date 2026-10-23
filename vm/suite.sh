@@ -22,6 +22,7 @@
 #   rootpath            a domain directory renamed while a build waits to start (issue #110)
 #   overbudget          builds over the budget while other domains are built (issue #111)
 #   memcg               account a retained QUERY2 buffer to the calling memory cgroup (#116)
+#   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -45,7 +46,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1618,6 +1619,41 @@ done
 [ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
 umount "$LAYER" && rm -rf "$LOWER/bdx" && umount "$LOWER" || fail "bd-cleanup"
 echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
+fi
+if want buildcost; then
+# Exploratory issue 118 probe in a disposable VM: one domain with 1000 files, one
+# cold first build, then seven directory renames with a warm query after each.
+# Counters and the build tracepoint make a missed invalidation or an accidental
+# extra build visible. The probe reports only bounded, per-ioctl observations.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bc-lower-mount
+mkdir -p "$LOWER/bc/d/s" || fail bc-directory
+"$BIN/overbudget-race" plant "$LOWER/bc/d/s" 1000 || fail bc-plant
+mount -t moobfs_layer -o lower="$LOWER/bc",domain_depth=1 none "$LAYER" || fail bc-layer-mount
+bc_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
+tr_on moobfs_domain_build || fail bc-trace-on
+sync; echo 3 > /proc/sys/vm/drop_caches || fail bc-drop-caches
+bc_before=$(bc_builds)
+"$BIN/query-build-cost" "$LAYER/d" 1001 first-cold || fail bc-first
+[ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-first-build-count
+"$BIN/query-build-cost" "$LAYER/d" 1001 first-warm || fail bc-warm
+[ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-warm-built-again
+for bc_rep in 1 2 3 4 5 6 7; do
+    if [ $((bc_rep % 2)) -eq 1 ]; then
+        mv "$LAYER/d/s" "$LAYER/d/t" || fail bc-rename
+    else
+        mv "$LAYER/d/t" "$LAYER/d/s" || fail bc-rename
+    fi
+    "$BIN/query-build-cost" "$LAYER/d" 1001 "rename-$bc_rep" || fail bc-rebuild
+    [ "$(bc_builds)" -eq $((bc_before + 1 + bc_rep)) ] || fail bc-rename-build-count
+    "$BIN/query-build-cost" "$LAYER/d" 1001 "warm-$bc_rep" || fail bc-after-warm
+    [ "$(bc_builds)" -eq $((bc_before + 1 + bc_rep)) ] || fail bc-warm-built-again
+done
+bc_traced=$(tr_count moobfs_domain_build)
+[ "$bc_traced" -eq 8 ] || fail "bc-trace-build-count-$bc_traced"
+grep ' moobfs_domain_build: ' "$TR/trace" | sed 's/^.* moobfs_domain_build: /QUERY_BUILD_TRACE /'
+tr_off moobfs_domain_build
+umount "$LAYER" && rm -rf "$LOWER/bc" && umount "$LOWER" || fail bc-cleanup
+echo "BUILD_COST_OBSERVED: one first build, seven rename rebuilds, and no warm-query rebuilds"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed
