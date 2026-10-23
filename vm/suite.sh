@@ -25,6 +25,7 @@
 #   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
 #   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
 #   buildcostevict      optional two-uid index-budget eviction probe (#118)
+#   buildlimit          optional QUERY2 work and admission limit regression (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -48,7 +49,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|buildlimit|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1703,6 +1704,57 @@ grep ' moobfs_domain_release: ' "$TR/trace" | sed 's/^.* moobfs_domain_release: 
 tr_off moobfs_domain_build moobfs_domain_release
 umount "$LAYER" && rm -rf "$LOWER/bce" && umount "$LOWER" || fail bce-cleanup
 echo "BUILD_COST_CROSS_USER_EVICTION: 3 builds and at least 2 budget releases across uids 1001 and 1002; budget=$bce_budget"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildlimit; then
+# Issue 118: a too-large build is discarded, while a separate small domain
+# demonstrates per-uid and mount-wide admission. This slow step is opt-in.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bl-lower-mount
+mkdir -p "$LOWER/blwork/d/s" "$LOWER/blrate/d/s" || fail bl-mkdir
+"$BIN/overbudget-race" plant "$LOWER/blwork/d/s" 17000 || fail bl-plant-work
+"$BIN/overbudget-race" plant "$LOWER/blrate/d/s" 1 || fail bl-plant-rate
+mount -t moobfs_layer -o lower="$LOWER/blwork",domain_depth=1 none "$LAYER" || fail bl-work-mount
+"$BIN/query-build-limit" "$LAYER/d" 1001 work || fail bl-work-errno-or-output
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 0 ] || fail bl-work-left-built-domain
+umount "$LAYER" || fail bl-work-unmount
+mount -t moobfs_layer -o lower="$LOWER/blrate",domain_depth=1 none "$LAYER" || fail bl-rate-mount
+bl_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
+bl_rename() {
+    if [ $((bl_i % 2)) -eq 0 ]; then
+        mv "$LAYER/d/s" "$LAYER/d/t"
+    else
+        mv "$LAYER/d/t" "$LAYER/d/s"
+    fi
+}
+bl_i=1
+while [ "$bl_i" -le 16 ]; do
+    [ "$bl_i" -eq 1 ] || bl_rename || fail bl-uid-rename
+    "$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bl-uid-admitted
+    bl_i=$((bl_i + 1))
+done
+[ "$(bl_builds)" -eq 16 ] || fail bl-uid-build-count
+bl_rename || fail bl-uid-limit-rename
+"$BIN/query-build-limit" "$LAYER/d" 1001 quota || fail bl-uid-quota
+"$BIN/query-build-limit" "$LAYER/d" 1002 ok || fail bl-other-uid-admitted
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bl-fresh-bypasses-admission
+[ "$(bl_builds)" -eq 17 ] || fail bl-other-uid-build-count
+umount "$LAYER" || fail bl-rate-unmount
+mount -t moobfs_layer -o lower="$LOWER/blrate",domain_depth=1 none "$LAYER" || fail bl-mount-cap-mount
+bl_i=1
+while [ "$bl_i" -le 64 ]; do
+    if [ "$bl_i" -gt 1 ]; then bl_rename || fail bl-mount-rename; fi
+    bl_uid=$((1001 + (bl_i - 1) / 16))
+    "$BIN/query-build-limit" "$LAYER/d" "$bl_uid" ok || fail bl-mount-admitted
+    bl_i=$((bl_i + 1))
+done
+[ "$(bl_builds)" -eq 64 ] || fail bl-mount-build-count
+bl_rename || fail bl-mount-quota-rename
+"$BIN/query-build-limit" "$LAYER/d" 1005 quota || fail bl-mount-quota
+sleep 61
+"$BIN/query-build-limit" "$LAYER/d" 1005 ok || fail bl-window-recovery
+[ "$(bl_builds)" -eq 65 ] || fail bl-recovery-build-count
+umount "$LAYER" && rm -rf "$LOWER/blwork" "$LOWER/blrate" &&
+    umount "$LOWER" || fail bl-cleanup
+echo "BUILD_LIMIT_PASS: work denied without published output; uid and mount admission recover"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed

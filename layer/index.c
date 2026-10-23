@@ -1267,6 +1267,9 @@ static int build_admit(struct moobl_index *ix)
 	unsigned int i;
 	int err = 0;
 
+	/* Mount-wide QUERY is already restricted to an administrator. */
+	if (capable(CAP_SYS_ADMIN))
+		return 0;
 	spin_lock(&ix->build_rate_lock);
 	if (time_after_eq(now, ix->build_window + MOOBL_BUILD_WINDOW)) {
 		ix->build_window = now;
@@ -1289,7 +1292,7 @@ static int build_admit(struct moobl_index *ix)
 		slot = free_slot;
 	if (ix->build_attempts >= MOOBL_BUILD_MOUNT_ATTEMPTS || !slot ||
 	    (slot->used && slot->attempts >= MOOBL_BUILD_UID_ATTEMPTS)) {
-		err = -EAGAIN;
+		err = -EDQUOT;
 		goto out;
 	}
 	if (!slot->used) {
