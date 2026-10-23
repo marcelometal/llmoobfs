@@ -60,3 +60,22 @@ Compile and run the targeted guest probe on the dedicated Mac mini after
 checking it is free. Review raw trace and CPU/I/O measurements, then decide
 whether to extend the scales and lower filesystems or develop a bounded
 mitigation with a negative regression test.
+
+## First native-KVM attempt — 2026-10-23
+
+The dedicated host had no QEMU process or layer mount at the preflight. The
+branch at `20aca6c` was transferred as a verified complete Git bundle and
+checked out separately on that host. `MOOB_ONLY=buildcost sh
+build/native-kvm.sh` booted its Debian guest, passed the M1 image phase, then
+stopped at `bc-first` before the query: the helper's read of `/proc/self/io`
+returned `Permission denied` after it changed to uid/gid 1001. The harness
+printed `MOOBFS_VM_FAIL: bc-first` and exited 1. This is a measurement-setup
+failure, not a QUERY2 result or a module regression. No build-cost data from
+this attempt is used.
+
+The working hypothesis is Linux's dumpability change on `setuid`, which
+restricts reading the task's `/proc/self/io`. The helper now calls
+`prctl(PR_SET_DUMPABLE, 1)` after dropping privileges and before opening the
+domain or measuring the ioctl. The program has no secret material, and this
+change is confined to the disposable test guest. The repeat run is pending;
+until it succeeds, the explanation remains a hypothesis.

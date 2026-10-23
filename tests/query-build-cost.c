@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <time.h>
 #include <unistd.h>
@@ -72,6 +73,11 @@ int main(int argc, char **argv)
 	}
 	if (setgid((gid_t)uid) || setuid((uid_t)uid)) {
 		perror("drop privileges");
+		return 1;
+	}
+	/* setuid makes this process non-dumpable; permit reading its own /proc/self/io. */
+	if (prctl(PR_SET_DUMPABLE, 1)) {
+		perror("restore self accounting access");
 		return 1;
 	}
 	fd = open(argv[1], O_RDONLY | O_DIRECTORY | O_CLOEXEC);
