@@ -432,10 +432,12 @@ KASAN harness runs the layer suite), and no benchmark exists.
   1.90 MiB of reads on first queries of 1,000- and 7,500-file ext4 domains;
   a query by one uid also evicted another uid's built private domain under a
   small shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
-  These are single-run observations, not a latency guarantee. Issue 118 remains
-  open; [ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)
-  proposes limits, but none is implemented. Do not expose a multi-user mount to
-  untrusted query workloads.
+  These are bounded observations, not a latency guarantee. This branch adds
+  experimental work and rebuild-frequency limits
+  ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
+  they are not a strict CPU-time or I/O-byte cap, and issue 118 remains open
+  pending full validation. Do not expose a multi-user mount to untrusted
+  query workloads.
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This
   code charges that buffer and user-triggered index/query allocations to the allocating
   task's memory cgroup where supported (issue 116, journal 0180). The mount-wide index

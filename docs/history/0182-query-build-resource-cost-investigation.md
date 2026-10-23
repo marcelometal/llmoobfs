@@ -1,6 +1,6 @@
 # 0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118)
 
-Date: 2026-10-23. Status: **measurement complete; resource-limit direction chosen, design pending validation**.
+Date: 2026-10-23. Status: **experimental implementation in local validation; issue open**.
 Estimated effort: M (one to three days) for the investigation; started
 2026-10-23, with labor time not yet measured. A mitigation, if selected,
 needs its own effort estimate after the evidence is reviewed.
@@ -239,15 +239,173 @@ accepting that queries above the eventual limit may return an error. This
 selects the resource-limit alternative above; it does not authorize a claim
 that a numerical threshold is already validated. ADR-0019 records the
 proposed admission and cumulative-work mechanism. The design counts all
-attempts and retries, fails explicitly without a partial result and
+attempts and retries, fails explicitly without a successful partial result and
 distinguishes a work-operation cap from a strict CPU-time or physical-I/O
 cap. The latter is not established by the current observations.
 
 The next round is to select and validate concrete thresholds and the errno
 contract, then implement the guard and test it negatively and in the full
 VM/KASAN suite. No production source was changed in this design round.
+
+Dated correction, 2026-10-23: ADR-0019 initially said no QUERY2_BATCH output
+would be copied on a build-limit error. Code inspection showed that the batch
+path can copy earlier successful subquery result buffers before a later
+subquery fails. The existing client contract requires discarding every output
+on any batch error. ADR-0019 now states this actual contract; the proposed
+limit must preserve and test it, not claim that zero bytes reach userspace.
 The public-limit text was reconciled in both READMEs, SECURITY, the security
 roadmap, the when-not-to-use guide and the site guide. `make test` passed 60
 attribute checks and nine image tests; the retired-claim checker, site-link
 checker, FAQ synchronizer and `git diff --check` passed. No module VM or
 KASAN run was made for this documentation-only round.
+
+## Initial limit implementation and calibration — 2026-10-23
+
+Three additional targeted native-KVM runs at the same source (`cb019c7`)
+repeated each ext4 size after remount. The 1,000-file first builds took
+45.932–49.011 ms wall time and read 159,744–167,936 bytes; the 7,500-file
+first builds took 196.926–210.976 ms and read 1,986,560–2,002,944 bytes.
+All six runs passed their eight-build and no-extra-warm-build assertions.
+Logs are `build/calib-0182-buildcost-{1,2,3}.log` and
+`build/calib-0182-buildcostlarge-{1,2,3}.log` on the dedicated host. This is
+one ext4 VM on one host, not an empirical distribution across supported
+lower filesystems or slower disks.
+
+The first implementation uses 32,768 cumulative scan work units per domain
+build (enumerated names, directory visits and `index_load` attempts), a
+cooperatively checked ten-second deadline, and a fixed 60-second admission
+window of 16 attempts per unprivileged UID and 64 per mount. Administrators
+are exempt from frequency admission but not from the per-build work and time
+limits; this keeps the existing privileged mount-wide QUERY/stress semantics.
+The initial numbers are experimental guardrails: the observed 7,500-file
+case needs about 15,000 work units and passes, while a larger domain may be
+refused. No claim of a strict CPU-time or physical-I/O-byte cap follows.
+Admission uses `EDQUOT`, work exhaustion `E2BIG`, and timeout `ETIMEDOUT`.
+The source currently has no mount option to raise these limits; this is an
+intentional compatibility change to test before publishing.
+
+The first patched `MOOB_ONLY=buildcostlarge` targeted KVM run at `cac4447`
+passed: first query 214.655 ms and 1,990,656 read bytes, eight expected
+builds, no extra build on warm queries. This confirms only that fixture, not
+the over-limit or concurrency behavior. Log:
+`build/buildlimit-0182-smoke.log` on the dedicated host.
+
+The first opt-in `buildlimit` guest attempt at `5650ed1` stopped during
+fixture creation, before a MoobFS query: ext4 reported `No space left on
+device` for file 16,367 of 17,000. The prepared ext4 device had too few
+inodes for this fixture. The harness now reformats that disposable test
+device with 40,000 inodes before planting; the rerun is pending. The failed
+attempt is not evidence of a limit pass or module failure. Log:
+`build/buildlimit-0182-v1.log` on the dedicated host.
+
+The `buildlimit` rerun at `b0b4f7d` exited 0 in native KVM. With the
+17,000-file attributed fixture, the first `QUERY2` returned `E2BIG` and did
+not modify the caller's result buffer, count or cursor. A second mount
+confirmed 16 builds for uid 1001, `EDQUOT` on its next stale build, a
+successful build for uid 1002 and a successful fresh-domain query by uid
+1001 without admission. A fresh mount then allowed 64 builds across uids
+1001–1004, returned `EDQUOT` for uid 1005, and allowed its pending build
+after a real 61-second wait. `GET_INFO` counts and the final
+`BUILD_LIMIT_PASS` and `MOOBFS_ONLY_PASS` markers matched. Log:
+`build/buildlimit-0182-v2.log` on the dedicated host.
+
+The attributed fixture fit after inode reprovisioning, but its external
+xattr blocks used more of the 64 MiB device than the work-limit behavior
+requires. A follow-up fixture creates 17,000 empty files instead: each
+still consumes an enumerated-name and an `index_load` attempt, enough to
+exceed 32,768 units, while using less disk. The targeted KVM run at
+`fd03229` again exited 0 with `BUILD_LIMIT_PASS` and `MOOBFS_ONLY_PASS`;
+log `build/buildlimit-0182-v3-empty.log`. This is the regression kept in
+the branch.
+
+The negative branch `neg/issue118-buildlimits-0182` at `e42a2ba`
+contains the same test but the pre-limit module from `ea86eac`. Its
+targeted native-KVM run exited nonzero at the intended first assertion:
+`query-build-limit` observed errno 0 and count 0 instead of `E2BIG`, then
+`MOOBFS_VM_FAIL: bl-work-errno-or-output`. Log:
+`~/moobfs-issue118-neg-20261023/build/buildlimit-0182-negative.log` on the
+dedicated host. This verifies the work-limit regression detects absence of
+the guard. It does not separately prove the UID and mount-frequency
+assertions fail without the guard; the positive run exercises them.
+
+The complete native KVM suite on the patched branch has started; its result
+is pending. KASAN/lockdep, btrfs/XFS-specific limit fixtures, a controlled
+performance comparison, publication and issue closure have not yet run.
+
+The first complete native-KVM suite at `fd03229` did **not** pass. It
+reached and passed the ext4 QUERY2 steps, then stopped at
+`MOOBFS_VM_FAIL: race-query-ext4`: the five-second legacy mount-wide
+`QUERY` race (with `domain_depth=0`) received `EDQUOT` after the new
+admission count was exhausted. Log: `build/buildlimit-0182-full.log` on the
+dedicated host. This is an integration incompatibility found by the full
+suite, not a kernel crash or a partial answer. The adopted scope of issue
+118 is unprivileged `QUERY2` on a domain. Commit `5e3ea9a` therefore charges
+frequency only when `domain != 0`; the per-build work and cooperative-time
+limits still apply to legacy whole-mount scans. The unprivileged legacy
+`QUERY` when domains are disabled remains outside the frequency guard and
+is a documented residual availability risk. The complete suite must be
+repeated on this new head; no pass is claimed yet.
+
+## Full-suite and deadline follow-up — 2026-10-23
+
+The second complete native-KVM run at `5e3ea9a` exited 0 on the dedicated
+Debian 6.12.111 host. The guest emitted `MOOBFS_VM_PASS`,
+`MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS` after the ext4, btrfs and
+XFS lower-layer checks, race/release cases, SQLite and memory-client
+acceptance, and malformed-image tests. The log is
+`~/moobfs-issue118-git-20261023/build/buildlimit-0182-full-v2.log`, with the
+guest console preserved in `build/vm-full-v2/console.log`. This run used the
+frequency exception for legacy mount-wide `QUERY`; it does not exercise the
+later opt-in deadline fixture or the btrfs/XFS over-limit fixture.
+
+The targeted `MOOB_ONLY=buildtime` native-KVM run at `76a7602` exited 0. A
+test-only 200 ms per-file scan delay made the 60-file first build exceed the
+cooperative ten-second deadline. `QUERY2` returned `ETIMEDOUT` without
+changing its result buffer, count or cursor; after clearing the delay, a
+second query succeeded and `GET_INFO` recorded one completed build. The
+guest emitted `BUILD_TIME_PASS` and `MOOBFS_ONLY_PASS`. Log:
+`build/buildtime-0182.log`, console: `build/vm-buildtime/console.log` on the
+dedicated host. This is a controlled deadline test, not a bound on one
+blocking lower-filesystem operation.
+
+Commit `70f57fb` extends the opt-in work-limit fixture to btrfs and XFS;
+its targeted run is pending. The full KASAN/UBSAN/lockdep suite and a
+before/after latency comparison are also pending. The cumulative allowance
+across moved-directory rescans and retries is apparent in the single
+`scan_job` shared by `domain_ensure()` but still lacks a forced regression
+that distinguishes it from a reset on retry. Publication and issue closure
+remain blocked on the verification gate of ADR-0019.
+
+## KASAN integration failure — 2026-10-23
+
+The first complete local KASAN/UBSAN/lockdep run at `76a7602` did **not**
+pass. `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS` were emitted, but the
+subsequent `permission-gaps faults` sweep stopped at
+`MOOBFS_VM_FAIL: fi-unprivileged-permissions`. Its first three warm-domain
+shapes passed. The guest then printed `PERMISSION_GAPS_FAIL: QUERY2
+(errno=122)`, which is `EDQUOT`, followed by a failed fault-result read.
+The sweep opens many distinct fresh domains as the same unprivileged UID;
+the new 16-attempt UID admission window is reached before the sweep can
+finish. This is a test-fixture incompatibility with the chosen observable
+limit, not a KASAN or lockdep diagnostic. It is not a KASAN pass.
+
+The fault trials are independent. The harness now remounts the layer before
+each group of eight fresh-domain trials, leaving at most two admitted builds
+per trial (the injected call and its retry) within one new admission window.
+The next round must run the targeted fault step and then repeat full KASAN on
+this harness change. Log: `build/kasan-0182.log`; guest console:
+`build/vng/console.log` on the dedicated host.
+
+The isolated `MOOB_ONLY=faults` KASAN/UBSAN/lockdep run at `d327a40`
+subsequently exited 0 with `MOOBFS_KASAN_ONLY_PASS`. All six
+unprivileged fault shapes passed, with 204 actual injected faults in 210
+calls, and no kernel diagnostic. This validates the fixture repair only;
+the repeated full KASAN run is in progress.
+
+Commit `7028c6e` adds a separate opt-in moved-directory regression. It
+uses function tracing to rename a directory after `index_load` begins,
+then requires `E2BIG` when the original and side scans together cross the
+single work allowance; each scan alone is below the cap. Its helper compiled
+with the remote Linux compiler, `make checkpatch`, ShellCheck and
+`git diff --check` passed. The VM result is pending, so cumulative accounting
+has not yet been validated dynamically by this test.

@@ -66,6 +66,28 @@ excluded from the full suite to keep its default run bounded.
 uids 1001 and 1002 each fit a budget sized from one measured domain, but
 not together. Alternating unprivileged queries must expose the shared-budget
 release and rebuild through `GET_INFO` and tracepoints.
+`MOOB_ONLY=buildlimit` is an opt-in and slower issue 118 regression. It
+reformats the disposable ext4 test device with enough inodes, builds a
+17,000-file domain that must fail with `E2BIG` without publishing output,
+then exercises 16 admissions per unprivileged UID, 64 across the mount,
+another UID, a fresh-domain query and recovery after a real 60-second
+window. Its success marker is `BUILD_LIMIT_PASS`; it is not part of the
+default full suite. It repeats the 17,000-file over-limit check on btrfs and
+XFS. A negative control on `neg/issue118-buildlimits-0182`
+uses the same guest step against the prior module and must fail.
+`MOOB_ONLY=buildtime` is a second opt-in regression. It uses the existing
+test-only `scan_delay_us` module parameter to make one domain build exceed
+the cooperative ten-second deadline, checks `ETIMEDOUT` and untouched
+outputs, clears the delay and verifies that the next query builds a complete
+domain. Its success marker is `BUILD_TIME_PASS`; it is not in the default
+suite because it deliberately waits about ten seconds.
+`MOOB_ONLY=buildmoved` is a third opt-in regression. Function tracing waits
+until a first domain build enters the file scan, then renames the scanned
+subdirectory inside the same domain. The original and moved scans each fit
+alone, but together must return `E2BIG` with no published answer; after the
+test-only delay is cleared, a later query must rebuild successfully. Its
+success marker is `BUILD_MOVED_PASS`. This tests cumulative accounting over
+the moved-directory side scan, not every possible retry path.
 
 ## 3. Markers and what they mean
 

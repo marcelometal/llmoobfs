@@ -102,8 +102,10 @@ These limits update the cases discussed in the value assessment, §9.6.
   does not limit that scan's CPU or lower I/O, and one uid's query can release
   another uid's built domain. Bounded native-KVM examples and their limits
   are in [journal 0182](history/0182-query-build-resource-cost-investigation.md);
-  issue 118 remains open; [ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)
-  proposes limits that are not yet implemented.
+  this branch adds experimental work and frequency limits
+  ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)),
+  but not a strict CPU/I/O cap or fair memory shares. Issue 118 remains open
+  pending full validation.
 - **You need it in production today, or in any critical setting.** Only source pre-release tags exist; the
   module is one author's code; its own tests and two source reviews by AI assistants found
   kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011); there is no

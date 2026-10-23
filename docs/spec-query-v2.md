@@ -352,3 +352,33 @@ query answers does not change.
 - **Queries and releases.** A released domain is built again by the next query on it, at the
   cost of a first query. The mount-wide `QUERY` returns `EAGAIN` if domains are released eight
   times while it builds the others.
+
+### Experimental domain-build limits (ADR-0019; issue 118)
+
+Before an absent or stale domain is built for `QUERY2`, an unprivileged caller consumes one
+admission attempt. A fixed 60-second window allows 16 attempts per UID and
+64 across the mount; accounting for at most 64 UIDs is stored per mount.
+Exhausting either count or the UID table returns `EDQUOT`. A fresh domain
+uses no admission. `CAP_SYS_ADMIN` callers bypass frequency admission, not
+the per-build limits below. Every admitted attempt counts, even if its build
+later fails or is interrupted. A `QUERY2_BATCH` on a fresh domain consumes
+none; if it triggers one build, that build is charged once. Legacy
+whole-mount `QUERY` when domains are disabled does not consume frequency
+admission, although its scans still face the work and elapsed-time limits.
+
+Each build has a cumulative 32,768-work-unit allowance across ordinary
+walks, retries and rescans of renamed directories. An enumerated name,
+directory visit or `index_load` attempt costs one unit. Exceeding it returns
+`E2BIG`. A ten-second elapsed deadline, checked between lower operations,
+returns `ETIMEDOUT`. One lower operation can itself outlast the deadline;
+these limits do not promise a strict CPU-time or physical-I/O-byte cap.
+There is no mount option to raise these experimental constants. An error
+drops the partially built domain. Individual `QUERY2` calls do not publish
+a successful partial result; on any `QUERY2_BATCH` error, clients must
+discard all outputs, including buffers copied by earlier subqueries.
+
+No on-disk format or ioctl layout changes. Compatibility changes at query
+time: an oversized or frequently rebuilt domain that previously answered
+may now fail. The figures are initial guardrails measured only in a bounded
+ext4 VM; supported lower filesystems and slower devices need further
+validation before the issue can close (journal 0182).

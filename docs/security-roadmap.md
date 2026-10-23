@@ -247,8 +247,10 @@ probes measured first-build CPU and lower-device reads on 1,000- and
 and budget eviction between private domains queried by two unprivileged
 uids. This is evidence of the existing cost, not a new CPU/I/O limit or a
 decision to accept the risk. The maintainer chose to design work and rebuild
-frequency limits ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md));
-threshold selection, implementation, validation and issue closure remain open.
+frequency limits ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)).
+An initial fixed policy is implemented locally; complete VM/KASAN validation,
+performance comparison and issue closure remain open. It is not a strict CPU
+or physical-I/O cap and does not solve fair index-memory shares.
 
 - Issue 116 / ADR-0018 accounts user-triggered query and index allocations to
   the allocating task's memory cgroup; journal 0180 records negative controls,

@@ -145,6 +145,9 @@ directory rename. The mount's memory budget does not cap the CPU or lower
 I/O of that scan. A bounded KVM probe measured the work and demonstrated
 that one uid's query can evict another uid's built domain under a small
 shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
-The maintainer chose the resource-limit direction; [ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)
-proposes a mechanism, but no limits are implemented. Avoid untrusted
-multi-user query workloads while this issue is open.
+The maintainer chose the resource-limit direction; this branch implements
+experimental work and rebuild-frequency limits
+([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)).
+They do not strictly cap CPU time or physical I/O, nor provide fair index
+memory shares. Full validation and issue closure remain pending. Avoid
+untrusted multi-user query workloads while this issue is open.

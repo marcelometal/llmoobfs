@@ -68,6 +68,16 @@ mask.
    the changelog under its own heading, and the version number in the request changes when a
    request that used to be valid changes meaning.
 
+**Experimental limit decision, 2026-10-23 (ADR-0019).** A valid `QUERY2`
+or `QUERY2_BATCH` request may now fail with `EDQUOT` (unprivileged build
+admission), `E2BIG` (scan work) or `ETIMEDOUT` (cooperative build deadline).
+Successful request and cursor meanings, structure layouts and command
+numbers do not change, so the request versions stay 2. This is a new
+resource-availability failure, not a new interpretation of a successful
+request. It is nevertheless a compatibility cost for callers that assumed
+every otherwise valid domain could be indexed; the changelog and query
+specification state it explicitly. No disk format changes.
+
 ## 4. Mount options and tools
 
 Mount options follow the UAPI rule: an option that shipped keeps its meaning; an unknown option

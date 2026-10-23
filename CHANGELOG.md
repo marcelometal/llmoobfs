@@ -12,9 +12,18 @@
   control observed 160 KiB and 1.90 MiB read on first builds of 1,000 and
   7,500 files. A two-uid probe demonstrated shared-budget eviction and
   rebuilding across private domains. The maintainer selected a resource-limit
-  design; ADR-0019 proposes cumulative scan-work and rebuild-frequency
-  bounds, with numerical thresholds and implementation still pending.
-  No module policy or production behavior changed.
+  design; ADR-0019 adds an experimental 32,768-work-unit and ten-second
+  per-build guard, plus 16 attempts per unprivileged UID and 64 per mount in
+  60-second windows. Over-limit queries now return `E2BIG`, `ETIMEDOUT` or
+  `EDQUOT` rather than a partial successful answer. Targeted native-KVM
+  tests passed, including a negative control against the pre-limit module;
+  the complete native-KVM suite and the opt-in deadline regression passed.
+  The first full KASAN run exposed that the existing unprivileged fault sweep
+  exceeds the new admission window; its independent fresh-domain trials now
+  remount in groups of eight. The corrected KASAN run, cross-filesystem
+  over-limit fixture and controlled performance comparison are pending. These
+  are not strict CPU-time or physical-I/O-byte caps, and the shared index
+  budget still has no fair per-user shares.
 
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and
   merged the unprivileged allocation-fault test/fix and concurrent budget

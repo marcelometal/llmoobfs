@@ -67,14 +67,16 @@ A result is not a grant of access. Authorization is checked when the query runs;
 or names may change afterwards, so a client must call `open()` normally and accept `EACCES`
 or `ENOENT`. There is no guarantee of the absence of a time-of-check/time-of-use window. A directory
 rename through the layer marks its domain stale; the next query rebuilds it, and may fail if
-concurrent changes keep preventing a stable build. Direct writes to the lower tree bypass
+concurrent changes keep preventing a stable build or if its work, time or
+unprivileged rebuild-frequency limit is reached (ADR-0019). Direct writes to the lower tree bypass
 this tracking and require remount for guaranteed resynchronization.
-[`docs/spec-m3.md` §3.1 and its dated note; `layer/index.c`: `moobl_index_renamed`, `domain_pin`]
+[`docs/spec-m3.md` §3.1 and its dated note; `docs/decisions/0019-bound-query-build-work-and-frequency.md`; `layer/index.c`: `moobl_index_renamed`, `query2_pin`]
 
 ## 8. What is implemented today?
 A stacked pass-through layer over ext4, btrfs and XFS (`fsx`, fstests' `quick` group), typed
 attributes validated in the kernel, an index built per domain by the first query and released
-under memory pressure, `QUERY2` with ordering, cursors and batches, the first `QUERY` for
+under memory pressure, experimental per-build work and unprivileged frequency
+limits, `QUERY2` with ordering, cursors and batches, the first `QUERY` for
 administrators, `GET_INFO`, delegated reflink and dedupe, tracepoints, and acceptance runs with
 git, concurrent WAL-mode SQLite, `dm-log-writes` power-loss replay and `dm-flakey` error
 injection. A SQLite virtual table over `QUERY2` exists as a prototype. Everything is tested in a

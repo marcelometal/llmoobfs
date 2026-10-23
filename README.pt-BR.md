@@ -454,10 +454,12 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   nas primeiras consultas de domínios ext4 com 1.000 e 7.500 arquivos; a consulta de um uid
   também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
   compartilhado pequeno ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
-  São observações de uma rodada, não uma garantia de latência. A issue 118 segue
-  aberta; a [ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)
-  propõe limites, ainda não implementados. Não exponha uma montagem multiusuário a consultas
-  não confiáveis.
+  São observações delimitadas, não uma garantia de latência. Este ramo acrescenta
+  limites experimentais de trabalho e frequência de reconstrução
+  ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
+  eles não são um teto estrito de tempo de CPU ou bytes de E/S, e a issue 118
+  segue aberta até a validação completa. Não exponha uma montagem multiusuário
+  a consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).
