@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 	int fd, want, got;
 
 	if (argc != 4) {
-		fprintf(stderr, "usage: query-build-limit plant DIR COUNT | DOMAIN UID ok|quota|work\n");
+		fprintf(stderr, "usage: query-build-limit plant DIR COUNT | DOMAIN UID ok|quota|work|timeout\n");
 		return 64;
 	}
 	if (!strcmp(argv[1], "plant"))
@@ -61,6 +61,8 @@ int main(int argc, char **argv)
 		want = EDQUOT;
 	else if (!strcmp(argv[3], "work"))
 		want = E2BIG;
+	else if (!strcmp(argv[3], "timeout"))
+		want = ETIMEDOUT;
 	else
 		return 64;
 	if (setgid((gid_t)uid) || setuid((uid_t)uid)) {

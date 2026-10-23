@@ -26,6 +26,7 @@
 #   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
 #   buildcostevict      optional two-uid index-budget eviction probe (#118)
 #   buildlimit          optional QUERY2 work and admission limit regression (#118)
+#   buildtime           optional cooperative scan-deadline regression (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -49,7 +50,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|buildlimit|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|buildlimit|buildtime|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1758,6 +1759,21 @@ sleep 61
 umount "$LAYER" && rm -rf "$LOWER/blwork" "$LOWER/blrate" &&
     umount "$LOWER" || fail bl-cleanup
 echo "BUILD_LIMIT_PASS: work denied without published output; uid and mount admission recover"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildtime; then
+# Existing test-only scan delay makes the cooperative ten-second deadline
+# reachable without relying on a particular lower device's speed.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bt-lower-mount
+mkdir -p "$LOWER/bt/d/s" || fail bt-mkdir
+"$BIN/overbudget-race" plant "$LOWER/bt/d/s" 60 || fail bt-plant
+mount -t moobfs_layer -o lower="$LOWER/bt",domain_depth=1 none "$LAYER" || fail bt-mount
+echo 200000 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bt-delay-on
+"$BIN/query-build-limit" "$LAYER/d" 1001 timeout || fail bt-timeout-errno-or-output
+echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bt-delay-off
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bt-recovery
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 1 ] || fail bt-build-count
+umount "$LAYER" && rm -rf "$LOWER/bt" && umount "$LOWER" || fail bt-cleanup
+echo "BUILD_TIME_PASS: timed-out scan did not publish results and the next query rebuilt"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed
