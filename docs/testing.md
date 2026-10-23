@@ -62,6 +62,10 @@ process counter is not treated as a measure of the lower-filesystem I/O. The
 first sample is not claimed to have incurred physical reads.
 `MOOB_ONLY=buildcostlarge` opts into the same probe with 7,500 files; it is
 excluded from the full suite to keep its default run bounded.
+`MOOB_ONLY=buildcostevict` is a separate opt-in probe: private domains for
+uids 1001 and 1002 each fit a budget sized from one measured domain, but
+not together. Alternating unprivileged queries must expose the shared-budget
+release and rebuild through `GET_INFO` and tracepoints.
 
 ## 3. Markers and what they mean
 
@@ -83,6 +87,8 @@ Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
 | --- | --- | --- |
 | `QUERY_BUILD_COST` | The helper issued one unprivileged `QUERY2` and recorded its wall, CPU, process read-byte and ext4-device sectors-read deltas | A stable performance distribution, precise per-query disk attribution or a resource limit |
 | `BUILD_COST_OBSERVED` | Build counters and tracepoints saw one first build and seven post-rename rebuilds, with no extra build on the paired warm queries | Severity on other scales, lower filesystems, kernels or concurrent workloads |
+| `BUILD_COST_DEVICE_CONTROL` | A raw read of the disposable ext4 device advanced its sectors-read counter | Exact attribution of all filesystem I/O to the query process |
+| `BUILD_COST_CROSS_USER_EVICTION` | Two different unprivileged uids built private domains in turn; the shared budget released the older index and forced its owner to rebuild on the next query | Fairness under arbitrary concurrency or a safe production budget |
 
 ### M1 regression (`vm/init`, Debian harness only)
 

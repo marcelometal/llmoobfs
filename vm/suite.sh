@@ -24,6 +24,7 @@
 #   memcg               account a retained QUERY2 buffer to the calling memory cgroup (#116)
 #   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
 #   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
+#   buildcostevict      optional two-uid index-budget eviction probe (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -47,7 +48,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1666,6 +1667,42 @@ bc_raw_after=$(awk '{print $3}' /sys/block/vda/stat)
 [ "$bc_raw_after" -gt "$bc_raw_before" ] || fail bc-block-counter-no-increase
 echo "BUILD_COST_DEVICE_CONTROL: raw device read advanced sectors by $((bc_raw_after - bc_raw_before))"
 echo "BUILD_COST_OBSERVED: files=$bc_files one first build, seven rename rebuilds, and no warm-query rebuilds"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildcostevict; then
+# Two private domains belong to different users. Size the shared budget from
+# one measured domain so either fits alone but not together. QUERY2 by uid 1002
+# must be able to release uid 1001's built domain, forcing uid 1001 to rebuild.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bce-lower-mount
+mkdir -p "$LOWER/bce/a/s" "$LOWER/bce/b/s" || fail bce-directories
+"$BIN/overbudget-race" plant "$LOWER/bce/a/s" 1000 || fail bce-plant-a
+"$BIN/overbudget-race" plant "$LOWER/bce/b/s" 1000 || fail bce-plant-b
+chown 1001:1001 "$LOWER/bce/a" && chown 1002:1002 "$LOWER/bce/b" &&
+    chmod 700 "$LOWER/bce/a" "$LOWER/bce/b" || fail bce-private-domains
+mount -t moobfs_layer -o lower="$LOWER/bce",domain_depth=1 none "$LAYER" || fail bce-measure-mount
+"$BIN/query-build-cost" "$LAYER/a" 1001 measure-a || fail bce-measure-a
+bce_one=$("$BIN/query" "$LAYER" info | sed -n 's/.* used=\([0-9]*\).*/\1/p')
+umount "$LAYER" || fail bce-measure-unmount
+[ -n "$bce_one" ] || fail bce-missing-used-counter
+bce_budget=$((bce_one * 3 / 2 + 65536))
+[ "$bce_budget" -ge 1048576 ] || fail bce-budget-below-minimum
+mount -t moobfs_layer -o lower="$LOWER/bce",domain_depth=1,index_budget="$bce_budget" none "$LAYER" || fail bce-budget-mount
+tr_on moobfs_domain_build moobfs_domain_release || fail bce-trace-on
+bce_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
+bce_releases() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_releases=\([0-9]*\).*/\1/p'; }
+bce_before=$(bce_builds)
+"$BIN/query-build-cost" "$LAYER/a" 1001 first-user || fail bce-first-user
+[ "$(bce_builds)" -eq $((bce_before + 1)) ] || fail bce-first-build
+"$BIN/query-build-cost" "$LAYER/b" 1002 second-user || fail bce-second-user
+[ "$(bce_builds)" -eq $((bce_before + 2)) ] || fail bce-second-build
+[ "$(bce_releases)" -ge 1 ] || fail bce-first-release
+"$BIN/query-build-cost" "$LAYER/a" 1001 first-user-again || fail bce-first-user-again
+[ "$(bce_builds)" -eq $((bce_before + 3)) ] || fail bce-rebuild-a
+[ "$(bce_releases)" -ge 2 ] || fail bce-second-release
+[ "$(grep ' moobfs_domain_release: ' "$TR/trace" | grep -c ' by=budget ')" -ge 2 ] || fail bce-budget-trace
+grep ' moobfs_domain_release: ' "$TR/trace" | sed 's/^.* moobfs_domain_release: /QUERY_BUILD_RELEASE /'
+tr_off moobfs_domain_build moobfs_domain_release
+umount "$LAYER" && rm -rf "$LOWER/bce" && umount "$LOWER" || fail bce-cleanup
+echo "BUILD_COST_CROSS_USER_EVICTION: 3 builds and at least 2 budget releases across uids 1001 and 1002; budget=$bce_budget"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed

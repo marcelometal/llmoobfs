@@ -153,3 +153,44 @@ cleanup, a read of a previously untouched raw-device sector checks that the
 virtio block counter itself advances. This control reads but never writes
 the disposable test device. The result is pending and is not yet evidence
 of cold-cache I/O.
+
+The targeted `MOOB_ONLY=buildcost` run at `ed5982a` exited 0 on the native
+KVM host. After remounting the 1,000-file ext4 tree, the first unprivileged
+query took 50.312 ms wall time and 43.234 ms system CPU, with 163,840
+`read_bytes` and 320 device sectors read (also 163,840 bytes at 512 bytes
+per sector). The seven post-rename queries took 10.284–19.556 ms wall time
+and zero measured read bytes/sectors; the paired built-index queries also
+read zero. Eight successful build tracepoints and `GET_INFO` again showed
+one first build, seven rebuilds, and no paired-query rebuilds. A raw device
+read after cleanup advanced the same sector counter by eight, validating
+that it observed reads in this guest. This is a bounded, per-run observation,
+not a distribution or proof that every lower-filesystem read is attributed
+to the query task. Log: `build/buildcost-0182-v5-remount.log`; previous guest
+artifacts are in `build/vm-attempt4` on the dedicated host.
+
+The targeted `MOOB_ONLY=buildcostlarge` run of the same source also exited
+0. After remounting the 7,500-file ext4 tree, the first unprivileged query
+took 201.097 ms wall time and 182.798 ms system CPU, with 1,990,656
+`read_bytes` and 3,888 device sectors read (the same 1,990,656 bytes at
+512 bytes per sector). The seven post-rename rebuild queries took
+54.088–92.168 ms wall time with zero additional measured read bytes or
+sectors; paired built-index queries took 0.020–0.068 ms, also with zero
+reads. Eight successful build tracepoints and `GET_INFO` confirmed exactly
+one first build and seven rebuilds. The raw-device control advanced by
+eight sectors. Log: `build/buildcost-0182-v6-large-remount.log`; previous
+guest artifacts are in `build/vm-attempt5` on the dedicated host.
+
+These two runs demonstrate that remounting after the cache-drop request
+exposed read I/O for this dataset, and that the larger tree incurred more
+measured work on this host. They do not provide a latency distribution or
+identify the cost on slower devices. The cross-user budget-eviction part of
+issue 118 has not yet been directly exercised; that is the next bounded
+probe.
+
+An opt-in cross-user probe is being prepared. It gives uid 1001 and uid
+1002 separate private ext4 domains of 1,000 attributed files, measures one
+domain's retained size, then mounts with a budget that fits one but not
+both. Queries under 1001, 1002 and 1001 in that order must show three builds
+and budget releases in `GET_INFO` and tracepoints. This distinguishes
+cross-user eviction from the already demonstrated same-domain rename cost.
+The guest result is pending; no eviction result is claimed yet.
