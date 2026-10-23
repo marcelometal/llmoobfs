@@ -149,5 +149,6 @@ The maintainer chose the resource-limit direction; this branch implements
 experimental work and rebuild-frequency limits
 ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)).
 They do not strictly cap CPU time or physical I/O, nor provide fair index
-memory shares. Full validation and issue closure remain pending. Avoid
+memory shares. Local VM and KASAN suites passed; policy review, publication,
+broader workload validation and issue closure remain pending. Avoid
 untrusted multi-user query workloads while this issue is open.

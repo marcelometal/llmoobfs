@@ -197,4 +197,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0178 — Unprivileged queries under allocation faults (issue 114, T9)](0178-unprivileged-allocation-fault-queries.md)
 - [0179 — Concurrent budget release under native KVM](0179-kvm-overbudget-race-followup.md)
 - [0180 — Memory-cgroup accounting of query-triggered allocations (issue 116; replacement PR 129, CI pending)](0180-memcg-accounting-investigation.md)
-- [0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118; experimental guard in local validation)](0182-query-build-resource-cost-investigation.md)
+- [0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118; locally validated experimental guard, unpublished)](0182-query-build-resource-cost-investigation.md)

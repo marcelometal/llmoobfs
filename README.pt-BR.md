@@ -457,9 +457,10 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   São observações delimitadas, não uma garantia de latência. Este ramo acrescenta
   limites experimentais de trabalho e frequência de reconstrução
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
-  eles não são um teto estrito de tempo de CPU ou bytes de E/S, e a issue 118
-  segue aberta até a validação completa. Não exponha uma montagem multiusuário
-  a consultas não confiáveis.
+  eles não são um teto estrito de tempo de CPU ou bytes de E/S. As suítes locais
+  de VM e KASAN passaram, mas a issue 118 segue aberta para revisão da política,
+  publicação e validação com cargas mais diversas. Não exponha uma montagem
+  multiusuário a consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).

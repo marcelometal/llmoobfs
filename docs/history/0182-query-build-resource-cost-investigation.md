@@ -1,6 +1,6 @@
 # 0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118)
 
-Date: 2026-10-23. Status: **experimental implementation in local validation; issue open**.
+Date: 2026-10-23. Status: **experimental implementation locally validated; not published; issue open**.
 Estimated effort: M (one to three days) for the investigation; started
 2026-10-23, with labor time not yet measured. A mitigation, if selected,
 needs its own effort estimate after the evidence is reviewed.
@@ -443,3 +443,85 @@ guest console: `build/vm-crossfs-moved/console.log` on the dedicated host.
 
 The before/after cold-query latency comparison is still pending. The module
 and test branch remains local; no issue update, push or PR was made.
+
+## Paired performance pilot — 2026-10-23
+
+Eight sequential before/after native-KVM pairs ran `buildcostlarge` on a
+7,500-file ext4 domain, rebuilding the disposable guest and remounting the
+lower filesystem before the first query on each run. The host governor was
+held at `performance` with turbo off, then restored to `schedutil` and its
+original turbo setting. Every run emitted `MOOBFS_ONLY_PASS`, returned one
+result, and reported process read bytes equal to the sampled block-sector
+delta. `bench/compare.py` found a before median of 162.113 ms and after
+median of 161.813 ms for that first query, a -0.2% relative difference with
+95% bootstrap interval -2.1% to +1.8% and Mann–Whitney p=0.958. It reported
+no difference detected and warned that eight repetitions are fewer than the
+30 required by the project benchmark plan. The pilot always ran before then
+after, so execution-order drift is a further limitation. Raw logs and guest
+consoles are preserved under `build/compare-0182/` and
+`build/vm-compare-{before,after}-[1-8]/` in the two dedicated-host checkouts;
+converted records and CSVs are in the positive checkout's
+`build/compare-0182-report/`. No general performance claim follows from this
+pilot. A separate 30-pair series with alternating order is in progress.
+
+## Thirty-pair controlled comparison — 2026-10-23
+
+The separate formal series completed 30 native-KVM before/after pairs, with
+the order alternated on odd/even pairs. `before` was the pre-limit module at
+`e42a2ba` with the same measurement helper; `after` was the limited module at
+`7028c6e`. Each run rebuilt the disposable guest, planted the 7,500-file
+ext4 fixture, remounted the lower filesystem and measured the first
+unprivileged `QUERY2` that built the domain. Host CPU governors were fixed at
+`performance` and turbo disabled during the series. All 60 runs exited 0,
+emitted `MOOBFS_ONLY_PASS`, and returned exactly one result. The script
+restored `schedutil` on all eight CPUs and the prior turbo setting; no QEMU
+process or saved frequency-state file remained after completion.
+
+For the first query, before/after medians were **163.214/164.638 ms** wall
+time, respectively. Across repetitions, p5–p95 was 157.868–168.116 ms
+before and 161.651–168.455 ms after. Median process CPU time was
+153.989/155.469 ms; median process `read_bytes` was **1,994,752 bytes in
+both**. `bench/compare.py` reported a **+0.9%** relative difference in wall
+medians (after minus before), 95% bootstrap interval **+0.3% to +1.8%**,
+Mann–Whitney p=0.00486, `n=30/30`, verdict `differs`. Because each
+repetition has only one first-cold query, the tool's per-repetition p50,
+p95 and p99 entries are identical; only the first-query comparison is
+interpreted. Descriptively, 22 of 30 paired after runs were slower, and the
+median paired relative increase was 1.402%. The effect is small but was
+detectable in this controlled shape; unlike the pilot, it must not be
+described as zero overhead. The likely contributors are the new scan checks
+and admission accounting, but this experiment does not isolate them.
+
+The initial parser rejected one otherwise valid run because it required
+process `read_bytes` to equal the whole guest-device sector delta. In the
+25th before run, the latter was 4,096 bytes greater. The device counter can
+include unrelated guest reads, so equality was an invalid control. The
+parser was corrected to require a valid result count and retain both I/O
+counters and their difference. Exactly one of 60 runs had a nonzero
+device-minus-process delta (4,096 bytes); no sample was discarded. This
+does not establish an exact physical-I/O attribution or a hard byte cap.
+
+Reproducible command on the dedicated host: `sh ~/issue118-compare30.sh`,
+then `python3 ~/issue118-parse30.py`. The scripts alternate the checkout
+order and run `MOOB_ONLY=buildcostlarge sh build/native-kvm.sh` once per
+side and pair; they call `bench/cpu-freq.sh` to fix and restore the host
+state. Scripts plus `raw.csv`, `compare.csv` and `ecdf.csv` were copied to
+`MoobFS-local/issue118-bench-20261023/` outside Git. The 60 guest consoles
+and host logs remain in each Mac mini checkout under
+`build/vm-compare30-{before,after}-[1-30]/` and
+`build/compare30-0182/`; the positive checkout also has
+`build/compare30-0182-report/` with the converted records and CSVs.
+The experiment covers one host, ext4 and this cold-query shape; it does not
+show behavior on slow lower devices, other workloads or concurrent callers.
+
+The local verification gate of ADR-0019 now has a negative control, normal
+and over-limit builds, timeout and frequency recovery, a forced cumulative
+moved rescan, the full native-KVM and KASAN suites, and the 30-pair latency
+comparison. The amount of CPU time and lower I/O saved by cutting off the
+17,000-file query, compared with allowing it to finish, was not measured.
+Before publication, the maintainer still needs to review the
+availability tradeoff for legitimate domains above the fixed cap and the
+measured +0.9% overhead. The lack of strict CPU/I/O caps, the legacy
+whole-mount frequency exception and unmeasured slower devices remain
+explicit limitations. Issue 118 stays open; there has been no push, PR,
+public issue update or merge for this branch.

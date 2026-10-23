@@ -1,6 +1,6 @@
 # ADR-0019 — Bound QUERY2 domain-build work and frequency
 
-Date: 2026-10-23. Status: **experimental implementation in local validation; not published**.
+Date: 2026-10-23. Status: **experimental implementation locally validated; not published**.
 Estimated effort: L (a week or more) for implementation, negative tests,
 performance comparison and KVM/KASAN validation. This is an estimate, not
 recorded labor time.
@@ -85,12 +85,12 @@ legacy-query race in journal 0182; it is an explicit compatibility choice.
 Three repeated ext4 KVM probes of each measured size (journal 0182) gave
 45.932–49.011 ms and 159,744–167,936 read bytes for 1,000 files, and
 196.926–210.976 ms and 1,986,560–2,002,944 read bytes for 7,500 files.
-The 7,500-file shape needs about 15,000 work units and a patched targeted
-run passed. This supports that specific case, not universal defaults for
-slower devices, btrfs/XFS or different client shapes. The constants must be
-reviewed against those cases and the negative/complete suite before
-publication. No on-disk format or ioctl structure changes. The query
-compatibility decision is explicit: a sufficiently large or frequently
+The 7,500-file shape needs about 15,000 work units and passed on ext4; opt-in
+over-limit fixtures also passed on btrfs and XFS. This supports those cases,
+not universal defaults for slower devices or different client shapes. The
+constants must be reviewed against the measured denial and performance
+cost before publication. No on-disk format or ioctl structure changes. The
+query compatibility decision is explicit: a sufficiently large or frequently
 rebuilt domain that once returned results can now fail with these errnos.
 
 ## Rejected alternatives and tradeoffs
@@ -116,3 +116,20 @@ query-performance comparison. Record both the measured work reduction and
 the legitimate queries denied. Journal 0182 separates checks already run
 from those still pending. The cooperative boundary remains a limitation
 even after the tests pass.
+
+Local verification on 2026-10-23 covered the named regressions: the negative
+pre-limit module failed the work-cap assertion; positive regressions covered
+normal and oversized builds, UID and mount admission, 61-second recovery,
+the cooperative timeout and a moved-directory rescan sharing its budget.
+The full native-KVM suite and full KASAN/UBSAN/lockdep suite passed. A
+30-pair, order-alternated ext4 cold-query comparison measured a **+0.9%**
+wall-median difference for the limited module (95% bootstrap interval
+**+0.3% to +1.8%**, journal 0182). This is a measured cost for that shape,
+not a universal regression bound. An otherwise legitimate 17,000-file
+domain was denied with `E2BIG` on all three supported lower filesystems.
+The cap stops a 17,000-file fixture early, but the reduction in CPU time or
+physical reads for that denied query has not been measured against the
+unlimited run. Publication still needs the maintainer's review of that
+availability and latency tradeoff; slower devices, other client shapes and
+strict CPU/I/O limits remain outside the verified contract. The issue
+remains open.

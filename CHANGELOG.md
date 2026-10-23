@@ -23,8 +23,11 @@
   remount in groups of eight. The corrected complete KASAN/UBSAN/lockdep run
   passed. An opt-in fixture denied oversized builds on ext4, btrfs and XFS,
   and a synchronized directory move verified that the rescan shares the
-  original work allowance. A controlled performance comparison remains
-  pending. These are not strict CPU-time or physical-I/O-byte caps, and the
+  original work allowance. A 30-pair, order-alternated native-KVM comparison
+  on a 7,500-file ext4 domain detected a +0.9% cold-query wall-median cost
+  (95% bootstrap interval +0.3% to +1.8%) and unchanged median measured
+  read bytes. Publication and issue closure remain pending. These are not
+  strict CPU-time or physical-I/O-byte caps, and the
   shared index budget still has no fair per-user shares.
 
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and

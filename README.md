@@ -435,8 +435,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   These are bounded observations, not a latency guarantee. This branch adds
   experimental work and rebuild-frequency limits
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
-  they are not a strict CPU-time or I/O-byte cap, and issue 118 remains open
-  pending full validation. Do not expose a multi-user mount to untrusted
+  they are not a strict CPU-time or I/O-byte cap. The local VM and KASAN suites
+  passed, but issue 118 remains open pending policy review, publication and
+  broader-workload validation. Do not expose a multi-user mount to untrusted
   query workloads.
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This
   code charges that buffer and user-triggered index/query allocations to the allocating

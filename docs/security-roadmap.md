@@ -248,9 +248,12 @@ and budget eviction between private domains queried by two unprivileged
 uids. This is evidence of the existing cost, not a new CPU/I/O limit or a
 decision to accept the risk. The maintainer chose to design work and rebuild
 frequency limits ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)).
-An initial fixed policy is implemented locally; complete VM/KASAN validation,
-performance comparison and issue closure remain open. It is not a strict CPU
-or physical-I/O cap and does not solve fair index-memory shares.
+An initial fixed policy is implemented locally. The complete native-KVM and
+KASAN suites, negative control, cross-filesystem denial and a 30-pair ext4
+performance comparison passed or completed as recorded in journal 0182; the
+comparison detected a +0.9% cold-query wall-median cost in that shape.
+Publication and issue closure remain open. This is not a strict CPU or
+physical-I/O cap and does not solve fair index-memory shares.
 
 - Issue 116 / ADR-0018 accounts user-triggered query and index allocations to
   the allocating task's memory cgroup; journal 0180 records negative controls,
