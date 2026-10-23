@@ -141,3 +141,15 @@ guest output is preserved in `build/vm-attempt3`.
 The phase label `first-cold` in these three run logs describes the requested
 cache drop, not verified physical reads. The script now uses the more precise
 label `first-after-drop-caches`; only this label changed after the large run.
+
+## Cold-cache control being tested — 2026-10-23
+
+The prior guest wrote and indexed a freshly planted tree while the lower
+filesystem stayed mounted. A cache-drop request alone produced zero read
+sectors; it did not prove the lower metadata was cold. The next bounded
+attempt will sync, unmount the lower, request cache eviction, remount it and
+only then mount the layer for the first query. After the query sequence and
+cleanup, a read of a previously untouched raw-device sector checks that the
+virtio block counter itself advances. This control reads but never writes
+the disposable test device. The result is pending and is not yet evidence
+of cold-cache I/O.

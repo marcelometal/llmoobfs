@@ -1633,12 +1633,14 @@ if [ -n "${MOOB_ONLY:-}" ] && want buildcostlarge; then bc_files=7500; fi
 mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bc-lower-mount
 mkdir -p "$LOWER/bc/d/s" || fail bc-directory
 "$BIN/overbudget-race" plant "$LOWER/bc/d/s" "$bc_files" || fail bc-plant
+sync && umount "$LOWER" || fail bc-lower-unmount-before-cold
+echo 3 > /proc/sys/vm/drop_caches || fail bc-drop-caches
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bc-lower-remount
 mount -t moobfs_layer -o lower="$LOWER/bc",domain_depth=1 none "$LAYER" || fail bc-layer-mount
 bc_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
 tr_on moobfs_domain_build || fail bc-trace-on
-sync; echo 3 > /proc/sys/vm/drop_caches || fail bc-drop-caches
 bc_before=$(bc_builds)
-"$BIN/query-build-cost" "$LAYER/d" 1001 first-after-drop-caches || fail bc-first
+"$BIN/query-build-cost" "$LAYER/d" 1001 first-after-remount || fail bc-first
 [ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-first-build-count
 "$BIN/query-build-cost" "$LAYER/d" 1001 first-warm || fail bc-warm
 [ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-warm-built-again
@@ -1658,6 +1660,11 @@ bc_traced=$(tr_count moobfs_domain_build)
 grep ' moobfs_domain_build: ' "$TR/trace" | sed 's/^.* moobfs_domain_build: /QUERY_BUILD_TRACE /'
 tr_off moobfs_domain_build
 umount "$LAYER" && rm -rf "$LOWER/bc" && umount "$LOWER" || fail bc-cleanup
+bc_raw_before=$(awk '{print $3}' /sys/block/vda/stat)
+dd if="$DEV_EXT4" of=/dev/null bs=4096 skip=10000 count=1 >/dev/null 2>&1 || fail bc-block-counter-read
+bc_raw_after=$(awk '{print $3}' /sys/block/vda/stat)
+[ "$bc_raw_after" -gt "$bc_raw_before" ] || fail bc-block-counter-no-increase
+echo "BUILD_COST_DEVICE_CONTROL: raw device read advanced sectors by $((bc_raw_after - bc_raw_before))"
 echo "BUILD_COST_OBSERVED: files=$bc_files one first build, seven rename rebuilds, and no warm-query rebuilds"
 fi
 if want xattrread; then
