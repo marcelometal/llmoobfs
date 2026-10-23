@@ -11,11 +11,20 @@
 #include <linux/path.h>
 #include <linux/cred.h>
 #include <linux/siphash.h>
+#include <linux/spinlock.h>
 
 #define MOOBL_SUPER_MAGIC 0x4d4f4f42	/* "MOOB" */
 #define MOOBL_NAME "moobfs_layer"
 #define MOOBL_INDEX_BUDGET_DEFAULT (128ULL << 20)
 #define MOOBL_INDEX_IDLE_DEFAULT 60U
+#define MOOBL_BUILD_UID_SLOTS 64U
+
+struct moobl_build_uid {
+	kuid_t uid;
+	unsigned long window;
+	u16 attempts;
+	bool used;
+};
 
 /*
  * One permission domain's part of the index (ADR-0012): not built until somebody queries the
@@ -60,6 +69,10 @@ struct moobl_index {
 	u64 move_gen;			/* bumped by every rename and link: a placement is recomputed on change */
 	u32 domains_built;		/* domains in state built, the outside part included */
 	u32 builds;			/* builds completed since mount */
+	spinlock_t build_rate_lock;	/* admission of new domain-build attempts */
+	unsigned long build_window;
+	u16 build_attempts;
+	struct moobl_build_uid build_uids[MOOBL_BUILD_UID_SLOTS];
 	u32 releases;			/* built domains released since mount */
 	u64 refusals;			/* allocations charge() refused since mount (index lock) */
 	unsigned int idle;		/* seconds a used domain is kept from the shrinker */
