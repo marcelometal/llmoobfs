@@ -24,6 +24,7 @@ t overbudget-race -Iinclude tests/overbudget-race.c
 t memcg-query -Iinclude tests/memcg-query.c
 t query-build-cost -Iinclude tests/query-build-cost.c
 t query-build-limit -Iinclude tests/query-build-limit.c
+t query-build-moved -Iinclude tests/query-build-moved.c
 t hostile    tests/hostile.c
 t buildrace  -Iinclude tests/buildrace.c -lpthread
 t chmodrace  -Iinclude tests/chmodrace.c

@@ -27,6 +27,7 @@
 #   buildcostevict      optional two-uid index-budget eviction probe (#118)
 #   buildlimit          optional QUERY2 work and admission limit regression (#118)
 #   buildtime           optional cooperative scan-deadline regression (#118)
+#   buildmoved          optional cumulative work across a moved-directory rescan (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -50,7 +51,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|buildlimit|buildtime|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1784,6 +1785,27 @@ echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bt-delay-off
 [ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 1 ] || fail bt-build-count
 umount "$LAYER" && rm -rf "$LOWER/bt" && umount "$LOWER" || fail bt-cleanup
 echo "BUILD_TIME_PASS: timed-out scan did not publish results and the next query rebuilt"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildmoved; then
+# Function tracing synchronizes a same-domain directory rename with the
+# first scan. Each of the 9,000 names fits alone; scanning them twice must
+# exceed the cumulative 32,768-unit allowance.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bm-lower-mount
+mkdir -p "$LOWER/bm/d/s" || fail bm-mkdir
+"$BIN/query-build-limit" plant "$LOWER/bm/d/s" 9000 || fail bm-plant
+: > "$LOWER/bm/d/visible" || fail bm-visible
+"$BIN/moobfs-attr" set "$LOWER/bm/d/visible" kind string note || fail bm-attr
+mount -t moobfs_layer -o lower="$LOWER/bm",domain_depth=1 none "$LAYER" || fail bm-mount
+mountpoint -q /sys/kernel/tracing || mount -t tracefs tracefs /sys/kernel/tracing || fail bm-tracefs
+echo 100 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bm-delay-on
+"$BIN/query-build-moved" "$LAYER/d"; bm_rc=$?
+echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bm-delay-off
+[ "$bm_rc" -eq 0 ] || fail bm-moved-scan-work-cap
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 0 ] || fail bm-partial-build
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bm-rebuild-after-denial
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 1 ] || fail bm-rebuild-count
+umount "$LAYER" && rm -rf "$LOWER/bm" && umount "$LOWER" || fail bm-cleanup
+echo "BUILD_MOVED_PASS: one allowance across original and moved-directory scans"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed
