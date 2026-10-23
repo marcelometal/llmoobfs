@@ -86,7 +86,7 @@ until a first domain build enters the file scan, then renames the scanned
 subdirectory inside the same domain. The original and moved scans each fit
 alone, but together must return `E2BIG` with no published answer; after the
 test-only delay is cleared, a later query must rebuild successfully. Its
-success marker is `BUILD_MOVED_PASS`. This tests cumulative accounting over
+success marker is `QUERY_BUILD_MOVED_PASS`. This tests cumulative accounting over
 the moved-directory side scan, not every possible retry path.
 
 ## 3. Markers and what they mean

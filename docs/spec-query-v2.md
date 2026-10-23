@@ -379,6 +379,7 @@ discard all outputs, including buffers copied by earlier subqueries.
 
 No on-disk format or ioctl layout changes. Compatibility changes at query
 time: an oversized or frequently rebuilt domain that previously answered
-may now fail. The figures are initial guardrails measured only in a bounded
-ext4 VM; supported lower filesystems and slower devices need further
-validation before the issue can close (journal 0182).
+may now fail. The figures are initial guardrails calibrated in a bounded
+ext4 VM. Opt-in denial fixtures passed on ext4, btrfs and XFS; slower devices
+and varied workloads still need validation before the issue can close
+(journal 0182).

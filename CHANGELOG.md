@@ -20,10 +20,12 @@
   the complete native-KVM suite and the opt-in deadline regression passed.
   The first full KASAN run exposed that the existing unprivileged fault sweep
   exceeds the new admission window; its independent fresh-domain trials now
-  remount in groups of eight. The corrected KASAN run, cross-filesystem
-  over-limit fixture and controlled performance comparison are pending. These
-  are not strict CPU-time or physical-I/O-byte caps, and the shared index
-  budget still has no fair per-user shares.
+  remount in groups of eight. The corrected complete KASAN/UBSAN/lockdep run
+  passed. An opt-in fixture denied oversized builds on ext4, btrfs and XFS,
+  and a synchronized directory move verified that the rescan shares the
+  original work allowance. A controlled performance comparison remains
+  pending. These are not strict CPU-time or physical-I/O-byte caps, and the
+  shared index budget still has no fair per-user shares.
 
 - Integration (journal 0179): PR 127 passed all eleven GitHub checks and
   merged the unprivileged allocation-fault test/fix and concurrent budget

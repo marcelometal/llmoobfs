@@ -409,3 +409,37 @@ single work allowance; each scan alone is below the cap. Its helper compiled
 with the remote Linux compiler, `make checkpatch`, ShellCheck and
 `git diff --check` passed. The VM result is pending, so cumulative accounting
 has not yet been validated dynamically by this test.
+
+## Complete KASAN repeat — 2026-10-23
+
+The repeated complete KASAN/UBSAN/lockdep run at `d327a40` exited 0 on the
+dedicated KVM host. It emitted `MOOBFS_ACCEPTANCE_PASS`,
+`MOOBFS_LAYER_PASS` for ext4, btrfs and XFS, and `MOOBFS_KASAN_PASS` with no
+kernel diagnostic. The host wrapper reported `kasan-local: pass`. Log:
+`~/moobfs-issue118-git-20261023/build/kasan-0182-v2.log`; guest console:
+`build/vng/console.log`. This run included the isolated fault-sweep repair,
+but predates the optional moved-directory test, which is outside the full
+KASAN suite. It does not resolve the residual legacy whole-mount QUERY
+frequency risk or prove strict CPU/I/O caps.
+
+## Cross-filesystem work cap and moved scan — 2026-10-23
+
+The opt-in `MOOB_ONLY="buildlimit buildmoved"` native-KVM run at `7028c6e`
+exited 0. The `buildlimit` fixture denied the 17,000-empty-file query with
+`E2BIG` on ext4, btrfs and XFS without changing the caller's result buffer,
+count or cursor. Its frequency checks again exercised separate UIDs, the
+mount-wide limit, fresh-domain bypass and recovery after a real 61-second
+wait. The guest printed `BUILD_LIMIT_PASS` and `MOOBFS_ONLY_PASS`.
+
+In the same run, PID-filtered function tracing observed five `index_load`
+calls before a same-domain directory rename. The query returned `E2BIG`
+without published output when its first scan and moved-directory rescan
+together exceeded the work allowance; the guest printed
+`QUERY_BUILD_MOVED_CHILD_PASS` and `QUERY_BUILD_MOVED_PASS`. Each side alone
+is below the allowance. This tests one forced moved-rescan path; it does not
+exhaustively cover every budget-release or rename retry schedule. Log:
+`~/moobfs-issue118-git-20261023/build/buildlimits-0182-crossfs-moved.log`;
+guest console: `build/vm-crossfs-moved/console.log` on the dedicated host.
+
+The before/after cold-query latency comparison is still pending. The module
+and test branch remains local; no issue update, push or PR was made.
