@@ -22,15 +22,15 @@
 
 The later domain-rename and concurrent index-budget corrections were merged
 through [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) after its
-11 reported checks passed; issues 110 and 111 were closed. This does not
-resolve the remaining resource-cost questions in issues 116 and 118 or the
-complete validation and integration of the unprivileged allocation-fault
-correction for issue 114 ([roadmap](ROADMAP.md)).
-An unpublished follow-up found a remaining concurrent-budget refusal under
-native KVM on the dedicated host. Trying another eligible domain when the
-oldest one's build mutex is busy passed the full Docker VM, native KVM and
-local KASAN suites; PR CI and integration are still pending
-([journal 0179](docs/history/0179-kvm-overbudget-race-followup.md)).
+11 reported checks passed; issues 110 and 111 were closed. A subsequent native
+KVM run found another concurrent-budget refusal. Trying another eligible
+domain when the oldest one's build mutex is busy, and the remaining
+unprivileged allocation-fault test for T9, were integrated by
+[PR 127](https://github.com/studiomoob/llmoobfs/pull/127) after all eleven
+checks passed, including KASAN/lockdep ([journals 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)
+and [0179](docs/history/0179-kvm-overbudget-race-followup.md)). Issue 114 is
+closed. Resource-cost issue 118 remains open; issue 116 is under separate
+validation in journal 0180 ([roadmap](ROADMAP.md)).
 
 ## The problem
 
@@ -241,10 +241,10 @@ remain coverage exclusions. `ipc` is built but not invoked by the suite.
 
 For targeted permission and fixed independent-encoding checks, use
 `MOOB_ONLY=permgaps make vm-test` ([journal 0172](docs/history/0172-permission-test-gaps.md)).
-The release step also queries as uid 1001. The KASAN fault step now tests
+The release step also queries as uid 1001. The KASAN fault step tests
 unprivileged queries under injected allocation failures. Its targeted and
-full KASAN runs and the native `make vm-test` suite passed locally; publication
-and issue reconciliation remain pending ([journal 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)).
+full KASAN runs and the native `make vm-test` suite passed locally, followed
+by the successful PR 127 checks and merge ([journal 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)).
 The budget-race follow-up was reproduced before its local fix and passed in
 the complete Docker VM, dedicated-host KVM and KASAN suites afterward
 ([journal 0179](docs/history/0179-kvm-overbudget-race-followup.md)).
@@ -427,6 +427,10 @@ KASAN harness runs the layer suite), and no benchmark exists.
   domain is built by a linear scan on its first query after mount, and again after it was
   released or a directory in it was renamed; the budget and the shrinker were tested on small
   trees only (journal 0101).
+- `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This
+  code charges that buffer and user-triggered index/query allocations to the allocating
+  task's memory cgroup where supported (issue 116, journal 0180). The mount-wide index
+  budget is still shared, so this does not provide per-user fair sharing (S9).
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
   mounts are refused, and so is an idmapped mount as `lower=`; no rootless containers.
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
