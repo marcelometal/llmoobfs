@@ -1758,7 +1758,17 @@ sleep 61
 [ "$(bl_builds)" -eq 65 ] || fail bl-recovery-build-count
 umount "$LAYER" && rm -rf "$LOWER/blwork" "$LOWER/blrate" &&
     umount "$LOWER" || fail bl-cleanup
-echo "BUILD_LIMIT_PASS: work denied without published output; uid and mount admission recover"
+for fs in btrfs xfs; do
+    case $fs in btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "bl-lower-mount-$fs"
+    mkdir -p "$LOWER/blwork/d/s" || fail "bl-mkdir-$fs"
+    "$BIN/query-build-limit" plant "$LOWER/blwork/d/s" 17000 || fail "bl-plant-$fs"
+    mount -t moobfs_layer -o lower="$LOWER/blwork",domain_depth=1 none "$LAYER" || fail "bl-work-mount-$fs"
+    "$BIN/query-build-limit" "$LAYER/d" 1001 work || fail "bl-work-errno-or-output-$fs"
+    [ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 0 ] || fail "bl-work-left-built-domain-$fs"
+    umount "$LAYER" && rm -rf "$LOWER/blwork" && umount "$LOWER" || fail "bl-cleanup-$fs"
+done
+echo "BUILD_LIMIT_PASS: work denied on ext4, btrfs and XFS without published output; uid and mount admission recover"
 fi
 if [ -n "${MOOB_ONLY:-}" ] && want buildtime; then
 # Existing test-only scan delay makes the cooperative ten-second deadline
