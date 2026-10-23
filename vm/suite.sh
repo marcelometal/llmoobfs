@@ -1708,6 +1708,9 @@ fi
 if [ -n "${MOOB_ONLY:-}" ] && want buildlimit; then
 # Issue 118: a too-large build is discarded, while a separate small domain
 # demonstrates per-uid and mount-wide admission. This slow step is opt-in.
+# The 17,000-file over-limit fixture needs more inodes than the default ext4
+# format of the disposable device provides.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 40000 "$DEV_EXT4" || fail bl-format
 mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bl-lower-mount
 mkdir -p "$LOWER/blwork/d/s" "$LOWER/blrate/d/s" || fail bl-mkdir
 "$BIN/overbudget-race" plant "$LOWER/blwork/d/s" 17000 || fail bl-plant-work
