@@ -241,6 +241,14 @@ turning that rule on, and the build-time check of an unlisted kernel.
 
 ### S9. Resource limits and denial of service
 
+- Issue 116 / ADR-0018 accounts user-triggered query and index allocations to
+  the allocating task's memory cgroup; journal 0180 records negative controls,
+  full native-KVM and integrated KASAN/UBSAN/lockdep passes. The local branch
+  was first published as PR 128; its DCO sign-off gate failed. The replacement
+  is [PR 129](https://github.com/studiomoob/llmoobfs/pull/129), whose CI and
+  integration are pending. This addresses missing memcg charges, not the fair
+  sharing below.
+
 - A per-mount and per-user cap on `QUERY` results and on index memory, already partly covered
   by `index_budget`; test the behavior when the cap is hit.
 - Cost of the mount-time scan with a large lower layer; `index=off` and a lazy index option
@@ -310,6 +318,11 @@ complete S14/S15 below. Journal 0178 adds a separate unprivileged
 allocation-fault test for T9 and fixes a silent omission when a permission
 lookup runs out of memory. Full local KASAN and native Docker VM suites passed;
 integration remains pending.
+
+*Integration update, 2026-10-22:* PR 127 passed all eleven GitHub checks,
+including KASAN/lockdep, and merged into `main`. T9 is checked and issue 114
+is closed. The paragraph above records the earlier local-validation state;
+S14/S15 below remain separate coverage work.
 
 ### S14 to S21. Making the tests find what reviews found (added 2026-10-20, journal 0156)
 

@@ -70,6 +70,32 @@ checkpoint, its old checks had passed but the branch was behind `main` and
 needed refresh and recheck before a merge decision. That dependency update
 was not part of the correction batch.
 
+Integration update, 2026-10-22: PR 127 merged after all eleven checks passed,
+including KASAN/lockdep. It completed issue 114's remaining T9 test and the
+concurrent-budget follow-up of issue 111; issue 114 was reconciled and closed.
+Issue 116 is being validated separately in journal 0180, while issue 118 and
+the broader S9 fair-sharing policy remain open. The pause checkpoint above
+describes its earlier date, not the present publication state.
+
+Local validation update, 2026-10-22: issue 116's memcg correction passed
+separate negative controls, the full native-KVM suite on ext4, btrfs and XFS
+after PR 127 integration, and the full KASAN/UBSAN/lockdep suite. Its
+accounting policy is accepted in ADR-0018. No controlled performance
+comparison or pull-request CI has run for issue 116; its branch remains local
+and the issue open. S9 fair sharing remains separate.
+
+Publication update, 2026-10-22: the maintainer authorized push and
+[PR 128](https://github.com/studiomoob/llmoobfs/pull/128) was opened for issue
+116. Its exact-head CI and review are the next gates; no check or merge is
+claimed at this checkpoint. The issue remains open, and the unmeasured
+performance overhead remains disclosed in ADR-0018 and journal 0180.
+
+CI correction, 2026-10-22: PR 128's `Lint` job rejected four documentation
+commits without DCO `Signed-off-by` trailers. The original branch remains
+preserved; [draft PR 129](https://github.com/studiomoob/llmoobfs/pull/129)
+replays the same final code and tests from `main` in signed-off commits.
+Its complete exact-head CI, review and integration are still pending.
+
 *Status correction, 2026-10-22 ([0177](docs/history/0177-merged-pr-state-reconciled.md)):*
 The checkpoint above records the state before merge. The exact published head
 of [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) passed its 11

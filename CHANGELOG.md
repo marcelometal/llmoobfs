@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Integration (journal 0179): PR 127 passed all eleven GitHub checks and
+  merged the unprivileged allocation-fault test/fix and concurrent budget
+  release correction. Issue 114's final T9 item was checked and the issue
+  closed; issue 116 remains a separate validation unit.
+
+- Fix (journal 0180, issue 116): charge user-triggered index, scan and query
+  allocations, including the retained `QUERY2` result buffer, to the current
+  memory cgroup. Add a bounded guest regression with separate buffer and index
+  assertions. The integrated full native-KVM and KASAN/UBSAN/lockdep suites
+  passed locally; [PR 129](https://github.com/studiomoob/llmoobfs/pull/129)
+  replaces PR 128 after its documentation commits failed the DCO sign-off
+  gate. Controlled performance comparison and replacement-PR CI remain pending.
+  This leaves the per-mount budget and S9 fair sharing distinct.
+
 - Fix (journal 0179): when the least-recently-used domain is being built,
   try another eligible built domain before refusing an index-budget build.
   The native KVM concurrency test on the dedicated host failed before this
