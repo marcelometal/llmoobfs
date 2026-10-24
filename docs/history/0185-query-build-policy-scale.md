@@ -108,3 +108,35 @@ name while keeping the six typed attributes on each file, so the full
 index build still occurs but the established empty-answer oracle applies.
 The retry will use a distinct output name and will not reuse the failed
 image.
+
+### Six-attribute scale and delay control — 2026-10-24
+
+The absent-term correction was committed in `d96b475`, transferred by a
+second verified bundle and fast-forwarded into the clean dedicated-host
+checkout. `six12000retry` and `six17000` each exited zero with a
+`MOOBFS_POLICY_PASS` marker using a 5 ms read delay; `six17000d20` did so
+with a 20 ms read delay. The query term was absent, but the six typed
+attributes on every file were still loaded into the index. `count=0` on
+successful queries and the sentinel `count=777` on denials were checked by
+the helper. These are separate cold images, one query per condition.
+
+| Files / delay | Direct verdict, wall ms | Delayed verdict, wall ms | Direct/delayed task reads | Direct/delayed read sectors |
+| --- | --- | --- | ---: | ---: |
+| 12,000 / 5 ms | full, 220.927 | full, 1,326.285 | 3,297,280 / 3,297,280 B | 6,376 / 6,376 |
+| 17,000 / 5 ms | `E2BIG`, 345.379 | `E2BIG`, 2,061.553 | 4,780,032 / 4,780,032 B | 9,272 / 9,272 |
+| 17,000 / 20 ms | `E2BIG`, 424.184 | `E2BIG`, 3,783.395 | 4,730,880 / 4,730,880 B | 9,192 / 9,192 |
+
+The 20 ms control did not reach the ten-second cooperative deadline; it
+demonstrates an expensive refusal under synthetic delayed reads, not a
+guaranteed maximum for slower storage. The different images also explain
+why their read counters should not be treated as a paired delta. Raw logs
+and images remain under the distinct run IDs on the host.
+
+The next comparison uses the prior production module at `f283f13`, which
+completed the 17,000-file query before the guard (journal 0182). The source
+diff from that commit to the current branch under `layer/` is confined to
+the guard in `index.c` and its accounting fields in `moobl.h`. The runner
+will compile that commit from a Git archive inside a new run directory,
+using the same current query helper and the same guest procedure, without
+opening or altering a second worktree. This tests the time saved by denial
+on delayed lower I/O; it does not by itself choose the acceptable limit.
