@@ -321,6 +321,40 @@ kernel review or a compatibility test.
 | [MoobFS candidate corpus on XERJ](https://hub.xerj.org/corpus/studiomoob--llmoobfs) | Selection of a source snapshot; license review is pending and the corpus is not installable yet. |
 | [MoobFS experimental source snapshot on Zenodo](https://doi.org/10.5281/zenodo.23514721) | Citation metadata and the official version DOI badge for commit `02381fba`, archive version `0.4.1-experimental+git.02381fba` (journal 0168). |
 | [TeleAI — Awesome Agent Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory/blob/749a08cfe25ad23dda05565d1a11b444608b7786/README.md) | Verified MoobFS entry under **Emerging projects**, described as experimental agent-memory storage; source for the discovery link in both READMEs (journal 0169, checked 2026-10-20). This listing is not a kernel review or a compatibility test. |
+## Product-gap assessment sources (2026-10-20)
+
+- Qdrant, [Filtering in Vector Search](https://qdrant.tech/documentation/search-patterns/vector-search-filtering/)
+  and [Indexing](https://qdrant.tech/documentation/manage-data/indexing/).
+  Official documentation consulted through the site and Context7
+  `/websites/qdrant_tech`; unversioned documentation, accessed 2026-10-20.
+  Used in journal 0164 for filtered vector-retrieval trade-offs, not as a selected
+  dependency or a claim of inherited authorization. Thanks to its authors.
+
+## Algorithm-fit assessment (2026-10-20, journal 0166)
+
+Sources used to prioritize research in [research-algorithm-fit.md](research-algorithm-fit.md),
+not adopted dependencies. That document records the inspected sections and limitations.
+The existing entries above already credit 2Q, ARC and equality intersection.
+
+- Linux 6.12.112: [`rbtree_augmented.h`](https://raw.githubusercontent.com/gregkh/linux/v6.12.112/include/linux/rbtree_augmented.h),
+  [`shrinker.h`](https://raw.githubusercontent.com/gregkh/linux/v6.12.112/include/linux/shrinker.h),
+  [`list_lru.h`](https://raw.githubusercontent.com/gregkh/linux/v6.12.112/include/linux/list_lru.h).
+  Exact KASAN version; augmentation and reclaim contracts, read-only inspection.
+- Yang et al., [S3-FIFO](https://www.cs.cmu.edu/~rvinayak/papers/s3-fifo-sosp-2023-fifo-queues-are-all-you-need-for-cache-eviction.pdf),
+  SOSP 2023, DOI 10.1145/3600006.3613147. Candidate for domain eviction comparison.
+- [SQLite FTS5 BM25](https://www.sqlite.org/fts5.html#the_bm25_function), official
+  documentation accessed 2026-10-20, also via Context7 `/websites/sqlite_docs`.
+  Lexical baseline; no runtime dependency/version selected.
+- Cormack, Clarke and Buettcher, [Reciprocal Rank Fusion](https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf),
+  SIGIR 2009. Candidate user-space ranking fusion.
+- Carbonell and Goldstein, [The Use of MMR](https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf),
+  SIGIR 1998. Candidate client-side diversity reranking.
+- Malkov and Yashunin, [HNSW](https://arxiv.org/abs/1603.09320), arXiv 1603.09320,
+  revised 2018. Conditional approximate-vector candidate; introductory reading only.
+- Lemire, Ssi-Yan-Kai and Kaser, [Roaring](https://arxiv.org/html/1603.06549v4),
+  arXiv 1603.06549v4, 2018 revision. Conditional set-representation candidate.
+
+Thanks to these authors and the maintainers of the underlying infrastructure.
 
 ## Not included
 

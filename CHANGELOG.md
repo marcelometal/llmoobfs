@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Documentation (journal 0183): integrate completed roadmap research from
+  journals 0164–0166 after PR 130, preserving current-state records and leaving
+  the proposed client packages unimplemented.
+
 - Documentation (journal 0181): reconcile the merged PR 129, its eleven
   successful checks and closed issue 116 across current-state documentation;
   preserve the earlier publication checkpoints and the unmeasured performance
@@ -91,6 +95,18 @@
 
 - Documentation (journal 0167): add verified external project records to both READMEs,
   with the scope and current limits of each record; preserve the four existing badges.
+
+- Research (journal 0166): assess established query, cache and retrieval
+  algorithms against source and historical measurements; document hypotheses
+  and validation plans. No algorithm adopted or implemented.
+
+- Planning (journal 0165): add G1–G6 client integration and retrieval packages to
+  ROADMAP with priorities, dependencies, effort estimates and validation gates.
+  All remain planned; implementation is explicitly deferred.
+
+- Assessment (journal 0164): evaluate client integration, derived search-index
+  lifecycle, portable recovery and end-to-end validation. Recommendations only;
+  native stacked architecture and the accepted roadmap sequence are unchanged.
 
 - Coverage (journal 0154): `moobl_xattr_get` at 0 of 4 PCs in the fifth syzkaller run is explained
   by its corpus, which kept almost no attribute read inside a mounted layer. Replayed with

@@ -145,6 +145,70 @@ review round 2:
   concurrent writes and renames, right after permission changes, and with a `fanotify` mark;
   publish what each side gets right and wrong.
 
+## Client integration and retrieval — planned, not started
+
+Added on 2026-10-20 at the maintainer's request, following
+[assessment 0164](docs/history/0164-roadmap-product-gaps.md) and recorded in
+[journal 0165](docs/history/0165-client-roadmap-priorities.md). Inclusion in the
+roadmap is approved; **implementation is not authorized**. Every G-item below is
+planned, not started. Priorities express order of consideration after the current
+correctness work, not delivery dates or a production-readiness commitment.
+
+The target experiment is file-backed agent memory on a managed Linux host, with
+two distinct OS identities and private/shared domains. Application tenant labels
+alone do not provide OS isolation. Reuse existing query, security and distribution
+work; these packages do not replace their acceptance criteria or the institutional
+collaboration track maintained separately.
+
+**P0 — Existing correctness and security work first.** Reconcile the active review
+and correction batches, their required VM/negative/sanitizer evidence and remaining
+limitations before choosing a feature batch. Passing a test gate does not start
+these proposals automatically; the maintainer selects and authorizes that batch.
+
+Effort is a preliminary engineering estimate: S = hours, M = one to three days,
+L = one week or more. Estimates exclude external review and infrastructure wait
+time and must be refined when a batch is scoped.
+
+The [known-algorithm assessment](docs/research-algorithm-fit.md) maps existing
+techniques to these packages, with evidence, trade-offs and experiment proposals.
+It does not select an algorithm or authorize implementation.
+
+| Item | Priority / effort | Scope and dependencies | Validation required before completion |
+| --- | --- | --- | --- |
+| **G1 — Usable client integration** | P1 / L | One narrow client package and one adapter: durable publication, typed fields, paging, explicit errors, capability detection from an accessible domain and fallback. Builds on the [client contract](docs/client-contract.md) and [ADR-0013](docs/decisions/0013-user-space-query-library.md). Any new UAPI needs its own decision; projection remains the separately accepted ADR-0014. | Adapter answers equal the reference on the supported query shapes, including multi-page results; test a caller unable to open the mount root, missing/unsupported module, budget exhaustion and heterogeneous files. Fallback must preserve the caller's access restrictions. Crash injection at publication steps yields an old complete or new complete final file (or absence before first publication), never mixed content/attributes. Document concurrent-writer semantics and unsupported operations. |
+| **G2 — Predictable shared operation** | P1 / L | Deliver the remaining [S9](docs/security-roadmap.md#s9-resource-limits-and-denial-of-service) work with user-visible diagnostics, workload limits and a supported deployment recipe. Reuse ADR-0012 and tracepoints. Distribution continues to require its existing gates. | In a dedicated VM, exercise two users, a noisy neighbor, cold/warm domains and budget saturation. Verify the configured resource policy and explicit errors, compare answers with the oracle, record actual memory including query buffers, rebuild counts and p50/p95/p99 latency. The declared workload must meet pre-registered resource and latency bounds under contention. No silent partial success. |
+| **G3 — Portable backup and recovery** | P1 / M | Complete the export/recovery work already proposed in [distribution strategy section 2.7](docs/distribution-strategy.md). Content, typed attributes, identity and relevant permissions form the recovery unit. It does not require G1 or a persistent kernel index. | Restore into a fresh tree; compare content hashes, typed values, identity and ownership/mode/ACL semantics under a declared UID/GID mapping. Rebuild and compare query answers and denials for both users. Missing/corrupt metadata and incompatible versions must be detected. Refuse overwrite by default; verify content remains readable without the module. Any new export format requires a specification and compatibility decision. |
+| **G4 — Derived-index lifecycle** | P2 / L | A user-space contract for stable client identity, content version/hash, embedding-model version, reconciliation and protected caches. Depends on G1; shares the restored-data contract of G3. Revisions and change tracking remain in the client under [M3 section 5](docs/spec-m3.md). | Exercise update, rename, delete, permission revocation, watcher interruption, lost events, restart and model change. After reconciliation the derived inventory equals a fresh scan for the declared scope/version; no orphaned or obsolete version is served. Measure freshness against pre-registered bounds. New retrieval after a completed revocation must not deliver forbidden content; define in-flight behavior and test protected vectors/caches as well as files. |
+| **G5 — Optional hybrid retrieval** | P2 / L | Integrate structured filters, lexical retrieval and vector ranking in user space. Depends on G1 and G4; use G2's measured envelope for multi-user claims. Select an existing engine only after a bounded comparison. No vector/ANN implementation in the kernel is planned. | Establish an exact-scoring oracle over the complete eligible set, including sets larger than one QUERY2 page. Verify filter/authorization correctness and deterministic tie handling; measure relevance and recall@k, usable-result count, p50/p95/p99, CPU and total RAM against the same search engine over plain files plus a user-space metadata index. Any approximate mode must meet its pre-registered recall threshold. Include lexical-only and vector-only baselines, restrictive filters and revocation tests; no claim of inherited protection from timing/count/ranking leaks. |
+| **G6 — End-to-end usefulness** | Cross-cutting: P1 protocol, P2 final evaluation / L | Define the evaluation protocol before implementing the chosen batch. Final evaluation combines G1–G5 in one real client; the shared scenario needs G2 and restoration needs G3. Extend [M4](docs/benchmark-plan.md), without treating existing pilot results as fresh evidence. | Reproduce write → retrieve usable context → update → revoke/delete → restart/restore with two OS identities and private/shared domains. Publish raw data, pinned versions, repeated runs and intervals. Measure correctness, relevance, time to usable context, freshness, resources, recovery and adapter-specific maintenance burden. Continue only if a preselected performance/resource objective or a concrete reduction in integration burden is demonstrated without weakening access restrictions or the declared relevance floor; publish negative outcomes too. |
+
+### Selection and validation rules
+
+1. P1 foundations are considered before the P2 retrieval extension. G2 and G3
+   need not wait for each other; this is a dependency statement, not an instruction
+   to start concurrent work. Within P2, G4 precedes G5. G6 defines the method first
+   and evaluates the completed integration last.
+2. Before authorizing implementation, scope one client/workload and record numeric
+   targets for latency, memory, freshness and relevance, corpus size, filter
+   selectivity, concurrency, repetitions and the baseline. These are workload
+   choices, not universal guarantees. A package cannot pass with unspecified
+   targets or targets chosen after seeing results. Predefine how any reduction
+   in integration burden will be measured (for example, duplicated metadata fields
+   and client-specific synchronization paths).
+3. Correctness failures, forbidden-content exposure, irrecoverable metadata loss
+   or failure of a declared acceptance bound block completion. Defer, narrow or
+   cancel an item when its benefit is not demonstrated; do not move work into the
+   kernel merely to retain it on the roadmap. Runtime tests use dedicated VMs;
+   kernel changes retain the existing regression, negative-run and sanitizer gates.
+4. A fallback or search service must carry the intended credentials and protect
+   derived data. Opening a result again does not establish absence of side
+   channels. Revocation cannot retract content already delivered to a process.
+5. Preserve ADR-0007: MoobFS already is a native stacked filesystem. An independent
+   on-disk filesystem remains conditional on a measured lower-filesystem bottleneck.
+   Kernel index persistence and a kernel change cursor retain their separate
+   evidence gates below. No backend, new disk format or revised UAPI is selected
+   by adding this plan.
+
 ## Depends on validation
 
 These are deliberately **not** scheduled: each is conditioned on M4 results or
