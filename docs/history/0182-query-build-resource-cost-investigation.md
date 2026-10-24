@@ -775,3 +775,19 @@ and VM logs were copied to a checked archive outside Git at
 runner is preserved beside it. The 17,000-file denial and lack of strict
 CPU/I/O bounds still require the maintainer's policy decision. No push or
 PR was performed.
+
+## Pull request opened — 2026-10-24
+
+After reviewing the full-scale bulk-client result, the maintainer explicitly
+authorized publishing the branch and opening a PR. Immediately before push,
+the worktree was clean at `7bdee6c`, `origin/main` was `55b50fa`, and all 31
+branch commits had DCO trailers. The branch
+`codex/issue118-query-cost-0182` was pushed without rewriting history,
+and [PR 135](https://github.com/studiomoob/llmoobfs/pull/135) was opened
+against `main` with the experimental limits, 17,000-file denial, tests and
+remaining risks stated. The public PR reported head `7bdee6c` and was open
+and mergeable on its first check. Issue 118 remained open. Native Linux VM,
+KASAN/lockdep, compiler, lint and CodeQL checks were in progress or queued;
+none was counted as passed at this checkpoint. The publication-note commit
+will become the final head to validate after its push. No merge was
+authorized or performed.
