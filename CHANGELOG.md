@@ -33,6 +33,12 @@
   read bytes. Publication and issue closure remain pending. These are not
   strict CPU-time or physical-I/O-byte caps, and the
   shared index budget still has no fair per-user shares.
+  A later 30-pair, fixed-frequency comparison of a cold 17,000-file query
+  against the pre-limit module measured a paired median saving of 3.490 ms
+  wall time, 3.370 ms process CPU and 20,480 task-attributed read bytes when
+  the guarded module returned `E2BIG`; the pre-limit module completed the
+  answer. This near-threshold saving is small and the legitimate denial
+  remains a policy tradeoff. The numerical limits are still provisional.
 
 - Documentation (journal 0183): integrate completed roadmap research from
   journals 0164–0166 after PR 130, preserving current-state records and leaving

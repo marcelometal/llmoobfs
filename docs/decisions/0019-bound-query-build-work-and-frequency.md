@@ -127,9 +127,23 @@ wall-median difference for the limited module (95% bootstrap interval
 **+0.3% to +1.8%**, journal 0182). This is a measured cost for that shape,
 not a universal regression bound. An otherwise legitimate 17,000-file
 domain was denied with `E2BIG` on all three supported lower filesystems.
-The cap stops a 17,000-file fixture early, but the reduction in CPU time or
-physical reads for that denied query has not been measured against the
-unlimited run. Publication still needs the maintainer's review of that
-availability and latency tradeoff; slower devices, other client shapes and
-strict CPU/I/O limits remain outside the verified contract. The issue
-remains open.
+At the 2026-10-23 checkpoint, the cap stopped a 17,000-file fixture early,
+but the reduction in CPU time or physical reads for that denied query had not
+been measured against the unlimited run. Publication still needs the
+maintainer's review of that availability and latency tradeoff; slower devices,
+other client shapes and strict CPU/I/O limits remain outside the verified
+contract. The issue remains open.
+
+On 2026-10-24, journal 0182 added 30 alternating, fixed-frequency pairs of
+that exact cold 17,000-file ext4 query against the pre-limit module. The
+guarded query returned `E2BIG` in every run, while the earlier module
+completed; median query CPU was 182.045 versus 184.629 ms, with a paired
+median saving of 3.370 ms (bootstrap 95% interval 1.213–4.611 ms). Median
+task-attributed reads were 4,636,672 versus 4,648,960 B, with a paired
+median saving of 20,480 B (interval 8,192–28,672 B). Wall time fell by a
+paired median 3.490 ms. These observations resolve the earlier unmeasured
+near-threshold cost, but the refused query still spends about 182 ms of
+process CPU and the test does not establish a physical-I/O cap. The numerical
+policy remains provisional until the maintainer weighs the legitimate denial
+against representative larger domains and slower lower devices. This note
+does not change the experimental mechanism or authorize publication.

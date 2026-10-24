@@ -608,3 +608,51 @@ physical-I/O bound. Logs and guest consoles were preserved outside Git as
 well as in the two dedicated-host test checkouts. A 30-pair alternating-order
 series with fixed CPU frequency is prepared but has not started; the required
 host-frequency change awaits the maintainer's explicit approval.
+
+## Thirty matched denial-cost pairs — 2026-10-24
+
+The maintainer explicitly approved the temporary benchmark CPU-frequency
+change. On the dedicated host, the same opt-in `MOOB_ONLY=builddenial sh
+build/native-kvm.sh` step ran 30 times with each module, alternating which
+version ran first. Each run created the same 17,000-file ext4 shape, remounted
+after cache eviction and measured one cold unprivileged `QUERY2`. The
+pre-limit production module at `f283f13` completed an empty answer in all 30
+runs; the guarded production module at `9019142` returned `E2BIG` with
+unchanged count, result and cursor in all 30. Both module checkouts were clean
+before the series. All 60 guest consoles contained `MOOBFS_ONLY_PASS` and
+the raw-device counter control; the runner exited zero. Frequency was held
+at `performance`, turbo disabled during the runs, then restored to the
+original eight `schedutil` governors and `no_turbo=0`; its state file was
+absent and no QEMU process remained afterward.
+
+| Metric | Pre-limit median | Guarded median | Paired guarded minus pre-limit median (bootstrap 95% interval) |
+| --- | ---: | ---: | ---: |
+| Query wall time | 202.027 ms | 198.756 ms | -3.490 ms [-4.450, -2.787] |
+| Query process CPU | 184.629 ms | 182.045 ms | -3.370 ms [-4.611, -1.213] |
+| Task `read_bytes` | 4,648,960 B | 4,636,672 B | -20,480 B [-28,672, -8,192] |
+| Device read sectors | 9,080 | 9,056 | -40 [-56, -16] |
+
+The established `bench/compare.py` analysis of the converted one-query
+records reported a -1.6% wall-median difference for this specific denial
+shape (independent-side 95% bootstrap interval -2.8% to -0.9%,
+Mann–Whitney p=5.09e-06, 30/30 repetitions). The separate paired bootstrap
+above kept each before/after pair together; the guarded query had lower wall
+time in 27/30 and lower measured CPU in 22/30 pairs. The two estimates answer
+slightly different questions and are reported together. The 17,000-file case
+is only slightly above the 32,768-work-unit cap, so the observed savings are
+small relative to the roughly 200 ms spent before refusal. It also proves a
+previously valid large query now fails. One pre-limit device-counter sample
+exceeded its task read counter by 8,192 B; it was retained and listed in the
+raw summary. Neither counter proves exact physical I/O attributable to the
+query, and the cooperative deadline is not a strict CPU limit.
+
+Raw `raw.csv`, `compare.csv`, `summary.json`, runner and parser scripts, 60 VM
+consoles and run logs are preserved outside Git under
+`MoobFS-local/issue118-denial-20261024/` as two checked tar archives and
+individual scripts. The same files remain in the dedicated-host checkouts
+under `build/compare-denial-0182*` and `build/vm-denial-{before,after}-*`.
+This measurement resolves the missing near-threshold resource-savings
+comparison, but it does not establish that 32,768 work units is the right
+availability tradeoff for representative larger domains or slower lower
+devices. Policy review and publication remain pending; issue 118 remains
+open. No push or PR was performed in this round.
