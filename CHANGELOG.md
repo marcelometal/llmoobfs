@@ -38,7 +38,13 @@
   wall time, 3.370 ms process CPU and 20,480 task-attributed read bytes when
   the guarded module returned `E2BIG`; the pre-limit module completed the
   answer. This near-threshold saving is small and the legitimate denial
-  remains a policy tradeoff. The numerical limits are still provisional.
+  remains a policy tradeoff. An opt-in VM control also completed a cold
+  `QUERY2` on a 6,000-file domain with six typed attributes per file, matching
+  the per-project scale of the previously measured 60,000-page client layout.
+  This is a one-domain synthetic control, not a fresh end-to-end client run.
+  The existing opt-in limit regression passed again after the shared fixture
+  helper gained the six-attribute plant mode.
+  The numerical limits are still provisional.
 
 - Documentation (journal 0183): integrate completed roadmap research from
   journals 0164–0166 after PR 130, preserving current-state records and leaving

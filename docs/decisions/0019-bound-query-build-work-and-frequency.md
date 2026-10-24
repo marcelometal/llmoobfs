@@ -147,3 +147,11 @@ process CPU and the test does not establish a physical-I/O cap. The numerical
 policy remains provisional until the maintainer weighs the legitimate denial
 against representative larger domains and slower lower devices. This note
 does not change the experimental mechanism or authorize publication.
+
+The documented ai-memory stage-2 scale had 60,000 files in ten roughly
+6,000-file project domains (journal 0068). A 2026-10-24 opt-in VM control
+with one 6,000-file domain and six matching attribute names/types completed
+one unprivileged cold `QUERY2` under this guard, building 36,000 entries.
+This is a representative per-domain shape, not a rerun of the full client
+or evidence for arbitrarily large domains. The 17,000-file denial and its
+compatibility cost remain. The policy is still provisional.

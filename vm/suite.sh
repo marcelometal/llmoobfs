@@ -25,6 +25,7 @@
 #   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
 #   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
 #   builddenial         optional 17000-file cold QUERY2 cost with/without work cap
+#   buildclient         optional 6000-file, six-attribute domain shape from client scale
 #   buildcostevict      optional two-uid index-budget eviction probe (#118)
 #   buildlimit          optional QUERY2 work and admission limit regression (#118)
 #   buildtime           optional cooperative scan-deadline regression (#118)
@@ -52,7 +53,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1735,6 +1736,26 @@ bdn_raw_after=$(awk '{print $3}' /sys/block/vda/stat)
 [ "$bdn_raw_after" -gt "$bdn_raw_before" ] || fail bdn-block-counter-no-increase
 echo "BUILD_DENIAL_DEVICE_CONTROL: raw device read advanced sectors by $((bdn_raw_after - bdn_raw_before))"
 echo "BUILD_DENIAL_OBSERVED: 17000 empty files, one cold query, outcome=$bdn_result"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildclient; then
+# Journal 0068 measured 60,000 client pages in ten similarly sized domains,
+# with five or six typed attributes per file. This tests one 6,000-file,
+# six-attribute domain against the proposed per-build work cap in a VM.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 20000 "$DEV_EXT4" || fail bcl-format
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bcl-lower-mount
+mkdir -p "$LOWER/bcl/d/s" || fail bcl-directory
+"$BIN/query-build-limit" plant6 "$LOWER/bcl/d/s" 6000 || fail bcl-plant
+sync && umount "$LOWER" || fail bcl-lower-unmount-before-cold
+echo 3 > /proc/sys/vm/drop_caches || fail bcl-drop-caches
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bcl-lower-remount
+mount -t moobfs_layer -o lower="$LOWER/bcl",domain_depth=1 none "$LAYER" || fail bcl-layer-mount
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bcl-query
+bcl_info=$("$BIN/query" "$LAYER" info) || fail bcl-info
+echo "$bcl_info"
+echo "$bcl_info" | grep -q 'domain_builds=1 ' || fail bcl-build-count
+echo "$bcl_info" | grep -q 'entries=36000 inodes=6000' || fail bcl-index-counts
+umount "$LAYER" && rm -rf "$LOWER/bcl" && umount "$LOWER" || fail bcl-cleanup
+echo 'BUILD_CLIENT_SHAPE_PASS: 6000 files with six typed attributes, one cold QUERY2 build'
 fi
 if [ -n "${MOOB_ONLY:-}" ] && want buildlimit; then
 # Issue 118: a too-large build is discarded, while a separate small domain

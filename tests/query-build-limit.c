@@ -9,12 +9,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 #include "moobfs_ioctl.h"
 
-static int plant_empty(const char *dir, const char *count)
+static int plant_empty(const char *dir, const char *count, int six_attrs)
 {
+	static const char time_value[9] = {5};
+	static const struct {
+		const char *name;
+		const char *value;
+		size_t len;
+	} attrs[] = {
+		{"user.moob.family", "\001note", 5},
+		{"user.moob.tier", "\001working", 8},
+		{"user.moob.kind", "\001fact", 5},
+		{"user.moob.pinned", "\004\000", 2},
+		{"user.moob.updated_at", time_value, sizeof(time_value)},
+		{"user.moob.expires_at", time_value, sizeof(time_value)},
+	};
 	unsigned long n, i;
+	size_t a;
 	char *end;
 	char path[PATH_MAX];
 	int fd;
@@ -27,8 +42,20 @@ static int plant_empty(const char *dir, const char *count)
 		if (snprintf(path, sizeof(path), "%s/f%05lu", dir, i) >= (int)sizeof(path))
 			return 1;
 		fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0644);
-		if (fd < 0 || close(fd)) {
+		if (fd < 0) {
 			perror("plant empty file");
+			return 1;
+		}
+		if (six_attrs)
+			for (a = 0; a < sizeof(attrs) / sizeof(attrs[0]); a++)
+				if (fsetxattr(fd, attrs[a].name, attrs[a].value,
+					     attrs[a].len, 0)) {
+					perror("plant typed attribute");
+					close(fd);
+					return 1;
+				}
+		if (close(fd)) {
+			perror("close planted file");
 			return 1;
 		}
 	}
@@ -44,11 +71,13 @@ int main(int argc, char **argv)
 	int fd, want, got;
 
 	if (argc != 4) {
-		fprintf(stderr, "usage: query-build-limit plant DIR COUNT | DOMAIN UID ok|quota|work|timeout\n");
+		fprintf(stderr, "usage: query-build-limit plant|plant6 DIR COUNT | DOMAIN UID ok|quota|work|timeout\n");
 		return 64;
 	}
 	if (!strcmp(argv[1], "plant"))
-		return plant_empty(argv[2], argv[3]);
+		return plant_empty(argv[2], argv[3], 0);
+	if (!strcmp(argv[1], "plant6"))
+		return plant_empty(argv[2], argv[3], 1);
 	errno = 0;
 	uid = strtoul(argv[2], &end, 10);
 	if (errno || *end || !uid || uid > UINT_MAX) {

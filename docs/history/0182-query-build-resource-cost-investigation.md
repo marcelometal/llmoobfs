@@ -656,3 +656,41 @@ comparison, but it does not establish that 32,768 work units is the right
 availability tradeoff for representative larger domains or slower lower
 devices. Policy review and publication remain pending; issue 118 remains
 open. No push or PR was performed in this round.
+
+## Representative domain-size control — 2026-10-24
+
+Journal 0068 recorded a real ai-memory stage-2 scale of 60,000 pages spread
+across ten similarly sized project domains, with five or six typed attributes
+per page. To check the proposed per-domain work cap against that documented
+shape, an opt-in `buildclient` VM step plants one 6,000-file ext4 domain with
+the six attribute names and types used by `bench/client/aimem-mirror.py`.
+The test uses an exclusive-create fixture on a disposable VM device; it does
+not replay the ai-memory client or measure the full ten-domain workload.
+The older `bench/client/stage2.sh` script clears a fixed host directory, so
+this control used the dedicated VM instead.
+
+The changed C helper compiled statically on the dedicated Linux host with
+`-O2 -Wall -Wextra -Werror -Wconversion`; `sh -n vm/suite.sh` and
+`git diff --check` passed. `MOOB_ONLY=buildclient sh build/native-kvm.sh`
+then exited zero with `QUERY_BUILD_LIMIT_PASS expected_errno=0`,
+`BUILD_CLIENT_SHAPE_PASS` and `MOOBFS_ONLY_PASS`. The current guarded module
+built the domain once and reported 36,000 attribute entries, 6,000 indexed
+inodes and 2,898,720 bytes used from its 128 MiB index budget. No QEMU
+process or saved CPU-frequency state remained afterward. The run log and
+guest console are preserved outside Git in
+`MoobFS-local/issue118-denial-20261024/`; the host keeps its original VM
+artifact. This one-domain result supports the compatibility of the known
+client's per-project size with the experimental cap. It does not establish
+behavior for projects above that size, concurrent callers, other clients or
+slower lower devices. The historical ten-domain client result used an older
+module and cannot be presented as a new end-to-end pass of this guard.
+
+Because `plant6` extends the existing `query-build-limit` fixture, the
+original `plant` path was checked again with
+`MOOB_ONLY=buildlimit sh build/native-kvm.sh` after the new step. It exited
+zero with `BUILD_LIMIT_PASS` and `MOOBFS_ONLY_PASS`: over-limit work was
+denied on ext4, btrfs and XFS without published output, and UID/mount
+admission recovered. The run log and console are preserved beside the
+client-shape artifacts. This targeted rerun does not replace the earlier
+complete native-KVM and KASAN/lockdep suites; those were run before the
+new optional fixture.
