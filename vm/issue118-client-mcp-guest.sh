@@ -10,7 +10,7 @@ out=$1 projects=$2 pages=$3
 disk=/dev/vda
 mount_dir=/tmp/moob118-mcp
 base=$mount_dir/aim2
-repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 client=/home/debian/clients/ai-memory/target/release/ai-memory
 [ -b "$disk" ] && [ "$(blkid -s LABEL -o value "$disk")" = moob118mcp ] || {
     echo 'AIMEM_MCP_FAIL: expected disposable disk missing' >&2

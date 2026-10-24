@@ -28,7 +28,7 @@ if pgrep -f '[q]emu-system' >/dev/null; then
     exit 1
 fi
 
-repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 kernel=$(uname -r)
 [ -d "/lib/modules/$kernel/build" ] || { echo 'matching kernel headers unavailable' >&2; exit 1; }
 if [ -n "$seed_run" ]; then

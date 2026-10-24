@@ -19,7 +19,7 @@ if pgrep -f '[q]emu-system' >/dev/null; then
     exit 1
 fi
 
-repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 client=/home/debian/clients/ai-memory/target/release/ai-memory
 kernel=$(uname -r)
 [ -x "$client" ] && [ -d "/lib/modules/$kernel/build" ] || {

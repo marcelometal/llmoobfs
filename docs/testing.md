@@ -126,6 +126,17 @@ It checks input-image hashes, settings, outcomes and alternating order,
 then reports paired medians and a descriptive bootstrap interval as JSON.
 Journal 0185 records the completed ten-pair run and its limitations.
 
+`sh vm/issue118-client-mcp-host.sh RUN_ID PROJECTS PAGES_PER_PROJECT`
+is an opt-in native-KVM real-client check on the dedicated Linux host. It
+creates a uniquely named ext4 image, compiles the current layer and query
+helper, and runs ai-memory's `memory_write_page` MCP workload through
+`bench/client/stage2.sh` inside the guest. The guest requires every
+requested write to succeed, mirrors typed attributes from the client's
+SQLite database, and requires zero SQL-versus-`QUERY2` differences across
+the six established shapes. It prints `AIMEM_MCP_PASS` only after these
+checks. The runner does not report a performance threshold. Journal 0186
+records the completed 2,000-write run and its limitations.
+
 ## 3. Markers and what they mean
 
 A run is read from the console log. Success markers are printed only after the

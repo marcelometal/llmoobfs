@@ -11,7 +11,7 @@ prefix=$1 pairs=$2 files=$3 delay_ms=$4 shape=$5 seed_run=$6
 case "$prefix" in ''|*[!a-zA-Z0-9_-]*) echo 'invalid prefix' >&2; exit 64 ;; esac
 case "$pairs" in ''|*[!0-9]*) echo 'invalid pair count' >&2; exit 64 ;; esac
 [ "$pairs" -ge 1 ] && [ "$pairs" -le 30 ] || exit 64
-repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 i=1
 while [ "$i" -le "$pairs" ]; do
     if [ $((i % 2)) -eq 1 ]; then
