@@ -140,3 +140,26 @@ will compile that commit from a Git archive inside a new run directory,
 using the same current query helper and the same guest procedure, without
 opening or altering a second worktree. This tests the time saved by denial
 on delayed lower I/O; it does not by itself choose the acceptable limit.
+
+### Initial pre-limit comparison — 2026-10-24
+
+The pre-limit module compiled from archived source at `f283f13` and ran
+through the same guest helper on new six-attribute, 17,000-file images.
+`six17000pre5` and `six17000pre20` both emitted `MOOBFS_POLICY_PASS` and
+completed full answers under direct and delayed reads. At 5 ms read delay,
+the pre-limit delayed query took 1,970.119 ms wall and 824.830 ms process
+CPU with 4,743,168 task read bytes and 9,200 underlying read sectors.
+At 20 ms, it took 3,920.441 ms wall and 884.565 ms process CPU with
+4,755,456 task read bytes and 9,240 sectors. The guarded, denied queries
+in the separate images above took 2,061.553 ms at 5 ms and 3,783.395 ms
+at 20 ms. The signs of those single-run wall differences disagree, so
+neither is treated as an effect of the guard. All four runs used distinct
+filesystem images and uncontrolled host CPU frequency.
+
+To remove filesystem-layout variation, the next bounded comparison copies
+one unmounted 17,000-file image from `six17000` into each new run. The
+runner records the disk hash before the guest uses it, validates the seed's
+file count and shape, and refuses reused output names. A new opt-in pairs
+script alternates module order and runs the two VMs sequentially. Results
+will be analyzed as pairs; no frequency adjustment is planned. The
+synthetic delay and one host remain limitations.

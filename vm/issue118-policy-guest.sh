@@ -5,13 +5,14 @@ set -eu
 PATH=/usr/sbin:/sbin:/usr/bin:/bin
 export PATH
 
-[ "$#" -eq 4 ] || exit 64
-out=$1 files=$2 delay_ms=$3 shape=$4
+[ "$#" -eq 5 ] || exit 64
+out=$1 files=$2 delay_ms=$3 shape=$4 prepare=$5
 case "$shape" in
     plain) plant=plant; term=kind ;;
     six) plant=plant6; term=policy_absent ;;
     *) exit 64 ;;
 esac
+case "$prepare" in plant|reuse) ;; *) exit 64 ;; esac
 disk=/dev/vda
 lower=/tmp/moob118-lower
 layer=/tmp/moob118-layer
@@ -33,8 +34,16 @@ cleanup() {
 trap cleanup EXIT
 
 mount -t ext4 "$disk" "$lower"
-mkdir -p "$lower/base/d/s"
-"$out/query-build-limit" "$plant" "$lower/base/d/s" "$files"
+if [ "$prepare" = plant ]; then
+    mkdir -p "$lower/base/d/s"
+    "$out/query-build-limit" "$plant" "$lower/base/d/s" "$files"
+else
+    [ -d "$lower/base/d/s" ] &&
+        [ "$(find "$lower/base/d/s" -maxdepth 1 -type f | wc -l)" -eq "$files" ] || {
+        echo 'MOOBFS_POLICY_FAIL: cloned fixture has wrong file count' >&2
+        exit 1
+    }
+fi
 sync
 umount "$lower"
 insmod "$out/moobfs_layer.ko"
