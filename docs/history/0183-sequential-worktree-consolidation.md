@@ -39,10 +39,18 @@ not listed in this branch's history index yet.
 
 `git diff --check origin/main...HEAD`, `sh scripts/check-retired-claims.sh`,
 `python3 scripts/check-site.py .` and `python3 scripts/site-faq.py --check`
-passed. The site check covered 12 HTML pages. No module, VM or benchmark test
-was run for this documentation-only integration. The roadmap items are proposals;
+passed. The site check covered 12 HTML pages. At this initial checkpoint,
+no module, VM or benchmark test had been run for this documentation-only
+integration. The roadmap items are proposals;
 they have not been implemented or validated as product behavior. Issue 118 is
 still local and its resource-limit policy is not approved for publication.
+
+*Validation update, 2026-10-24.* `make vm-test` completed with exit status 0
+in the Docker/QEMU Debian 6.12.111 test environment. The console contained
+`MOOBFS_VM_PASS`, `MOOBFS_ACCEPTANCE_PASS` and `MOOBFS_LAYER_PASS` once each,
+with no `MOOBFS_VM_FAIL`. This exercises the unchanged module from `main`;
+it does not validate the proposed G-items or replace a sanitizer run on a
+future code change.
 
 ## Next step
 
