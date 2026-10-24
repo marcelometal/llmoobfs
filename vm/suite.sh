@@ -24,6 +24,7 @@
 #   memcg               account a retained QUERY2 buffer to the calling memory cgroup (#116)
 #   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
 #   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
+#   builddenial         optional 17000-file cold QUERY2 cost with/without work cap
 #   buildcostevict      optional two-uid index-budget eviction probe (#118)
 #   buildlimit          optional QUERY2 work and admission limit regression (#118)
 #   buildtime           optional cooperative scan-deadline regression (#118)
@@ -51,7 +52,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1706,6 +1707,34 @@ grep ' moobfs_domain_release: ' "$TR/trace" | sed 's/^.* moobfs_domain_release: 
 tr_off moobfs_domain_build moobfs_domain_release
 umount "$LAYER" && rm -rf "$LOWER/bce" && umount "$LOWER" || fail bce-cleanup
 echo "BUILD_COST_CROSS_USER_EVICTION: 3 builds and at least 2 budget releases across uids 1001 and 1002; budget=$bce_budget"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want builddenial; then
+# Compare the same cold 17,000-file QUERY2 with the pre-limit and limited
+# modules. The helper accepts only a complete empty answer or E2BIG with
+# untouched output, and reports process CPU/read bytes plus device sectors.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 40000 "$DEV_EXT4" || fail bdn-format
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bdn-lower-mount
+mkdir -p "$LOWER/bdn/d/s" || fail bdn-directory
+"$BIN/query-build-limit" plant "$LOWER/bdn/d/s" 17000 || fail bdn-plant
+sync && umount "$LOWER" || fail bdn-lower-unmount-before-cold
+echo 3 > /proc/sys/vm/drop_caches || fail bdn-drop-caches
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bdn-lower-remount
+mount -t moobfs_layer -o lower="$LOWER/bdn",domain_depth=1 none "$LAYER" || fail bdn-layer-mount
+bdn_result=$("$BIN/query-build-denial" "$LAYER/d" 1001) || fail bdn-query
+echo "$bdn_result"
+case "$bdn_result" in
+    *"outcome=full "*) bdn_expected_builds=1 ;;
+    *"outcome=denied "*) bdn_expected_builds=0 ;;
+    *) fail bdn-outcome ;;
+esac
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq "$bdn_expected_builds" ] || fail bdn-build-count
+umount "$LAYER" && rm -rf "$LOWER/bdn" && umount "$LOWER" || fail bdn-cleanup
+bdn_raw_before=$(awk '{print $3}' /sys/block/vda/stat)
+dd if="$DEV_EXT4" of=/dev/null bs=4096 skip=10000 count=1 >/dev/null 2>&1 || fail bdn-block-counter-read
+bdn_raw_after=$(awk '{print $3}' /sys/block/vda/stat)
+[ "$bdn_raw_after" -gt "$bdn_raw_before" ] || fail bdn-block-counter-no-increase
+echo "BUILD_DENIAL_DEVICE_CONTROL: raw device read advanced sectors by $((bdn_raw_after - bdn_raw_before))"
+echo "BUILD_DENIAL_OBSERVED: 17000 empty files, one cold query, outcome=$bdn_result"
 fi
 if [ -n "${MOOB_ONLY:-}" ] && want buildlimit; then
 # Issue 118: a too-large build is discarded, while a separate small domain

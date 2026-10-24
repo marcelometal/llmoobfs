@@ -557,3 +557,29 @@ state was changed by this checkpoint. The next technical task remains the
 denied-query resource-savings measurement and representative-workload
 validation, followed by the maintainer's policy choice and a separate
 publication gate.
+
+## Denied-query savings experiment prepared — 2026-10-24
+
+After roadmap PR 134 merged as `55b50fa`, the issue-118 branch incorporated
+the new `main` locally in merge `639e44d`. The merge changed documentation,
+not the production limit implementation. One active worktree remains. The
+dedicated host was checked before use: no QEMU process or pending CPU-frequency
+state, and both positive (`7ef9124`) and pre-limit (`e42a2ba`) test checkouts
+were clean. No new VM or benchmark result is claimed in this paragraph.
+
+An opt-in `builddenial` guest step is being added for the existing 17,000-file
+empty-attribute fixture. It remounts the lower ext4 filesystem after cache
+eviction, issues one unprivileged `QUERY2`, and records wall time, process CPU,
+task read bytes and block-device sectors. The helper accepts only a complete
+empty answer (pre-limit module) or `E2BIG` with unchanged output (limited
+module); a raw-device read checks that the sector counter advances. The same
+helper and fixture must run on both module versions. This measures the work
+avoided by the refusal; it does not make device-sector deltas an exact
+per-query attribution or establish a strict CPU/I/O cap.
+
+The first strict host compile of the helper failed at `-Wconversion` because
+the nanosecond field was added to an unsigned value without an explicit cast.
+The cast was added; the repeat static Linux compile passed with `-Werror` and
+`-Wconversion`. `sh -n` passed for both changed VM scripts, and
+`git diff --check` passed. Dynamic results, negative-control output and
+performance conclusions remain pending.
