@@ -44,6 +44,11 @@
   This is a one-domain synthetic control, not a fresh end-to-end client run.
   The existing opt-in limit regression passed again after the shared fixture
   helper gained the six-attribute plant mode.
+  A later bulk stage-2 client run in a KVM guest on the Mac mini completed
+  60,000 pages across ten domains with the guarded module; all 60
+  SQLite-versus-QUERY2 answer checks agreed. It skipped MCP writes, live
+  mirroring and latency measurement. The 17,000-file denial still needs a
+  compatibility decision.
   The numerical limits are still provisional.
 
 - Documentation (journal 0183): integrate completed roadmap research from

@@ -155,3 +155,13 @@ one unprivileged cold `QUERY2` under this guard, building 36,000 entries.
 This is a representative per-domain shape, not a rerun of the full client
 or evidence for arbitrarily large domains. The 17,000-file denial and its
 compatibility cost remain. The policy is still provisional.
+
+A subsequent 2026-10-24 dedicated-VM run on the Mac mini replayed the
+historical ai-memory stage-2 bulk scale with the guarded module: 60,000
+pages in ten 6,000-page project domains, all pages mirrored, and all 60
+SQLite-versus-QUERY2 answer comparisons equal (journal 0182). This is
+stronger compatibility evidence for that one client shape than the earlier
+single-domain synthetic control. It does not cover MCP writes, a live
+sidecar, latency, projects above 6,000 pages or a slow lower device. The
+experimental cap and the legitimate 17,000-file denial remain unchanged;
+publication still requires the maintainer's explicit choice.

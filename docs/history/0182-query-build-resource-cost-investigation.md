@@ -727,3 +727,51 @@ project domain, slower lower device or different client may change that
 decision. Issue 118 should remain open for the residual availability risks
 and wider validation after a PR, rather than being closed solely on these
 local tests.
+
+## Full-scale client bulk comparison in a dedicated VM — 2026-10-24
+
+The maintainer asked whether the client-scale control could run on the Mac
+mini. The one-domain synthetic control above had already run there in native
+KVM. A separate `virtme-ng` guest on that host now ran the historical
+ai-memory stage-2 **bulk** procedure at its full 60,000-page scale, with the
+guarded module from branch commit `1e518c2` and the pinned ai-memory binary
+at `385b81e`. The guest booted the host's Debian 6.12.111 kernel under KVM,
+loaded the MoobFS module inside the VM, and used a newly created 2 GiB ext4
+disk image. No host module was loaded. A new output directory and disk label
+were checked before each run, so the historical `stage2.sh` cleanup touched
+only the disposable guest disk. The query tool was compiled from this branch.
+
+The first VM smoke command failed because `vng` was on the PATH without its
+companion `virtme-run`; adding the existing virtualenv's `bin` directory
+fixed it. The first 200-page pilot stopped before mounting its disk because
+the guest root was read-only at `/mnt`; using the guest's writable `/tmp`
+mount point fixed that. The repeated pilot then exited zero: 200 pages in
+two projects, 12 comparisons and zero differences. These failed setup
+attempts did not create client data or a pass claim.
+
+The full run used `BULK=1` with ten projects and 6,000 pages per project.
+The client's `reindex` populated its SQLite database in 885 seconds; the
+existing mirror copied six or five typed fields onto all 60,000 page files
+(`missing_files=0`, 19.5 seconds, 77 µs median per page). The established
+`aimem-compare.py` reported `COMPARE: projects=10 checks=60 failed=0`, with
+nonempty result totals for each of its six shapes. The wrapper required
+that marker and printed `AIMEM_VM_PASS`; the VM command exited zero. The
+pre-comparison `GET_INFO` showed zero built domains, so these comparisons
+exercised initial domain builds under the new guard. Afterward, QEMU was
+idle, the benchmark CPU-frequency state file was absent, and the positive
+checkout was clean. The run did not pin CPU frequency or change turbo.
+
+This is a successful full-scale **bulk client comparison**, not an MCP write
+replay, live sidecar test or new latency benchmark. `LATENCY=/nonexistent`
+explicitly skipped the optional latency tool. The lower was ext4 on this
+host; other lower filesystems and slower devices remain unmeasured for this
+client. The query page cache was not evicted before every shape. A broad
+text search for `error` in the client's setup log matched embedded SQL
+migration text, not a test verdict; exit status and `COMPARE` supplied the
+verdict. The source checkout, output directories, VM log and sparse disk
+images remain on the dedicated host. The pilot and full output directories
+and VM logs were copied to a checked archive outside Git at
+`MoobFS-local/issue118-denial-20261024/aimem-vm-results.tar.gz`; the VM
+runner is preserved beside it. The 17,000-file denial and lack of strict
+CPU/I/O bounds still require the maintainer's policy decision. No push or
+PR was performed.

@@ -440,7 +440,10 @@ KASAN harness runs the layer suite), and no benchmark exists.
   experimental work and rebuild-frequency limits
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
   they are not a strict CPU-time or I/O-byte cap. The local VM and KASAN suites
-  passed, but issue 118 remains open pending policy review, publication and
+  passed. A separate Mac mini KVM guest replayed the 60,000-page stage-2 bulk
+  client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
+  answer checks agreed. That run did not test MCP writes, a live mirror or
+  latency. Issue 118 remains open pending policy review, publication and
   broader-workload validation. Do not expose a multi-user mount to untrusted
   query workloads.
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This

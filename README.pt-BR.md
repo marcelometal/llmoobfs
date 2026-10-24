@@ -462,7 +462,11 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   limites experimentais de trabalho e frequência de reconstrução
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
   eles não são um teto estrito de tempo de CPU ou bytes de E/S. As suítes locais
-  de VM e KASAN passaram, mas a issue 118 segue aberta para revisão da política,
+  de VM e KASAN passaram. Uma VM KVM separada no Mac mini repetiu a carga bulk
+  de 60 mil páginas do estágio 2 do cliente em dez domínios com este limite;
+  as 60 comparações de resposta entre SQLite e QUERY2 concordaram. Essa
+  rodada não mediu escrita via MCP, espelhamento em tempo real nem latência.
+  A issue 118 segue aberta para revisão da política,
   publicação e validação com cargas mais diversas. Não exponha uma montagem
   multiusuário a consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
