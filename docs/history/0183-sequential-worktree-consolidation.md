@@ -1,6 +1,6 @@
 # 0183 — Consolidate the local work and carry completed roadmap research forward
 
-Date: 2026-10-24. Status: local documentation integration; not published.
+Date: 2026-10-24. Status: PR 134 open; not merged (publication update below).
 
 ## Goal and decision
 
@@ -52,9 +52,20 @@ with no `MOOBFS_VM_FAIL`. This exercises the unchanged module from `main`;
 it does not validate the proposed G-items or replace a sanitizer run on a
 future code change.
 
-## Next step
+## Next step at the local checkpoint
 
 Review and publish the roadmap documentation only with separate authorization.
 After that unit closes, continue issue 118 in the same worktree, preserving its
 local commits and negative-control evidence. Keep QUERY3 deferred until its
 priority is explicitly reconsidered.
+
+## Publication update, 2026-10-24
+
+The maintainer authorized publication after reviewing the completed local
+validation. Branch `codex/roadmap-integration-20261024` was pushed at
+`ad6bcb5`, and [PR 134](https://github.com/studiomoob/llmoobfs/pull/134)
+opened against `main` at `de957ba`. At the first post-publication check, its
+CI and KASAN/lockdep jobs were in progress. These are pending checks, not
+passing results. The next step is to verify every required check at the final
+published head, then seek a separate merge decision. Issue 118 remains local;
+no work on it began during this documentation publication.
