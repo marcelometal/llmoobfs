@@ -583,3 +583,28 @@ The cast was added; the repeat static Linux compile passed with `-Werror` and
 `-Wconversion`. `sh -n` passed for both changed VM scripts, and
 `git diff --check` passed. Dynamic results, negative-control output and
 performance conclusions remain pending.
+
+## First matched denial fixture — 2026-10-24
+
+The opt-in `MOOB_ONLY=builddenial` native-KVM step exited 0 on the dedicated
+host with the limited module at `9019142` and with the pre-limit module at
+`f283f13`. Both used the same 17,000-file empty-attribute fixture, helper
+source and ext4 remount/cache-eviction sequence. The limited query returned
+`E2BIG` with unchanged output; the earlier module completed with an empty
+answer. Both guest consoles emitted `MOOBFS_ONLY_PASS` and the raw-device
+counter control. The negative checkout kept the original pre-limit production
+module; its new commit adds only this test fixture.
+
+| Module | Wall | Process CPU | Task read bytes | Device read sectors |
+| --- | ---: | ---: | ---: | ---: |
+| Before, full answer | 283.097 ms | 229.105 ms | 4,657,152 | 9,096 |
+| After, `E2BIG` | 277.972 ms | 230.192 ms | 4,624,384 | 9,032 |
+
+The denied query read 32,768 fewer bytes by both observed counters, but its
+process CPU was 1.087 ms higher in this single comparison. Frequency was not
+fixed and the limited module ran first, so the wall-time difference cannot be
+treated as an effect. Neither device sectors nor task reads are a verified
+physical-I/O bound. Logs and guest consoles were preserved outside Git as
+well as in the two dedicated-host test checkouts. A 30-pair alternating-order
+series with fixed CPU frequency is prepared but has not started; the required
+host-frequency change awaits the maintainer's explicit approval.
