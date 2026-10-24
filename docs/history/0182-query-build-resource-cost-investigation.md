@@ -525,3 +525,35 @@ measured +0.9% overhead. The lack of strict CPU/I/O caps, the legacy
 whole-mount frequency exception and unmeasured slower devices remain
 explicit limitations. Issue 118 stays open; there has been no push, PR,
 public issue update or merge for this branch.
+
+## Continuity and policy-review checkpoint — 2026-10-24
+
+A read-only continuity check found `codex/issue118-query-cost-0182` clean at
+`cfac333` both locally and in the dedicated-host checkout. Issue 118 was
+OPEN; no PR or remote branch had this head. The dedicated host had no QEMU
+process or saved benchmark CPU-frequency state. The technical evidence and
+raw comparison records above remain preserved. This round did not change
+the module or tests and did not run another VM or benchmark.
+
+The proposed next product decision is to retain the work/frequency guard
+provisionally, but not treat its numerical constants as final yet. The
+30-pair comparison found a small, detectable +0.9% cost, while the
+17,000-file denial establishes a real compatibility cost. Before choosing
+whether to publish the fixed values, measure the CPU and lower-I/O work
+avoided by that denial against the pre-limit module and exercise larger
+representative domains and slower lower devices where available. If those
+workloads fit the cap, an experimental, explicitly limited publication can
+be considered; otherwise revise the work threshold and repeat the relevant
+positive, negative and performance tests. Raising the threshold without
+such evidence or claiming a strict CPU/I/O cap are not supported by these
+measurements. This is a recommendation for maintainer review, **not** an
+accepted policy change or authorization to publish.
+
+The local-only migration note
+`MoobFS-local/ISSUE118-RETOMADA-2026-10-24.md` points to the exact branch,
+negative control, logs, benchmark CSVs, validation results, limitations and
+resume order. No code behavior, public issue, pull request or remote Git
+state was changed by this checkpoint. The next technical task remains the
+denied-query resource-savings measurement and representative-workload
+validation, followed by the maintainer's policy choice and a separate
+publication gate.
