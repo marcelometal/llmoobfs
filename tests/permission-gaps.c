@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/xattr.h>
@@ -487,10 +488,25 @@ static struct fault_result fault_trial(const char *domain, int nth, int shape)
 	return result;
 }
 
+/* Each fault trial is independent. A fresh-domain trial can pay for both the
+ * injected failure and its retry, so remount between groups of eight to keep
+ * this fault sweep below the separate QUERY2 build-admission limit (#118).
+ */
+static void fresh_fault_mount_reset(void)
+{
+	char options[PATHCAP + 32];
+	int n = snprintf(options, sizeof(options), "lower=%s,domain_depth=1", lower);
+
+	MUST(n > 0 && n < (int)sizeof(options), "fault mount options");
+	MUST(!umount(layer), "fault unmount between trial groups");
+	MUST(!mount("none", layer, "moobfs_layer", 0, options),
+	     "fault remount between trial groups");
+}
+
 static void faults(void)
 {
 	static const unsigned char text[] = {1, 'v'}, rank[] = {2, 0, 0, 0, 0, 0, 0, 0, 0};
-	int fresh, shape, calls = 0, total = 0;
+	int fresh, shape, calls = 0, fresh_calls = 0, total = 0;
 
 	umask(0);
 	for (fresh = 0; fresh < 2; fresh++) for (shape = 0; shape < 3; shape++) {
@@ -502,6 +518,8 @@ static void faults(void)
 			unsigned int truncated;
 			int fd;
 
+			if (fresh && !(fresh_calls % 8))
+				fresh_fault_mount_reset();
 			snprintf(domain, sizeof(domain), "uf-%d-%d-%03d", fresh, shape, n);
 			directory(layer, domain, 0755);
 			snprintf(rel, sizeof(rel), "%s/private", domain); directory(layer, rel, 0755);
@@ -518,6 +536,8 @@ static void faults(void)
 			snprintf(rel, sizeof(rel), "%s/private", domain); mode(layer, rel, 0700);
 			result = fault_trial(domain, n, shape);
 			calls++;
+			if (fresh)
+				fresh_calls++;
 			if (!result.hit) break;
 			hits++; total++;
 		}

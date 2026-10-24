@@ -22,6 +22,14 @@
 #   rootpath            a domain directory renamed while a build waits to start (issue #110)
 #   overbudget          builds over the budget while other domains are built (issue #111)
 #   memcg               account a retained QUERY2 buffer to the calling memory cgroup (#116)
+#   buildcost           bounded unprivileged first-build and post-rename cost probe (#118)
+#   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
+#   builddenial         optional 17000-file cold QUERY2 cost with/without work cap
+#   buildclient         optional 6000-file, six-attribute domain shape from client scale
+#   buildcostevict      optional two-uid index-budget eviction probe (#118)
+#   buildlimit          optional QUERY2 work and admission limit regression (#118)
+#   buildtime           optional cooperative scan-deadline regression (#118)
+#   buildmoved          optional cumulative work across a moved-directory rescan (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
 #   lowerro             a read-only, frozen or idmapped lower mount (journal 0117)
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
@@ -45,7 +53,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1618,6 +1626,236 @@ done
 [ "$(wc -l < /tmp/bd.k)" -eq 1001 ] || fail "bd-count ($(wc -l < /tmp/bd.k))"
 umount "$LAYER" && rm -rf "$LOWER/bdx" && umount "$LOWER" || fail "bd-cleanup"
 echo "BIGDIR_PASS: a 3000-entry directory built in batches, equal to the oracle"
+fi
+if want buildcost || { [ -n "${MOOB_ONLY:-}" ] && want buildcostlarge; }; then
+# Exploratory issue 118 probe in a disposable VM: one domain with 1000 files,
+# one first build after drop_caches, then seven directory renames with a query
+# over the already-built index after each rebuild.
+# Counters and the build tracepoint make a missed invalidation or an accidental
+# extra build visible. The opt-in large scale uses 7500 files; it never runs as
+# part of the full suite. The probe reports only bounded per-ioctl observations.
+bc_files=1000
+if [ -n "${MOOB_ONLY:-}" ] && want buildcostlarge; then bc_files=7500; fi
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bc-lower-mount
+mkdir -p "$LOWER/bc/d/s" || fail bc-directory
+"$BIN/overbudget-race" plant "$LOWER/bc/d/s" "$bc_files" || fail bc-plant
+sync && umount "$LOWER" || fail bc-lower-unmount-before-cold
+echo 3 > /proc/sys/vm/drop_caches || fail bc-drop-caches
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bc-lower-remount
+mount -t moobfs_layer -o lower="$LOWER/bc",domain_depth=1 none "$LAYER" || fail bc-layer-mount
+bc_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
+tr_on moobfs_domain_build || fail bc-trace-on
+bc_before=$(bc_builds)
+"$BIN/query-build-cost" "$LAYER/d" 1001 first-after-remount || fail bc-first
+[ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-first-build-count
+"$BIN/query-build-cost" "$LAYER/d" 1001 first-warm || fail bc-warm
+[ "$(bc_builds)" -eq $((bc_before + 1)) ] || fail bc-warm-built-again
+for bc_rep in 1 2 3 4 5 6 7; do
+    if [ $((bc_rep % 2)) -eq 1 ]; then
+        mv "$LAYER/d/s" "$LAYER/d/t" || fail bc-rename
+    else
+        mv "$LAYER/d/t" "$LAYER/d/s" || fail bc-rename
+    fi
+    "$BIN/query-build-cost" "$LAYER/d" 1001 "rename-$bc_rep" || fail bc-rebuild
+    [ "$(bc_builds)" -eq $((bc_before + 1 + bc_rep)) ] || fail bc-rename-build-count
+    "$BIN/query-build-cost" "$LAYER/d" 1001 "warm-$bc_rep" || fail bc-after-warm
+    [ "$(bc_builds)" -eq $((bc_before + 1 + bc_rep)) ] || fail bc-warm-built-again
+done
+bc_traced=$(tr_count moobfs_domain_build)
+[ "$bc_traced" -eq 8 ] || fail "bc-trace-build-count-$bc_traced"
+grep ' moobfs_domain_build: ' "$TR/trace" | sed 's/^.* moobfs_domain_build: /QUERY_BUILD_TRACE /'
+tr_off moobfs_domain_build
+umount "$LAYER" && rm -rf "$LOWER/bc" && umount "$LOWER" || fail bc-cleanup
+bc_raw_before=$(awk '{print $3}' /sys/block/vda/stat)
+dd if="$DEV_EXT4" of=/dev/null bs=4096 skip=10000 count=1 >/dev/null 2>&1 || fail bc-block-counter-read
+bc_raw_after=$(awk '{print $3}' /sys/block/vda/stat)
+[ "$bc_raw_after" -gt "$bc_raw_before" ] || fail bc-block-counter-no-increase
+echo "BUILD_COST_DEVICE_CONTROL: raw device read advanced sectors by $((bc_raw_after - bc_raw_before))"
+echo "BUILD_COST_OBSERVED: files=$bc_files one first build, seven rename rebuilds, and no warm-query rebuilds"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildcostevict; then
+# Two private domains belong to different users. Size the shared budget from
+# one measured domain so either fits alone but not together. QUERY2 by uid 1002
+# must be able to release uid 1001's built domain, forcing uid 1001 to rebuild.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bce-lower-mount
+mkdir -p "$LOWER/bce/a/s" "$LOWER/bce/b/s" || fail bce-directories
+"$BIN/overbudget-race" plant "$LOWER/bce/a/s" 1000 || fail bce-plant-a
+"$BIN/overbudget-race" plant "$LOWER/bce/b/s" 1000 || fail bce-plant-b
+chown 1001:1001 "$LOWER/bce/a" && chown 1002:1002 "$LOWER/bce/b" &&
+    chmod 700 "$LOWER/bce/a" "$LOWER/bce/b" || fail bce-private-domains
+mount -t moobfs_layer -o lower="$LOWER/bce",domain_depth=1 none "$LAYER" || fail bce-measure-mount
+"$BIN/query-build-cost" "$LAYER/a" 1001 measure-a || fail bce-measure-a
+bce_one=$("$BIN/query" "$LAYER" info | sed -n 's/.* used=\([0-9]*\).*/\1/p')
+umount "$LAYER" || fail bce-measure-unmount
+[ -n "$bce_one" ] || fail bce-missing-used-counter
+bce_budget=$((bce_one * 3 / 2 + 65536))
+[ "$bce_budget" -ge 1048576 ] || fail bce-budget-below-minimum
+mount -t moobfs_layer -o "lower=$LOWER/bce,domain_depth=1,index_budget=$bce_budget" none "$LAYER" || fail bce-budget-mount
+tr_on moobfs_domain_build moobfs_domain_release || fail bce-trace-on
+bce_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
+bce_releases() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_releases=\([0-9]*\).*/\1/p'; }
+bce_before=$(bce_builds)
+"$BIN/query-build-cost" "$LAYER/a" 1001 first-user || fail bce-first-user
+[ "$(bce_builds)" -eq $((bce_before + 1)) ] || fail bce-first-build
+"$BIN/query-build-cost" "$LAYER/b" 1002 second-user || fail bce-second-user
+[ "$(bce_builds)" -eq $((bce_before + 2)) ] || fail bce-second-build
+[ "$(bce_releases)" -ge 1 ] || fail bce-first-release
+"$BIN/query-build-cost" "$LAYER/a" 1001 first-user-again || fail bce-first-user-again
+[ "$(bce_builds)" -eq $((bce_before + 3)) ] || fail bce-rebuild-a
+[ "$(bce_releases)" -ge 2 ] || fail bce-second-release
+[ "$(grep ' moobfs_domain_release: ' "$TR/trace" | grep -c ' by=budget ')" -ge 2 ] || fail bce-budget-trace
+grep ' moobfs_domain_release: ' "$TR/trace" | sed 's/^.* moobfs_domain_release: /QUERY_BUILD_RELEASE /'
+tr_off moobfs_domain_build moobfs_domain_release
+umount "$LAYER" && rm -rf "$LOWER/bce" && umount "$LOWER" || fail bce-cleanup
+echo "BUILD_COST_CROSS_USER_EVICTION: 3 builds and at least 2 budget releases across uids 1001 and 1002; budget=$bce_budget"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want builddenial; then
+# Compare the same cold 17,000-file QUERY2 with the pre-limit and limited
+# modules. The helper accepts only a complete empty answer or E2BIG with
+# untouched output, and reports process CPU/read bytes plus device sectors.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 40000 "$DEV_EXT4" || fail bdn-format
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bdn-lower-mount
+mkdir -p "$LOWER/bdn/d/s" || fail bdn-directory
+"$BIN/query-build-limit" plant "$LOWER/bdn/d/s" 17000 || fail bdn-plant
+sync && umount "$LOWER" || fail bdn-lower-unmount-before-cold
+echo 3 > /proc/sys/vm/drop_caches || fail bdn-drop-caches
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bdn-lower-remount
+mount -t moobfs_layer -o lower="$LOWER/bdn",domain_depth=1 none "$LAYER" || fail bdn-layer-mount
+bdn_result=$("$BIN/query-build-denial" "$LAYER/d" 1001) || fail bdn-query
+echo "$bdn_result"
+case "$bdn_result" in
+    *"outcome=full "*) bdn_expected_builds=1 ;;
+    *"outcome=denied "*) bdn_expected_builds=0 ;;
+    *) fail bdn-outcome ;;
+esac
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq "$bdn_expected_builds" ] || fail bdn-build-count
+umount "$LAYER" && rm -rf "$LOWER/bdn" && umount "$LOWER" || fail bdn-cleanup
+bdn_raw_before=$(awk '{print $3}' /sys/block/vda/stat)
+dd if="$DEV_EXT4" of=/dev/null bs=4096 skip=10000 count=1 >/dev/null 2>&1 || fail bdn-block-counter-read
+bdn_raw_after=$(awk '{print $3}' /sys/block/vda/stat)
+[ "$bdn_raw_after" -gt "$bdn_raw_before" ] || fail bdn-block-counter-no-increase
+echo "BUILD_DENIAL_DEVICE_CONTROL: raw device read advanced sectors by $((bdn_raw_after - bdn_raw_before))"
+echo "BUILD_DENIAL_OBSERVED: 17000 empty files, one cold query, outcome=$bdn_result"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildclient; then
+# Journal 0068 measured 60,000 client pages in ten similarly sized domains,
+# with five or six typed attributes per file. This tests one 6,000-file,
+# six-attribute domain against the proposed per-build work cap in a VM.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 20000 "$DEV_EXT4" || fail bcl-format
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bcl-lower-mount
+mkdir -p "$LOWER/bcl/d/s" || fail bcl-directory
+"$BIN/query-build-limit" plant6 "$LOWER/bcl/d/s" 6000 || fail bcl-plant
+sync && umount "$LOWER" || fail bcl-lower-unmount-before-cold
+echo 3 > /proc/sys/vm/drop_caches || fail bcl-drop-caches
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bcl-lower-remount
+mount -t moobfs_layer -o lower="$LOWER/bcl",domain_depth=1 none "$LAYER" || fail bcl-layer-mount
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bcl-query
+bcl_info=$("$BIN/query" "$LAYER" info) || fail bcl-info
+echo "$bcl_info"
+echo "$bcl_info" | grep -q 'domain_builds=1 ' || fail bcl-build-count
+echo "$bcl_info" | grep -q 'entries=36000 inodes=6000' || fail bcl-index-counts
+umount "$LAYER" && rm -rf "$LOWER/bcl" && umount "$LOWER" || fail bcl-cleanup
+echo 'BUILD_CLIENT_SHAPE_PASS: 6000 files with six typed attributes, one cold QUERY2 build'
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildlimit; then
+# Issue 118: a too-large build is discarded, while a separate small domain
+# demonstrates per-uid and mount-wide admission. This slow step is opt-in.
+# The 17,000-file over-limit fixture needs more inodes than the default ext4
+# format of the disposable device provides.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 40000 "$DEV_EXT4" || fail bl-format
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bl-lower-mount
+mkdir -p "$LOWER/blwork/d/s" "$LOWER/blrate/d/s" || fail bl-mkdir
+"$BIN/query-build-limit" plant "$LOWER/blwork/d/s" 17000 || fail bl-plant-work
+"$BIN/overbudget-race" plant "$LOWER/blrate/d/s" 1 || fail bl-plant-rate
+mount -t moobfs_layer -o lower="$LOWER/blwork",domain_depth=1 none "$LAYER" || fail bl-work-mount
+"$BIN/query-build-limit" "$LAYER/d" 1001 work || fail bl-work-errno-or-output
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 0 ] || fail bl-work-left-built-domain
+umount "$LAYER" || fail bl-work-unmount
+mount -t moobfs_layer -o lower="$LOWER/blrate",domain_depth=1 none "$LAYER" || fail bl-rate-mount
+bl_builds() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p'; }
+bl_rename() {
+    if [ $((bl_i % 2)) -eq 0 ]; then
+        mv "$LAYER/d/s" "$LAYER/d/t"
+    else
+        mv "$LAYER/d/t" "$LAYER/d/s"
+    fi
+}
+bl_i=1
+while [ "$bl_i" -le 16 ]; do
+    [ "$bl_i" -eq 1 ] || bl_rename || fail bl-uid-rename
+    "$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bl-uid-admitted
+    bl_i=$((bl_i + 1))
+done
+[ "$(bl_builds)" -eq 16 ] || fail bl-uid-build-count
+bl_rename || fail bl-uid-limit-rename
+"$BIN/query-build-limit" "$LAYER/d" 1001 quota || fail bl-uid-quota
+"$BIN/query-build-limit" "$LAYER/d" 1002 ok || fail bl-other-uid-admitted
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bl-fresh-bypasses-admission
+[ "$(bl_builds)" -eq 17 ] || fail bl-other-uid-build-count
+umount "$LAYER" || fail bl-rate-unmount
+mount -t moobfs_layer -o lower="$LOWER/blrate",domain_depth=1 none "$LAYER" || fail bl-mount-cap-mount
+bl_i=1
+while [ "$bl_i" -le 64 ]; do
+    if [ "$bl_i" -gt 1 ]; then bl_rename || fail bl-mount-rename; fi
+    bl_uid=$((1001 + (bl_i - 1) / 16))
+    "$BIN/query-build-limit" "$LAYER/d" "$bl_uid" ok || fail bl-mount-admitted
+    bl_i=$((bl_i + 1))
+done
+[ "$(bl_builds)" -eq 64 ] || fail bl-mount-build-count
+bl_rename || fail bl-mount-quota-rename
+"$BIN/query-build-limit" "$LAYER/d" 1005 quota || fail bl-mount-quota
+sleep 61
+"$BIN/query-build-limit" "$LAYER/d" 1005 ok || fail bl-window-recovery
+[ "$(bl_builds)" -eq 65 ] || fail bl-recovery-build-count
+umount "$LAYER" && rm -rf "$LOWER/blwork" "$LOWER/blrate" &&
+    umount "$LOWER" || fail bl-cleanup
+for fs in btrfs xfs; do
+    case $fs in btrfs) dev=$DEV_BTRFS ;; xfs) dev=$DEV_XFS ;; esac
+    mount -t "$fs" "$dev" "$LOWER" || fail "bl-lower-mount-$fs"
+    mkdir -p "$LOWER/blwork/d/s" || fail "bl-mkdir-$fs"
+    "$BIN/query-build-limit" plant "$LOWER/blwork/d/s" 17000 || fail "bl-plant-$fs"
+    mount -t moobfs_layer -o lower="$LOWER/blwork",domain_depth=1 none "$LAYER" || fail "bl-work-mount-$fs"
+    "$BIN/query-build-limit" "$LAYER/d" 1001 work || fail "bl-work-errno-or-output-$fs"
+    [ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 0 ] || fail "bl-work-left-built-domain-$fs"
+    umount "$LAYER" && rm -rf "$LOWER/blwork" && umount "$LOWER" || fail "bl-cleanup-$fs"
+done
+echo "BUILD_LIMIT_PASS: work denied on ext4, btrfs and XFS without published output; uid and mount admission recover"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildtime; then
+# Existing test-only scan delay makes the cooperative ten-second deadline
+# reachable without relying on a particular lower device's speed.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bt-lower-mount
+mkdir -p "$LOWER/bt/d/s" || fail bt-mkdir
+"$BIN/overbudget-race" plant "$LOWER/bt/d/s" 60 || fail bt-plant
+mount -t moobfs_layer -o lower="$LOWER/bt",domain_depth=1 none "$LAYER" || fail bt-mount
+echo 200000 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bt-delay-on
+"$BIN/query-build-limit" "$LAYER/d" 1001 timeout || fail bt-timeout-errno-or-output
+echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bt-delay-off
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bt-recovery
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 1 ] || fail bt-build-count
+umount "$LAYER" && rm -rf "$LOWER/bt" && umount "$LOWER" || fail bt-cleanup
+echo "BUILD_TIME_PASS: timed-out scan did not publish results and the next query rebuilt"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildmoved; then
+# Function tracing synchronizes a same-domain directory rename with the
+# first scan. Each of the 9,000 names fits alone; scanning them twice must
+# exceed the cumulative 32,768-unit allowance.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bm-lower-mount
+mkdir -p "$LOWER/bm/d/s" || fail bm-mkdir
+"$BIN/query-build-limit" plant "$LOWER/bm/d/s" 9000 || fail bm-plant
+: > "$LOWER/bm/d/visible" || fail bm-visible
+"$BIN/moobfs-attr" set "$LOWER/bm/d/visible" kind string note || fail bm-attr
+mount -t moobfs_layer -o lower="$LOWER/bm",domain_depth=1 none "$LAYER" || fail bm-mount
+mountpoint -q /sys/kernel/tracing || mount -t tracefs tracefs /sys/kernel/tracing || fail bm-tracefs
+echo 100 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bm-delay-on
+"$BIN/query-build-moved" "$LAYER/d"; bm_rc=$?
+echo 0 > /sys/module/moobfs_layer/parameters/scan_delay_us || fail bm-delay-off
+[ "$bm_rc" -eq 0 ] || fail bm-moved-scan-work-cap
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 0 ] || fail bm-partial-build
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bm-rebuild-after-denial
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 1 ] || fail bm-rebuild-count
+umount "$LAYER" && rm -rf "$LOWER/bm" && umount "$LOWER" || fail bm-cleanup
+echo "BUILD_MOVED_PASS: one allowance across original and moved-directory scans"
 fi
 if want xattrread; then
 # The test-only knob returns one error after listxattr finds a typed attribute. A failed

@@ -136,6 +136,15 @@ controlled before/after performance comparison was run for the memcg change;
 issue 118 is the next resource-cost investigation, while S9 fair sharing
 remains separate.
 
+*Local issue 118 progress, 2026-10-23 ([0182](docs/history/0182-query-build-resource-cost-investigation.md)):*
+Repeated KVM probes measured unprivileged build CPU/I/O and cross-user
+budget eviction. ADR-0019 records the maintainer's resource-limit direction.
+An experimental cumulative-work, elapsed-time and rebuild-frequency guard
+is implemented locally. The targeted KVM regression and a pre-fix negative
+control passed; the complete KVM suite, KASAN, performance comparison and
+publication are separate gates. This does not implement S9 fair index-memory
+shares or guarantee strict CPU-time or physical-I/O-byte limits.
+
 Planned from ADR-0017 (accepted 2026-10-20, journal 0156), the answers to the design objections of
 review round 2:
 - **Per-result checks as the default?** Measure every query answered with per-result permission

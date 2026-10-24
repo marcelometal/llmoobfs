@@ -752,6 +752,13 @@ static bool depth_and_domain(struct moobl_index *ix, struct dentry *dentry, unsi
  */
 #define MOOBL_LOAD_TRIES 16
 #define MOOBL_BUILD_TRIES 4
+
+/* Initial bounded policy for issue 118; a build attempt pays even if it fails. */
+#define MOOBL_BUILD_WINDOW (60 * HZ)
+#define MOOBL_BUILD_UID_ATTEMPTS 16U
+#define MOOBL_BUILD_MOUNT_ATTEMPTS 64U
+#define MOOBL_BUILD_WORK 32768U
+#define MOOBL_BUILD_TIME_NS (10ULL * NSEC_PER_SEC)
 #define MOOBL_MOVED_ROUNDS 64
 
 /* A directory renamed inside a domain while it was being built, at its new name. */
@@ -1251,6 +1258,56 @@ static int index_load(struct super_block *sb, struct dentry *lower, struct dentr
 	return err;	/* -EAGAIN when every reading was overtaken by an update */
 }
 
+/* Fixed-size accounting cannot grow in response to an unprivileged query. */
+static int build_admit(struct moobl_index *ix)
+{
+	struct moobl_build_uid *slot = NULL, *free_slot = NULL;
+	unsigned long now = jiffies;
+	kuid_t uid = current_uid();
+	unsigned int i;
+	int err = 0;
+
+	/* Mount-wide QUERY is already restricted to an administrator. */
+	if (capable(CAP_SYS_ADMIN))
+		return 0;
+	spin_lock(&ix->build_rate_lock);
+	if (time_after_eq(now, ix->build_window + MOOBL_BUILD_WINDOW)) {
+		ix->build_window = now;
+		ix->build_attempts = 0;
+	}
+	for (i = 0; i < MOOBL_BUILD_UID_SLOTS; i++) {
+		struct moobl_build_uid *entry = &ix->build_uids[i];
+
+		if (entry->used &&
+		    time_after_eq(now, entry->window + MOOBL_BUILD_WINDOW))
+			entry->used = false;
+		if (entry->used && uid_eq(entry->uid, uid)) {
+			slot = entry;
+			break;
+		}
+		if (!entry->used && !free_slot)
+			free_slot = entry;
+	}
+	if (!slot)
+		slot = free_slot;
+	if (ix->build_attempts >= MOOBL_BUILD_MOUNT_ATTEMPTS || !slot ||
+	    (slot->used && slot->attempts >= MOOBL_BUILD_UID_ATTEMPTS)) {
+		err = -EDQUOT;
+		goto out;
+	}
+	if (!slot->used) {
+		slot->uid = uid;
+		slot->window = now;
+		slot->attempts = 0;
+		slot->used = true;
+	}
+	slot->attempts++;
+	ix->build_attempts++;
+out:
+	spin_unlock(&ix->build_rate_lock);
+	return err;
+}
+
 struct scan_name {
 	struct list_head list;
 	int len;
@@ -1268,6 +1325,7 @@ struct scan_ctx {
 	struct dir_context ctx;
 	struct list_head names;
 	unsigned int count;	/* names in this batch */
+	u32 *work;		/* cumulative across batches, moved scans and retries */
 	int err;
 };
 
@@ -1281,6 +1339,11 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 		return true;
 	if (sc->count == MOOBL_SCAN_BATCH)
 		return false;	/* not consumed: the next iterate_dir() starts with it */
+	if (*sc->work >= MOOBL_BUILD_WORK) {
+		sc->err = -E2BIG;
+		return false;
+	}
+	(*sc->work)++;
 	sn = kmalloc(sizeof(*sn) + len, GFP_KERNEL_ACCOUNT);
 	if (!sn) {
 		sc->err = -ENOMEM;
@@ -1320,7 +1383,21 @@ struct scan_job {
 	unsigned int stop;		/* directories at this depth are not entered; 0: none such */
 	bool index;			/* false: only collect the directories at depth stop */
 	struct list_head found;		/* those directories, when !index */
+	u64 started_ns;
+	u32 work;		/* names, directories and index_load attempts combined */
 };
+
+static int scan_check(struct scan_job *job, bool charge)
+{
+	if (ktime_get_ns() - job->started_ns > MOOBL_BUILD_TIME_NS)
+		return -ETIMEDOUT;
+	if (charge) {
+		if (job->work >= MOOBL_BUILD_WORK)
+			return -E2BIG;
+		job->work++;
+	}
+	return 0;
+}
 
 static void scan_dir_free(struct scan_dir *sd)
 {
@@ -1382,8 +1459,10 @@ static int scan_push_dir(struct scan_job *job, struct scan_dir *cur, struct dent
 			return 0;
 		}
 		/* a domain directory: its own attributes belong outside, its content to its domain */
-		err = index_load(job->sb, child, cur->dentry, &nd->self, self_dom(nd), cpath, NULL,
-				 &job->buf);
+		err = scan_check(job, true);
+		if (!err)
+			err = index_load(job->sb, child, cur->dentry, &nd->self,
+					 self_dom(nd), cpath, NULL, &job->buf);
 		scan_dir_free(nd);
 		return err;
 	}
@@ -1397,8 +1476,10 @@ static int scan_file(struct scan_job *job, struct scan_dir *cur, struct dentry *
 	struct moobl_place fpl = { .domain = cur->inner, .hetero = cur->inner && !cur->inner_ok };
 	int err;
 
-	err = index_load(job->sb, child, cur->dentry, &fpl, cur->inner ? d_inode(cur->dom) : NULL,
-			 cpath, NULL, &job->buf);
+	err = scan_check(job, true);
+	if (!err)
+		err = index_load(job->sb, child, cur->dentry, &fpl,
+				 cur->inner ? d_inode(cur->dom) : NULL, cpath, NULL, &job->buf);
 	kfree(cpath);
 	return err;
 }
@@ -1460,19 +1541,25 @@ static int scan_run(struct scan_job *job)
 	while (!list_empty(&job->stack) && !err) {
 		struct scan_dir *cur = list_first_entry(&job->stack, struct scan_dir, list);
 		struct path dpath = { .mnt = sbi->lower.mnt, .dentry = cur->dentry };
-		struct scan_ctx sc = { .ctx.actor = scan_actor, .names = LIST_HEAD_INIT(sc.names) };
+		struct scan_ctx sc = { .ctx.actor = scan_actor, .names = LIST_HEAD_INIT(sc.names),
+				       .work = &job->work };
 		struct scan_name *sn, *tmp;
 		struct file *dir;
 
 		list_del(&cur->list);
+		err = scan_check(job, true);
+		if (err)
+			goto drop;
 		if (fatal_signal_pending(current)) {
 			err = -EINTR;
 			goto drop;
 		}
 		cond_resched();
 		if (job->index && !cur->skip_self) {
-			err = index_load(job->sb, cur->dentry, cur->parent, &cur->self,
-					 self_dom(cur), cur->path, NULL, &job->buf);
+			err = scan_check(job, true);
+			if (!err)
+				err = index_load(job->sb, cur->dentry, cur->parent, &cur->self,
+						 self_dom(cur), cur->path, NULL, &job->buf);
 			if (err)
 				goto drop;
 		}
@@ -1486,6 +1573,9 @@ static int scan_run(struct scan_job *job)
 			bool full;
 
 			sc.count = 0;
+			err = scan_check(job, false);
+			if (err)
+				break;
 			err = iterate_dir(dir, &sc.ctx);
 			if (err == -ENOENT && !IS_ROOT(cur->dentry))
 				err = 0;
@@ -1517,6 +1607,8 @@ drop:
 static int scan_job_init(struct scan_job *job, struct super_block *sb)
 {
 	job->sb = sb;
+	job->started_ns = ktime_get_ns();
+	job->work = 0;
 	INIT_LIST_HEAD(&job->stack);
 	INIT_LIST_HEAD(&job->found);
 	job->stop = 0;
@@ -1559,10 +1651,16 @@ static int scan_moved(struct scan_job *job, struct list_head *todo, struct dentr
 	list_for_each_entry(md, todo, list) {
 		struct scan_dir *sd;
 
+		err = scan_check(job, false);
+		if (err)
+			break;
+
 		if (!domain && job->stop && md->depth == job->stop) {
 			/* a domain directory: only its own attributes belong outside */
-			err = index_load(job->sb, md->lower, NULL, &md->self, NULL, md->path,
-					 NULL, &job->buf);
+			err = scan_check(job, true);
+			if (!err)
+				err = index_load(job->sb, md->lower, NULL, &md->self, NULL,
+						 md->path, NULL, &job->buf);
 			if (err)
 				break;
 			continue;
@@ -1643,6 +1741,12 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 		mutex_unlock(&dom->build);
 		return 0;
 	}
+	/* The legacy whole-mount QUERY without domains keeps its existing admission contract. */
+	err = domain ? build_admit(ix) : 0;
+	if (err) {
+		mutex_unlock(&dom->build);
+		return err;
+	}
 	err = scan_job_init(&job, sb);
 	if (err) {
 		mutex_unlock(&dom->build);
@@ -1664,6 +1768,9 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 		LIST_HEAD(todo);
 		unsigned int rounds;
 
+		err = scan_check(&job, false);
+		if (err)
+			break;
 		nofs = ix_write_lock(ix);
 		WRITE_ONCE(dom->state, MOOBL_DOM_BUILDING);
 		refused = ix->refusals;	/* a build of another domain cannot clear what follows */
@@ -1793,6 +1900,8 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 	xa_init(&ix->fallback);
 	xa_init(&ix->domains);
 	init_rwsem(&ix->query_sem);
+	spin_lock_init(&ix->build_rate_lock);
+	ix->build_window = jiffies;
 	INIT_LIST_HEAD(&ix->loaders);
 	mutex_init(&ix->outside.build);
 	INIT_LIST_HEAD(&ix->outside.moved);

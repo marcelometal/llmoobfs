@@ -431,6 +431,21 @@ KASAN harness runs the layer suite), and no benchmark exists.
   domain is built by a linear scan on its first query after mount, and again after it was
   released or a directory in it was renamed; the budget and the shrinker were tested on small
   trees only (journal 0101).
+- `index_budget` does not cap the CPU or lower-filesystem I/O of a build.
+  A bounded native-KVM probe of the current module observed 160 KiB and
+  1.90 MiB of reads on first queries of 1,000- and 7,500-file ext4 domains;
+  a query by one uid also evicted another uid's built private domain under a
+  small shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  These are bounded observations, not a latency guarantee. This branch adds
+  experimental work and rebuild-frequency limits
+  ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
+  they are not a strict CPU-time or I/O-byte cap. The local VM and KASAN suites
+  passed. A separate Mac mini KVM guest replayed the 60,000-page stage-2 bulk
+  client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
+  answer checks agreed. That run did not test MCP writes, a live mirror or
+  latency. Issue 118 remains open pending policy review, publication and
+  broader-workload validation. Do not expose a multi-user mount to untrusted
+  query workloads.
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This
   code charges that buffer and user-triggered index/query allocations to the allocating
   task's memory cgroup where supported (issue 116, journal 0180). The mount-wide index

@@ -127,6 +127,8 @@ struct moob_info {
  * per-result checks gives ESTALE. A term with MOOB_TERM_MISSING_OK also matches inodes
  * without that attribute (an attribute of another type is not missing); without order_by at
  * least one term must lack the flag, and EXISTS cannot carry it.
+ * Building a stale or absent domain can return EDQUOT (unprivileged rebuild frequency), E2BIG
+ * (scan work) or ETIMEDOUT (cooperative elapsed deadline); no partial answer succeeds.
  */
 #define MOOB_QUERY2_VERSION 2U
 #define MOOB_QUERY2_CURSOR 128U
@@ -156,6 +158,7 @@ struct moob_query2 {
  * one permission check: each request has its own results array, limit, count, truncated and
  * cursor. Requests are all validated before any runs; they run in order, each under its own
  * index lock, so the batch is not a snapshot. Union and deduplication stay with the caller.
+ * On any error discard every output, including results copied by earlier subqueries.
  */
 #define MOOB_QUERY2_BATCH_MAX 8U
 

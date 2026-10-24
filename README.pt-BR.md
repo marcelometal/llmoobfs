@@ -453,6 +453,22 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   domínio é construído por uma varredura linear na primeira consulta depois da montagem, e de novo
   depois de ser liberado ou de ter um diretório renomeado dentro dele; o orçamento e o shrinker só
   foram testados em árvores pequenas (diário 0101).
+- `index_budget` não limita CPU nem E/S no sistema de arquivos inferior durante uma construção.
+  Uma medição delimitada em KVM nativo do módulo atual observou 160 KiB e 1,90 MiB de leituras
+  nas primeiras consultas de domínios ext4 com 1.000 e 7.500 arquivos; a consulta de um uid
+  também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
+  compartilhado pequeno ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  São observações delimitadas, não uma garantia de latência. Este ramo acrescenta
+  limites experimentais de trabalho e frequência de reconstrução
+  ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
+  eles não são um teto estrito de tempo de CPU ou bytes de E/S. As suítes locais
+  de VM e KASAN passaram. Uma VM KVM separada no Mac mini repetiu a carga bulk
+  de 60 mil páginas do estágio 2 do cliente em dez domínios com este limite;
+  as 60 comparações de resposta entre SQLite e QUERY2 concordaram. Essa
+  rodada não mediu escrita via MCP, espelhamento em tempo real nem latência.
+  A issue 118 segue aberta para revisão da política,
+  publicação e validação com cargas mais diversas. Não exponha uma montagem
+  multiusuário a consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).

@@ -2,6 +2,55 @@
 
 ## Unreleased
 
+- Documentation (journal 0183): PR 134 integrated the completed client-roadmap
+  research after nine green checks, including VM and KASAN/lockdep. Its
+  G-items remain proposals without implementation.
+
+- Investigation (journal 0182, issue 118): a bounded native-KVM probe of
+  unprivileged `QUERY2` on a 1,000-file ext4 domain observed a first build
+  and seven post-rename rebuilds, with no build on paired warm queries.
+  The first build took 14.181 ms and post-rename queries 5.818–8.868 ms
+  wall time on that host; an opt-in 7,500-file probe observed 156.833 ms
+  for the first build and 50.992–70.107 ms after renames. Process and
+  device read counters stayed at zero until a remount-based cold-cache
+  control observed 160 KiB and 1.90 MiB read on first builds of 1,000 and
+  7,500 files. A two-uid probe demonstrated shared-budget eviction and
+  rebuilding across private domains. The maintainer selected a resource-limit
+  design; ADR-0019 adds an experimental 32,768-work-unit and ten-second
+  per-build guard, plus 16 attempts per unprivileged UID and 64 per mount in
+  60-second windows. Over-limit queries now return `E2BIG`, `ETIMEDOUT` or
+  `EDQUOT` rather than a partial successful answer. Targeted native-KVM
+  tests passed, including a negative control against the pre-limit module;
+  the complete native-KVM suite and the opt-in deadline regression passed.
+  The first full KASAN run exposed that the existing unprivileged fault sweep
+  exceeds the new admission window; its independent fresh-domain trials now
+  remount in groups of eight. The corrected complete KASAN/UBSAN/lockdep run
+  passed. An opt-in fixture denied oversized builds on ext4, btrfs and XFS,
+  and a synchronized directory move verified that the rescan shares the
+  original work allowance. A 30-pair, order-alternated native-KVM comparison
+  on a 7,500-file ext4 domain detected a +0.9% cold-query wall-median cost
+  (95% bootstrap interval +0.3% to +1.8%) and unchanged median measured
+  read bytes. Publication and issue closure remain pending. These are not
+  strict CPU-time or physical-I/O-byte caps, and the
+  shared index budget still has no fair per-user shares.
+  A later 30-pair, fixed-frequency comparison of a cold 17,000-file query
+  against the pre-limit module measured a paired median saving of 3.490 ms
+  wall time, 3.370 ms process CPU and 20,480 task-attributed read bytes when
+  the guarded module returned `E2BIG`; the pre-limit module completed the
+  answer. This near-threshold saving is small and the legitimate denial
+  remains a policy tradeoff. An opt-in VM control also completed a cold
+  `QUERY2` on a 6,000-file domain with six typed attributes per file, matching
+  the per-project scale of the previously measured 60,000-page client layout.
+  This is a one-domain synthetic control, not a fresh end-to-end client run.
+  The existing opt-in limit regression passed again after the shared fixture
+  helper gained the six-attribute plant mode.
+  A later bulk stage-2 client run in a KVM guest on the Mac mini completed
+  60,000 pages across ten domains with the guarded module; all 60
+  SQLite-versus-QUERY2 answer checks agreed. It skipped MCP writes, live
+  mirroring and latency measurement. The 17,000-file denial still needs a
+  compatibility decision.
+  The numerical limits are still provisional.
+
 - Documentation (journal 0183): integrate completed roadmap research from
   journals 0164–0166 after PR 130, preserving current-state records and leaving
   the proposed client packages unimplemented.

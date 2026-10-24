@@ -138,3 +138,17 @@ model is [ADR-0011](docs/decisions/0011-threat-and-credential-model.md)
 (accepted 2026-10-12): adversaries, promises, non-promises, unprivileged surfaces and the
 findings F1 to F14, of which part of F2 (fair shares of the index budget) is open. [docs/security-roadmap.md](docs/security-roadmap.md) lists
 fstests, syzkaller, hostile-lower handling and the other open items.
+
+Known availability limit (issue 118): an authorized, unprivileged `QUERY2`
+can build a whole domain with the mounter's credentials, again after a
+directory rename. The mount's memory budget does not cap the CPU or lower
+I/O of that scan. A bounded KVM probe measured the work and demonstrated
+that one uid's query can evict another uid's built domain under a small
+shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+The maintainer chose the resource-limit direction; this branch implements
+experimental work and rebuild-frequency limits
+([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)).
+They do not strictly cap CPU time or physical I/O, nor provide fair index
+memory shares. Local VM and KASAN suites passed; policy review, publication,
+broader workload validation and issue closure remain pending. Avoid
+untrusted multi-user query workloads while this issue is open.

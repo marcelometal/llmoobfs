@@ -46,6 +46,49 @@ requires that controller and fails if it is missing. The upstream 6.12.112
 KASAN kernel used here has `CONFIG_MEMCG` disabled, so its full suite prints
 `MEMCG_SKIPPED` and tests memory safety, not cgroup charging.
 
+`MOOB_ONLY=buildcost make vm-test` runs the bounded issue 118 probe on ext4:
+1,000 attributed files in one domain, one first build after requesting a guest
+cache drop, seven directory
+renames and a built-domain query after each build. The query process drops to
+uid/gid 1001. The Debian QEMU TCG guest checks build counters and prints
+per-ioctl wall time, process CPU time, `/proc/self/io` read-byte deltas and
+`/sys/block/vda/stat` sectors-read deltas. The device counter includes all
+guest reads during the ioctl, so it is an approximate rather than a
+per-process attribution.
+Those numbers are exploratory; only native KVM on a dedicated host is used
+for performance conclusions. In the first such run (journal 0182), the
+`read_bytes` delta was zero even for the cache-dropped first build, so this
+process counter is not treated as a measure of the lower-filesystem I/O. The
+first sample is not claimed to have incurred physical reads.
+`MOOB_ONLY=buildcostlarge` opts into the same probe with 7,500 files; it is
+excluded from the full suite to keep its default run bounded.
+`MOOB_ONLY=buildcostevict` is a separate opt-in probe: private domains for
+uids 1001 and 1002 each fit a budget sized from one measured domain, but
+not together. Alternating unprivileged queries must expose the shared-budget
+release and rebuild through `GET_INFO` and tracepoints.
+`MOOB_ONLY=buildlimit` is an opt-in and slower issue 118 regression. It
+reformats the disposable ext4 test device with enough inodes, builds a
+17,000-file domain that must fail with `E2BIG` without publishing output,
+then exercises 16 admissions per unprivileged UID, 64 across the mount,
+another UID, a fresh-domain query and recovery after a real 60-second
+window. Its success marker is `BUILD_LIMIT_PASS`; it is not part of the
+default full suite. It repeats the 17,000-file over-limit check on btrfs and
+XFS. A negative control on `neg/issue118-buildlimits-0182`
+uses the same guest step against the prior module and must fail.
+`MOOB_ONLY=buildtime` is a second opt-in regression. It uses the existing
+test-only `scan_delay_us` module parameter to make one domain build exceed
+the cooperative ten-second deadline, checks `ETIMEDOUT` and untouched
+outputs, clears the delay and verifies that the next query builds a complete
+domain. Its success marker is `BUILD_TIME_PASS`; it is not in the default
+suite because it deliberately waits about ten seconds.
+`MOOB_ONLY=buildmoved` is a third opt-in regression. Function tracing waits
+until a first domain build enters the file scan, then renames the scanned
+subdirectory inside the same domain. The original and moved scans each fit
+alone, but together must return `E2BIG` with no published answer; after the
+test-only delay is cleared, a later query must rebuild successfully. Its
+success marker is `QUERY_BUILD_MOVED_PASS`. This tests cumulative accounting over
+the moved-directory side scan, not every possible retry path.
+
 ## 3. Markers and what they mean
 
 A run is read from the console log. Success markers are printed only after the
@@ -61,6 +104,13 @@ Markers come from three places: `vm/init` and `tests/mounted.c` (M1),
 | `MEMCG_INDEX_RESULT` | Building a bounded attributed domain raises the calling cgroup's unreclaimable slab charge | Fair sharing of the mount-wide index budget or charges to file owners |
 | `MEMCG_ACCOUNT_PASS` | Both accounting assertions passed in a guest with the memory controller enabled | Every allocation path or every kernel configuration |
 | `MEMCG_SKIPPED` | The guest lacks the memory controller; no accounting assertion ran | Accounting correctness; the Debian harness treats this as a failure |
+
+| Issue 118 probe marker | Proves | Does not prove |
+| --- | --- | --- |
+| `QUERY_BUILD_COST` | The helper issued one unprivileged `QUERY2` and recorded its wall, CPU, process read-byte and ext4-device sectors-read deltas | A stable performance distribution, precise per-query disk attribution or a resource limit |
+| `BUILD_COST_OBSERVED` | Build counters and tracepoints saw one first build and seven post-rename rebuilds, with no extra build on the paired warm queries | Severity on other scales, lower filesystems, kernels or concurrent workloads |
+| `BUILD_COST_DEVICE_CONTROL` | A raw read of the disposable ext4 device advanced its sectors-read counter | Exact attribution of all filesystem I/O to the query process |
+| `BUILD_COST_CROSS_USER_EVICTION` | Two different unprivileged uids built private domains in turn; the shared budget released the older index and forced its owner to rebuild on the next query | Fairness under arbitrary concurrency or a safe production budget |
 
 ### M1 regression (`vm/init`, Debian harness only)
 

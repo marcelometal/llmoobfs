@@ -201,4 +201,5 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0179 — Concurrent budget release under native KVM](0179-kvm-overbudget-race-followup.md)
 - [0180 — Memory-cgroup accounting of query-triggered allocations (issue 116; PR 129 merged)](0180-memcg-accounting-investigation.md)
 - [0181 — Reconcile the merged memcg correction across current-state documentation](0181-merged-memcg-state-reconciled.md)
+- [0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118; locally validated experimental guard, unpublished)](0182-query-build-resource-cost-investigation.md)
 - [0183 — Consolidate the local work and carry completed roadmap research forward](0183-sequential-worktree-consolidation.md)
