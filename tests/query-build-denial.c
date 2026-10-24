@@ -72,10 +72,12 @@ int main(int argc, char **argv)
 	char *stop;
 	int fd, error;
 
-	if (argc != 3) {
-		fprintf(stderr, "usage: query-build-denial DOMAIN UID\n");
+	if (argc != 3 && argc != 4) {
+		fprintf(stderr, "usage: query-build-denial DOMAIN UID [ABSENT_TERM]\n");
 		return 64;
 	}
+	if (argc == 4 && strlen(argv[3]) >= sizeof(q.terms[0].name))
+		return 64;
 	errno = 0;
 	uid = strtoul(argv[2], &stop, 10);
 	if (errno || *stop || !uid || uid > UINT_MAX)
@@ -98,7 +100,7 @@ int main(int argc, char **argv)
 	q.results = (__u64)(uintptr_t)&result;
 	q.count = 777;
 	q.truncated = 777;
-	strcpy(q.terms[0].name, "kind");
+	strcpy(q.terms[0].name, argc == 4 ? argv[3] : "kind");
 	q.terms[0].op = MOOB_OP_EXISTS;
 	if (read_bytes(&io_before) || device_sectors(&dev_before) ||
 	    getrusage(RUSAGE_SELF, &cpu_before) ||

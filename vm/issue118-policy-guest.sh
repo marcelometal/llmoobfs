@@ -7,7 +7,11 @@ export PATH
 
 [ "$#" -eq 4 ] || exit 64
 out=$1 files=$2 delay_ms=$3 shape=$4
-case "$shape" in plain) plant=plant ;; six) plant=plant6 ;; *) exit 64 ;; esac
+case "$shape" in
+    plain) plant=plant; term=kind ;;
+    six) plant=plant6; term=policy_absent ;;
+    *) exit 64 ;;
+esac
 disk=/dev/vda
 lower=/tmp/moob118-lower
 layer=/tmp/moob118-layer
@@ -41,7 +45,7 @@ measure() {
     echo 3 > /proc/sys/vm/drop_caches
     mount -t ext4 "$device" "$lower"
     mount -t moobfs_layer -o "lower=$lower/base,domain_depth=1" none "$layer"
-    result=$("$out/query-build-denial" "$layer/d" 1001)
+    result=$("$out/query-build-denial" "$layer/d" 1001 "$term")
     printf 'MOOBFS_POLICY_RESULT: files=%s shape=%s condition=%s read_delay_ms=%s %s\n' \
         "$files" "$shape" "$condition" "$delay_ms" "$result"
     umount "$layer"

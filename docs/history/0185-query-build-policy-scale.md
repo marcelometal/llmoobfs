@@ -93,3 +93,18 @@ The next round uses the six-attribute fixture from the earlier 6,000-file
 client-shape control at larger per-domain sizes. This distinguishes the
 empty-file sensitivity sweep from a closer, still synthetic client shape.
 No policy change or issue closure follows from these observations.
+
+### First six-attribute attempt — setup failure, 2026-10-24
+
+`sh vm/issue118-policy-host.sh six12000 12000 5 six` created a new image
+and planted its files, but the measurement helper exited before emitting a
+result: `QUERY2` succeeded with `count=1` and `truncated=1`, while that
+helper had assumed an empty answer because its `kind EXISTS` term matched
+none of the earlier empty-file fixtures. This is an oracle/setup mismatch,
+not a module regression or a timed policy result. The runner exited 1 and
+kept `build/issue118-policy/six12000/console.log` and its image; no
+success marker was printed. The correction is to query an absent attribute
+name while keeping the six typed attributes on each file, so the full
+index build still occurs but the established empty-answer oracle applies.
+The retry will use a distinct output name and will not reuse the failed
+image.
