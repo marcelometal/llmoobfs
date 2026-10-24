@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Documentation (journal 0183): PR 134 integrated the completed client-roadmap
+  research after nine green checks, including VM and KASAN/lockdep. Its
+  G-items remain proposals without implementation.
+
 - Investigation (journal 0182, issue 118): a bounded native-KVM probe of
   unprivileged `QUERY2` on a 1,000-file ext4 domain observed a first build
   and seven post-rename rebuilds, with no build on paired warm queries.

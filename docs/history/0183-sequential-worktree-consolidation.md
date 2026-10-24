@@ -1,6 +1,6 @@
 # 0183 — Consolidate the local work and carry completed roadmap research forward
 
-Date: 2026-10-24. Status: PR 134 open; not merged (publication update below).
+Date: 2026-10-24. Status: PR 134 merged (integration update below).
 
 ## Goal and decision
 
@@ -69,3 +69,13 @@ CI and KASAN/lockdep jobs were in progress. These are pending checks, not
 passing results. The next step is to verify every required check at the final
 published head, then seek a separate merge decision. Issue 118 remains local;
 no work on it began during this documentation publication.
+
+## Integration update, 2026-10-24
+
+PR 134's final head `4dd49b2` passed all nine reported checks, including
+Native Linux VM and KASAN/lockdep. With separate maintainer authorization,
+it merged into `main` as `55b50fa` on 2026-10-24. The documentation unit is
+complete. The primary checkout then switched to the existing issue-118 branch
+without creating another worktree; `origin/main` was merged there locally,
+preserving journal 0182 and the current-state records. No issue-118 push or
+PR follows from this roadmap merge.
