@@ -694,3 +694,36 @@ admission recovered. The run log and console are preserved beside the
 client-shape artifacts. This targeted rerun does not replace the earlier
 complete native-KVM and KASAN/lockdep suites; those were run before the
 new optional fixture.
+
+The first attempt to package the new commits for the dedicated-host checkout
+using a bare revision range produced an empty Git bundle. Recreating the
+bundle with the branch ref and the existing host commit as an exclusion
+passed `git bundle verify` locally and on the host; the clean test checkout
+fast-forwarded to `e012cd5`. The temporary test edits on the host were
+saved as per-file diffs and restored file by file before the fast-forward.
+No published history or test result was changed by the failed bundle attempt.
+
+## Prepublication checkpoint — 2026-10-24
+
+After the targeted VM runs, `make checkpatch`, `sh -n vm/suite.sh`,
+`git diff --check`, `sh scripts/check-retired-claims.sh` and
+`python3 scripts/check-site.py .` exited zero. The complete native-KVM
+suite and full KASAN/UBSAN/lockdep pass documented above predate the new
+optional client-shape fixture; the targeted `buildclient` and `buildlimit`
+runs validate that fixture and its shared helper. The production module
+was not changed after those complete suites. `origin/main` remained
+`55b50fa` on the read-only remote refresh, issue 118 was open, and no PR
+used this branch. The 29 local commits from `origin/main` through `e012cd5`
+all had `Signed-off-by` trailers. These checks establish a reviewable local
+branch, not a CI result for an unpublished head.
+
+The proposed publication choice is to keep the fixed 32,768-work-unit cap
+as an explicitly experimental limit, since the documented 6,000-file client
+domain shape passes and the cap bounds an otherwise unlimited scan, while
+disclosing that a 17,000-file domain now fails after consuming roughly
+182 ms of CPU. This is a proposal for the maintainer's compatibility
+decision, not an accepted policy or authorization to push. A larger real
+project domain, slower lower device or different client may change that
+decision. Issue 118 should remain open for the residual availability risks
+and wider validation after a PR, rather than being closed solely on these
+local tests.
