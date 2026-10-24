@@ -2,10 +2,14 @@
 
 ## Unreleased
 
-- Investigation in progress (journal 0185, issue 118): measure larger
-  domain builds and delayed lower-device reads in a dedicated VM before
-  changing the experimental numerical limit or closing the issue. No
-  result or policy change is claimed yet.
+- Investigation (journal 0185, issue 118): dedicated native-KVM probes
+  measured larger domain builds and synthetic delayed lower-device reads.
+  Ten matched, alternating module pairs on cloned 17,000-file images with
+  six attributes per file and a 20 ms read delay showed `E2BIG` under the
+  current guard versus a full answer before the guard. The denial saved a
+  paired median 17.945 ms wall and 8 KiB task reads, while using a paired
+  median 13.262 ms more process CPU. The issue remains open for the
+  compatibility/policy decision; no production limit changed.
 
 - Documentation (journal 0184): reconcile the experimental issue-118 guard
   merged by PR 135 after eleven green checks, including Native Linux VM and

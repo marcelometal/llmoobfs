@@ -204,4 +204,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0182 — Resource cost of unprivileged QUERY2 domain rebuilds (issue 118; experimental guard merged, issue open)](0182-query-build-resource-cost-investigation.md)
 - [0183 — Consolidate the local work and carry completed roadmap research forward](0183-sequential-worktree-consolidation.md)
 - [0184 — Reconcile the merged issue-118 guard and retain its open policy question](0184-merged-query-build-guard-state.md)
-- [0185 — Query-build policy at larger domains and delayed lower I/O (in progress)](0185-query-build-policy-scale.md)
+- [0185 — Query-build policy at larger domains and delayed lower I/O; measurement complete](0185-query-build-policy-scale.md)

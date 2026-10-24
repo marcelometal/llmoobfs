@@ -1,7 +1,7 @@
 # 0185 — Query-build policy at larger domains and delayed lower I/O
 
-Date: 2026-10-24. Status: investigation in progress.
-Work started: 2026-10-24. End and labor time: not yet recorded.
+Date: 2026-10-24. Status: bounded measurement complete; policy decision open.
+Work started and ended: 2026-10-24. Labor time: not tracked separately.
 
 ## Goal and decision
 
@@ -163,3 +163,74 @@ file count and shape, and refuses reused output names. A new opt-in pairs
 script alternates module order and runs the two VMs sequentially. Results
 will be analyzed as pairs; no frequency adjustment is planned. The
 synthetic delay and one host remain limitations.
+
+### Matched-image, alternating-order comparison — 2026-10-24
+
+The pilot `pilotclone` ran each module once on a copy of the same unmounted
+17,000-file, six-attribute image with a 20 ms read delay. Both VMs emitted
+`MOOBFS_POLICY_PASS`; the guarded delayed query returned `E2BIG` in
+4,056.109 ms and the pre-limit query returned its full answer in
+4,071.337 ms. This pilot established the cloned-image path, not a stable
+effect estimate.
+
+`sh vm/issue118-policy-pairs.sh pair20a 10 17000 20 six six17000`
+then completed ten sequential pairs, alternating which module ran first.
+All twenty VMs emitted `MOOBFS_POLICY_PASS`: the current guard denied the
+query and preserved the sentinel output; the pre-limit module completed
+the empty answer. The analyzer validated each run's fixture settings,
+verdict, result markers, alternating console timestamps and identical
+pre-run disk SHA-256 across all twenty copies. These pairs used one seed
+image; no other QEMU ran on the host. The metrics below are medians across
+the ten paired current-minus-pre-limit differences; the interval is a
+percentile bootstrap of those ten differences (20,000 draws, fixed seed).
+
+| Condition / metric | Current median | Pre-limit median | Paired difference median | Bootstrap 95% interval | Current lower in pairs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 20 ms delayed, wall | 4,050.439 ms | 4,072.482 ms | −17.945 ms | −32.397 to −10.659 ms | 9/10 |
+| 20 ms delayed, process CPU | 895.774 ms | 882.974 ms | +13.262 ms | +5.134 to +35.152 ms | 1/10 |
+| 20 ms delayed, task reads | 4,780,032 B | 4,788,224 B | −8,192 B | −8,192 to −8,192 B | 10/10 |
+| 20 ms delayed, device read sectors | 9,288 | 9,304 | −16 | −32 to −16 | 9/10 |
+| Direct, wall | 396.771 ms | 385.101 ms | +13.015 ms | −17.976 to +42.281 ms | 4/10 |
+| Direct, process CPU | 358.425 ms | 349.548 ms | +10.150 ms | −15.829 to +34.095 ms | 4/10 |
+| Direct, task reads | 4,780,032 B | 4,788,224 B | −8,192 B | −8,192 to −8,192 B | 10/10 |
+
+The observed delayed wall saving at the denial boundary is about 0.44%
+of the pre-limit median, while the guarded query consumed more process CPU
+in nine pairs. The identical 8 KiB task-read difference shows the guard
+returns close to the end of this build. These are measurements of this
+fixture, host and synthetic delay, not a general performance guarantee.
+The bootstrap interval describes resampling uncertainty within these ten
+serial pairs; it does not account for other hosts, physical media, client
+shapes, host frequency variation or longer term drift. Device sectors
+include guest activity beyond the query. No query reached the cooperative
+ten-second timeout, so its behavior on a slower device remains unmeasured.
+
+The raw twenty console logs and environment records are retained outside
+Git on the dedicated host at
+`build/issue118-policy/pair20a-logs.tar.gz` and locally at
+`MoobFS-local/issue118-policy-20261024/pair20a-logs.tar.gz` (SHA-256
+`30d4eb4f7a774a18bafa51e3cf2219b8ef7a6854721326ed9d662a823598eb7f`).
+The local JSON analysis is `pair20a-analysis.json` in the same folder
+(SHA-256 `b9b53d3c79603aeba3a06a0896c0ad03d234a0be9be364de3aabb1e331b371df`).
+Reproduce the summary with
+`python3 bench/issue118-policy-pairs.py ARCHIVE pair20a 10 17000 20 six six17000`.
+The twenty disk images remain under their distinct run IDs on the host.
+
+The fixed 32,768-work-unit limit should stay described as experimental:
+this measurement confirms a legitimate 17,000-file domain is refused after
+nearly all of its measured reads, with little wall time saved on this
+synthetically delayed lower device. There is insufficient evidence here to
+choose a new universal limit or assert the guard bounds I/O. Keep issue
+118 open for the compatibility/policy decision; a configurable limit or
+domain partitioning can be evaluated with real client shapes and storage
+classes. No production guard code, published limit or issue state changed
+in this investigation.
+
+The archived-pair analyzer exited zero on the twenty-record archive and
+produced the local JSON above. `python3 -m py_compile` on the analyzer,
+`sh -n` on the three policy runners, `git diff --check`,
+`make checkpatch`, `sh scripts/check-retired-claims.sh`,
+`python3 scripts/check-site.py .` (12 HTML pages) and
+`python3 scripts/site-faq.py --check` exited zero. No new production
+module code was introduced, so the full VM regression suite was not
+repeated for this documentation and measurement commit.

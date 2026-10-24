@@ -118,7 +118,13 @@ runs that probe sequentially with alternating current/pre-limit module
 order in each pair, using a fresh copy of the same seed image per VM.
 It refuses previously used run IDs and leaves every console and image for
 review. The caller must analyze the paired results; the script does not
-declare a performance win from its success marker alone.
+declare a performance win from its success marker alone. After archiving
+each pair's `console.log` and `environment.txt` under its run ID, validate
+and summarize the archive with
+`python3 bench/issue118-policy-pairs.py ARCHIVE PREFIX PAIRS FILES READ_DELAY_MS SHAPE SEED_RUN`.
+It checks input-image hashes, settings, outcomes and alternating order,
+then reports paired medians and a descriptive bootstrap interval as JSON.
+Journal 0185 records the completed ten-pair run and its limitations.
 
 ## 3. Markers and what they mean
 
