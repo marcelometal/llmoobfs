@@ -5,6 +5,12 @@ Estimated effort: L (a week or more) for implementation, negative tests,
 performance comparison and KVM/KASAN validation. This is an estimate, not
 recorded labor time.
 
+*Status update, 2026-10-24 (journal 0184):* the experimental mechanism was
+merged into `main` by PR 135 at `2396c16`, after all eleven reported checks
+passed on head `94dc454`. The earlier status describes the local checkpoint.
+The numerical policy remains experimental; the 17,000-file denial and the
+absence of strict CPU-time or physical-I/O bounds remain known limitations.
+
 ## Context
 
 ADR-0012 intentionally builds a domain synchronously on its first query,

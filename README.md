@@ -31,10 +31,12 @@ checks passed, including KASAN/lockdep ([journals 0178](docs/history/0178-unpriv
 and [0179](docs/history/0179-kvm-overbudget-race-followup.md)). Issue 114 is
 closed. The memcg accounting correction was merged through
 [PR 129](https://github.com/studiomoob/llmoobfs/pull/129) after all eleven
-reported checks passed, and issue 116 was closed. Resource-cost issue 118
-and S9 fair sharing remain open ([journal 0180](docs/history/0180-memcg-accounting-investigation.md),
-[roadmap](ROADMAP.md)); no controlled before/after performance comparison
-has measured the accounting overhead.
+reported checks passed, and issue 116 was closed. The experimental resource-cost
+guard for issue 118 was merged by [PR 135](https://github.com/studiomoob/llmoobfs/pull/135)
+after eleven green checks; the issue and S9 fair sharing remain open
+([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md),
+[roadmap](ROADMAP.md)). No controlled before/after performance comparison
+has measured the memcg accounting overhead ([journal 0180](docs/history/0180-memcg-accounting-investigation.md)).
 
 ## The problem
 
@@ -436,14 +438,15 @@ KASAN harness runs the layer suite), and no benchmark exists.
   1.90 MiB of reads on first queries of 1,000- and 7,500-file ext4 domains;
   a query by one uid also evicted another uid's built private domain under a
   small shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
-  These are bounded observations, not a latency guarantee. This branch adds
+  These are bounded observations, not a latency guarantee. `main` includes
   experimental work and rebuild-frequency limits
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
   they are not a strict CPU-time or I/O-byte cap. The local VM and KASAN suites
-  passed. A separate Mac mini KVM guest replayed the 60,000-page stage-2 bulk
-  client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
+  and all eleven PR checks passed. A separate Mac mini KVM guest replayed the
+  60,000-page stage-2 bulk client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
   answer checks agreed. That run did not test MCP writes, a live mirror or
-  latency. Issue 118 remains open pending policy review, publication and
+  latency. A valid 17,000-file domain was denied with `E2BIG` under the
+  experimental cap. Issue 118 remains open for policy review and
   broader-workload validation. Do not expose a multi-user mount to untrusted
   query workloads.
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This

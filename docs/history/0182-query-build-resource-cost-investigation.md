@@ -5,6 +5,11 @@ Estimated effort: M (one to three days) for the investigation; started
 2026-10-23, with labor time not yet measured. A mitigation, if selected,
 needs its own effort estimate after the evidence is reviewed.
 
+*Status update, 2026-10-24 (journal 0184):* the guard was published and merged
+through PR 135 as `2396c16`. Its eleven reported checks passed on head
+`94dc454`; issue 118 remains open. The opening status above records the
+earlier local checkpoint.
+
 ## Goal and starting evidence
 
 Issue 118 asks whether a caller permitted to open a domain directory should

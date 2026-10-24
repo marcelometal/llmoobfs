@@ -36,10 +36,12 @@ após as onze verificações passarem, inclusive KASAN/lockdep ([diários 0178](
 e [0179](docs/history/0179-kvm-overbudget-race-followup.md)). A issue 114 foi
 fechada. A correção da cobrança ao cgroup de memória entrou pela
 [PR 129](https://github.com/studiomoob/llmoobfs/pull/129) após as onze
-verificações passarem, e a issue 116 foi fechada. A issue 118 sobre custo de
-recursos e a divisão justa S9 continuam abertas ([diário 0180](docs/history/0180-memcg-accounting-investigation.md),
-[roadmap](ROADMAP.md)); ainda não houve comparação controlada de desempenho
-antes e depois da cobrança.
+verificações passarem, e a issue 116 foi fechada. A proteção experimental
+de custo da issue 118 entrou pela [PR 135](https://github.com/studiomoob/llmoobfs/pull/135)
+após onze verificações verdes; a issue e a divisão justa S9 continuam
+abertas ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md),
+[roadmap](ROADMAP.md)). Ainda não houve comparação controlada de desempenho
+antes e depois da cobrança ao cgroup de memória ([diário 0180](docs/history/0180-memcg-accounting-investigation.md)).
 
 ## O problema
 
@@ -458,16 +460,17 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   nas primeiras consultas de domínios ext4 com 1.000 e 7.500 arquivos; a consulta de um uid
   também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
   compartilhado pequeno ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
-  São observações delimitadas, não uma garantia de latência. Este ramo acrescenta
+  São observações delimitadas, não uma garantia de latência. A `main` contém
   limites experimentais de trabalho e frequência de reconstrução
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
   eles não são um teto estrito de tempo de CPU ou bytes de E/S. As suítes locais
-  de VM e KASAN passaram. Uma VM KVM separada no Mac mini repetiu a carga bulk
-  de 60 mil páginas do estágio 2 do cliente em dez domínios com este limite;
+  de VM e KASAN e os onze checks do PR passaram. Uma VM KVM separada no Mac
+  mini repetiu a carga bulk de 60 mil páginas do estágio 2 do cliente em dez domínios com este limite;
   as 60 comparações de resposta entre SQLite e QUERY2 concordaram. Essa
   rodada não mediu escrita via MCP, espelhamento em tempo real nem latência.
-  A issue 118 segue aberta para revisão da política,
-  publicação e validação com cargas mais diversas. Não exponha uma montagem
+  Um domínio válido de 17 mil arquivos foi recusado com `E2BIG` sob o
+  limite experimental. A issue 118 segue aberta para revisão da política
+  e validação com cargas mais diversas. Não exponha uma montagem
   multiusuário a consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados

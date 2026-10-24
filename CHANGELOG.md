@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Documentation (journal 0184): reconcile the experimental issue-118 guard
+  merged by PR 135 after eleven green checks, including Native Linux VM and
+  KASAN/lockdep. Issue 118 remains open for the 17,000-file compatibility
+  denial and residual availability limits; no additional module change.
+
 - Documentation (journal 0183): PR 134 integrated the completed client-roadmap
   research after nine green checks, including VM and KASAN/lockdep. Its
   G-items remain proposals without implementation.
@@ -30,8 +35,8 @@
   original work allowance. A 30-pair, order-alternated native-KVM comparison
   on a 7,500-file ext4 domain detected a +0.9% cold-query wall-median cost
   (95% bootstrap interval +0.3% to +1.8%) and unchanged median measured
-  read bytes. Publication and issue closure remain pending. These are not
-  strict CPU-time or physical-I/O-byte caps, and the
+  read bytes. PR 135 has since merged; issue closure remains pending. These
+  are not strict CPU-time or physical-I/O-byte caps, and the
   shared index budget still has no fair per-user shares.
   A later 30-pair, fixed-frequency comparison of a cold 17,000-file query
   against the pre-limit module measured a paired median saving of 3.490 ms
