@@ -89,6 +89,20 @@ test-only delay is cleared, a later query must rebuild successfully. Its
 success marker is `QUERY_BUILD_MOVED_PASS`. This tests cumulative accounting over
 the moved-directory side scan, not every possible retry path.
 
+`sh vm/issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS` is a separate,
+opt-in native-KVM probe for issue 118's numerical policy. It requires a
+dedicated Linux host with matching kernel headers, KVM and virtme-ng; it
+refuses an existing output directory and creates a new ext4 image under
+`build/issue118-policy/RUN_ID/`. The guest plants `FILES` empty files with
+exclusive creation and measures one unprivileged cold `QUERY2` on the
+direct disk, then on the same disk through `dm-delay` with the specified
+read delay in milliseconds (writes are not delayed). The helper validates
+the complete answer or an `E2BIG`/`ETIMEDOUT` failure with untouched output.
+Its `MOOBFS_POLICY_PASS` marker covers those assertions and guest setup,
+not a performance threshold, a real slow device or a strict CPU/I/O cap.
+Journal 0185 records each actual run; this command is not in the default
+suite.
+
 ## 3. Markers and what they mean
 
 A run is read from the console log. Success markers are printed only after the

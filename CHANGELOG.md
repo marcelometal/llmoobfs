@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Investigation in progress (journal 0185, issue 118): measure larger
+  domain builds and delayed lower-device reads in a dedicated VM before
+  changing the experimental numerical limit or closing the issue. No
+  result or policy change is claimed yet.
+
 - Documentation (journal 0184): reconcile the experimental issue-118 guard
   merged by PR 135 after eleven green checks, including Native Linux VM and
   KASAN/lockdep. Issue 118 remains open for the 17,000-file compatibility

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Measure one cold QUERY2 over an empty-attribute domain, with or without E2BIG. */
+/* Measure one cold QUERY2 over an empty-attribute domain, including bounded failures. */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -115,19 +115,21 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	if ((error == 0 && (q.count != 0 || q.truncated)) ||
-	    (error == E2BIG && (q.count != 777 || q.truncated != 777 ||
+	    ((error == E2BIG || error == ETIMEDOUT) &&
+	     (q.count != 777 || q.truncated != 777 ||
 			     memcmp(&result, &original, sizeof(result)) ||
 			     memcmp(q.cursor,
 				    (unsigned char[MOOB_QUERY2_CURSOR]){0},
 				    sizeof(q.cursor)))) ||
-	    (error != 0 && error != E2BIG) || io_after < io_before ||
+	    (error != 0 && error != E2BIG && error != ETIMEDOUT) ||
+	    io_after < io_before ||
 	    dev_after < dev_before) {
 		fprintf(stderr, "query-build-denial: unexpected errno=%d count=%u truncated=%u\n",
 			error, q.count, q.truncated);
 		return 1;
 	}
 	printf("QUERY_BUILD_DENIAL outcome=%s wall_ns=%llu user_us=%lld sys_us=%lld read_bytes=%llu dev_read_sectors=%llu count=%u\n",
-	       error == E2BIG ? "denied" : "full",
+	       error == E2BIG ? "denied" : error == ETIMEDOUT ? "timeout" : "full",
 	       time_ns(end) - time_ns(start),
 	       time_us(cpu_after.ru_utime) - time_us(cpu_before.ru_utime),
 	       time_us(cpu_after.ru_stime) - time_us(cpu_before.ru_stime),
