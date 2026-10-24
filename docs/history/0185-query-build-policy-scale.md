@@ -36,8 +36,60 @@ images rather than overwrite them.
 
 ## Results and next step
 
-Pending. Record setup failures and their fixes, exact executed commands,
-guest verdict markers, resource observations and limits here at each round.
-Only after the evidence is checked should the maintainer choose whether to
-keep, raise or make the cap configurable. No policy change or issue closure
-follows from beginning this experiment.
+### Harness pilot — 2026-10-24
+
+The dedicated host was reachable, its Debian 6.12.111 kernel had
+`CONFIG_DM_DELAY=m` and `dm-delay.ko.xz`, and no QEMU process was active.
+The first SSH preflight omitted the `debian` login name and failed before
+running a remote command; the corrected destination connected. A local Mac
+syntax-only C check could not find Linux's `sys/prctl.h`; this is not a C
+test verdict, and the helper was instead compiled statically on the Linux
+host. `sh -n`, `git diff --check`, `make checkpatch`, the retired-claims
+check and the site check passed before the test-harness commit `cb1190d`.
+The branch was transferred with a bundle verified at both ends; the clean
+host checkout switched to the same commit without a public push.
+
+The first opt-in command was
+`sh vm/issue118-policy-host.sh pilot1000 1000 5`. It created a new 128 MiB
+ext4 image and completed with `MOOBFS_POLICY_PASS`. The unprivileged cold
+query returned a full empty answer in both conditions. Direct virtio disk:
+23.202 ms wall, 21.470 ms process user+system CPU, 184,320 task read bytes
+and 304 underlying read sectors. Through `dm-delay` configured for 5 ms
+read delay and zero write delay: 95.397 ms wall, 24.792 ms process CPU,
+184,320 task read bytes and 304 sectors. The guest printed the six-argument
+device-mapper table with the configured delay. These are single pilot
+observations, not a paired statistical effect or a real slow device result.
+The image and console remain under `build/issue118-policy/pilot1000/` on
+the dedicated host; that output name cannot be reused by the runner.
+
+### Empty-file domain sweep — 2026-10-24
+
+The same committed runner then executed `files12000 12000 5`,
+`files17000 17000 5`, `files24000 24000 5` and `files30000 30000 5`,
+each as `sh vm/issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS` in a new
+KVM guest and image. All four exited zero with `MOOBFS_POLICY_PASS`; the
+helper validated untouched query output on each denial. The host checkout
+remained clean and no QEMU process remained after the runs.
+
+| Files | Direct verdict/wall ms | Delayed verdict/wall ms | Task read bytes, direct/delayed | Underlying read sectors, direct/delayed |
+| ---: | --- | --- | ---: | ---: |
+| 12,000 | full / 112.096 | full / 975.682 | 3,244,032 / 3,244,032 | 6,280 / 6,280 |
+| 17,000 | `E2BIG` / 172.576 | `E2BIG` / 1,415.784 | 4,669,440 / 4,669,440 | 9,064 / 9,080 |
+| 24,000 | `E2BIG` / 253.347 | `E2BIG` / 1,467.573 | 6,410,240 / 6,410,240 | 12,464 / 12,464 |
+| 30,000 | `E2BIG` / 162.084 | `E2BIG` / 1,575.927 | 7,958,528 / 7,958,528 | 15,488 / 15,488 |
+
+These are one direct and one delayed query per size, not a randomized
+performance study. The 30,000-file direct time being shorter than the
+24,000-file direct time cautions against a monotonic latency claim.
+Read bytes and sectors rose across the planted sizes even though the work
+allowance denied all three larger queries; they do not establish which
+lower operation caused the difference or a strict I/O bound. The injected
+5 ms read delay produced a material wall-time difference in this guest,
+but did not reach the cooperative ten-second deadline. Raw images,
+environment files and console logs remain in distinct
+`build/issue118-policy/files*/` directories on the host.
+
+The next round uses the six-attribute fixture from the earlier 6,000-file
+client-shape control at larger per-domain sizes. This distinguishes the
+empty-file sensitivity sweep from a closer, still synthetic client shape.
+No policy change or issue closure follows from these observations.

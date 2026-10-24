@@ -5,8 +5,9 @@ set -eu
 PATH=/usr/sbin:/sbin:/usr/bin:/bin
 export PATH
 
-[ "$#" -eq 3 ] || exit 64
-out=$1 files=$2 delay_ms=$3
+[ "$#" -eq 4 ] || exit 64
+out=$1 files=$2 delay_ms=$3 shape=$4
+case "$shape" in plain) plant=plant ;; six) plant=plant6 ;; *) exit 64 ;; esac
 disk=/dev/vda
 lower=/tmp/moob118-lower
 layer=/tmp/moob118-layer
@@ -29,7 +30,7 @@ trap cleanup EXIT
 
 mount -t ext4 "$disk" "$lower"
 mkdir -p "$lower/base/d/s"
-"$out/query-build-limit" plant "$lower/base/d/s" "$files"
+"$out/query-build-limit" "$plant" "$lower/base/d/s" "$files"
 sync
 umount "$lower"
 insmod "$out/moobfs_layer.ko"
@@ -41,8 +42,8 @@ measure() {
     mount -t ext4 "$device" "$lower"
     mount -t moobfs_layer -o "lower=$lower/base,domain_depth=1" none "$layer"
     result=$("$out/query-build-denial" "$layer/d" 1001)
-    printf 'MOOBFS_POLICY_RESULT: files=%s condition=%s read_delay_ms=%s %s\n' \
-        "$files" "$condition" "$delay_ms" "$result"
+    printf 'MOOBFS_POLICY_RESULT: files=%s shape=%s condition=%s read_delay_ms=%s %s\n' \
+        "$files" "$shape" "$condition" "$delay_ms" "$result"
     umount "$layer"
     umount "$lower"
 }
@@ -55,4 +56,4 @@ dmsetup create "$mapper" --table \
 dmsetup table "$mapper"
 measure delayed "/dev/mapper/$mapper"
 dmsetup remove "$mapper"
-echo "MOOBFS_POLICY_PASS: files=$files read_delay_ms=$delay_ms"
+echo "MOOBFS_POLICY_PASS: files=$files shape=$shape read_delay_ms=$delay_ms"

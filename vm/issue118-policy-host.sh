@@ -1,19 +1,23 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 # Opt-in, native-KVM issue-118 probe on a dedicated Linux host.
-# Usage: vm/issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS
+# Usage: vm/issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS [plain|six]
 # Each invocation creates a fresh image and output directory; nothing is overwritten.
 set -eu
 PATH="$HOME/.venv-vng/bin:/usr/sbin:/sbin:$PATH"
 export PATH
 
-[ "$#" -eq 3 ] || { echo 'usage: issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS' >&2; exit 64; }
-run_id=$1 files=$2 delay_ms=$3
+[ "$#" -ge 3 ] && [ "$#" -le 4 ] || {
+    echo 'usage: issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS [plain|six]' >&2
+    exit 64
+}
+run_id=$1 files=$2 delay_ms=$3 shape=${4:-plain}
 case "$run_id" in ''|*[!a-zA-Z0-9_-]*) echo 'invalid run id' >&2; exit 64 ;; esac
 case "$files" in ''|*[!0-9]*) echo 'invalid file count' >&2; exit 64 ;; esac
 case "$delay_ms" in ''|*[!0-9]*) echo 'invalid read delay' >&2; exit 64 ;; esac
 [ "$files" -ge 1 ] && [ "$files" -le 30000 ] || exit 64
 [ "$delay_ms" -ge 1 ] && [ "$delay_ms" -le 20 ] || exit 64
+case "$shape" in plain|six) ;; *) echo 'invalid shape' >&2; exit 64 ;; esac
 command -v vng >/dev/null || { echo 'vng unavailable' >&2; exit 1; }
 command -v qemu-system-x86_64 >/dev/null || { echo 'QEMU unavailable' >&2; exit 1; }
 if pgrep -f '[q]emu-system' >/dev/null; then
@@ -37,11 +41,13 @@ cc -static -O2 -Wall -Wextra -Werror -I"$repo/include" \
 cc -static -O2 -Wall -Wextra -Werror -I"$repo/include" \
     "$repo/tests/query-build-denial.c" -o "$out/query-build-denial"
 cp "$repo/layer/moobfs_layer.ko" "$out/moobfs_layer.ko"
-truncate -s 128M "$out/lower.img"
+if [ "$shape" = six ]; then disk_size=256M; else disk_size=128M; fi
+truncate -s "$disk_size" "$out/lower.img"
 mke2fs -q -F -t ext4 -b 4096 -N 50000 -L moob118policy "$out/lower.img"
 {
     printf 'repo_head='; git -C "$repo" rev-parse HEAD
-    printf 'kernel=%s\nfiles=%s\nread_delay_ms=%s\n' "$kernel" "$files" "$delay_ms"
+    printf 'kernel=%s\nfiles=%s\nread_delay_ms=%s\nshape=%s\n' \
+        "$kernel" "$files" "$delay_ms" "$shape"
     qemu-system-x86_64 --version | head -n 1
     sha256sum "$out/moobfs_layer.ko" "$out/query-build-limit" "$out/query-build-denial"
 } > "$out/environment.txt"
@@ -49,7 +55,7 @@ mke2fs -q -F -t ext4 -b 4096 -N 50000 -L moob118policy "$out/lower.img"
 rc=0
 vng -r --user root --cpus 2 --memory 2G --disk "$out/lower.img" \
     --rwdir "$out" \
-    --exec "sh $repo/vm/issue118-policy-guest.sh $out $files $delay_ms" \
+    --exec "sh $repo/vm/issue118-policy-guest.sh $out $files $delay_ms $shape" \
     > "$out/console.log" 2>&1 || rc=$?
 grep '^MOOBFS_POLICY_' "$out/console.log" || true
 [ "$rc" -eq 0 ] || { echo 'VM command failed; see console.log' >&2; exit 1; }
