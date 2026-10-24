@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Documentation (journal 0183): integrate completed roadmap research from
+  journals 0164–0166 after PR 130, preserving current-state records and leaving
+  the proposed client packages unimplemented.
+
 - Documentation (journal 0181): reconcile the merged PR 129, its eleven
   successful checks and closed issue 116 across current-state documentation;
   preserve the earlier publication checkpoints and the unmeasured performance
