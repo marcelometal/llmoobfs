@@ -32,6 +32,7 @@ Measured wall-clock times per machine are not recorded yet; the CI timeouts are
 | `make attr-tools` | Linux-only `moobfs-attr`, `moobfs-check`, `moobfs-index` | `build/host/` |
 | `make module` / `make layer` | `kernel/moobfs.ko` / `layer/moobfs_layer.ko` against `KDIR` | in-tree (`kernel/`, `layer/`) |
 | `make vm-test` | Docker image, both modules, tests and the full guest run (M1 regression, layer suite, acceptance) on Debian **6.12.111+deb13-amd64** under QEMU TCG | `build/vm/` |
+| `make install-test` | Follows [operations.md](operations.md) in a disposable Debian 13 VM (official generic cloud image of 2026-10-21, QEMU TCG): `make install` refused on the image's 6.12.113 kernel, then installed on 6.12.111, mounted by hand, by `fstab` at boot and by a mount unit, two users checked, uninstalled. Ends in `MOOBFS_INSTALL_PASS`; any step prints `MOOBFS_INSTALL_FAIL: <why>`. Proves the guide's commands on that image only; not real hardware, Secure Boot or another distribution (journal 0197) | `build/install-test/` |
 | KASAN workflow | Upstream **6.12.112** with `vm/kasan.config` (KASAN, UBSAN, lockdep), the same `vm/suite.sh` inside virtme-ng | `build/vng/`, `build/linux/` |
 
 The Debian base digest and kernel package are pinned, but auxiliary apt packages
@@ -471,7 +472,8 @@ sudo umount /mnt/moob
 sudo rmmod moobfs
 ```
 
-For the layer: `make layer`, `insmod layer/moobfs_layer.ko`, then
+To install the module on a dedicated test host and mount it at boot, follow
+[operations.md](operations.md). For a one-off mount: `make layer`, `insmod layer/moobfs_layer.ko`, then
 `mount -t moobfs_layer -o lower=<dir>[,nolinks][,noindex][,index_budget=<n>][,index_idle=<0-86400>][,index_build_work=<1024-65536>][,domain_depth=<0-8>] none <mnt>`.
 `index_idle` defaults to 60 seconds. `domain_depth` defaults to 1 (first-level directories are domains for `MOOB_IOC_QUERY2`); 0 turns
 domains off and keeps the v1 `QUERY` open to every user (`docs/spec-query-v2.md`).

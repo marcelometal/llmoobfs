@@ -14,6 +14,9 @@ accepted but may be only partly implemented, and only the journals and
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
+| [status.md](status.md) | EN | Current state in detail: the last tag, corrections merged since, open issues (journal 0197) |
+| [status.pt-BR.md](status.pt-BR.md) | PT | Courtesy mirror of status.md |
+| [operations.md](operations.md) | EN | Install on a dedicated test host, mount by hand and at boot, users, upgrade, uninstall (roadmap C2) |
 | [architecture-overview.md](architecture-overview.md) | EN | How the stacked layer is built, with a source citation for each claim |
 | [when-not-to-use.md](when-not-to-use.md) | EN | Comparison with plain files, SQLite, FUSE and memory frameworks; when not to use MoobFS |
 | [adoption-risks.md](adoption-risks.md) | EN | Proposal: fifteen adoption risks, the evidence for each and the fix, work or deployment rule that answers it |

@@ -25,6 +25,10 @@ There are three interfaces, each with its own version and its own rule.
    builds: the module uses in-kernel interfaces that change between versions without notice.
 2. The module refuses to build against a kernel outside the list instead of building with
    warnings. (Not implemented: today the build does not check the version.)
+   *Note, 2026-10-25 (journal 0197):* `make install` now refuses a kernel that is not in
+   `scripts/supported-kernels` unless `MOOB_ALLOW_UNSUPPORTED=1`; `make layer` itself still does
+   not check. A Debian 13 system installed from the 2026-10-21 cloud image runs
+   `6.12.113+deb13-amd64`, which is outside the list.
 3. A kernel is added by a pull request that adds it to CI and records one fstests `quick` run per
    lower filesystem. It is removed when its upstream series ends or when keeping it needs code the
    maintainer does not want to carry; removal is announced in the changelog one release ahead.

@@ -12,6 +12,11 @@ charged to the memory cgroup where that controller exists (ADR-0018). The curren
 description is [architecture-overview.md](architecture-overview.md) and
 [spec-query-v2.md](spec-query-v2.md).
 
+*Note, 2026-10-25 (journal 0197).* Installation from source on a dedicated test host, with
+`make install` refusing kernels outside `scripts/supported-kernels`, and the `fstab` and mount-unit
+recipes are now [operations.md](operations.md). DKMS, packages, signing and the `moobfs` CLI
+remain FUTURE (roadmap items C4 and C6).
+
 Legend:
 
 - **EXISTS**: it is in the repository and was exercised by the suite described in `docs/testing.md`.

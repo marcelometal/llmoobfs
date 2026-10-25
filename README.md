@@ -2,7 +2,7 @@
 
 **An agent's memory as ordinary files that the kernel can query, with file permissions deciding who sees what.**
 
-[Project site](https://studiomoob.github.io/llmoobfs/) · [Measurements](docs/history/0088-m4-report.md) · [Try it in a VM](#try-it-in-a-vm) · [How to help](docs/help-wanted.md) · [Docs index](docs/README.md) · [FAQ](docs/faq.md) · [Roadmap](ROADMAP.md) · [Português](README.pt-BR.md)
+[Project site](https://studiomoob.github.io/llmoobfs/) · [Measurements](docs/history/0088-m4-report.md) · [Try it in a VM](#try-it-in-a-vm) · [Install](docs/operations.md) · [Status](docs/status.md) · [How to help](docs/help-wanted.md) · [Docs index](docs/README.md) · [FAQ](docs/faq.md) · [Roadmap](ROADMAP.md) · [Português](README.pt-BR.md)
 
 [![CI](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml/badge.svg)](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml)
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
@@ -10,37 +10,10 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15408/badge)](https://www.bestpractices.dev/projects/15408)
 [![Zenodo DOI: experimental snapshot](https://zenodo.org/badge/DOI/10.5281/zenodo.23514721.svg)](https://doi.org/10.5281/zenodo.23514721)
 
-> **Experimental. Not for production.** One kernel series (6.12), tested in a VM only; no outside
-> human review yet (two independent source reviews by AI assistants, journals 0111 and 0114). The last
-> tag, `v0.4.1-experimental` (2026-10-20), is a source snapshot before this review batch.
-> The two findings of the [independent review](docs/history/0144-independent-review.md)
-> have corrections on `main`; the review batch passed the full integrated VM suite
-> and local KASAN/UBSAN/lockdep. The required pull-request checks passed before merge.
-> `v0.4.1-experimental` still contains both defects. A later review (journal 0151) found a third,
-> a chmod during an index build that left the file in `QUERY2` answers; fixed in journal 0152.
-> See [Limitations](#limitations).
-
-The later domain-rename and concurrent index-budget corrections were merged
-through [PR 126](https://github.com/studiomoob/llmoobfs/pull/126) after its
-11 reported checks passed; issues 110 and 111 were closed. A subsequent native
-KVM run found another concurrent-budget refusal. Trying another eligible
-domain when the oldest one's build mutex is busy, and the remaining
-unprivileged allocation-fault test for T9, were integrated by
-[PR 127](https://github.com/studiomoob/llmoobfs/pull/127) after all eleven
-checks passed, including KASAN/lockdep ([journals 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)
-and [0179](docs/history/0179-kvm-overbudget-race-followup.md)). Issue 114 is
-closed. The memcg accounting correction was merged through
-[PR 129](https://github.com/studiomoob/llmoobfs/pull/129) after all eleven
-reported checks passed, and issue 116 was closed. The experimental resource-cost
-guard for issue 118 was merged by [PR 135](https://github.com/studiomoob/llmoobfs/pull/135)
-after eleven green checks; the issue and S9 fair sharing remain open
-([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md),
-[roadmap](ROADMAP.md)). No controlled before/after performance comparison
-has measured the memcg accounting overhead ([journal 0180](docs/history/0180-memcg-accounting-investigation.md)).
-The bounded per-mount work choice was subsequently merged by
-[PR 138](https://github.com/studiomoob/llmoobfs/pull/138) after twelve green
-checks ([journal 0193](docs/history/0193-merged-per-mount-build-work-policy.md));
-issue 118 remains open for broader evidence.
+> **Experimental. Not for production.** Kernel code with no outside human review yet, tested on
+> one kernel series (6.12) in VMs. Use it only in a disposable VM or on a dedicated test host. The
+> current state, what was merged since the last tag and the defects that tag still has are on the
+> [status page](docs/status.md); the limits are under [Limitations](#limitations).
 
 ## The problem
 
@@ -71,6 +44,26 @@ prompt stay in the application.
 For batch queries, use output only after success; discard every result and output
 cursor on error ([client contract](docs/client-contract.md#6-writing-and-querying),
 [regression scope](docs/testing.md), journal 0173).
+
+## Is it for you?
+
+**Worth trying or evaluating if** you build an agent memory system, or any program that keeps
+records as files with a few fields, on Linux, and you want the operating system (owners, modes,
+ACLs) to decide which user or agent sees which record, and the kernel to answer "which files in
+this directory have `kind = decision`" without a second database kept in step.
+
+**Not yet if** you need production guarantees, a kernel other than Debian's
+`6.12.111+deb13-amd64`, macOS or Windows, a rootless container that mounts by itself, semantic or
+vector search, or a home for data you cannot lose. SQLite or plain files are the better choice
+then ([when-not-to-use.md](docs/when-not-to-use.md)).
+
+## Ways to try it
+
+| Path | Needs | Where |
+| --- | --- | --- |
+| Watch it run in a disposable VM; nothing is installed on your machine | Docker; 7 to 8 minutes on an x86-64 runner, longer on Apple Silicon | [Try it in a VM](#try-it-in-a-vm) |
+| Install it on a dedicated test host, mount it at boot, give users their directories | Debian 13 with kernel `6.12.111+deb13-amd64`, root, Secure Boot off | [docs/operations.md](docs/operations.md) |
+| Use it from your own program | Files, `setxattr` and one ioctl; no library yet | [client-contract.md](docs/client-contract.md) |
 
 ## Four numbers
 

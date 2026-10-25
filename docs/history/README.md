@@ -214,3 +214,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0192 — Budget release stays with the builder's filesystem uid](0192-same-fsuid-budget-release.md)
 - [0193 — Reconcile the merged per-mount build-work policy](0193-merged-per-mount-build-work-policy.md)
 - [0196 — Consumable path on the roadmap; kernel freeze restated (ADR-0022)](0196-consumable-path-roadmap.md)
+- [0197 — First contact and installation on a test host (C1, C2; install test passed in a VM)](0197-first-contact-and-install.md)

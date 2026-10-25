@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- First contact and installation (roadmap C1 and C2, journal 0197): the
+  READMEs open with a short warning, "Is it for you?" and "Ways to try it";
+  the status detail moved to `docs/status.md` (and its Portuguese mirror).
+  New `docs/operations.md`, `sudo make install` / `make uninstall` (refuse
+  kernels outside `scripts/supported-kernels`, never overwrite without
+  `FORCE=1`) and `make install-test`, which followed the guide in a
+  disposable Debian 13 VM and ended in `MOOBFS_INSTALL_PASS`. Finding: a
+  fresh Debian 13 runs 6.12.113, outside the kernel list. No module change.
+
 - Roadmap: a user-space "Consumable path" (items C1–C7: first contact,
   install and mount, container recipe, `moobfs` CLI, client library, DKMS
   and packages prepared in VMs, optional agent adapter) and ADR-0022, which
