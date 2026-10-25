@@ -22,7 +22,7 @@ BUILD=build/install
 MODDIR=$DESTDIR/lib/modules/$KVER/updates/moobfs
 BINDIR=$DESTDIR$PREFIX/bin
 MANDIR=$DESTDIR$PREFIX/share/man/man1
-TOOLS='moobfs-attr moobfs-check moobfs-index'
+TOOLS='moobfs moobfs-attr moobfs-check moobfs-index'
 
 die() { echo "moobfs install: $*" >&2; exit 1; }
 

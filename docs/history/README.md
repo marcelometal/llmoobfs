@@ -217,3 +217,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0195 — G4 derived-index package; mounted gate passed in three runs](0195-g4-derived-index-package.md)
 - [0196 — Consumable path on the roadmap; kernel freeze restated (ADR-0022)](0196-consumable-path-roadmap.md)
 - [0197 — First contact and installation on a test host (C1, C2; install test passed in a VM)](0197-first-contact-and-install.md)
+- [0198 — The `moobfs` command-line tool (C4)](0198-moobfs-command-line-tool.md)

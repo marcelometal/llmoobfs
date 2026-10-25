@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `moobfs` command-line tool (roadmap C4, journal 0198): `moobfs info`,
+  `moobfs query` (QUERY2 with the cursor followed, or the mount-wide QUERY
+  without domains; text or JSON; paths sorted like `moobfs-index` without
+  `--order`) and `moobfs check`, with an explicit message and a sysexits(3)
+  status for each refusal. Installed by `make install`; tested in the VM
+  suite as two users against the oracle (`CLI_PASS`, `CLI_E2BIG_PASS`) and
+  in `make install-test` (`CLI_QUERY`). User space only; no new ioctl.
+
 - First contact and installation (roadmap C1 and C2, journal 0197): the
   READMEs open with a short warning, "Is it for you?" and "Ways to try it";
   the status detail moved to `docs/status.md` (and its Portuguese mirror).

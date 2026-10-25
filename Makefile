@@ -18,7 +18,7 @@ help:
 	@echo '  make man-lint      lint the manual pages in man/ with mandoc'
 	@echo '  make fuzz          libFuzzer over the attribute encoding (LLVM clang with libFuzzer)'
 	@echo 'Linux-only targets:'
-	@echo '  make attr-tools    moobfs-attr, moobfs-check, moobfs-index'
+	@echo '  make attr-tools    moobfs, moobfs-attr, moobfs-check, moobfs-index'
 	@echo '  make bench-tools   M4 harness binaries; make bench-smoke runs its smoke test'
 	@echo '  make hostile-test  adversarial lower trees through moobfs-check and moobfs-index (S4)'
 	@echo '  make sqlite-ext    the moobfs SQLite extension, $$(BUILD)/moobfs.so (needs libsqlite3-dev >= 3.38)'
@@ -45,13 +45,15 @@ $(BUILD)/fsck.moobfs: tools/fsck.c $(COMMON) $(HEADERS) | $(BUILD)
 $(BUILD)/attr_test: tests/attr_test.c common/attr.c include/moobfs_attr.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tests/attr_test.c common/attr.c $(LDFLAGS) -o $@
 # Linux-only tools over the xattr API (built statically inside the VM container too).
-attr-tools: $(BUILD)/moobfs-attr $(BUILD)/moobfs-check $(BUILD)/moobfs-index
+attr-tools: $(BUILD)/moobfs-attr $(BUILD)/moobfs-check $(BUILD)/moobfs-index $(BUILD)/moobfs
 $(BUILD)/moobfs-attr: tools/moobfs-attr.c common/attr.c include/moobfs_attr.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-attr.c common/attr.c $(LDFLAGS) -o $@
 $(BUILD)/moobfs-check: tools/moobfs-check.c common/attr.c include/moobfs_attr.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-check.c common/attr.c $(LDFLAGS) -o $@
 $(BUILD)/moobfs-index: tools/moobfs-index.c tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-index.c common/attr.c $(LDFLAGS) -o $@
+$(BUILD)/moobfs: tools/moobfs.c tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs.c common/attr.c $(LDFLAGS) -o $@
 # M4 benchmark harness (docs/benchmark-harness.md). gen is portable; load is Linux-only.
 bench-tools: $(BUILD)/bench-gen $(BUILD)/bench-load $(BUILD)/bench-sqlclient $(BUILD)/bench-aimem-latency $(BUILD)/bench-readcost
 $(BUILD)/bench-gen: bench/gen.c bench/common.h | $(BUILD)
