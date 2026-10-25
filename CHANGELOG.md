@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Investigation (journal 0186, issue 118): a real ai-memory MCP workload
+  wrote 2,000 requested pages in ten projects through the guarded layer
+  inside a dedicated VM, with zero refused writes. The client created one
+  additional profile page; the mirror covered all 2,001 pages and 66
+  SQLite-versus-`QUERY2` comparisons passed. This bounded client shape
+  does not decide the larger-domain limit; issue 118 stays open.
+
+- Investigation (journal 0185, issue 118): dedicated native-KVM probes
+  measured larger domain builds and synthetic delayed lower-device reads.
+  Ten matched, alternating module pairs on cloned 17,000-file images with
+  six attributes per file and a 20 ms read delay showed `E2BIG` under the
+  current guard versus a full answer before the guard. The denial saved a
+  paired median 17.945 ms wall and 8 KiB task reads, while using a paired
+  median 13.262 ms more process CPU. The issue remains open for the
+  compatibility/policy decision; no production limit changed.
+
+- Documentation (journal 0184): reconcile the experimental issue-118 guard
+  merged by PR 135 after eleven green checks, including Native Linux VM and
+  KASAN/lockdep. Issue 118 remains open for the 17,000-file compatibility
+  denial and residual availability limits; no additional module change.
+
 - Documentation (journal 0183): PR 134 integrated the completed client-roadmap
   research after nine green checks, including VM and KASAN/lockdep. Its
   G-items remain proposals without implementation.
@@ -30,8 +51,8 @@
   original work allowance. A 30-pair, order-alternated native-KVM comparison
   on a 7,500-file ext4 domain detected a +0.9% cold-query wall-median cost
   (95% bootstrap interval +0.3% to +1.8%) and unchanged median measured
-  read bytes. Publication and issue closure remain pending. These are not
-  strict CPU-time or physical-I/O-byte caps, and the
+  read bytes. PR 135 has since merged; issue closure remains pending. These
+  are not strict CPU-time or physical-I/O-byte caps, and the
   shared index budget still has no fair per-user shares.
   A later 30-pair, fixed-frequency comparison of a cold 17,000-file query
   against the pre-limit module measured a paired median saving of 3.490 ms

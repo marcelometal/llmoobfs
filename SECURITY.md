@@ -145,10 +145,11 @@ directory rename. The mount's memory budget does not cap the CPU or lower
 I/O of that scan. A bounded KVM probe measured the work and demonstrated
 that one uid's query can evict another uid's built domain under a small
 shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
-The maintainer chose the resource-limit direction; this branch implements
+The maintainer chose the resource-limit direction; `main` includes
 experimental work and rebuild-frequency limits
 ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)).
 They do not strictly cap CPU time or physical I/O, nor provide fair index
-memory shares. Local VM and KASAN suites passed; policy review, publication,
-broader workload validation and issue closure remain pending. Avoid
+memory shares. Local VM and KASAN suites and all eleven PR checks passed;
+policy review, broader workload validation and issue closure remain pending.
+The experimental cap denied a valid 17,000-file domain with `E2BIG`. Avoid
 untrusted multi-user query workloads while this issue is open.

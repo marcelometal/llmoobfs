@@ -89,6 +89,54 @@ test-only delay is cleared, a later query must rebuild successfully. Its
 success marker is `QUERY_BUILD_MOVED_PASS`. This tests cumulative accounting over
 the moved-directory side scan, not every possible retry path.
 
+`sh vm/issue118-policy-host.sh RUN_ID FILES READ_DELAY_MS [plain|six] [current|prelimit] [SEED_RUN]`
+is a separate,
+opt-in native-KVM probe for issue 118's numerical policy. It requires a
+dedicated Linux host with matching kernel headers, KVM and virtme-ng; it
+refuses an existing output directory and creates a new ext4 image under
+`build/issue118-policy/RUN_ID/`. The guest plants `FILES` empty files with
+exclusive creation and measures one unprivileged cold `QUERY2` on the
+direct disk, then on the same disk through `dm-delay` with the specified
+read delay in milliseconds (writes are not delayed). `six` plants the six
+typed attributes of the earlier client-shape control on each file; the
+default `plain` plants empty files. `prelimit` compiles the production
+module from the pinned pre-guard commit `f283f13` inside a fresh archive
+under the run directory; the current module and query helper are unchanged.
+The default is `current`. The runner validates an optional `SEED_RUN` by
+count and shape, copies its unmounted disk image
+into a new output directory and reuses that fixture without planting new
+files. This permits matched module comparisons without another worktree.
+The query helper validates the complete answer or an `E2BIG`/`ETIMEDOUT`
+failure with untouched output.
+Its `MOOBFS_POLICY_PASS` marker covers those assertions and guest setup,
+not a performance threshold, a real slow device or a strict CPU/I/O cap.
+Journal 0185 records each actual run; this command is not in the default
+suite.
+
+`sh vm/issue118-policy-pairs.sh PREFIX PAIRS FILES READ_DELAY_MS SHAPE SEED_RUN`
+runs that probe sequentially with alternating current/pre-limit module
+order in each pair, using a fresh copy of the same seed image per VM.
+It refuses previously used run IDs and leaves every console and image for
+review. The caller must analyze the paired results; the script does not
+declare a performance win from its success marker alone. After archiving
+each pair's `console.log` and `environment.txt` under its run ID, validate
+and summarize the archive with
+`python3 bench/issue118-policy-pairs.py ARCHIVE PREFIX PAIRS FILES READ_DELAY_MS SHAPE SEED_RUN`.
+It checks input-image hashes, settings, outcomes and alternating order,
+then reports paired medians and a descriptive bootstrap interval as JSON.
+Journal 0185 records the completed ten-pair run and its limitations.
+
+`sh vm/issue118-client-mcp-host.sh RUN_ID PROJECTS PAGES_PER_PROJECT`
+is an opt-in native-KVM real-client check on the dedicated Linux host. It
+creates a uniquely named ext4 image, compiles the current layer and query
+helper, and runs ai-memory's `memory_write_page` MCP workload through
+`bench/client/stage2.sh` inside the guest. The guest requires every
+requested write to succeed, mirrors typed attributes from the client's
+SQLite database, and requires zero SQL-versus-`QUERY2` differences across
+the six established shapes. It prints `AIMEM_MCP_PASS` only after these
+checks. The runner does not report a performance threshold. Journal 0186
+records the completed 2,000-write run and its limitations.
+
 ## 3. Markers and what they mean
 
 A run is read from the console log. Success markers are printed only after the
