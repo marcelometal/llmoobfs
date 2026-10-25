@@ -441,3 +441,6 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 - systemd [`systemd.mount(5)`](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html):
   `x-systemd.requires-mounts-for=` in `fstab`, `RequiresMountsFor=` and unit naming after the
   mount point, used by `docs/operations.md` section 4.
+- FreeBSD [sysexits(3)](https://man.freebsd.org/cgi/man.cgi?query=sysexits&sektion=3), also
+  shipped by glibc as `<sysexits.h>`: the exit codes 64, 65, 69, 75 and 77 of the `moobfs` tool
+  (journal 0198), as the other tools already use 64 and 65. Defined in the tool, not included.

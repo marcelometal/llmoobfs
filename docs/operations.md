@@ -58,7 +58,7 @@ and copies:
 | File | Destination |
 | --- | --- |
 | `moobfs_layer.ko` | `/lib/modules/$(uname -r)/updates/moobfs/` (then `depmod`) |
-| `moobfs-attr`, `moobfs-check`, `moobfs-index` | `/usr/local/bin/` |
+| `moobfs`, `moobfs-attr`, `moobfs-check`, `moobfs-index` | `/usr/local/bin/` |
 | Their manual pages | `/usr/local/share/man/man1/` |
 
 It refuses to replace anything already at a destination, a symbolic link included; `FORCE=1`
@@ -157,13 +157,22 @@ sudo -u alice moobfs-attr list /srv/memory/alice/note.md     # kind	string	decis
 sudo -u bob cat /srv/memory/alice/note.md                    # Permission denied
 ```
 
+Query a domain through the kernel's index with `moobfs` ([tools.md](tools.md#moobfs)):
+
+```sh
+sudo -u alice moobfs query /srv/memory/alice kind eq string decision   # note.md
+sudo -u bob moobfs query /srv/memory/alice kind eq string decision     # permission denied (exit 77)
+moobfs info /srv/memory                                                # the mount's settings
+```
+
 A directory shared by a group is `root:<group>` with mode `2770` and a default ACL; the recipe is
 in [distribution-strategy.md](distribution-strategy.md) §2.2. Containers: §2.5 of the same
 document, until item C3 validates a recipe.
 
 ## 6. Check, upgrade, back up
 
-- **Check** the attributes of a tree, mounted or not: `moobfs-check /srv/memory` prints a JSON
+- **Check** the attributes of a tree, mounted or not: `moobfs check /srv/memory` (or
+  `moobfs-check`) prints a JSON
   report and exits 0 when clean, 2 when it found problems. It never repairs.
 - **Upgrade** the module: stop the clients, then
 

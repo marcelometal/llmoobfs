@@ -225,11 +225,20 @@ run_lower() {
     [ "$(wc -l < /tmp/k.txt)" -eq 4 ] || fail "query-after-remount-count-$fs"
     same_query kind eq string decision || fail "query-after-remount-eq-$fs"
     grep -q 'r/g1$' /tmp/k.txt || fail "query-after-remount-path-$fs"
+    # moobfs CLI (roadmap C4): without domains the mount root answers the mount-wide QUERY
+    "$BIN/moobfs" query --ino "$LAYER" score ge int64 10 > /tmp/k.txt || fail "cli-v1-$fs"
+    "$BIN/moobfs-index" "$LOWER" score ge int64 10 > /tmp/o.txt || fail "cli-v1-oracle-$fs"
+    cmp -s /tmp/k.txt /tmp/o.txt || { cat /tmp/k.txt /tmp/o.txt; fail "cli-v1-mismatch-$fs"; }
+    [ "$(wc -l < /tmp/k.txt)" -eq 4 ] || fail "cli-v1-count-$fs"
+    "$BIN/moobfs" query "$LAYER/r" score ge int64 10 > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail "cli-v1-subdir-status-$fs"
+    grep -q 'domains are off' /tmp/e.txt || { cat /tmp/e.txt; fail "cli-v1-subdir-message-$fs"; }
     umount "$LAYER" || fail "q-umount2-$fs"
     mount -t moobfs_layer -o lower="$LOWER",domain_depth=0,noindex none "$LAYER" || fail "q-noindex-mount-$fs"
     "$BIN/query" "$LAYER" score ge int64 10 > /tmp/noindex.txt 2>&1 && fail "query-noindex-answered-$fs"
     grep -q 'Operation not supported' /tmp/noindex.txt || { cat /tmp/noindex.txt; fail "query-noindex-errno-$fs"; }
     [ "$("$BIN/query" "$LAYER" q2errno kind exists x x)" = "q2 95" ] || fail "query2-noindex-errno-$fs"   # EOPNOTSUPP
+    "$BIN/moobfs" query "$LAYER" score ge int64 10 > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail "cli-noindex-status-$fs"
+    grep -q 'index of this mount is off' /tmp/e.txt || { cat /tmp/e.txt; fail "cli-noindex-message-$fs"; }
     f=$("$BIN/query" "$LAYER" info | sed -n 's/.* flags=\([0-9a-fx]*\) .*/\1/p')
     [ -n "$f" ] && [ $(( f & 2 )) -ne 0 ] || fail "query-noindex-flag-$fs"   # MOOB_FLAG_INDEX_OFF
     umount "$LAYER" || fail "q-umount3-$fs"
@@ -371,6 +380,42 @@ run_lower() {
     [ "$("$BIN/query" --uid 1001 "$LAYER/db" q2errno kind eq string note)" = "q2 13" ] || fail "q2-isolation-$fs"
     [ "$("$BIN/query" "$LAYER/da/sub" q2errno kind eq string note)" = "q2 25" ] || fail "q2-enotty-sub-$fs"
     [ "$("$BIN/query" "$LAYER" q2errno kind eq string note)" = "q2 25" ] || fail "q2-enotty-root-$fs"
+    # moobfs CLI (roadmap C4): as two users, equal to the oracle, paged, ordered and limited
+    clicmp() {   # uid domain tag [cli options]: the CLI's answer equals the oracle's
+        u=$1; d=$2; tag=$3; shift 3
+        "$BIN/asuid" "$u" "$BIN/moobfs" query --ino "$@" "$LAYER/$d" kind eq string note > /tmp/k.txt || fail "cli-query-$tag-$fs"
+        "$BIN/moobfs-index" --domain "$LOWER/$d" kind eq string note > /tmp/o.txt || fail "cli-oracle-$tag-$fs"
+        cmp -s /tmp/k.txt /tmp/o.txt || { echo "cli:"; cat /tmp/k.txt; echo "oracle:"; cat /tmp/o.txt; fail "cli-mismatch-$tag-$fs"; }
+    }
+    clicmp 1001 da own-a
+    clicmp 1002 db own-b
+    clicmp 1001 dshared shared-a
+    clicmp 1002 dshared shared-b
+    clicmp 1001 da paged --page 1
+    "$BIN/asuid" 1001 "$BIN/moobfs" query --ino --page 1 --order kind string desc "$LAYER/da" kind eq string note > /tmp/k.txt || fail "cli-order-$fs"
+    "$BIN/moobfs-index" --domain --order kind string desc "$LOWER/da" kind eq string note > /tmp/o.txt || fail "cli-order-oracle-$fs"
+    cmp -s /tmp/k.txt /tmp/o.txt && [ "$(wc -l < /tmp/k.txt)" -eq 4 ] || { cat /tmp/k.txt /tmp/o.txt; fail "cli-order-mismatch-$fs"; }
+    "$BIN/asuid" 1001 "$BIN/moobfs" query --ino --page 1 --limit 2 --order kind string asc "$LAYER/da" kind eq string note > /tmp/k.txt || fail "cli-limit-$fs"
+    "$BIN/moobfs-index" --domain --order kind string asc --limit 2 "$LOWER/da" kind eq string note > /tmp/o.txt || fail "cli-limit-oracle-$fs"
+    cmp -s /tmp/k.txt /tmp/o.txt && [ "$(wc -l < /tmp/k.txt)" -eq 2 ] || { cat /tmp/k.txt /tmp/o.txt; fail "cli-limit-mismatch-$fs"; }
+    "$BIN/asuid" 1001 "$BIN/moobfs" query --json "$LAYER/da" kind eq string note > /tmp/k.json || fail "cli-json-$fs"
+    grep -q '"complete": true, "count": 4,' /tmp/k.json && grep -q '"path": "sub/m1.md"' /tmp/k.json || { cat /tmp/k.json; fail "cli-json-content-$fs"; }
+    # explicit errors: another user's domain, a directory that is not a domain, no layer
+    "$BIN/asuid" 1001 "$BIN/moobfs" query "$LAYER/db" kind eq string note > /tmp/k.txt 2> /tmp/e.txt; [ $? -eq 77 ] || fail "cli-eacces-status-$fs"
+    [ ! -s /tmp/k.txt ] && grep -q 'permission denied' /tmp/e.txt || { cat /tmp/k.txt /tmp/e.txt; fail "cli-eacces-message-$fs"; }
+    "$BIN/moobfs" query "$LAYER" kind eq string note > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail "cli-root-status-$fs"
+    grep -q 'give a domain directory (1 level below' /tmp/e.txt || { cat /tmp/e.txt; fail "cli-root-message-$fs"; }
+    "$BIN/moobfs" query /tmp kind eq string note > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail "cli-nolayer-status-$fs"
+    grep -q 'is not on a moobfs_layer mount' /tmp/e.txt || { cat /tmp/e.txt; fail "cli-nolayer-message-$fs"; }
+    "$BIN/moobfs" query "$LAYER/da" kind zz string note > /dev/null 2>&1; [ $? -eq 65 ] || fail "cli-bad-terms-$fs"
+    # info: counters for root only; check runs moobfs-check
+    "$BIN/asuid" 1001 "$BIN/moobfs" info "$LAYER/da" > /tmp/k.txt 2>&1 || { cat /tmp/k.txt; fail "cli-info-user-$fs"; }
+    grep -q 'directories 1 level below' /tmp/k.txt && grep -q 'administrators only' /tmp/k.txt || { cat /tmp/k.txt; fail "cli-info-user-content-$fs"; }
+    "$BIN/moobfs" info --json "$LAYER" > /tmp/k.json || fail "cli-info-json-$fs"
+    grep -q '"domain_depth": 1,' /tmp/k.json && grep -q '"counters": {' /tmp/k.json && grep -q "\"lower_fs\": \"$fs\"" /tmp/k.json || { cat /tmp/k.json; fail "cli-info-json-content-$fs"; }
+    "$BIN/moobfs" check "$LOWER" > /tmp/k.json || { cat /tmp/k.json; fail "cli-check-$fs"; }
+    grep -q '"problems"' /tmp/k.json || { cat /tmp/k.json; fail "cli-check-output-$fs"; }
+    echo "CLI_PASS: $fs; two users equal to the oracle, paging, order, limit, JSON, info, check and explicit errors"
     "$BIN/query" "$LAYER/dshared" q2invalid | grep -q QUERY2_INVALID_REQUESTS_REFUSED || fail "q2-invalid-$fs"
     # v1 is restricted to CAP_SYS_ADMIN while domains are on (spec §4.5)
     "$BIN/query" --uid 1001 "$LAYER" kind eq string note > /tmp/k.txt 2>/dev/null && fail "q2-v1-open-to-user-$fs"
@@ -769,6 +814,18 @@ run_lower() {
     mount -t moobfs_layer -o lower="$LOWER/hostile" none "$LAYER" || fail "hostile-marker-valid-$fs"
     umount "$LAYER" || fail "hostile-marker-umount-$fs"
     rm -rf "$LOWER/hostile"
+    if [ "$fs" = ext4 ]; then
+        # moobfs CLI (roadmap C4): a build over the work allowance (E2BIG) is a temporary refusal
+        # that names the option; 1100 names against index_build_work=1024, with no layer mounted
+        # while the tree is written
+        mkdir -p "$LOWER/cliwork/big" || fail "cli-work-mkdir"
+        i=0; while [ $i -lt 1100 ]; do : > "$LOWER/cliwork/big/f$i" || fail "cli-work-files"; i=$((i + 1)); done
+        mount -t moobfs_layer -o lower="$LOWER/cliwork",index_build_work=1024 none "$LAYER" || fail "cli-work-mount"
+        "$BIN/asuid" 1001 "$BIN/moobfs" query "$LAYER/big" kind eq string note > /dev/null 2> /tmp/e.txt; [ $? -eq 75 ] || { cat /tmp/e.txt; fail "cli-e2big-status"; }
+        grep -q 'index_build_work' /tmp/e.txt || { cat /tmp/e.txt; fail "cli-e2big-message"; }
+        umount "$LAYER" && rm -rf "$LOWER/cliwork" || fail "cli-work-cleanup"
+        echo "CLI_E2BIG_PASS"
+    fi
     # A btrfs subvolume inside the tree numbers its files from the start again, so two files
     # could share one index record: the layer refuses to enter it and the scan leaves it out.
     if [ "$fs" = btrfs ]; then
@@ -1926,6 +1983,8 @@ umount "$LAYER" && umount "$LOWER" || fail "xr-unmount"
 echo "XATTRREAD_PASS: EIO/ENOMEM build errors, retry, adoption rebuild and ENODATA race"
 fi
 rmmod moobfs_layer || fail layer-unload
+"$BIN/moobfs" query /tmp kind eq string note > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail cli-unloaded-status
+grep -q 'module is not loaded' /tmp/e.txt || { cat /tmp/e.txt; fail cli-unloaded-message; }
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
 # the layer; the initramfs harness has no KCSAN and keeps the plain grep
 if command -v kdiag > /dev/null 2>&1; then

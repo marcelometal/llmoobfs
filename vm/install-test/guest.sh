@@ -45,7 +45,7 @@ phase1() {
 	mark "LISTED_KERNEL: $(uname -r)"
 	cd "$SRC"
 	make install >install.log 2>&1 || { tail -n 20 install.log; fail "make install"; }
-	mark "INSTALLED: $(ls /lib/modules/$KVER/updates/moobfs/) $(echo /usr/local/bin/moobfs-*)"
+	mark "INSTALLED: $(ls /lib/modules/$KVER/updates/moobfs/) $(echo /usr/local/bin/moobfs*)"
 	if make install >install-again.log 2>&1; then fail "second install overwrote without FORCE"; fi
 	grep -q 'exists; uninstall first' install-again.log || fail "second install: unexpected message"
 	mark "OVERWRITE_REFUSED"
@@ -72,6 +72,13 @@ phase1() {
 	if as bob ls /srv/memory/alice 2>/dev/null; then fail "bob listed alice's directory"; fi
 	if as bob sh -c 'echo x > /srv/memory/alice/x' 2>/dev/null; then fail "bob wrote in alice's directory"; fi
 	mark "USERS_ISOLATED: alice reads and tags her note; bob cannot read, list or write"
+	[ "$(as alice moobfs query /srv/memory/alice kind eq string decision)" = note.md ] ||
+		fail "alice's query"
+	rc=0
+	as bob moobfs query /srv/memory/alice kind eq string decision >/dev/null 2>&1 || rc=$?
+	[ "$rc" -eq 77 ] || fail "bob's query: exit $rc, not 77"
+	moobfs info /srv/memory | grep -q 'directories 1 level below /srv/memory' || fail "moobfs info"
+	mark "CLI_QUERY: alice finds her note through the index; bob is refused with exit 77"
 	if as alice ln -s note.md /srv/memory/alice/link 2>/dev/null; then fail "nolinks did not refuse"; fi
 	mark "NOLINKS_REFUSED"
 	if as bob cat /srv/moobfs/lower/alice/note.md 2>/dev/null; then fail "lower reachable by a user"; fi
@@ -129,7 +136,7 @@ EOF
 	rmmod moobfs_layer
 	make uninstall >uninstall.log 2>&1 || { cat uninstall.log; fail "make uninstall"; }
 	if modinfo moobfs_layer >/dev/null 2>&1; then fail "module still installed"; fi
-	[ ! -e /usr/local/bin/moobfs-attr ] || fail "tools still installed"
+	[ ! -e /usr/local/bin/moobfs-attr ] && [ ! -e /usr/local/bin/moobfs ] || fail "tools still installed"
 	mark "UNINSTALLED"
 	getfattr -d -m '^user\.moob\.' /srv/moobfs/lower/alice/note.md | grep -q '^user.moob.kind=' ||
 		fail "attribute not on the lower"

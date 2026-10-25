@@ -69,6 +69,7 @@ ou arquivos comuns são a melhor escolha ([when-not-to-use.md](docs/when-not-to-
 | --- | --- | --- |
 | Ver funcionando numa VM descartável; nada é instalado na sua máquina | Docker; 7 a 8 minutos num runner x86-64, mais no Apple Silicon | [Experimente numa VM](#experimente-numa-vm) |
 | Instalar num host de teste dedicado, montar no boot, dar diretórios aos usuários | Debian 13 com kernel `6.12.111+deb13-amd64`, root, Secure Boot desligado | [docs/operations.md](docs/operations.md) (em inglês) |
+| Consultar pelo terminal ou por um script | O comando `moobfs`, instalado pelo guia do host de teste: `moobfs query <domínio> kind eq string decision` | [docs/tools.md](docs/tools.md#moobfs) (em inglês) |
 | Usar a partir do seu programa | Arquivos, `setxattr` e um ioctl; ainda sem biblioteca | [client-contract.md](docs/client-contract.md) |
 
 ## Quatro números

@@ -1,0 +1,103 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.Dd October 25, 2026
+.Dt MOOBFS 1
+.Os
+.Sh NAME
+.Nm moobfs
+.Nd query and inspect a mounted MoobFS layer
+.Sh SYNOPSIS
+.Nm
+.Cm info
+.Op Fl -json
+.Ar path
+.Nm
+.Cm query
+.Op Fl -json
+.Op Fl -ino
+.Op Fl -order Ar name type Cm asc | desc
+.Op Fl -limit Ar N
+.Op Fl -page Ar N
+.Ar directory
+.Op Ar term ...
+.Nm
+.Cm check
+.Op Ar moobfs-check-argument ...
+.Sh DESCRIPTION
+.Nm
+answers attribute queries from the MoobFS layer's index and reports the state of a mount.
+It uses the existing ioctls and tools; it adds no kernel interface.
+MoobFS is an experimental research project.
+.Bl -tag -width Ds
+.It Cm info
+finds the moobfs_layer mount that holds
+.Ar path
+and prints what GET_INFO reports on its root: lower filesystem, interface versions, whether the
+index is on, the domain depth, the index budget and build work, the attribute limits, and for an
+administrator the index counters.
+.It Cm query
+asks QUERY2 on a domain
+.Ar directory
+and follows the cursor until the answer is complete, printing one path per line, relative to
+.Ar directory .
+On the root of a mount without domains it asks the mount-wide QUERY, which has no cursor.
+Without
+.Fl -order
+the results are sorted by inode number.
+.It Cm check
+runs
+.Xr moobfs-check 1
+with the remaining arguments.
+.El
+.Pp
+A
+.Ar term
+is four words,
+.Dq name op type value ,
+up to four terms joined by AND; op is one of
+.Cm eq , lt , le , gt , ge , prefix
+or
+.Cm exists ,
+whose type and value are given as
+.Dq - .
+An operator ending in
+.Sq \&?
+also matches files without the attribute.
+Types are
+.Cm string , int64 , double , bool
+and
+.Cm time .
+.Bl -tag -width Ds
+.It Fl -json
+print one JSON object
+.It Fl -ino
+prefix each path with its inode number and a tab
+.It Fl -order Ar name type Cm asc | desc
+return the files whose
+.Ar name
+attribute has
+.Ar type ,
+ordered by its value and inode number; terms may then be empty
+.It Fl -limit Ar N
+stop after
+.Ar N
+results
+.It Fl -page Ar N
+results per call, 1 to 4096 (default 4096)
+.El
+.Sh EXIT STATUS
+0 on success; 1 a system call failed; 3 the mount-wide query had more results than it can
+return; 64 usage; 65 invalid terms or a query the kernel refused; 69 no layer there, a directory
+that is not a domain, or the index off; 75 a temporary refusal (index budget, build limits, a
+domain that kept changing); 77 permission denied.
+The message on standard error names the cause.
+.Sh EXAMPLES
+.Dl $ moobfs info /srv/memory
+.Dl $ moobfs query /srv/memory/alice kind eq string decision
+.Dl $ moobfs query --order created time desc --limit 10 /srv/memory/alice
+.Sh SEE ALSO
+.Xr moobfs-attr 1 ,
+.Xr moobfs-check 1 ,
+.Xr moobfs-index 1
+.Pp
+docs/tools.md and docs/operations.md in the MoobFS repository,
+.Lk https://github.com/studiomoob/llmoobfs

@@ -63,6 +63,7 @@ then ([when-not-to-use.md](docs/when-not-to-use.md)).
 | --- | --- | --- |
 | Watch it run in a disposable VM; nothing is installed on your machine | Docker; 7 to 8 minutes on an x86-64 runner, longer on Apple Silicon | [Try it in a VM](#try-it-in-a-vm) |
 | Install it on a dedicated test host, mount it at boot, give users their directories | Debian 13 with kernel `6.12.111+deb13-amd64`, root, Secure Boot off | [docs/operations.md](docs/operations.md) |
+| Query it from the shell or a script | The `moobfs` command, installed by the test-host guide: `moobfs query <domain> kind eq string decision` | [docs/tools.md](docs/tools.md#moobfs) |
 | Use it from your own program | Files, `setxattr` and one ioctl; no library yet | [client-contract.md](docs/client-contract.md) |
 
 ## Four numbers
