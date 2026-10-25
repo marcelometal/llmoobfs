@@ -26,7 +26,7 @@
 #   buildcostlarge      optional 7500-file scale of the same probe (not in the full suite)
 #   builddenial         optional 17000-file cold QUERY2 cost with/without work cap
 #   buildclient         optional 6000-file, six-attribute domain shape from client scale
-#   buildcostevict      optional two-uid index-budget eviction probe (#118)
+#   buildcostevict      optional two-uid budget probe: the second uid gets ENOMEM (ADR-0021)
 #   buildlimit          optional QUERY2 work and admission limit regression (#118)
 #   buildwork           optional per-mount query-build work policy regression (#118)
 #   buildtime           optional cooperative scan-deadline regression (#118)
@@ -1676,8 +1676,9 @@ echo "BUILD_COST_OBSERVED: files=$bc_files one first build, seven rename rebuild
 fi
 if [ -n "${MOOB_ONLY:-}" ] && want buildcostevict; then
 # Two private domains belong to different users. Size the shared budget from
-# one measured domain so either fits alone but not together. QUERY2 by uid 1002
-# must be able to release uid 1001's built domain, forcing uid 1001 to rebuild.
+# one measured domain so either fits alone but not together. uid 1002's QUERY2
+# must fail with ENOMEM and must not release uid 1001's domain (ADR-0021).
+# uid 1001's following query must not rebuild.
 mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bce-lower-mount
 mkdir -p "$LOWER/bce/a/s" "$LOWER/bce/b/s" || fail bce-directories
 "$BIN/overbudget-race" plant "$LOWER/bce/a/s" 1000 || fail bce-plant-a
@@ -1698,17 +1699,16 @@ bce_releases() { "$BIN/query" "$LAYER" info | sed -n 's/.*domain_releases=\([0-9
 bce_before=$(bce_builds)
 "$BIN/query-build-cost" "$LAYER/a" 1001 first-user || fail bce-first-user
 [ "$(bce_builds)" -eq $((bce_before + 1)) ] || fail bce-first-build
-"$BIN/query-build-cost" "$LAYER/b" 1002 second-user || fail bce-second-user
-[ "$(bce_builds)" -eq $((bce_before + 2)) ] || fail bce-second-build
-[ "$(bce_releases)" -ge 1 ] || fail bce-first-release
+"$BIN/query-build-cost" "$LAYER/b" 1002 second-user expect-enomem || fail bce-second-user
+[ "$(bce_builds)" -eq $((bce_before + 1)) ] || fail bce-second-built
+[ "$(bce_releases)" -eq 0 ] || fail bce-cross-user-release
 "$BIN/query-build-cost" "$LAYER/a" 1001 first-user-again || fail bce-first-user-again
-[ "$(bce_builds)" -eq $((bce_before + 3)) ] || fail bce-rebuild-a
-[ "$(bce_releases)" -ge 2 ] || fail bce-second-release
-[ "$(grep ' moobfs_domain_release: ' "$TR/trace" | grep -c ' by=budget ')" -ge 2 ] || fail bce-budget-trace
-grep ' moobfs_domain_release: ' "$TR/trace" | sed 's/^.* moobfs_domain_release: /QUERY_BUILD_RELEASE /'
+[ "$(bce_builds)" -eq $((bce_before + 1)) ] || fail bce-rebuilt-a
+[ "$(bce_releases)" -eq 0 ] || fail bce-still-released
+[ "$(grep ' moobfs_domain_release: ' "$TR/trace" | grep -c ' by=budget ')" -eq 0 ] || fail bce-budget-trace
 tr_off moobfs_domain_build moobfs_domain_release
 umount "$LAYER" && rm -rf "$LOWER/bce" && umount "$LOWER" || fail bce-cleanup
-echo "BUILD_COST_CROSS_USER_EVICTION: 3 builds and at least 2 budget releases across uids 1001 and 1002; budget=$bce_budget"
+echo "BUILD_COST_CROSS_USER_HELD: uid 1002 got ENOMEM; uid 1001 stayed built; budget=$bce_budget"
 fi
 if [ -n "${MOOB_ONLY:-}" ] && want builddenial; then
 # Compare the same cold 17,000-file QUERY2 with the pre-limit and limited

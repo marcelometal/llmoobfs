@@ -67,3 +67,21 @@ documents, checked their explicit heading anchors, and confirmed all six G-items
 and the implementation gate are present.
 No kernel, VM, retrieval, restore or performance tests are claimed.
 Next: review the concrete roadmap locally; implementation remains deferred.
+
+## Follow-up, 2026-10-24
+
+The maintainer accepted a first evolution batch limited to the evaluation
+protocol and the G1 scope. [Journal 0188](0188-g6-protocol-and-g1-scope.md)
+records it. The planning status of this journal is unchanged: the packages
+themselves stay unstarted.
+
+## Follow-up, 2026-10-24 evening
+
+The G1 mounted gate has since passed (journal 0189). That does not change
+the planning record above. G3, G4, G5 and the G6 final evaluation stay
+unstarted.
+
+## Follow-up, 2026-10-24 evening — G3
+
+The identity-map restore drill has since passed (journal 0190). G4, G5 and
+the G6 final evaluation stay unstarted. G2 stays with S9.

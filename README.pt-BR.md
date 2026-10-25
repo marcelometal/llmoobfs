@@ -457,14 +457,27 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   foram testados em árvores pequenas (diário 0101).
 - `index_budget` não limita CPU nem E/S no sistema de arquivos inferior durante uma construção.
   Uma medição delimitada em KVM nativo do módulo atual observou 160 KiB e 1,90 MiB de leituras
-  nas primeiras consultas de domínios ext4 com 1.000 e 7.500 arquivos; a consulta de um uid
-  também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
-  compartilhado pequeno ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  nas primeiras consultas de domínios ext4 com 1.000 e 7.500 arquivos
+  ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  Uma prova posterior no host impede que uma consulta libere um domínio
+  construído por outro uid de sistema de arquivos. Se o restante livre do
+  orçamento compartilhado for pequeno demais, a consulta devolve `ENOMEM` e
+  deixa o outro domínio construído
+  ([ADR-0021](docs/decisions/0021-budget-release-keeps-the-builders-domain.md),
+  [diário 0192](docs/history/0192-same-fsuid-budget-release.md)).
+  Um uid ainda pode ocupar o orçamento inteiro ao liberar os próprios domínios.
+  Não há fração reservada por usuário.
   São observações delimitadas, não uma garantia de latência. A `main` contém
   limites experimentais de trabalho e frequência de reconstrução
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
   eles não são um teto estrito de tempo de CPU ou bytes de E/S. As suítes locais
-  de VM e KASAN e os onze checks do PR passaram. Uma VM KVM separada no Mac
+  de VM e KASAN e os onze checks do PR passaram para esse limite anterior.
+  A regressão de host da ADR-0021 passou, e a prova nativa de KVM desse passo
+  também passou no host dedicado. Os passos `release`, `overbudget` e
+  `buildcostevict` também passaram lá sob KASAN, UBSAN e lockdep. A suíte
+  completa de KASAN, UBSAN e lockdep desta mudança depois saiu 0
+  (`MOOBFS_KASAN_PASS`). A suíte nativa de KVM completa desta mudança não
+  rodou. Uma VM KVM separada no Mac
   mini repetiu a carga bulk de 60 mil páginas do estágio 2 do cliente em dez domínios com este limite;
   as 60 comparações de resposta entre SQLite e QUERY2 concordaram. Essa
   rodada não mediu escrita via MCP, espelhamento em tempo real nem latência.

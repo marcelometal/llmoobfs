@@ -207,3 +207,8 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0185 — Query-build policy at larger domains and delayed lower I/O; measurement complete](0185-query-build-policy-scale.md)
 - [0186 — Real ai-memory MCP workload with the issue-118 guard; bounded run complete](0186-issue118-real-client-mcp.md)
 - [0187 — Per-mount query-build work policy (approved for PR, CI pending)](0187-query-build-work-mount-policy.md)
+- [0188 — G6 evaluation protocol and the G1 scope, before any package](0188-g6-protocol-and-g1-scope.md)
+- [0189 — G1 adapter package; mounted gate passed the same evening](0189-g1-adapter-package.md)
+- [0190 — G3 identity-map restore drill passed](0190-g3-restore-drill.md)
+- [0191 — G2 eviction baseline recorded, fair share not implemented](0191-g2-eviction-baseline.md)
+- [0192 — Budget release stays with the builder's filesystem uid](0192-same-fsuid-budget-release.md)

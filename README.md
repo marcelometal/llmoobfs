@@ -435,14 +435,26 @@ KASAN harness runs the layer suite), and no benchmark exists.
   trees only (journal 0101).
 - `index_budget` does not cap the CPU or lower-filesystem I/O of a build.
   A bounded native-KVM probe of the current module observed 160 KiB and
-  1.90 MiB of reads on first queries of 1,000- and 7,500-file ext4 domains;
-  a query by one uid also evicted another uid's built private domain under a
-  small shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  1.90 MiB of reads on first queries of 1,000- and 7,500-file ext4 domains
+  ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+  A later host drill stops a query from releasing a domain last built by
+  another filesystem uid. If the free remainder of the shared budget is too
+  small, that query returns `ENOMEM` and leaves the other domain built
+  ([ADR-0021](docs/decisions/0021-budget-release-keeps-the-builders-domain.md),
+  [journal 0192](docs/history/0192-same-fsuid-budget-release.md)).
+  One uid can still occupy the whole budget by releasing that uid's own
+  domains. There is no reserved per-user fraction.
   These are bounded observations, not a latency guarantee. `main` includes
   experimental work and rebuild-frequency limits
   ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md));
   they are not a strict CPU-time or I/O-byte cap. The local VM and KASAN suites
-  and all eleven PR checks passed. A separate Mac mini KVM guest replayed the
+  and all eleven PR checks passed for that earlier guard. ADR-0021's host
+  regression passed, and its opt-in native-KVM probe passed on the dedicated
+  host. The steps `release`, `overbudget` and `buildcostevict` also passed
+  there under KASAN, UBSAN and lockdep. The complete KASAN, UBSAN and lockdep
+  suite of this change then exited 0 (`MOOBFS_KASAN_PASS`). The complete
+  native-KVM suite of this change was not run.
+  A separate Mac mini KVM guest replayed the
   60,000-page stage-2 bulk client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
   answer checks agreed. That run did not test MCP writes, a live mirror or
   latency. A valid 17,000-file domain was denied with `E2BIG` under the

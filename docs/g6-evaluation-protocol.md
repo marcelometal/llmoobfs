@@ -1,0 +1,388 @@
+# G6 evaluation protocol and the G1 scope
+
+Date: 2026-10-24. Status: protocol and scope, written before any run of this
+batch. The G3 drill is specified here and not started. No number below was
+measured for this protocol.
+
+Implementation note, 2026-10-24 (journal [0189](history/0189-g1-adapter-package.md)):
+the adapter package is `bench/client/langgraph_store.py` with host checks in
+`bench/client/g1_protocol.py`. The mounted gate in sections 5 and 6 passed the
+same evening on the dedicated Debian host, ext4, kernel `6.12.111+deb13-amd64`.
+The pass, the counters and the limits are in that journal's evening follow-up.
+No latency, memory or relevance ceiling was added. The G3 identity-map drill
+in section 8 passed later the same evening (journal
+[0190](history/0190-g3-restore-drill.md)).
+
+This is the method required by [ROADMAP](../ROADMAP.md) item G6 before a
+client package is built. It extends the measurement rules of
+[benchmark-plan](benchmark-plan.md) and journal
+[0134](history/0134-measurement-method-review.md). It does not replace the
+M4 pilot, and those pilot results are not fresh evidence for this batch.
+Journal [0188](history/0188-g6-protocol-and-g1-scope.md) records the decision.
+
+The preselected objective for the G1 package is a reduction in integration
+burden, counted below. A speed win is not the objective. Latency may be
+reported later only under the rules in section 7, and a latency figure cannot
+pass or fail G1.
+
+## 1. What is fixed, and what stays unbound
+
+Fixed before any implementation run, and not to be edited after results are
+seen:
+
+- the client, the reference store, the corpus, the two OS identities, the
+  filter shapes, the selectivity of the timed filter, the repetition rule and
+  the G1 pass/fail counts in sections 3 to 6;
+- the G3 recovery bounds in section 8.
+
+Left unbound on purpose. A package that needs one of these cannot be declared
+passed until a dated amendment sets the number **before** the run that uses it:
+
+- any latency or memory ceiling;
+- a G2 contention bound;
+- a freshness bound for a derived index (G4);
+- a relevance floor, recall@k or nDCG (G5 and the G6 final evaluation).
+
+An amendment is a new dated section of this file plus a journal entry. It does
+not rewrite the bounds already fixed.
+
+## 2. What this batch does not change
+
+No kernel interface, disk format, mount option or attribute encoding. No new
+query operator. Projection stays the accepted and unimplemented ADR-0014.
+Richer SQL stays ADR-0013 and is not this package: the adapter keeps calling
+`QUERY2` directly. S9 fair sharing and the issue 118 resource limits stay on
+their own track. Algorithm experiments in
+[research-algorithm-fit](research-algorithm-fit.md) stay unstarted.
+
+Client-specific behavior stays in the adapter. A need that appears only for
+this client does not change `layer/` or the UAPI.
+
+## 3. Client and reference
+
+The one client of this batch is the LangGraph store interface (`BaseStore`),
+through the existing adapter `bench/client/langgraph_store.py`. It is the
+second client named in the [client contract](client-contract.md) section 9
+and journal [0089](history/0089-second-client-langgraph-adapter.md).
+ai-memory remains evidence of another client. It is not the design target of
+this package.
+
+Pinned reference, the same versions already recorded in
+[references](references.md): langgraph 1.2.15 and langgraph-checkpoint 4.3.0.
+The oracle for answer equality is LangGraph's `InMemoryStore`, compared as
+sets where that store promises no order. The Python of the guest is recorded
+in the run's `environment.txt`. If those pins do not install, the run is
+blocked. It is not a pass and not a reason to change the pin after the fact.
+
+The lower filesystem for this gate is ext4. btrfs and XFS stay covered by the
+module suite and are not required to close G1.
+
+## 4. Workload
+
+Prepared by the test, then used by the adapter. Seed 1. `domain_depth=1`.
+Group `moobteam` contains uid 1001 and uid 1002.
+
+| Domain | Owner : group | Directory mode | Files the adapter creates | Count |
+| --- | --- | --- | --- | --- |
+| `alice` | 1001 : 1001 | `0700` | `0600`, same owner | 1 000 |
+| `bob` | 1002 : 1002 | `0700` | `0600`, same owner | 1 000 |
+| `team` | root : `moobteam` | `2770` | `0664`, publisher uid, group `moobteam` | 5 000 |
+
+The shared directory is setgid so new files keep `moobteam`. The adapter used
+to create every file `0600`. That mode is more private than `team` and the
+homogeneity rule then omits the file from every `QUERY2`, which is the failure
+journal 0089 already hit. `reach_ok` indexes a file that shares the domain
+directory's owner and group, or a file readable by owner, group and other. The
+owner of `team` is root. Uid 1001 cannot give a file that owner, so a `0660`
+file planted by uid 1001 stays out of the index: the first mounted run returned
+zero `team` hits for that reason. The package adds other-read when the
+publisher is not the domain owner. The `team` files of this corpus are therefore
+`0664`, owned by the publisher, group `moobteam`. A publisher who is already
+the domain owner, including both private domains and the host check, still
+creates `0600` or `0660` from the directory classes. Modes are set on the
+descriptor. The test creates the three domain directories before the adapter
+runs, so the adapter does not recreate them with another mode.
+
+One extra file, `team/salary.json`, is planted outside the adapter: owner
+1002, mode `0600`. It is not one of the 5 000. The homogeneity rule leaves it
+out of `team`'s index for every caller, including uid 1002 and root. Uid 1002
+can still read it by path. Uid 1001 cannot.
+
+Each of the 7 000 adapter files is one JSON memory. The value has four
+top-level scalars and no other indexed field:
+
+- `kind`: one of `decision`, `note`, `task`, `fact`, `plan`, `event`, `ref`,
+  `log`, in exact equal counts (125 in each private domain, 625 in `team`);
+- `flag`: bool, exactly half `true`;
+- `score`: a double with two decimal digits, assigned independently of `kind`;
+- `note`: a short string that is not queried.
+
+`Random(1)` only shuffles which item receives which quota slot. The timed
+filter is `kind` equal to `decision`. Its selectivity is 625/5000 = 0.125 on
+`team` and 125/1000 = 0.125 on a private domain, by construction. A generator
+that does not hit those counts is rejected before any query. That check is a
+property of the fixture, not a performance result.
+
+Namespace labels are the domain names, one label deep, so every file sits in
+its domain. Keys are `m00000` upward, stable for a seed.
+
+### Filter shapes
+
+The equality run covers the twelve shapes of journal 0089, all pages:
+
+1. string equality on `kind`;
+2. bool equality on `flag`;
+3. `score` greater than 0.5;
+4. `score` greater or equal to 0.5;
+5. `score` less than 0.5;
+6. `score` less or equal to 0.5;
+7. `$ne` on `kind`;
+8. `kind` and `flag` together;
+9. a list value;
+10. a nested object;
+11. a key that is not a valid attribute name;
+12. a missing field.
+
+Shapes 1 to 6 and 8 are pushed to `QUERY2` when the adapter can express them,
+within four terms. Shapes 7 and 9 to 12 stay post-filtered in the adapter.
+Both groups must match the oracle. Post-filtering is not kernel support, and
+it is not a permission check.
+
+### Paging, concurrency, repetitions
+
+`team` has 5 000 files. One `QUERY2` call returns at most 4 096 results, so a
+search that matches the whole domain must issue at least two `QUERY2` calls
+and follow the cursor. A client search with limit 100 must return 100 items,
+and the next search with offset 100 the following 100, in the adapter's
+documented order (newest first). The union of the pages equals the oracle.
+Client offset may slice a result set the kernel cursor has already completed.
+Pushing offset into the kernel is not required.
+
+Correctness is deterministic for seed 1. One complete run judges the
+zero-difference checks. Thirty repetitions apply only when a latency
+difference is reported (section 7).
+
+Concurrency, recorded and not a freshness bound: while uid 1002 publishes 30
+new files in `team`, uid 1001 runs 30 searches there. Two publishers of the
+same key are last-rename-wins. Each final name is one complete file. The
+report lists any search that missed an in-flight file. That miss does not
+fail G1. There is no second writer inside `alice` or `bob`.
+
+## 5. Baselines
+
+| Question | Oracle | Pass condition |
+| --- | --- | --- |
+| Do supported searches match the reference store? | `InMemoryStore` at the pinned version | 0 item differences, every shape, every page |
+| Is the private file outside the domain index? | `QUERY2` as uid 1001, uid 1002 and root on `team` | `salary.json` absent for all three; uid 1001's `open` fails; uid 1002's `open` by path succeeds |
+| Can a caller who cannot see the mount root still search? | the same search with the mount root visible | same result set; detection uses `statfs` on the domain only |
+| Does the no-module fallback respect the caller's access? | every matching file that uid can `open` | 0 paths the uid cannot open |
+
+The mount-root case is prepared as root, then run as uid 1001 inside a mount
+namespace whose root is a bind mount of `alice`. The process has no path to
+the moobfs mount root. `statfs` on the domain returns magic `0x4d4f4f42`.
+Opening the mount root is not required and must not be added as a requirement.
+
+Fallback is for a directory whose `statfs` magic is not the layer, and for an
+ioctl that fails because the module is absent. It walks only names the caller
+can open. It may return `salary.json` to uid 1002, who can read it, even
+though `QUERY2` omits that file. That difference is documented. It is not a
+failure. Fallback must not return `salary.json` to uid 1001.
+
+A resource refusal is not a fallback. `ENOMEM`, `E2BIG`, `ETIMEDOUT` and
+`EDQUOT` from `QUERY2` fail the search. The caller receives the error and no
+list. A short successful list after one of those errors fails the case.
+
+## 6. Bounds that pass or fail G1
+
+All of the following are required. One miss fails the package.
+
+**Burden.** Counted by reading the adapter and the data directory after the
+run. The JSON body may repeat the scalars that are also typed attributes.
+That repetition is the file. It is not a second store.
+
+| Id | Count | Bound |
+| --- | --- | --- |
+| B1 | files created that are not the memory `.json`, a `.tmp.*` publication temporary, or a namespace directory | 0 |
+| B2 | functions that, on put, update anything other than that file and its `user.moob.*` attributes | 0 |
+| B3 | uses of `access`, mode bits or ACLs to drop a result the kernel already returned | 0 |
+| B4 | side databases or side indexes in the data directory | 0 |
+
+Post-filtered value predicates are counted apart from B3 and may be non-zero.
+
+**Answers.** Zero differences against `InMemoryStore` on the twelve shapes,
+including both pages of a `team` search wider than 4 096 results, and both
+client pages of limit 100.
+
+**Publication.** The adapter keeps the contract order: temporary file in the
+same directory, content, typed attributes, `fsync` the file, `rename` over the
+final name, `fsync` the directory. A test runs each prefix of that sequence
+and then inspects the directory. Before `rename`, the final name is absent or
+still the previous complete file. After `rename`, the final name is the new
+complete file: the bytes and the typed attributes of that publication, not a
+mix of two publications. A crash after `rename` and before the directory
+`fsync` may leave either the new complete name or the previous one. It must
+not leave a mix. This prefix test is the G1 crash gate. It does not replace
+the module's existing power-loss replay and does not claim a new one.
+
+**Sequential freshness.** After a put returns, a search by the same uid in the
+same process sees the item. After a delete of ten known keys returns, a search
+does not see them. Zero misses, zero leftovers, in that scripted order only.
+
+**Capability and errors.**
+
+- The confined uid 1001 completes a search of `alice` without a descriptor of
+  the mount root.
+- With the module not mounted, fallback matches the open-oracle of section 5.
+- Heterogeneous `salary.json` stays out of every `team` search while the
+  module is mounted.
+- Budget drill, separate mount, `index_budget=1M` (the minimum the module
+  accepts), 5 000 files, eight typed attributes, ext4. The sizing uses the
+  historical accounting of about 530 to 607 bytes per file in journal
+  [0088](history/0088-m4-report.md), which is not a measurement of the current
+  module. If the first search returns `ENOMEM`, `E2BIG`, `ETIMEDOUT` or
+  `EDQUOT` and the adapter reports that failure with no list, the case passes.
+  If those 5 000 files fit, the case does not pass and the file count is not
+  raised or lowered after the fact. A later amendment may choose a larger
+  count before another run. The main corpus uses the default budget. If that
+  corpus itself returns a resource error, the run is an invalid environment,
+  not a product pass or fail.
+
+**Operations the package documents and does not pretend to support as kernel
+queries:** `$ne`, lists, nested objects, invalid attribute names, client
+offset as a kernel cursor, and concurrent publishers of one key. Disjunctions,
+counts and full-text stay outside the adapter, as the client contract already
+says.
+
+## 7. What is recorded and cannot pass or fail G1
+
+After the cold build of `team` and after the warm searches, record as root
+`index_budget`, `index_used` and `index_inodes` from `GET_INFO`, and the
+searching process's `VmHWM`. No ceiling is set. A memory number cannot close
+G1 or G6.
+
+Warm p50, p95 and p99 of the selective `kind` search and of put may be
+recorded. A comparison against the no-module fallback, or any claim that one
+side is faster, uses a KVM guest, CPU frequency held still, at least 30
+repetitions, order alternated, and `bench/compare.py` as journal 0134
+requires: relative difference of medians, 95% bootstrap interval, Mann-Whitney
+U. Fewer than 30 repetitions, or a run under emulation, is exploratory and
+claims no difference. The spread rule of the benchmark plan remains a
+stability flag, not evidence. SQLite is not the G1 baseline. Where an older
+report compares with SQLite, that engine does not perform the POSIX check the
+layer does.
+
+No relevance number is reported. There is no labeled question set in this
+batch.
+
+## 8. G3 bounds
+
+The identity-map drill passed on 2026-10-24 (journal
+[0190](history/0190-g3-restore-drill.md)), on the G1 ext4 corpus. A
+non-identity UID map stays out of scope. The bounds below are the ones that
+run used.
+
+The recovery unit is the file bytes, every `user.moob.*` attribute
+byte-for-byte, and the numeric owner, group, mode and POSIX ACL. The UID/GID
+map of this drill is identity. A non-identity map is out of scope.
+
+The drill uses the same three domains and the private file. It does not need
+the G1 adapter: a fixture may plant the tree. The copy tool is
+`rsync -aHAX --numeric-ids` from the lower tree, which is the command already
+named in [distribution strategy](distribution-strategy.md) section 2.7. No new
+archive format. The user-facing step is a script that exits without writing
+when the destination is not empty. Raw rsync remains the mechanism inside that
+script.
+
+Pass, all required:
+
+- content hashes, typed-attribute bytes, owner, group, mode and ACLs match
+  under the identity map;
+- after mount, `QUERY2` answers and denials for uid 1001 and uid 1002 match
+  the pre-restore oracle, and `salary.json` is still absent from `team`
+  searches;
+- `moobfs-check` exits 0 on the restored tree;
+- with the module unmounted, `cat` and `getfattr` still read the restored tree;
+- one typed attribute with an illegal type byte is detected (`moobfs-check`
+  exit 2), not accepted as a complete memory;
+- `user.moob.format` on the lower root set above `MOOB_ATTR_FORMAT_VERSION`
+  (1 in the current header) makes the mount fail;
+- a second run onto a non-empty destination does not replace an existing file.
+
+An absent optional attribute is not the defect case. The format allows absence.
+
+## 9. G2 fairness property, registered before a mechanism
+
+G2 stays with S9. ADR-0019 bounds how much work one domain build may do and
+how often an unprivileged uid may start one. It does not split `index_budget`.
+On the module recorded in journal 0191, when a build did not fit,
+`domain_release` dropped the least recently queried built domain of any
+user. That was the cross-user eviction finding F2 left open.
+
+The property a later implementation must meet, on ext4, with two unprivileged
+uids and `domain_depth=1`:
+
+- A build charged to uid 1002 does not release a domain built for uid 1001.
+  The following search by uid 1001 returns the same answers, and
+  `domain_builds` does not increase because of that search.
+- If uid 1002's build does not fit in the budget without releasing uid 1001,
+  the search returns `ENOMEM`, `E2BIG`, `ETIMEDOUT` or `EDQUOT`, with no
+  result list. Uid 1001's domain stays built.
+- One uid may still use the whole `index_budget`, including by releasing
+  that same uid's other domains. Fairness does not disable release.
+- No latency number is a pass or a fail. p50, p95 and p99 may be recorded
+  under the method of section 7. A latency ceiling is not set, so G2 cannot
+  pass as a completed roadmap item. This property is necessary and not
+  sufficient. The share algorithm is not chosen in the property above.
+
+`bench/client/g2_baseline.py` records the module before the filter. Its
+output is evidence of that module. It is not a pass of the property. Journal
+[0191](history/0191-g2-eviction-baseline.md) records the 2026-10-24 run:
+with `index_budget=1M` and 2 000 files in each domain, the second build
+released the first domain, both across the two uids and within one uid.
+Each search still returned its 2 000 answers. Only one domain stayed built.
+
+Implementation note, 2026-10-25
+([ADR-0021](decisions/0021-budget-release-keeps-the-builders-domain.md),
+journal [0192](history/0192-same-fsuid-budget-release.md)): a budget
+release may drop only a domain last built by the same filesystem uid. If
+the remainder is too small, the search returns `ENOMEM` and leaves the
+other uid's domain built. The shrinker is unchanged and may still drop any
+idle domain. One uid may still fill the budget. There is no reserved
+fraction. `bench/client/g2_share.py` is the regression. On the dedicated
+Debian host it exited 2 on the previous module and exited 0 after the
+filter. The latency ceiling stays unset, so G2 still cannot pass as a
+completed roadmap item. Later the same morning the opt-in native-KVM
+step passed on the dedicated host and failed on the pre-filter module.
+`release`, `overbudget` and `buildcostevict` then passed under KASAN,
+UBSAN and lockdep. The complete KASAN, UBSAN and lockdep suite of this
+change then exited 0 (`MOOBFS_KASAN_PASS`). The complete native-KVM suite
+of this change was not run.
+
+## 10. Still unbound
+
+G4's freshness bound and G5's recall floor are not set, so those items and
+the G6 final evaluation cannot pass yet. The final evaluation, when those
+amendments exist, is still one real client, two OS identities, private and
+shared domains, and the same search engine over plain files plus a
+user-space metadata index. Negative results are published. Existing M4
+pilots are not that evaluation.
+
+## 11. Order
+
+The G1 package is the next implementation unit of this track. G3's drill
+follows that scope and does not wait for G1 to run, because a fixture can
+plant the tree. This document does not start either one. G2 stays with S9.
+G4 and G5 wait on G1 and on their own amendments.
+
+Evening note, 2026-10-24: the G1 mounted gate has passed (journal 0189).
+The G3 identity-map drill then passed (journal 0190). G2, G4, G5 and the
+final evaluation remain unbound.
+
+Later the same evening, section 9 registered the G2 fairness property.
+The latency ceiling stays unset, so G2 still cannot pass as a completed
+item. The baseline script records the module of that day; it is not that pass.
+
+On 2026-10-25 the budget-release filter of ADR-0021 met the property on
+the dedicated host (journal 0192). The complete KASAN, UBSAN and lockdep
+suite of that change then exited 0. The latency ceiling is still unset, so
+G2 remains incomplete.

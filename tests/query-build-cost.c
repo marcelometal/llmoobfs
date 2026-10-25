@@ -77,8 +77,10 @@ int main(int argc, char **argv)
 	char *stop;
 	int fd;
 
-	if (argc != 4) {
-		fprintf(stderr, "usage: query-build-cost DOMAIN UID PHASE\n");
+	int expect_enomem = argc == 5 && !strcmp(argv[4], "expect-enomem");
+
+	if (argc != 4 && !expect_enomem) {
+		fprintf(stderr, "usage: query-build-cost DOMAIN UID PHASE [expect-enomem]\n");
 		return 64;
 	}
 	errno = 0;
@@ -114,7 +116,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	if (ioctl(fd, MOOB_IOC_QUERY2, &q)) {
+		if (expect_enomem && errno == ENOMEM) {
+			printf("QUERY_BUILD_DENIED errno=ENOMEM phase=%s\n", argv[3]);
+			return 0;
+		}
 		perror("QUERY2");
+		return 1;
+	}
+	if (expect_enomem) {
+		fprintf(stderr, "QUERY2 succeeded, expected ENOMEM\n");
 		return 1;
 	}
 	if (clock_gettime(CLOCK_MONOTONIC, &end) ||

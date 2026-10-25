@@ -109,3 +109,20 @@ this branch adds experimental work and frequency limits
 mitigation still under validation
 Publication and issue closure remain pending
 An initial fixed policy is implemented locally
+
+# Cross-user budget release, stopped on the host 2026-10-25 (journal 0192).
+a query by one uid also evicted another uid's built private domain under a
+também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
+one uid's query can evict another uid's built domain under a small
+one uid's query can release another uid's built domain
+its VM probe and KASAN were not run
+a prova em VM e o KASAN dessa mudança não rodaram
+The VM probe and KASAN of ADR-0020 were not run
+The VM probe and KASAN of ADR-0021 were not run
+The guest step was updated to that expectation and has not been run since.
+KASAN was not run for this change
+O KASAN dessa mudança não rodou
+KASAN of that change was not run
+That is not the complete KASAN suite
+Não é a suíte KASAN completa
+The complete KASAN suite was not run

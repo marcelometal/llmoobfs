@@ -99,14 +99,24 @@ These limits update the cases discussed in the value assessment, §9.6.
   retain about 1.1 MB per open file until close (journal 0139), outside the index budget.
 - **Untrusted users share a mount.** An authorized `QUERY2` can scan its
   entire domain on first use and after directory renames. The memory budget
-  does not limit that scan's CPU or lower I/O, and one uid's query can release
-  another uid's built domain. Bounded native-KVM examples and their limits
-  are in [journal 0182](history/0182-query-build-resource-cost-investigation.md);
+  does not limit that scan's CPU or lower I/O. A budget release no longer
+  drops a domain last built by another filesystem uid; the query returns
+  `ENOMEM` when the remainder is too small. The same uid can still release
+  its own domains and occupy the whole budget. There is no reserved fraction.
+  Bounded native-KVM examples of the scan cost are in
+  [journal 0182](history/0182-query-build-resource-cost-investigation.md);
+  the host regression of the release rule is
+  [journal 0192](history/0192-same-fsuid-budget-release.md)
+  ([ADR-0021](decisions/0021-budget-release-keeps-the-builders-domain.md)).
   `main` includes experimental work and frequency limits
   ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)),
   but not a strict CPU/I/O cap or fair memory shares. A valid 17,000-file
   domain is denied under the experimental cap. Issue 118 remains open for
-  policy review and broader-workload validation.
+  policy review and broader-workload validation. The opt-in native-KVM probe
+  of ADR-0021 passed on the dedicated host, and so did `release`, `overbudget`
+  and `buildcostevict` under KASAN, UBSAN and lockdep. The complete KASAN,
+  UBSAN and lockdep suite of this change then exited 0 (`MOOBFS_KASAN_PASS`).
+  The complete native-KVM suite of this change was not run.
 - **You need it in production today, or in any critical setting.** Only source pre-release tags exist; the
   module is one author's code; its own tests and two source reviews by AI assistants found
   kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011); there is no
