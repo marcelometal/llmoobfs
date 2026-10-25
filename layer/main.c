@@ -259,6 +259,9 @@ static int moobl_show_options(struct seq_file *m, struct dentry *root)
 	if (MOOBL_SB(root->d_sb)->index.enabled &&
 	    MOOBL_SB(root->d_sb)->index.idle != MOOBL_INDEX_IDLE_DEFAULT)
 		seq_printf(m, ",index_idle=%u", MOOBL_SB(root->d_sb)->index.idle);
+	if (MOOBL_SB(root->d_sb)->index.enabled &&
+	    MOOBL_SB(root->d_sb)->index.build_work_limit != MOOBL_BUILD_WORK_DEFAULT)
+		seq_printf(m, ",index_build_work=%u", MOOBL_SB(root->d_sb)->index.build_work_limit);
 	return 0;
 }
 
@@ -1648,9 +1651,11 @@ struct moobl_fc {
 	u64 index_budget;
 	int domain_depth;		/* -1: default */
 	int index_idle;			/* -1: default */
+	u32 index_build_work;		/* 0: default */
 };
 
-enum { Opt_lower, Opt_nolinks, Opt_noindex, Opt_index_budget, Opt_domain_depth, Opt_index_idle };
+enum { Opt_lower, Opt_nolinks, Opt_noindex, Opt_index_budget, Opt_domain_depth,
+	Opt_index_idle, Opt_index_build_work };
 
 static const struct fs_parameter_spec moobl_params[] = {
 	fsparam_string("lower", Opt_lower),
@@ -1659,6 +1664,7 @@ static const struct fs_parameter_spec moobl_params[] = {
 	fsparam_string("index_budget", Opt_index_budget),
 	fsparam_u32("domain_depth", Opt_domain_depth),
 	fsparam_u32("index_idle", Opt_index_idle),
+	fsparam_u32("index_build_work", Opt_index_build_work),
 	{}
 };
 
@@ -1702,6 +1708,9 @@ static int moobl_reconf_same(struct fs_context *fc, struct moobl_fc *ctx, int op
 		break;
 	case Opt_index_idle:
 		same = (unsigned int)ctx->index_idle == sbi->index.idle;
+		break;
+	case Opt_index_build_work:
+		same = ctx->index_build_work == sbi->index.build_work_limit;
 		break;
 	default:
 		same = false;
@@ -1757,6 +1766,12 @@ static int moobl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 			return invalfc(fc, "index_idle must be between 0 and 86400 seconds");
 		ctx->index_idle = (int)result.uint_32;
 		break;
+	case Opt_index_build_work:
+		if (result.uint_32 < MOOBL_BUILD_WORK_MIN ||
+		    result.uint_32 > MOOBL_BUILD_WORK_MAX)
+			return invalfc(fc, "index_build_work must be between 1024 and 65536");
+		ctx->index_build_work = result.uint_32;
+		break;
 	}
 	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE)
 		return moobl_reconf_same(fc, ctx, opt, param->key);
@@ -1781,7 +1796,8 @@ static int moobl_fill_super(struct super_block *sb, struct fs_context *fc)
 	/* Initialize the index state first: kill_sb tears it down on every failure path. */
 	moobl_index_init(sb, ctx->index_budget ? ctx->index_budget : MOOBL_INDEX_BUDGET_DEFAULT,
 			 !ctx->noindex, ctx->domain_depth < 0 ? 1 : (unsigned int)ctx->domain_depth,
-			 ctx->index_idle < 0 ? MOOBL_INDEX_IDLE_DEFAULT : (unsigned int)ctx->index_idle);
+			 ctx->index_idle < 0 ? MOOBL_INDEX_IDLE_DEFAULT : (unsigned int)ctx->index_idle,
+			 ctx->index_build_work ? ctx->index_build_work : MOOBL_BUILD_WORK_DEFAULT);
 	err = kern_path(ctx->lower, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &sbi->lower);
 	if (err) {
 		/* the walk's own error: ENOENT, ENOTDIR, EACCES, or ENOMEM, not always EINVAL */

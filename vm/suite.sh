@@ -28,6 +28,7 @@
 #   buildclient         optional 6000-file, six-attribute domain shape from client scale
 #   buildcostevict      optional two-uid index-budget eviction probe (#118)
 #   buildlimit          optional QUERY2 work and admission limit regression (#118)
+#   buildwork           optional per-mount query-build work policy regression (#118)
 #   buildtime           optional cooperative scan-deadline regression (#118)
 #   buildmoved          optional cumulative work across a moved-directory rescan (#118)
 #   stall               a FUSE mount that never answers, inside a checked domain (journal 0116)
@@ -53,7 +54,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildwork|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1820,6 +1821,34 @@ for fs in btrfs xfs; do
     umount "$LAYER" && rm -rf "$LOWER/blwork" && umount "$LOWER" || fail "bl-cleanup-$fs"
 done
 echo "BUILD_LIMIT_PASS: work denied on ext4, btrfs and XFS without published output; uid and mount admission recover"
+fi
+if [ -n "${MOOB_ONLY:-}" ] && want buildwork; then
+# ADR-0020: the default still denies the measured attributed domain; an
+# explicit bounded mount choice admits it. Invalid choices must not mount.
+"$TOOLS/mke2fs" -q -F -t ext4 -b 4096 -N 40000 "$DEV_EXT4" || fail bw-format
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail bw-lower-mount
+mkdir -p "$LOWER/bw/d/s" || fail bw-mkdir
+"$BIN/query-build-limit" plant6 "$LOWER/bw/d/s" 17000 || fail bw-plant
+for bw_value in 0 1023 65537 -1 nope; do
+    if mount -t moobfs_layer -o "lower=$LOWER/bw,index_build_work=$bw_value" none "$LAYER" 2>/dev/null; then
+        umount "$LAYER" || fail bw-invalid-unmount
+        fail "bw-invalid-accepted-$bw_value"
+    fi
+done
+mount -t moobfs_layer -o lower="$LOWER/bw" none "$LAYER" || fail bw-default-mount
+grep " $LAYER " /proc/mounts | grep -q 'index_build_work' && fail bw-default-shown
+"$BIN/query-build-limit" "$LAYER/d" 1001 work || fail bw-default-denial
+umount "$LAYER" || fail bw-default-unmount
+mount -t moobfs_layer -o "lower=$LOWER/bw,index_build_work=1024" none "$LAYER" || fail bw-min-mount
+"$BIN/query-build-limit" "$LAYER/d" 1001 work || fail bw-min-denial
+umount "$LAYER" || fail bw-min-unmount
+mount -t moobfs_layer -o "lower=$LOWER/bw,index_build_work=65536" none "$LAYER" || fail bw-max-mount
+grep " $LAYER " /proc/mounts | grep -q 'index_build_work=65536' || fail bw-max-not-shown
+"$BIN/reconf" "$LAYER" "$LOWER/bw" 1 65536 || fail bw-remount-contract
+"$BIN/query-build-limit" "$LAYER/d" 1001 ok || fail bw-max-full-answer
+[ "$("$BIN/query" "$LAYER" info | sed -n 's/.*domain_builds=\([0-9]*\).*/\1/p')" -eq 1 ] || fail bw-max-build-count
+umount "$LAYER" && rm -rf "$LOWER/bw" && umount "$LOWER" || fail bw-cleanup
+echo 'BUILD_WORK_OPTION_PASS: invalid values refused; default and minimum denied; 65536 completed 17000 attributed files; remount contract preserved'
 fi
 if [ -n "${MOOB_ONLY:-}" ] && want buildtime; then
 # Existing test-only scan delay makes the cooperative ten-second deadline

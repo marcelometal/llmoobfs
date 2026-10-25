@@ -757,7 +757,6 @@ static bool depth_and_domain(struct moobl_index *ix, struct dentry *dentry, unsi
 #define MOOBL_BUILD_WINDOW (60 * HZ)
 #define MOOBL_BUILD_UID_ATTEMPTS 16U
 #define MOOBL_BUILD_MOUNT_ATTEMPTS 64U
-#define MOOBL_BUILD_WORK 32768U
 #define MOOBL_BUILD_TIME_NS (10ULL * NSEC_PER_SEC)
 #define MOOBL_MOVED_ROUNDS 64
 
@@ -1326,6 +1325,7 @@ struct scan_ctx {
 	struct list_head names;
 	unsigned int count;	/* names in this batch */
 	u32 *work;		/* cumulative across batches, moved scans and retries */
+	u32 work_limit;
 	int err;
 };
 
@@ -1339,7 +1339,7 @@ static bool scan_actor(struct dir_context *ctx, const char *name, int len, loff_
 		return true;
 	if (sc->count == MOOBL_SCAN_BATCH)
 		return false;	/* not consumed: the next iterate_dir() starts with it */
-	if (*sc->work >= MOOBL_BUILD_WORK) {
+	if (*sc->work >= sc->work_limit) {
 		sc->err = -E2BIG;
 		return false;
 	}
@@ -1385,6 +1385,7 @@ struct scan_job {
 	struct list_head found;		/* those directories, when !index */
 	u64 started_ns;
 	u32 work;		/* names, directories and index_load attempts combined */
+	u32 work_limit;
 };
 
 static int scan_check(struct scan_job *job, bool charge)
@@ -1392,7 +1393,7 @@ static int scan_check(struct scan_job *job, bool charge)
 	if (ktime_get_ns() - job->started_ns > MOOBL_BUILD_TIME_NS)
 		return -ETIMEDOUT;
 	if (charge) {
-		if (job->work >= MOOBL_BUILD_WORK)
+		if (job->work >= job->work_limit)
 			return -E2BIG;
 		job->work++;
 	}
@@ -1542,7 +1543,7 @@ static int scan_run(struct scan_job *job)
 		struct scan_dir *cur = list_first_entry(&job->stack, struct scan_dir, list);
 		struct path dpath = { .mnt = sbi->lower.mnt, .dentry = cur->dentry };
 		struct scan_ctx sc = { .ctx.actor = scan_actor, .names = LIST_HEAD_INIT(sc.names),
-				       .work = &job->work };
+				       .work = &job->work, .work_limit = job->work_limit };
 		struct scan_name *sn, *tmp;
 		struct file *dir;
 
@@ -1609,6 +1610,7 @@ static int scan_job_init(struct scan_job *job, struct super_block *sb)
 	job->sb = sb;
 	job->started_ns = ktime_get_ns();
 	job->work = 0;
+	job->work_limit = IX(sb)->build_work_limit;
 	INIT_LIST_HEAD(&job->stack);
 	INIT_LIST_HEAD(&job->found);
 	job->stop = 0;
@@ -1884,7 +1886,7 @@ void moobl_index_mount(struct super_block *sb)
 }
 
 void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth,
-		      unsigned int idle)
+		      unsigned int idle, u32 build_work_limit)
 {
 	struct moobl_index *ix = IX(sb);
 
@@ -1909,6 +1911,7 @@ void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned
 	get_random_bytes(&ix->cursor_key, sizeof(ix->cursor_key));
 	ix->budget = budget;
 	ix->idle = idle;
+	ix->build_work_limit = build_work_limit;
 	ix->dev = sb->s_dev;
 	ix->enabled = enabled;
 	ix->initialized = true;
