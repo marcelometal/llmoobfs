@@ -361,7 +361,8 @@ of this change was not run.
 ## 10. Still unbound
 
 Note, 2026-10-25: section 12 proposes G4's freshness and inventory bounds.
-They bind only once the maintainer accepts that section.
+They bind only once the maintainer accepts that section. It was accepted the
+same day, and the G4 package met those bounds (journal 0195).
 
 G4's freshness bound and G5's recall floor are not set, so those items and
 the G6 final evaluation cannot pass yet. The final evaluation, when those
@@ -393,6 +394,11 @@ G2 remains incomplete.
 Later on 2026-10-25, section 12 proposed the G4 amendment. G4's
 implementation waits for its acceptance. G5 waits on G4.
 
+The maintainer accepted section 12 the same morning. The G4 package then met
+every bound of section 12.6 in three runs on the dedicated host (journal
+[0195](history/0195-g4-derived-index-package.md)). G5's relevance floor and
+the final evaluation stay unbound.
+
 ## 12. G4 amendment, 2026-10-25 — proposed, not accepted
 
 Status: proposed by journal [0194](history/0194-g4-protocol-amendment.md).
@@ -400,6 +406,11 @@ The maintainer has not accepted it, nothing below has run, and no number in
 this section was measured for it. Once accepted, sections 12.1 to 12.6 are
 fixed under the rule of section 1 and are not edited after a result. Until
 then G4 stays unstarted.
+
+Acceptance note, 2026-10-25 (journal [0195](history/0195-g4-derived-index-package.md)):
+the maintainer accepted this section as written, before any G4 run.
+Sections 12.1 to 12.6 are fixed from that point. The heading keeps its
+original wording.
 
 ### 12.1 What G4 is in this batch, and what it does not change
 

@@ -214,3 +214,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0192 — Budget release stays with the builder's filesystem uid](0192-same-fsuid-budget-release.md)
 - [0193 — Reconcile the merged per-mount build-work policy](0193-merged-per-mount-build-work-policy.md)
 - [0194 — G4 protocol amendment proposed, before any package](0194-g4-protocol-amendment.md)
+- [0195 — G4 derived-index package; mounted gate passed in three runs](0195-g4-derived-index-package.md)

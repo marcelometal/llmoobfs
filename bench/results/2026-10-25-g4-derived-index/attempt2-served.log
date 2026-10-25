@@ -1,0 +1,38 @@
+G1_PLANT alice 500/1000
+G1_PLANT alice 1000/1000
+G1_PLANT bob 500/1000
+G1_PLANT bob 1000/1000
+G1_PLANT team 500/5000
+G1_PLANT team 1000/5000
+G1_PLANT team 1500/5000
+G1_PLANT team 2000/5000
+G1_PLANT team 2500/5000
+G1_PLANT team 3000/5000
+G1_PLANT team 3500/5000
+G1_PLANT team 4000/5000
+G1_PLANT team 4500/5000
+G1_PLANT team 5000/5000
+G4_PLANT files=7001 seconds=71.5
+G4_GET_INFO budget=134217728 used=0
+G4_START pass_s_1001=0.958
+G4_START pass_s_1002=0.825
+G4_START inventory_1001=missing:0,extra:0,sha:0,model:0,vector:0
+G4_START inventory_1002=missing:0,extra:0,sha:0,model:0,vector:0
+G4_F1 alice_n=300 alice_never=0 alice_p50_s=0.0786 alice_p95_s=0.1034 alice_p99_s=0.3777 alice_max_s=0.4014
+G4_F1 bob_n=300 bob_never=0 bob_p50_s=0.0753 bob_p95_s=0.1033 bob_p99_s=0.3774 bob_max_s=0.3985
+G4_E1 changes=100
+G4_E2 changes=100
+G4_E3 changes=100
+G4_E3 inventory_1001=missing:0,extra:0,sha:0,model:0,vector:0
+G4_E3 inventory_1002=missing:0,extra:0,sha:0,model:0,vector:0
+Traceback (most recent call last):
+  File "/home/debian/moobfs-g4-0195/bench/client/g4_mounted.py", line 603, in <module>
+    main()
+    ~~~~^^
+  File "/home/debian/moobfs-g4-0195/bench/client/g4_mounted.py", line 585, in main
+    step()
+    ~~~~^^
+  File "/home/debian/moobfs-g4-0195/bench/client/g4_mounted.py", line 287, in e1_e3
+    self.served("E3")
+    ~~~~~~~~~~~^^^^^^
+TypeError: Run.served() missing 1 required positional argument: 'uid'

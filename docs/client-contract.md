@@ -185,3 +185,7 @@ journal. The scoped batch for that adapter is
 `bench/client/` (journal [0189](history/0189-g1-adapter-package.md)). The mounted
 gate passed on the dedicated Debian host the same evening. The counters and
 the limits are in that journal.
+A derived vector index kept in user space beside that adapter, outside the
+data directory and per OS identity, is the G4 package (journal
+[0195](history/0195-g4-derived-index-package.md)). It stays in the client, as
+section 8 says.

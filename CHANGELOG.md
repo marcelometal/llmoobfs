@@ -9,7 +9,16 @@
   start and on queue overflow. Eleven scenarios and proposed bounds:
   inventory equal to a fresh scan, nothing obsolete served, revocation and
   cache protection, live freshness p99 at most 1 s, recovery within 60 s.
-  Not accepted and not run; no G4 code exists.
+  Accepted by the maintainer the same day.
+
+- G4 derived-index package (journal 0195): `bench/client/g4_derived.py`
+  (watcher, reconciler, exact derived search) and `bench/client/g4_mounted.py`.
+  On the dedicated Debian host, ext4, three runs passed every bound of
+  protocol section 12.6: inventories equal to a fresh scan after each of
+  E1–E11, nothing obsolete served, revocation and cache protection held,
+  live freshness p99 0.098–0.444 s (max 0.454 s), recovery after restart,
+  queue overflow, model change and lower-tree writes in 0.77–1.08 s. No
+  change to the layer, the UAPI or the G1 adapter. G5 not started.
 
 - Merged per-mount `index_build_work` policy (PR 138, ADR-0020,
   journals 0187 and 0193):

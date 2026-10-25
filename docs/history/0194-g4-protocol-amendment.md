@@ -1,6 +1,6 @@
 # 0194 — G4 protocol amendment proposed, before any package
 
-Date: 2026-10-25. Status: amendment proposed; not accepted; nothing run.
+Date: 2026-10-25. Status: amendment proposed, then accepted the same day (journal 0195).
 Work started: 2026-10-25 09:48 America/Sao_Paulo, when the maintainer chose
 to write the G4 protocol before any G4 code. Wall-clock time, not an
 engineering-effort measurement. The amendment is effort S (hours). The G4
@@ -101,3 +101,9 @@ Completed 2026-10-25 at 09:51 America/Sao_Paulo. `git diff --check` passed.
 `python3 scripts/site-faq.py --check` confirmed the FAQ is current. A local
 check resolved 301 relative Markdown destinations, anchors included, in the
 six changed files. No module build, VM or host run.
+
+## Follow-up, 2026-10-25
+
+The maintainer accepted section 12 as written. Journal
+[0195](0195-g4-derived-index-package.md) implemented the package and passed
+its bounds in three runs.
