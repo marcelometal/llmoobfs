@@ -218,7 +218,9 @@ set. Read on 2026-10-14.
 
   `bench/compare.py` (percentile bootstrap interval of the difference of medians; the U test with
   the normal approximation and tie correction, checked against SciPy's `mannwhitneyu` on three
-  samples) and `bench/cpu-freq.sh`, implemented.
+  samples) and `bench/cpu-freq.sh`, implemented. Journal 0188 and
+  `docs/g6-evaluation-protocol.md` reuse this method for any later G1 latency claim
+  and add no source.
 
 ### Casefolded lower directories (issue #95, journal 0136)
 
@@ -256,6 +258,7 @@ set. Read on 2026-10-14.
 | dm-log-writes, dm-flakey | https://docs.kernel.org/admin-guide/device-mapper/log-writes.html, https://docs.kernel.org/admin-guide/device-mapper/dm-flakey.html | power-loss and I/O-error tests |
 | Shrinker interface | `include/linux/shrinker.h` (`shrinker_alloc`, `shrinker_register`, `shrinker_free`), `mm/shrinker.c`, `Documentation/admin-guide/mm/shrinker_debugfs.rst`, Linux 6.12.112 | releases built domains under memory pressure (ADR-0012, implemented in journal 0101) |
 | Memory-cgroup allocation flags | [`Documentation/core-api/memory-allocation.rst`](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/Documentation/core-api/memory-allocation.rst?h=v6.12.112), `include/linux/gfp_types.h`, `mm/util.c` and `mm/vmalloc.c`, Linux 6.12.112, GPL-2.0 | `__GFP_ACCOUNT` guidance and the kvmalloc/vmalloc charge path investigated in journal 0180 |
+| Memory-cgroup charge stays in the cgroup that hit the limit | [`mm/memcontrol.c` `try_charge_memcg()`](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/mm/memcontrol.c?h=v6.12.112) calls `try_to_free_mem_cgroup_pages()` on `mem_over_limit` and fails the charge when that reclaim does not make room; [`memory.max`](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/Documentation/admin-guide/cgroup-v2.rst?h=v6.12.112) is that cgroup's hard limit. Linux 6.12.112, GPL-2.0 | Prior art for ADR-0021: a budget release reclaims only the builder's own domains, or the build returns `ENOMEM`. It does not take a sibling's domain. Checked against the v6.12.112 sources on 2026-10-25 |
 | Kernel build-limit primitives | `include/linux/jiffies.h` (`time_after_eq`), `include/linux/uidgid.h` (`uid_eq`), `include/linux/timekeeping.h` (`ktime_get_ns`) and `include/linux/capability.h` (`capable`), exact Debian 6.12.111 build headers checked on the dedicated host, GPL-2.0 | Fixed-window admission and cooperative deadline in ADR-0019 and journal 0182; the algorithm is local to MoobFS, not claimed as a kernel-provided rate limiter |
 | Device-mapper delay target | [Linux 6.12 `dm-delay` documentation](https://docs.kernel.org/6.12/admin-guide/device-mapper/delay.html), verified against `CONFIG_DM_DELAY=m` and the `dm-delay.ko.xz` file of the exact Debian 6.12.111 guest kernel | The six-argument table delays reads while leaving writes and flushes at zero delay in the issue-118 lower-I/O sensitivity probe (journal 0185); it emulates a delay, not a particular storage device. |
 | Tracepoints | `Documentation/trace/tracepoints.rst`, `Documentation/trace/events.rst`, `samples/trace_events/` (the pattern for a module's own events), Linux 6.12.112 | the index's events (journal 0102) |
@@ -306,7 +309,7 @@ Other failures must abort an index build or adoption.
 | Letta | https://github.com/letta-ai/letta | Apache-2.0 | V1 server, branch `archive` at `56ba9c2` |
 | Letta Code | https://github.com/letta-ai/letta-code | Apache-2.0 | `271f119` |
 | Graphiti | https://github.com/getzep/graphiti | Apache-2.0 | `964bb11` |
-| LangGraph store | https://github.com/langchain-ai/langgraph | MIT | `799c2f0`; adapter and equality test against `InMemoryStore` with langgraph 1.2.15 and langgraph-checkpoint 4.3.0 from PyPI (`bench/client/langgraph_store.py`, journal 0089) |
+| LangGraph store | https://github.com/langchain-ai/langgraph | MIT | `799c2f0`; adapter and equality test against `InMemoryStore` with langgraph 1.2.15 and langgraph-checkpoint 4.3.0 from PyPI (`bench/client/langgraph_store.py`, journal 0089). Journal 0189 reuses those pins for the G1 host checks and for the mounted gate, which passed the same evening on the dedicated Debian host. |
 | LangMem | https://github.com/langchain-ai/langmem | MIT | `48e3c11` |
 | OpenAI Agents SDK sessions | https://github.com/openai/openai-agents-python | MIT | `125efa0` |
 

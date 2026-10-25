@@ -45,6 +45,8 @@ struct moobl_domain {
 	bool lost;			/* an update of it failed since it was built (F2) */
 	u64 top_gen;			/* ix->top_gen when its build began */
 	unsigned long used_at;		/* jiffies of the last query that used it */
+	u32 built_uid;			/* init-ns fsuid of the last successful build */
+	u8 has_builder;			/* built_uid is set while the domain is built */
 };
 
 struct moobl_index {

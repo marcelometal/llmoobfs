@@ -133,6 +133,12 @@ and S7 (fuzzing).
   stale domain. [ADR-0016](0016-failed-index-update-rebuilds-its-domain.md) confines a failed
   update to its own domain, which is built again by its next query. Fair shares of the budget
   remain under S9.
+  *Note, 2026-10-25:* [ADR-0021](0021-budget-release-keeps-the-builders-domain.md)
+  stops a budget release from dropping a domain last built by another
+  filesystem uid. The query returns `ENOMEM` when the remainder is too small.
+  One uid can still fill the whole budget by releasing that uid's own domains.
+  A reserved fraction is not implemented, so F2 stays open under S9. Journal
+  0192 records the host regression. The shrinker can still drop any idle domain.
 
 Added on 2026-10-12, from the review of journal 0066 (`docs/research-stacked-fs-kernel-rules.md`):
 

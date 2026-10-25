@@ -28,6 +28,7 @@
 #include <linux/limits.h>
 #include <linux/posix_acl.h>
 #include <linux/capability.h>
+#include <linux/uidgid.h>
 #include <linux/random.h>
 #include <linux/siphash.h>
 #include <linux/sched/mm.h>
@@ -915,6 +916,7 @@ static void domain_takedown(struct moobl_index *ix, struct moobl_domain *dom, u6
 	lockdep_assert_held_write(&ix->query_sem);
 	lockdep_assert_held_write(&ix->lock);
 	domain_drop(ix, domain);
+	WRITE_ONCE(dom->has_builder, 0);
 	WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
 	ix->domains_built--;
 	ix->drop_gen++;
@@ -926,6 +928,13 @@ static unsigned long reclaim_idle(const struct moobl_index *ix)
 	return (unsigned long)ix->idle * HZ;
 }
 
+/* A budget release may drop only a domain last built by this uid (ADR-0021). */
+static bool builder_matches(const struct moobl_domain *dom, bool same_builder, u32 uid)
+{
+	return !same_builder || (READ_ONCE(dom->has_builder) &&
+				 READ_ONCE(dom->built_uid) == uid);
+}
+
 /*
  * The built domain queried least recently, other than except, and not used in the last idle
  * jiffies; NULL when there is none. The cursor finds the next oldest candidate after a busy
@@ -933,16 +942,19 @@ static unsigned long reclaim_idle(const struct moobl_index *ix)
  * unmount, so the walk needs no lock; the state is checked again under domain_release()'s locks.
  * A plain walk rather than a list_lru: the domains of one mount are few, and the index memory
  * is not charged to a memory cgroup, so a per-cgroup, per-node list would buy nothing.
+ * same_builder restricts the choice to domains last built by uid.
  */
 static struct moobl_domain *domain_lru(struct moobl_index *ix, struct moobl_domain *except,
 				       unsigned long idle, bool after, unsigned long after_used,
-				       u64 after_key, u64 *key, unsigned long *selected_used)
+				       u64 after_key, u64 *key, unsigned long *selected_used,
+				       bool same_builder, u32 uid)
 {
 	struct moobl_domain *dom, *best = NULL;
 	unsigned long idx, used, best_used = 0;
 
 	used = READ_ONCE(ix->outside.used_at);
 	if (READ_ONCE(ix->outside.state) == MOOBL_DOM_BUILT && &ix->outside != except &&
+	    builder_matches(&ix->outside, same_builder, uid) &&
 	    time_after_eq(jiffies, used + idle) &&
 	    (!after || time_after(used, after_used))) {
 		best = &ix->outside;
@@ -952,6 +964,7 @@ static struct moobl_domain *domain_lru(struct moobl_index *ix, struct moobl_doma
 	xa_for_each(&ix->domains, idx, dom) {
 		used = READ_ONCE(dom->used_at);
 		if (dom == except || READ_ONCE(dom->state) != MOOBL_DOM_BUILT ||
+		    !builder_matches(dom, same_builder, uid) ||
 		    time_before(jiffies, used + idle) ||
 		    (after && !time_after(used, after_used) &&
 		     !(used == after_used && (u64)idx > after_key)))
@@ -974,14 +987,16 @@ static struct moobl_domain *domain_lru(struct moobl_index *ix, struct moobl_doma
  * update of this very mount. From a build over the budget the caller holds except->build, so
  * the other domain's build mutex is only tried (two builds could otherwise wait for each
  * other) and the rest is taken in the order of domain_ensure(). A busy candidate does not hide
- * later candidates that can be released. Returns whether one was released.
+ * later candidates that can be released. A budget release (same_builder) skips a domain
+ * last built by another uid. The shrinker passes same_builder false and may drop any
+ * idle domain. Returns whether one was released.
  */
-static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, bool reclaim)
+static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, bool reclaim,
+			   bool same_builder, u32 uid)
 {
 	unsigned long idle = reclaim ? reclaim_idle(ix) : 0;
 	struct moobl_domain *dom;
 	unsigned int nofs, attempts, limit;
-	bool done = false;
 	u64 key = 0;
 	unsigned long after_used = 0, selected_used;
 	u64 after_key = 0;
@@ -990,44 +1005,53 @@ static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, 
 	/* A busy oldest domain must not hide another domain that can make room. */
 	limit = READ_ONCE(ix->domains_built) + 1;
 	for (attempts = 0; attempts < limit; attempts++) {
+		bool owned;
+
 		dom = domain_lru(ix, except, idle, after, after_used, after_key,
-				 &key, &selected_used);
+				 &key, &selected_used, same_builder, uid);
 		if (!dom)
 			return false;
-		if (mutex_trylock(&dom->build))
-			break;
+		if (!mutex_trylock(&dom->build)) {
+			after = true;
+			after_used = selected_used;
+			after_key = key;
+			continue;
+		}
+		if (reclaim) {
+			if (!down_write_trylock(&ix->query_sem)) {
+				mutex_unlock(&dom->build);
+				return false;
+			}
+			nofs = memalloc_nofs_save();
+			if (!down_write_trylock(&ix->lock)) {
+				memalloc_nofs_restore(nofs);
+				up_write(&ix->query_sem);
+				mutex_unlock(&dom->build);
+				return false;
+			}
+		} else {
+			down_write(&ix->query_sem);
+			nofs = ix_write_lock(ix);
+		}
+		owned = dom->state == MOOBL_DOM_BUILT &&
+			(!same_builder || (dom->has_builder && dom->built_uid == uid));
+		if (owned) {
+			u64 before = ix->used;
+
+			domain_takedown(ix, dom, key);
+			ix->releases++;
+			trace_moobfs_domain_release(ix->dev, key, reclaim, (s64)(before - ix->used));
+		}
+		ix_write_unlock(ix, nofs);
+		up_write(&ix->query_sem);
+		mutex_unlock(&dom->build);
+		if (owned)
+			return true;
 		after = true;
 		after_used = selected_used;
 		after_key = key;
 	}
-	if (attempts == limit)
-		return false;
-	if (reclaim) {
-		if (!down_write_trylock(&ix->query_sem))
-			goto out_build;
-		nofs = memalloc_nofs_save();
-		if (!down_write_trylock(&ix->lock)) {
-			memalloc_nofs_restore(nofs);
-			goto out_query;
-		}
-	} else {
-		down_write(&ix->query_sem);
-		nofs = ix_write_lock(ix);
-	}
-	if (dom->state == MOOBL_DOM_BUILT) {
-		u64 before = ix->used;
-
-		domain_takedown(ix, dom, key);
-		ix->releases++;
-		trace_moobfs_domain_release(ix->dev, key, reclaim, (s64)(before - ix->used));
-		done = true;
-	}
-	ix_write_unlock(ix, nofs);
-out_query:
-	up_write(&ix->query_sem);
-out_build:
-	mutex_unlock(&dom->build);
-	return done;
+	return false;
 }
 
 #define MOOBL_BUDGET_RELEASES 1024
@@ -1711,8 +1735,9 @@ static u64 rename_gen(struct moobl_index *ix)
  * Makes sure the domain whose directory is lower (mount-relative path) is built, building it
  * if it is not; domain 0 is what belongs to no domain, read from the lower root down to the
  * domain directories. Callers of a domain being built wait for it. When the build does not fit
- * the index budget and may_release is set, the domains queried least recently are released
- * until it fits. Returns -EAGAIN when the domain kept changing under the build, -ENOMEM also
+ * the index budget and may_release is set, this fsuid's least recently queried domains
+ * are released until it fits. Another fsuid's domain is left built. Returns -EAGAIN when
+ * the domain kept changing under the build, -ENOMEM also
  * when it does not fit the budget; after a failure nothing of the domain is left in the index.
  * gen is ix->top_gen as sampled before path was taken (rename_gen()): a rename of the domain
  * directory or one above it after that sample leaves the build stale, never fresh under the
@@ -1726,6 +1751,11 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	struct moobl_domain *dom = domain_get(ix, domain);
 	const struct cred *old;
 	struct scan_job job;
+	/*
+	 * Filesystem uid of the query, before the mounter credentials
+	 * override it. Real uid stays 0 when a process only drops euid.
+	 */
+	kuid_t builder = current_fsuid();
 	unsigned int nofs, released = 0;
 	u64 t0, used0, refused = 0;
 	int tries, err;
@@ -1801,6 +1831,8 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 			domain_drop(ix, domain);
 			WRITE_ONCE(dom->state, MOOBL_DOM_NONE);
 		} else {
+			WRITE_ONCE(dom->built_uid, from_kuid(&init_user_ns, builder));
+			WRITE_ONCE(dom->has_builder, 1);
 			WRITE_ONCE(dom->used_at, jiffies);
 			WRITE_ONCE(dom->state, MOOBL_DOM_BUILT);
 			dom->paths_stale = false;	/* every renamed directory was scanned again */
@@ -1808,12 +1840,13 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 			ix->domains_built++;
 			ix->builds++;
 		}
-		/* over the budget: make room by releasing what was queried least recently */
+		/* over the budget: release this uid's least recently queried domain */
 		if (err == -ENOMEM && ix->refusals != refused && may_release &&
 		    released < MOOBL_BUDGET_RELEASES) {
 			ix_write_unlock(ix, nofs);
 			moved_list_free(&todo);
-			if (domain_release(ix, dom, false)) {
+			if (domain_release(ix, dom, false, true,
+					   from_kuid(&init_user_ns, builder))) {
 				released++;
 				tries--;
 				continue;
@@ -1957,7 +1990,7 @@ static unsigned long moobl_shrink_scan(struct shrinker *s, struct shrink_control
 	while (freed < sc->nr_to_scan) {
 		u64 before = READ_ONCE(ix->used), after;
 
-		if (!domain_release(ix, NULL, true))
+		if (!domain_release(ix, NULL, true, false, 0))
 			break;
 		after = READ_ONCE(ix->used);
 		freed += max_t(unsigned long, 1, div_u64(before > after ? before - after : 0, PAGE_SIZE));

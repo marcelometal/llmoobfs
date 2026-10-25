@@ -44,7 +44,7 @@ accepted but may be only partly implemented, and only the journals and
 
 | Document | Lang | What it covers |
 | --- | --- | --- |
-| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0019, with alternatives and reasons |
+| [decisions/](decisions/) | EN | Architecture decision records ADR-0001 to ADR-0021, with alternatives and reasons |
 | [history/](history/README.md) | EN | Technical journal: one entry per piece of work, with evidence and limitations |
 
 Key decisions for newcomers: [ADR-0007](decisions/0007-stacked-memory-layer.md) (a stacked layer
@@ -58,6 +58,7 @@ over a mature filesystem) and [ADR-0009](decisions/0009-query-role-and-user-spac
 | --- | --- | --- |
 | [client-test-plan.md](client-test-plan.md) | EN | Proposal: test with a real agent memory client (ai-memory), in three stages |
 | [benchmark-plan.md](benchmark-plan.md) | EN | M4 plan: questions, baselines, workloads, what a result must show |
+| [g6-evaluation-protocol.md](g6-evaluation-protocol.md) | EN | G6 protocol and G1 scope; G1 mounted gate and the G3 identity-map drill passed on 2026-10-24 |
 | [benchmark-harness.md](benchmark-harness.md) | EN | Harness specification: dataset, SQLite baselines, latency records, report, where raw archives go |
 | [bench-accelerated-guest.md](bench-accelerated-guest.md) | EN | How to run a campaign in an accelerated guest or a cloud VM |
 | [../bench/results/](../bench/results/README.md) | EN | Pilot campaign results and the `bench-evidence` release for raw archives |
