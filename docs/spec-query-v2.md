@@ -383,3 +383,16 @@ may now fail. The figures are initial guardrails calibrated in a bounded
 ext4 VM. Opt-in denial fixtures passed on ext4, btrfs and XFS; slower devices
 and varied workloads still need validation before the issue can close
 (journal 0182).
+
+*2026-10-25 proposal, ADR-0020 and journal 0187:* A per-mount
+`index_build_work=<units>` option retains the 32,768 default and accepts
+1,024–65,536 inclusive. The value is fixed for a mount, shown when it
+differs from the default, and applies to the same cumulative work counter
+across batches, retries and moved-directory rescans. The administrator
+may admit larger domains by choosing a higher bound or reduce work with a
+lower one; the 10-second cooperative deadline and 16-per-UID/64-per-mount
+admission limits remain. An invalid value is refused at mount, and a
+changed value is refused on new mount-API reconfiguration. The earlier
+paragraphs describe the published fixed-policy checkpoint; this note
+describes the proposed compatibility extension and does not establish a
+strict CPU/I/O bound.

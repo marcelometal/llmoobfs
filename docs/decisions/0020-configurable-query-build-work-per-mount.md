@@ -1,6 +1,6 @@
 # ADR-0020 — Configure the bounded query-build work per mount
 
-Date: 2026-10-25. Status: proposed implementation; validation pending.
+Date: 2026-10-25. Status: locally validated proposal; maintainer policy review pending.
 Supersedes the fixed-work-number part of [ADR-0019](0019-bound-query-build-work-and-frequency.md),
 while retaining its admission, cumulative accounting, error, deadline and
 output-on-error decisions.
@@ -69,3 +69,14 @@ domain, the existing cumulative work/retry and admission tests, and the
 cooperative deadline. Run the complete native VM suite and KASAN/lockdep
 before considering publication. Keep issue 118 open for real lower-device
 and larger real-client policy evidence.
+
+## Local validation, 2026-10-25
+
+The opt-in dedicated native-KVM test passed invalid-value, boundary,
+default-denial, full-answer and remount checks. The complete native VM
+suite passed on Debian 6.12.111. The complete KASAN/UBSAN/lockdep suite
+passed on upstream 6.12.112 with no kernel diagnostics (journal 0187).
+These runs validate the local implementation, not the operator-policy
+choice or behavior on a real slow lower device. The opt-in 17,000-file
+path ran on the native kernel; the complete KASAN suite exercised the
+unchanged default policy.

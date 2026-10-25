@@ -75,6 +75,16 @@ window. Its success marker is `BUILD_LIMIT_PASS`; it is not part of the
 default full suite. It repeats the 17,000-file over-limit check on btrfs and
 XFS. A negative control on `neg/issue118-buildlimits-0182`
 uses the same guest step against the prior module and must fail.
+`MOOB_ONLY=buildwork` is a separate opt-in regression for the proposed
+`index_build_work` mount policy (ADR-0020). It plants one 17,000-file
+domain with six typed attributes per file on disposable ext4, rejects
+invalid option values, checks denial under the 32,768 default and the
+1,024 minimum, and checks a full answer at the 65,536 maximum. It also
+checks mount-option display and same-value/new-value reconfiguration.
+Its success marker is `BUILD_WORK_OPTION_PASS`; it is not a full-suite
+marker or a slow-device measurement. Run this opt-in step with an ext4
+test image of at least 256 MiB and 40,000 inodes; the default 64 MiB
+guest image is too small for this fixture.
 `MOOB_ONLY=buildtime` is a second opt-in regression. It uses the existing
 test-only `scan_delay_us` module parameter to make one domain build exceed
 the cooperative ten-second deadline, checks `ETIMEDOUT` and untouched
@@ -451,9 +461,12 @@ sudo rmmod moobfs
 ```
 
 For the layer: `make layer`, `insmod layer/moobfs_layer.ko`, then
-`mount -t moobfs_layer -o lower=<dir>[,nolinks][,noindex][,index_budget=<n>][,domain_depth=<0-8>] none <mnt>`.
+`mount -t moobfs_layer -o lower=<dir>[,nolinks][,noindex][,index_budget=<n>][,index_build_work=<1024-65536>][,domain_depth=<0-8>] none <mnt>`.
 `domain_depth` defaults to 1 (first-level directories are domains for `MOOB_IOC_QUERY2`); 0 turns
 domains off and keeps the v1 `QUERY` open to every user (`docs/spec-query-v2.md`).
+`index_build_work` defaults to 32,768 cumulative units per build. Raising it
+can admit larger domains at a cost in synchronous work; the cooperative
+ten-second deadline and rebuild-frequency limits still apply.
 Do not alter the backing image or the lower tree from outside while mounted.
 Signed-module policies of a particular VM may reject unsigned modules. Other
 kernel versions are unverified.
