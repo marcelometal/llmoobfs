@@ -6,6 +6,7 @@
  * (journal 0118), and the reconfiguration then completes.
  *
  *   reconf <layer mount> <lower directory> <domain_depth of the mount>
+ *          [index_build_work of the mount, default 32768]
  *
  * The layer must be mounted without nolinks and with the default index budget (128M).
  * Prints RECONF_PASS and exits 0 when every case behaves; exits 1 otherwise, 2 when the API
@@ -53,11 +54,13 @@ static int expect(const char *what, int got, int want)
 
 int main(int argc, char **argv)
 {
+	const char *build_work;
 	int bad = 0;
 
-	if (argc != 4)
+	if (argc != 4 && argc != 5)
 		return 2;
 	layer = argv[1];
+	build_work = argc == 5 ? argv[4] : "32768";
 	if (set_one(FSCONFIG_SET_STRING, "index_budget", "64M", 0) < 0)
 		return 2;
 	/* changes: refused */
@@ -67,12 +70,17 @@ int main(int argc, char **argv)
 	bad |= expect("lower=/", set_one(FSCONFIG_SET_STRING, "lower", "/", 0), EINVAL);
 	bad |= expect("domain_depth 7", set_one(FSCONFIG_SET_STRING, "domain_depth", "7", 0),
 		      EINVAL);
+	bad |= expect("index_build_work changed",
+		      set_one(FSCONFIG_SET_STRING, "index_build_work",
+			      strcmp(build_work, "32768") ? "32768" : "65536", 0), EINVAL);
 	/* the current values, as libmount repeats them: accepted, and the remount completes */
 	bad |= expect("lower (current)", set_one(FSCONFIG_SET_STRING, "lower", argv[2], 1), 0);
 	bad |= expect("domain_depth (current)",
 		      set_one(FSCONFIG_SET_STRING, "domain_depth", argv[3], 1), 0);
 	bad |= expect("index_budget (current)",
 		      set_one(FSCONFIG_SET_STRING, "index_budget", "128M", 1), 0);
+	bad |= expect("index_build_work (current)",
+		      set_one(FSCONFIG_SET_STRING, "index_build_work", build_work, 1), 0);
 	if (bad)
 		return 1;
 	printf("RECONF_PASS\n");

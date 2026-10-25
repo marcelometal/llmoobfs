@@ -449,6 +449,10 @@ KASAN harness runs the layer suite), and no benchmark exists.
   experimental cap. Issue 118 remains open for policy review and
   broader-workload validation. Do not expose a multi-user mount to untrusted
   query workloads.
+  A proposed per-mount `index_build_work` range of 1,024–65,536 units keeps
+  32,768 as the default; see [ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md)
+  and [journal 0187](docs/history/0187-query-build-work-mount-policy.md)
+  for its dedicated-VM validation and pending PR checks.
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This
   code charges that buffer and user-triggered index/query allocations to the allocating
   task's memory cgroup where supported (issue 116, journal 0180). The mount-wide index

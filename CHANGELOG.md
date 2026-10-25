@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Proposed per-mount `index_build_work` policy (ADR-0020, journal 0187):
+  retain the 32,768-unit default; let a mounter choose 1,024–65,536
+  cumulative work units. A dedicated VM opt-in test admitted a valid
+  17,000-file attributed domain at the upper bound while the default
+  refused it. The complete native VM and KASAN/UBSAN/lockdep suites
+  passed locally. The maintainer approved the range for a PR; PR checks remain. The deadline,
+  admission limits and issue-118 status are unchanged.
+
 - Investigation (journal 0186, PR 136 merged; issue 118 open): a real
   ai-memory MCP workload wrote 2,000 requested pages in ten projects
   through the guarded layer inside a dedicated VM, with zero refused

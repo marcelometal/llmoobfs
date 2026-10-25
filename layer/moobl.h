@@ -18,6 +18,9 @@
 #define MOOBL_INDEX_BUDGET_DEFAULT (128ULL << 20)
 #define MOOBL_INDEX_IDLE_DEFAULT 60U
 #define MOOBL_BUILD_UID_SLOTS 64U
+#define MOOBL_BUILD_WORK_DEFAULT 32768U
+#define MOOBL_BUILD_WORK_MIN 1024U
+#define MOOBL_BUILD_WORK_MAX 65536U
 
 struct moobl_build_uid {
 	kuid_t uid;
@@ -73,6 +76,7 @@ struct moobl_index {
 	unsigned long build_window;
 	u16 build_attempts;
 	struct moobl_build_uid build_uids[MOOBL_BUILD_UID_SLOTS];
+	u32 build_work_limit;		/* cumulative scan work permitted per build */
 	u32 releases;			/* built domains released since mount */
 	u64 refusals;			/* allocations charge() refused since mount (index lock) */
 	unsigned int idle;		/* seconds a used domain is kept from the shrinker */
@@ -133,7 +137,7 @@ bool moobl_casefolded(struct dentry *lower);
 
 /* index.c */
 void moobl_index_init(struct super_block *sb, u64 budget, bool enabled, unsigned int domain_depth,
-		      unsigned int idle);
+		      unsigned int idle, u32 build_work_limit);
 int moobl_index_shrinker_start(struct super_block *sb);
 void moobl_index_mount(struct super_block *sb);
 void moobl_index_destroy(struct super_block *sb);
