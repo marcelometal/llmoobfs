@@ -402,3 +402,15 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   `TASK_KILLABLE`, shown as `D` in `/proc/<pid>/stat`, which `tests/rootpath-race.c`
   uses to see the QUERY2 waiting; `/proc/<pid>/stack` and `wchan` gave no
   function names in the guest kernel.
+
+## 9. Consumable path (ADR-0022, journal 0196)
+
+- [OpenZFS](https://github.com/openzfs/zfs), CDDL: an out-of-tree Linux filesystem module
+  distributed through DKMS (Debian's `zfs-dkms`), whose build checks a stated range of
+  supported kernels. Precedent for the stage 2 shape of item C6; no code used.
+- [DKMS](https://github.com/dkms-project/dkms), GPL-2.0: `dkms.conf`, including
+  `BUILD_EXCLUSIVE_KERNEL`, for building a module against each installed kernel and refusing
+  kernels outside a range. Proposed for C6; not used yet.
+- Linux v6.12.112, `Documentation/admin-guide/module-signing.rst`, GPL-2.0: module signing,
+  `CONFIG_MODULE_SIG_FORCE` and the constraints Secure Boot puts on an out-of-tree module.
+  Basis of C6's signing criterion.

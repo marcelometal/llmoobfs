@@ -213,3 +213,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0191 — G2 eviction baseline recorded, fair share not implemented](0191-g2-eviction-baseline.md)
 - [0192 — Budget release stays with the builder's filesystem uid](0192-same-fsuid-budget-release.md)
 - [0193 — Reconcile the merged per-mount build-work policy](0193-merged-per-mount-build-work-policy.md)
+- [0196 — Consumable path on the roadmap; kernel freeze restated (ADR-0022)](0196-consumable-path-roadmap.md)

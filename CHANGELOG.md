@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Roadmap: a user-space "Consumable path" (items C1–C7: first contact,
+  install and mount, container recipe, `moobfs` CLI, client library, DKMS
+  and packages prepared in VMs, optional agent adapter) and ADR-0022, which
+  keeps the kernel, UAPI and format freeze and lets these items proceed one
+  by one. Packages are not published before the stage 2 gates (journal
+  0196). Documentation only.
+
 - Merged per-mount `index_build_work` policy (PR 138, ADR-0020,
   journals 0187 and 0193):
   retain the 32,768-unit default; let a mounter choose 1,024–65,536
