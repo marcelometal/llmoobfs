@@ -71,7 +71,7 @@ outside_intact "planted temporary name"
 
 # an entry that appears after the existence check is not replaced (the final step is link(2))
 reset_outside
-# shellcheck disable=SC2329 # called by place() in place of mktemp(1)
+# shellcheck disable=SC2317,SC2329 # called by place() in place of mktemp(1); 0.9 reports SC2317
 mktemp() { t=$(command mktemp "$@") && ln -s "$outside" "$d/race" && echo "$t"; }
 refused "entry created after the check" "$d/race"
 unset -f mktemp

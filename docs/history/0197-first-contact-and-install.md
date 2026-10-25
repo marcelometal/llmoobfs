@@ -145,7 +145,11 @@ Evidence, in the pinned `debian:trixie-slim` container as uid 1000:
   `directory with FORCE: replaced` (the file ended up inside the directory),
   `planted temporary name: wrote through a link`, `entry created after the check: replaced`,
   `uninstall removed a link`.
-- Shellcheck `--shell=sh` is clean.
+- Shellcheck `--shell=sh` is clean. The first push of the correction (`57aad48`) failed the CI
+  step `make lint`. The `mktemp` wrapper carried a directive only for SC2329, the code that
+  current shellcheck reports. The 0.9.0 of Ubuntu 24.04 reports the same case as SC2317. The
+  directive now names both, and `make lint`'s shellcheck command is clean with
+  `koalaman/shellcheck:v0.9.0` and `:stable`.
 - `make install-test` was run again on the corrected tree: `MOOBFS_INSTALL_PASS` in 1065 s, with
   every marker of the first passing run, including `OVERWRITE_REFUSED`. No `BUG:`, `Oops` or
   `WARNING:` line appears in the three console logs.
