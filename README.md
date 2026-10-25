@@ -37,6 +37,10 @@ after eleven green checks; the issue and S9 fair sharing remain open
 ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md),
 [roadmap](ROADMAP.md)). No controlled before/after performance comparison
 has measured the memcg accounting overhead ([journal 0180](docs/history/0180-memcg-accounting-investigation.md)).
+The bounded per-mount work choice was subsequently merged by
+[PR 138](https://github.com/studiomoob/llmoobfs/pull/138) after twelve green
+checks ([journal 0193](docs/history/0193-merged-per-mount-build-work-policy.md));
+issue 118 remains open for broader evidence.
 
 ## The problem
 
@@ -141,7 +145,7 @@ after `F_SETFL` and attribute-read errors taken as "no attribute" while indexing
 [0144](docs/history/0144-independent-review.md), R1 and R2), and a chmod during the first build of a
 domain that could leave the file in `QUERY2` answers to users who can no longer read it (journals
 [0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
-Facts as of 2026-10-20:
+Facts as of 2026-10-25:
 
 - **One kernel series**, in a VM: Debian 6.12.111 in QEMU and upstream 6.12.112 under
   KASAN/UBSAN/lockdep, required on every pull request that touches the module; x86-64; lower
@@ -163,6 +167,12 @@ Facts as of 2026-10-20:
   query on it, and released again under memory pressure or to stay within its budget, least
   recently queried first; a query that needs every domain (the
   mount-wide `QUERY`) costs what the mount scan used to.
+- An unprivileged build is also bounded by `index_build_work` (default
+  32,768 cumulative units; a mounter may choose 1,024–65,536), a ten-second
+  cooperative deadline and rebuild-frequency limits. The default denies the
+  measured 17,000-file domain. Issue 118 stays open
+  ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
+  [journal 0193](docs/history/0193-merged-per-mount-build-work-policy.md)).
 - Mounting needs **`CAP_SYS_ADMIN` in the initial user namespace**.
 - **The interface may change**, with no compatibility promise.
 
@@ -423,7 +433,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   Negative rounds detected both original defects. Injecting the read result does not reproduce
   an actual lower-filesystem I/O failure. The full local sanitizer run at `49098aa`
   reported `XATTRREAD_PASS`, `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` and
-  `MOOBFS_KASAN_PASS` on Linux 6.12.112. Pull-request CI remains a separate pre-merge gate.
+  `MOOBFS_KASAN_PASS` on Linux 6.12.112. Those corrections are on `main`; the
+  required pull-request checks passed before that batch merged.
+  `v0.4.1-experimental` still contains both defects.
 
 - One kernel series tested (Debian 6.12.111, upstream 6.12.112 under KASAN), x86-64, in a VM;
   kernel APIs are version-specific and the pinned test target is not a compatibility promise. On
@@ -458,13 +470,14 @@ KASAN harness runs the layer suite), and no benchmark exists.
   60,000-page stage-2 bulk client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
   answer checks agreed. That run did not test MCP writes, a live mirror or
   latency. A valid 17,000-file domain was denied with `E2BIG` under the
-  experimental cap. Issue 118 remains open for policy review and
+  32,768-unit default. Issue 118 remains open for slow lower-device and
   broader-workload validation. Do not expose a multi-user mount to untrusted
   query workloads.
-  A proposed per-mount `index_build_work` range of 1,024–65,536 units keeps
-  32,768 as the default; see [ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md)
-  and [journal 0187](docs/history/0187-query-build-work-mount-policy.md)
-  for its dedicated-VM validation and pending PR checks.
+  The merged `index_build_work` option lets a mounter choose 1,024–65,536
+  units while keeping 32,768 as the default. The measured 17,000-file
+  attributed domain completed at 65,536 in a dedicated VM; see
+  [ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md)
+  and [journal 0193](docs/history/0193-merged-per-mount-build-work-policy.md).
 - `QUERY2` can retain a result buffer of up to 1,114,112 bytes per open descriptor. This
   code charges that buffer and user-triggered index/query allocations to the allocating
   task's memory cgroup where supported (issue 116, journal 0180). The mount-wide index

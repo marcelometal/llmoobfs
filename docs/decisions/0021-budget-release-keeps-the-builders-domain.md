@@ -1,9 +1,11 @@
 # ADR-0021 — A budget release drops only the builder's own domain
 
-Date: 2026-10-25. Status: **implemented; the host regression, the opt-in
-native-KVM probe, the steps `release`, `overbudget` and `buildcostevict`
-under KASAN, and the complete KASAN, UBSAN and lockdep suite passed**
-(`MOOBFS_KASAN_PASS`). Not published.
+Date: 2026-10-25. Status: **implemented and merged by PR 139** (`e57d8c5`).
+The host regression, the opt-in native-KVM probe, the steps `release`,
+`overbudget` and `buildcostevict` under KASAN, and the complete KASAN,
+UBSAN and lockdep suite passed (`MOOBFS_KASAN_PASS`). The complete
+native-KVM suite of this change was not run. The opening status originally
+ended with "Not published."
 Estimated effort: M (one to three days). This is an estimate, not recorded
 labor time. Journal 0192 records the host validation window.
 This is ADR-0021 because ADR-0020, the per-mount query-build work policy,

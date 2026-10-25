@@ -110,6 +110,30 @@ mitigation still under validation
 Publication and issue closure remain pending
 An initial fixed policy is implemented locally
 
+# Merged per-mount query-build work policy, 2026-10-25 (journal 0193).
+A proposed per-mount `index_build_work` range
+for its dedicated-VM validation and pending PR checks
+PR checks remain
+Issue 118 remains open for policy review and broader-workload validation
+Facts as of 2026-10-20
+Fatos em 2026-10-20
+as of 2026-10-20
+Pull-request CI remains a separate pre-merge gate
+pull-request CI is a separate pre-merge gate
+A CI do pull request é uma etapa separada e obrigatória antes do merge
+corrections are implemented in the review batch
+têm correções no lote de revisão
+
+# Plan page and help list, second pass on 2026-10-25 (journal 0193).
+Nothing has been released
+nothing is measured yet (M4)
+the UAPI is version 1 and may change
+may be missing from answers until the next mount
+their report is in progress
+M4 is not started
+what is pending (M4)
+not yet exercised
+
 # Cross-user budget release, stopped on the host 2026-10-25 (journal 0192).
 a query by one uid also evicted another uid's built private domain under a
 também expulsou o índice de um domínio privado construído por outro uid sob um orçamento

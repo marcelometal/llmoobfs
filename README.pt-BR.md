@@ -16,9 +16,9 @@
 > **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
 > revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
 > diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
-> código anterior a este lote de revisão. Os dois achados da
-> [revisão independente](docs/history/0144-independent-review.md) têm correções no lote de revisão,
-> já integrado à `main`. Ele passou na suíte completa integrada em VM e na
+> código anterior às correções que hoje estão na `main`. Os dois achados da
+> [revisão independente](docs/history/0144-independent-review.md) têm correções na
+> `main`. Esse lote passou na suíte completa integrada em VM e na
 > KASAN/UBSAN/lockdep local; as verificações obrigatórias do PR passaram antes do merge.
 > A `v0.4.1-experimental` ainda contém
 > ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
@@ -42,6 +42,10 @@ após onze verificações verdes; a issue e a divisão justa S9 continuam
 abertas ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md),
 [roadmap](ROADMAP.md)). Ainda não houve comparação controlada de desempenho
 antes e depois da cobrança ao cgroup de memória ([diário 0180](docs/history/0180-memcg-accounting-investigation.md)).
+A opção de limite de trabalho por montagem entrou depois pela
+[PR 138](https://github.com/studiomoob/llmoobfs/pull/138), com as doze
+verificações aprovadas ([diário 0193](docs/history/0193-merged-per-mount-build-work-policy.md));
+a issue 118 continua aberta para ampliar as evidências.
 
 ## O problema
 
@@ -151,7 +155,7 @@ atributo tomados como "sem atributo" ao indexar (revisão [0144](docs/history/01
 R1 e R2), e um chmod durante a primeira construção de um domínio, que podia deixar o arquivo nas
 respostas do `QUERY2` para usuários que já não conseguem lê-lo (diários
 [0151](docs/history/0151-review-d110d4e.md), [0152](docs/history/0152-chmod-during-build-fixed.md)).
-Fatos em 2026-10-20:
+Fatos em 2026-10-25:
 
 - **Uma série de kernel**, em VM: Debian 6.12.111 no QEMU e o 6.12.112 upstream sob
   KASAN/UBSAN/lockdep, obrigatório em todo pull request que mexe no módulo; x86-64; sistemas de
@@ -175,6 +179,13 @@ Fatos em 2026-10-20:
   consulta a cada um e liberado de novo sob pressão de memória ou para caber no orçamento, o
   consultado há mais tempo primeiro; uma consulta que precisa de todos os domínios (o `QUERY` da
   montagem inteira) custa o que a varredura da montagem custava.
+- Uma construção sem privilégio também é limitada por `index_build_work`
+  (padrão de 32.768 unidades acumuladas; quem monta pode escolher de 1.024 a
+  65.536), por um prazo cooperativo de dez segundos e por limites de
+  frequência de reconstrução. O padrão recusa o domínio medido de 17 mil
+  arquivos. A issue 118 continua aberta
+  ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
+  [diário 0193](docs/history/0193-merged-per-mount-build-work-policy.md)).
 - Montar exige **`CAP_SYS_ADMIN` no namespace de usuário inicial**.
 - **A interface pode mudar**, sem promessa de compatibilidade.
 
@@ -443,8 +454,10 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   aceitação e da camada. As negativas detectaram ambos os defeitos originais. Injetar o
   resultado de leitura não reproduz uma falha real de E/S do sistema de baixo. A rodada local
   completa sob sanitizers no commit `49098aa` registrou `XATTRREAD_PASS`,
-  `MOOBFS_ACCEPTANCE_PASS`, `MOOBFS_LAYER_PASS` e `MOOBFS_KASAN_PASS` no Linux 6.12.112.
-  A CI do pull request é uma etapa separada e obrigatória antes do merge.
+  `MOOBFS_ACCEPTANCE_PASS`,   `MOOBFS_LAYER_PASS` e `MOOBFS_KASAN_PASS` no Linux 6.12.112.
+  Essas correções estão na `main`; as verificações obrigatórias do pull
+  request passaram antes do merge desse lote. A `v0.4.1-experimental` ainda
+  contém os dois defeitos.
 
 - Uma série de kernel testada (Debian 6.12.111, 6.12.112 upstream sob KASAN), x86-64, em VM; as
   APIs do kernel dependem da versão, e o alvo de teste fixado não é promessa de compatibilidade. Em
@@ -482,9 +495,14 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   as 60 comparações de resposta entre SQLite e QUERY2 concordaram. Essa
   rodada não mediu escrita via MCP, espelhamento em tempo real nem latência.
   Um domínio válido de 17 mil arquivos foi recusado com `E2BIG` sob o
-  limite experimental. A issue 118 segue aberta para revisão da política
-  e validação com cargas mais diversas. Não exponha uma montagem
-  multiusuário a consultas não confiáveis.
+  padrão de 32.768 unidades. A opção `index_build_work` já integrada
+  permite ao responsável pela montagem escolher de 1.024 a 65.536, mantendo
+  o padrão; o domínio medido completou com 65.536 em VM dedicada
+  ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
+  [diário 0193](docs/history/0193-merged-per-mount-build-work-policy.md)).
+  A issue 118 segue aberta para testes com dispositivo inferior realmente
+  lento e projeto real maior. Não exponha uma montagem multiusuário a
+  consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).

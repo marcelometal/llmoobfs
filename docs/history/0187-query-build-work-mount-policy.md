@@ -1,6 +1,6 @@
 # 0187 — Per-mount query-build work policy
 
-Date: 2026-10-25. Status: local implementation validated; approved for PR, CI pending.
+Date: 2026-10-25. Status: implementation merged by PR 138; issue 118 open.
 Work started and ended: 2026-10-25. Labor time was not measured.
 
 ## Goal and decision
@@ -103,3 +103,12 @@ on 2026-10-25. `make test` then exited zero on macOS: 60 attribute checks
 and nine image tests passed. Push the branch, open the PR and run its
 required CI. Issue 118 stays open for the broader evidence. No push or PR
 had occurred when this journal update was committed.
+
+## Post-merge status, 2026-10-25
+
+PR 138's exact head `6621b21` passed twelve reported checks, including
+Native Linux VM and KASAN/lockdep, then merged as `b7ae1b8`. The merge
+tree equals that validated head. The preceding sections preserve the
+pre-publication checkpoint; journal 0193 records the current-state
+reconciliation. Issue 118 remains open for the untested lower-device and
+single-project client shapes.

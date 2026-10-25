@@ -372,7 +372,8 @@ directory visit or `index_load` attempt costs one unit. Exceeding it returns
 `E2BIG`. A ten-second elapsed deadline, checked between lower operations,
 returns `ETIMEDOUT`. One lower operation can itself outlast the deadline;
 these limits do not promise a strict CPU-time or physical-I/O-byte cap.
-There is no mount option to raise these experimental constants. An error
+ADR-0019 published these constants with no mount option; the per-mount
+choice is the later note in this section. An error
 drops the partially built domain. Individual `QUERY2` calls do not publish
 a successful partial result; on any `QUERY2_BATCH` error, clients must
 discard all outputs, including buffers copied by earlier subqueries.
@@ -393,6 +394,13 @@ may admit larger domains by choosing a higher bound or reduce work with a
 lower one; the 10-second cooperative deadline and 16-per-UID/64-per-mount
 admission limits remain. An invalid value is refused at mount, and a
 changed value is refused on new mount-API reconfiguration. The earlier
-paragraphs describe the published fixed-policy checkpoint; this note
-describes the proposed compatibility extension and does not establish a
+paragraphs describe the fixed-policy checkpoint; this note records the
+proposal as written before PR 138 merged it and does not establish a
 strict CPU/I/O bound.
+
+*2026-10-25 publication, PR 138 and journal 0193:* The option described
+above merged in `main` as `b7ae1b8` after twelve green PR checks. The
+earlier fixed-policy paragraphs and proposal note remain dated checkpoints;
+the published behavior is the 32,768 default with a 1,024–65,536
+per-mount choice. Issue 118 remains open for slow lower-device and large
+single-project client evidence.

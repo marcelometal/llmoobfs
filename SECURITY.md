@@ -110,9 +110,9 @@ These are targets for a single volunteer maintainer, not guarantees:
 The [review of 2026-10-20](docs/history/0144-independent-review.md) found two defects beyond
 ADR-0011: stale backing-file flags after `F_SETFL` (R1), and operational lower `getxattr`
 errors skipped during indexing (R2). Both affect `v0.4.1-experimental`. Corrections are
-implemented in the review batch. The full integrated VM suite and local
-KASAN/UBSAN/lockdep run at `49098aa` passed; pull-request CI is a separate
-pre-merge gate. R1 synchronizes mutable lower flags before delegated I/O
+on `main`. The full integrated VM suite and local
+KASAN/UBSAN/lockdep run at `49098aa` passed, and the required pull-request
+checks passed before that batch merged. R1 synchronizes mutable lower flags before delegated I/O
 ([0149](docs/history/0149-sync-backing-file-flags.md)). R2 propagates operational read errors
 through the existing build/adoption failure paths, while preserving the exclusions for
 missing, oversized or malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)).
@@ -146,9 +146,14 @@ I/O of that scan. A bounded KVM probe measured the work
 ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
 The maintainer chose the resource-limit direction; `main` includes
 experimental work and rebuild-frequency limits
-([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)).
+([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md))
+and a per-mount `index_build_work` choice of 1,024–65,536 units, default
+32,768 ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
+[PR 138](https://github.com/studiomoob/llmoobfs/pull/138)).
 They do not strictly cap CPU time or physical I/O, nor provide fair index
-memory shares. A later change stops a budget release from dropping a domain
+memory shares. The default still denies the measured valid 17,000-file
+domain with `E2BIG`; 65,536 completed that fixture in a dedicated VM.
+A later change stops a budget release from dropping a domain
 last built by another filesystem uid: the query returns `ENOMEM` when the
 remainder is too small, and one uid can still fill the whole budget
 ([ADR-0021](docs/decisions/0021-budget-release-keeps-the-builders-domain.md),
@@ -158,8 +163,7 @@ dedicated host. The steps `release`, `overbudget` and `buildcostevict`
 also passed there under KASAN, UBSAN and lockdep. The complete KASAN, UBSAN
 and lockdep suite of this change then exited 0 (`MOOBFS_KASAN_PASS`). The
 complete native-KVM suite of this change was not run. Local VM and KASAN
-suites and all eleven PR checks passed for
-the earlier guard. The experimental cap denied a valid 17,000-file domain
-with `E2BIG`. Policy review, broader workload validation and issue closure
-remain pending. Avoid
-untrusted multi-user query workloads while this issue is open.
+suites and all eleven PR checks passed for the earlier guard.
+Issue 118 remains open for a real slow lower device, a large
+single-project client and broader-workload validation. Avoid untrusted
+multi-user query workloads while this issue is open.
