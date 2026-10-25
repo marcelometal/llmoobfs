@@ -93,3 +93,17 @@ Local ShellCheck was unavailable; the updated PR CI is the remaining lint
 gate. The full regression VM suite was not repeated locally because the
 production module was unchanged; the dedicated MCP pilot and full run
 above exercised the real-client path.
+
+## Publication update — 2026-10-25
+
+The maintainer authorized completing the previously reviewed PR 136.
+Immediately before merge, `origin/main` was still `2396c16`, the PR head
+was `40ed7f5`, all eleven checks had completed successfully, the PR was
+mergeable, and no reviews or comments were pending. GitHub merged it into
+`main` as `c2fc2df` at 2026-10-25T08:48:11Z. The merge commit's tree was
+verified identical to the validated PR head with
+`git diff --quiet 40ed7f5 origin/main`; the local `main` advanced by
+fast-forward and was clean. Issue 118 remained open after the merge for
+the compatibility and numerical-policy decision. This update records
+publication of the measured code and documentation; it does not claim a
+new performance threshold or a resolved issue.

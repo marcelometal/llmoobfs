@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-- Investigation (journal 0186, issue 118): a real ai-memory MCP workload
-  wrote 2,000 requested pages in ten projects through the guarded layer
-  inside a dedicated VM, with zero refused writes. The client created one
+- Investigation (journal 0186, PR 136 merged; issue 118 open): a real
+  ai-memory MCP workload wrote 2,000 requested pages in ten projects
+  through the guarded layer inside a dedicated VM, with zero refused
+  writes. The client created one
   additional profile page; the mirror covered all 2,001 pages and 66
   SQLite-versus-`QUERY2` comparisons passed. This bounded client shape
   does not decide the larger-domain limit; issue 118 stays open.
