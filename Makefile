@@ -7,7 +7,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
 
-.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext install uninstall install-test
+.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext install uninstall install-test install-unit
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -29,6 +29,7 @@ help:
 	@echo '  sudo make install  build the layer module and tools, copy them, depmod (refuses other kernels)'
 	@echo '  sudo make uninstall  remove what install copied; lower directories are untouched'
 	@echo '  make install-test  follow docs/operations.md in a disposable Debian 13 VM; needs only Docker'
+	@echo '  make install-unit  install.sh never replaces an existing entry without FORCE=1 (Linux)'
 	@echo 'Details: docs/development.md and docs/testing.md'
 tools: $(BUILD)/mkfs.moobfs $(BUILD)/fsck.moobfs $(BUILD)/attr_test
 # SQL over a domain, no database (ADR-0013, journal 0108): load with .load or load_extension
@@ -110,3 +111,5 @@ uninstall:
 	sh scripts/install.sh uninstall
 install-test:
 	sh vm/install-test/run.sh
+install-unit:
+	sh scripts/test-install.sh

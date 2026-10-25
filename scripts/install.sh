@@ -48,15 +48,30 @@ check_kernel() {
 	die "see docs/operations.md; MOOB_ALLOW_UNSUPPORTED=1 overrides at your own risk"
 }
 
-# Creation must not overwrite existing files by default (AGENTS.md).
+# Creation must not overwrite existing files by default (AGENTS.md). Any entry counts as
+# existing, a dangling symbolic link included. The copy goes to a new temporary name from
+# mktemp(1), never a fixed one, and reaches the destination through link(2), which fails on an
+# existing entry, so one that appears after the check is not replaced either. FORCE=1 renames
+# over a file or link; a directory is never replaced.
 place() {   # place <source> <destination> <mode>
-	if [ -e "$2" ] && [ "${FORCE:-}" != 1 ]; then
+	if [ -d "$2" ] && [ ! -L "$2" ]; then
+		die "$2 is a directory; not replacing it"
+	fi
+	if [ "${FORCE:-}" != 1 ] && { [ -e "$2" ] || [ -L "$2" ]; }; then
 		die "$2 exists; uninstall first, or FORCE=1 to replace it"
 	fi
 	mkdir -p "$(dirname "$2")"
-	cp "$1" "$2.moobfs-new"
-	chmod "$3" "$2.moobfs-new"
-	mv -f "$2.moobfs-new" "$2"
+	tmp=$(mktemp "$(dirname "$2")/.moobfs-install.XXXXXX") || die "cannot create a file next to $2"
+	if ! { cp "$1" "$tmp" && chmod "$3" "$tmp"; }; then
+		rm -f "$tmp"
+		die "cannot copy $1 next to $2"
+	fi
+	if [ "${FORCE:-}" = 1 ]; then
+		mv -fT "$tmp" "$2" || { rm -f "$tmp"; die "cannot replace $2"; }
+	else
+		ln -T "$tmp" "$2" 2>/dev/null || { rm -f "$tmp"; die "$2 exists; uninstall first, or FORCE=1 to replace it"; }
+		rm -f "$tmp"
+	fi
 	echo "installed $2"
 }
 
@@ -91,15 +106,20 @@ do_uninstall() {
 		die "moobfs_layer is loaded; unmount every moobfs_layer mount and run rmmod moobfs_layer first"
 	fi
 	for f in "$MODDIR/moobfs_layer.ko" $(for t in $TOOLS; do echo "$BINDIR/$t $MANDIR/$t.1"; done); do
-		if [ -e "$f" ]; then
+		if [ -f "$f" ] && [ ! -L "$f" ]; then
 			rm -f "$f"
 			echo "removed $f"
+		elif [ -e "$f" ] || [ -L "$f" ]; then
+			echo "left $f: not a regular file, so install did not put it there" >&2
 		fi
 	done
 	rmdir "$MODDIR" 2>/dev/null || true
 	[ -n "$DESTDIR" ] || depmod -a "$KVER"
 	echo "moobfs uninstall: done for kernel $KVER; lower directories are untouched"
 }
+
+# scripts/test-install.sh sources this file to test place() and do_uninstall().
+[ "${MOOB_INSTALL_SOURCED:-}" != 1 ] || return 0
 
 case $ACTION in
 install) do_install ;;

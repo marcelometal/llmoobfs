@@ -106,6 +106,50 @@ checker now also covers `docs/status.md`, `docs/status.pt-BR.md` and `docs/opera
 `vm/install-test/*.sh` (koalaman/shellcheck:stable in Docker) and `git diff --check` exited zero.
 `make checkpatch`, `make vm-test` and KASAN were not run: the module did not change.
 
+## Correction before merge: `install.sh` could replace existing entries
+
+While pull request 143 was waiting for merge, a reviewing agent, with the maintainer's
+authorization, read `scripts/install.sh`. It found that the promise not to overwrite without
+`FORCE=1` did not hold. The merge waited for the correction.
+
+- The existence check was `test -e`, which is false for a dangling symbolic link. So such a link at
+  a destination was replaced.
+- The copy went to a fixed name, `<destination>.moobfs-new`. If something already existed there
+  (for example a symbolic link planted in a staging directory), `cp` wrote through it.
+- The last step was `mv -f`, which replaced anything that appeared after the check. With `FORCE=1`
+  and a directory at the destination, it moved the file into that directory.
+- `uninstall` removed any entry with `test -e`, including a symbolic link to a file elsewhere.
+
+The correction, in `place()`:
+
+- Every entry counts as existing (`-e` or `-L`), and a directory is refused even with `FORCE=1`.
+- The copy goes to a new name from `mktemp` in the destination directory, created exclusively and
+  removed on any failure.
+- Without `FORCE=1`, the copy reaches its destination with `ln -T`. `link(2)` fails on any existing
+  entry, so the step cannot replace an entry created after the check. With `FORCE=1` it uses
+  `mv -fT`, which renames over a file or link itself and never into a directory.
+- `uninstall` removes only regular files and names anything else it leaves.
+
+New test `scripts/test-install.sh` (`make install-unit`, added to the CI job "Tools and
+sanitizers"). It sources `install.sh`, runs as an ordinary user in a scratch `DESTDIR`, and covers
+these cases: a regular file, a dangling link, a live link, a FIFO and a directory (also with
+`FORCE=1`); a link planted at the old temporary name; an entry created between the check and the
+final step (a `mktemp` wrapper creates it); `FORCE=1` on a file and on a link; temporary files left
+behind; and `uninstall` with a link in place.
+
+Evidence, in the pinned `debian:trixie-slim` container as uid 1000:
+
+- With the corrected script: `INSTALL_UNIT_PASS`.
+- Negative round, the same test against the script of commit `de8cf7c` (only the sourcing guard
+  added; `fail` made non-fatal to list every case). Every reported defect reproduced: `dangling link: replaced`,
+  `directory with FORCE: replaced` (the file ended up inside the directory),
+  `planted temporary name: wrote through a link`, `entry created after the check: replaced`,
+  `uninstall removed a link`.
+- Shellcheck `--shell=sh` is clean.
+- `make install-test` was run again on the corrected tree: `MOOBFS_INSTALL_PASS` in 1065 s, with
+  every marker of the first passing run, including `OVERWRITE_REFUSED`. No `BUG:`, `Oops` or
+  `WARNING:` line appears in the three console logs.
+
 ## Public surfaces
 
 Updated: both READMEs, the new status pages, `ROADMAP.md`, `docs/README.md`,
@@ -136,6 +180,7 @@ this unit changes.
 
 ## Next step
 
-The pull request with journals 0196 and 0197 waits for its checks and the maintainer's merge.
+The pull request with journals 0196 and 0197 waits for its checks on the correction above and the
+maintainer's merge.
 Then C3 (container recipe) or C4 (`moobfs` CLI). The core front owns issue 142, which asks to add
 the current Debian 6.12 kernel to CI and to `scripts/supported-kernels`.

@@ -61,7 +61,9 @@ and copies:
 | `moobfs-attr`, `moobfs-check`, `moobfs-index` | `/usr/local/bin/` |
 | Their manual pages | `/usr/local/share/man/man1/` |
 
-It refuses to replace a file that already exists; `FORCE=1` replaces it (see Upgrade).
+It refuses to replace anything already at a destination, a symbolic link included; `FORCE=1`
+replaces a file or link (see Upgrade), never a directory. `make uninstall` removes only regular
+files.
 `PREFIX` changes `/usr/local`; `DESTDIR` stages everything in another root without `depmod`.
 
 Load it and check that the kernel knows the filesystem type:
