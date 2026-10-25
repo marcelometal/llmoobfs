@@ -107,3 +107,8 @@ six changed files. No module build, VM or host run.
 The maintainer accepted section 12 as written. Journal
 [0195](0195-g4-derived-index-package.md) implemented the package and passed
 its bounds in three runs.
+
+Note, 2026-10-25: pull request 140 merged first (`4f5148f`). This journal's
+commit and journal 0195's were applied again on that main, with the
+`Signed-off-by` line the CI requires; the changelog and the history index
+keep both sides, 0193 before 0194.
