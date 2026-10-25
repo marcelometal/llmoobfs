@@ -360,6 +360,10 @@ of this change was not run.
 
 ## 10. Still unbound
 
+Note, 2026-10-25: section 12 proposes G4's freshness and inventory bounds.
+They bind only once the maintainer accepts that section. It was accepted the
+same day, and the G4 package met those bounds (journal 0195).
+
 G4's freshness bound and G5's recall floor are not set, so those items and
 the G6 final evaluation cannot pass yet. The final evaluation, when those
 amendments exist, is still one real client, two OS identities, private and
@@ -386,3 +390,183 @@ On 2026-10-25 the budget-release filter of ADR-0021 met the property on
 the dedicated host (journal 0192). The complete KASAN, UBSAN and lockdep
 suite of that change then exited 0. The latency ceiling is still unset, so
 G2 remains incomplete.
+
+Later on 2026-10-25, section 12 proposed the G4 amendment. G4's
+implementation waits for its acceptance. G5 waits on G4.
+
+The maintainer accepted section 12 the same morning. The G4 package then met
+every bound of section 12.6 in three runs on the dedicated host (journal
+[0195](history/0195-g4-derived-index-package.md)). G5's relevance floor and
+the final evaluation stay unbound.
+
+## 12. G4 amendment, 2026-10-25 — proposed, not accepted
+
+Status: proposed by journal [0194](history/0194-g4-protocol-amendment.md).
+The maintainer has not accepted it, nothing below has run, and no number in
+this section was measured for it. Once accepted, sections 12.1 to 12.6 are
+fixed under the rule of section 1 and are not edited after a result. Until
+then G4 stays unstarted.
+
+Acceptance note, 2026-10-25 (journal [0195](history/0195-g4-derived-index-package.md)):
+the maintainer accepted this section as written, before any G4 run.
+Sections 12.1 to 12.6 are fixed from that point. The heading keeps its
+original wording.
+
+### 12.1 What G4 is in this batch, and what it does not change
+
+G4 is the lifecycle of a **derived index** kept by the client in user space:
+one vector per memory, computed from the memory's content by a named model.
+The batch tests that this index stays equal to the files it was derived from
+through update, rename, delete, permission revocation, a stopped or restarted
+watcher, lost change events and a model change. It does not test whether the
+vectors find useful memories. Relevance is G5.
+
+No change to `layer/`, the UAPI, the disk format, mount options or attribute
+encoding. The G1 adapter's `put`, `get` and structured `search` keep their
+code and their section 6 counts: B1, B2 and B4 stay 0, because the derived
+index is not in the data directory and `put` does not write it. A text query
+on the adapter's `BaseStore.search` still raises `NotImplementedError`.
+Wiring a vector query into that method is G5. Revisions and change history
+stay in the client under [M3 section 5](spec-m3.md). No kernel change cursor
+is requested.
+
+### 12.2 Identity, version and model
+
+- **Identity** is the LangGraph pair `(namespace, key)`, which in the adapter
+  is the path below the data directory. A rename outside the adapter is, for
+  LangGraph, a delete of one key and a new key. The derived index follows
+  that. `user.moob.memory_id` is not introduced by this batch.
+- **Content version** is the SHA-256 of the file's bytes, read as the
+  indexing uid. Modification time and size are not the version: a change in
+  the same timestamp tick with the same size is the racy-clean case git
+  documents, and a stat comparison would keep an obsolete vector.
+- **Model** is a named, deterministic embedding with no dependency:
+  `hash64-v1` maps the value's canonical JSON (sorted keys, no spaces) to 64
+  signed float32 components by feature hashing of its tokens, then L2
+  normalization. `hash64-v2` is the same with another seed. It stands in for
+  an embedding model so that a model change can be tested. It is not a
+  relevance claim and is not the G5 model.
+
+A derived entry is `(namespace, key, sha256, model, vector)`. It holds no
+value bytes.
+
+### 12.3 Where the derived index lives, and who may read it
+
+One derived index per OS identity, under that uid's cache directory, outside
+the data directory: `$XDG_CACHE_HOME/moobfs-g4/` (default
+`~/.cache/moobfs-g4/`), directory `0700`, files `0600`, owned by the uid. A
+uid indexes only what it can open itself. Uid 1001 and uid 1002 therefore
+each derive their own entries for `team`. That duplicate work is recorded,
+not bounded. Root is not claimed to be kept out of a cache.
+
+The **eligible set** of a uid is every memory `.json` of the corpus, in
+`alice`, `bob` and `team`, that the uid can open and read at that moment.
+`salary.json` is outside uid 1001's eligible set and inside uid 1002's.
+
+The **oracle** is a fresh scan: the eligible set walked, read, hashed and
+embedded from nothing, with the current model, by code that does not read
+the derived index. The model function is shared, because it is the model.
+
+### 12.4 How the index follows changes
+
+The watcher reuses the state-based design of journal
+[0092](history/0092-userspace-index-baseline.md): one inotify watch per
+directory, added before the directory is read; every event becomes a path to
+look at again; each path ends equal to the disk at that moment, including
+"gone". Events watched: close after write, create, delete, both sides of a
+rename, and `IN_ATTRIB` on files and directories. A mode change on a
+directory re-evaluates its subtree. `IN_Q_OVERFLOW` forces a full pass. So
+does a start, which also covers any change made while no watcher ran.
+
+inotify on a layer directory reports changes made through the layer (journal
+[0030](history/0030-verification-notify-landlock-timing.md)). A change made
+directly on the lower tree is not claimed to reach a watcher on the mount. It
+is reconciled by the next full pass. A full pass reuses a cached vector when
+`(namespace, key, sha256, model)` matches, and embeds otherwise.
+
+A derived search is exact: score every entry of the uid's index under the
+requested namespace prefix, with the current model only, top k, ties broken
+by `(namespace, key)`. Each candidate is then opened and read as the caller.
+A candidate whose bytes no longer hash to the entry's `sha256`, or that the
+caller can no longer open, is not returned, and its path is queued for the
+watcher. That read is not a permission system and does not hide counts,
+scores or timing (ROADMAP rule 4).
+
+Code goes in `bench/client/` next to the adapter: the watcher and reconciler
+in one module, the mounted test in another. inotify is called through
+`ctypes` on libc, as the adapter already calls `ioctl`.
+
+### 12.5 Scenarios
+
+Host and corpus are those of sections 3 and 4: the dedicated Debian host,
+ext4, the same LangGraph pins, seed 1, the 7 000 adapter files and
+`salary.json`. Uid 1001 and uid 1002 each run one watcher. Unless a scenario
+says otherwise, uid 1002 makes the changes in `team` and in `bob`, and both
+inventories are compared.
+
+| Id | Change | What must follow |
+| --- | --- | --- |
+| E1 | 100 updates of existing keys through the adapter, values changed | new `sha256`, new vector |
+| E2 | 100 new keys through the adapter | new entries |
+| E3 | 100 deletes through the adapter | entries gone |
+| E4 | 50 renames with `mv` inside `team`, outside the adapter | old key gone, new key present; re-embeds recorded |
+| E5 | uid 1002 changes 10 of its own `team` files from `0664` to `0600` | out of uid 1001's index; still in uid 1002's |
+| E6 | root changes `team` to `2700`, then back to `2770` after reconciliation | every `team` entry out of uid 1001's index and back again |
+| E7 | uid 1001's watcher killed with SIGKILL; 200 changes of E1 to E3 kinds; watcher restarted | start pass reconciles them |
+| E8 | `fs.inotify.max_queued_events` set to 64 as root before uid 1001's watcher starts; watcher stopped with SIGSTOP; 1 000 changes; SIGCONT | at least one `IN_Q_OVERFLOW` recorded, then a full pass; the sysctl is restored afterwards |
+| E9 | model switched from `hash64-v1` to `hash64-v2` for uid 1001 while its watcher runs | every entry re-embedded with v2 |
+| E10 | root writes 20 files directly on the lower tree, then uid 1001's watcher is restarted | whether the running watcher saw them is recorded; the start pass reconciles them |
+| E11 | two publishers of one key in `team`, 30 rounds, as in section 4 | last-rename-wins; one entry per final name |
+
+### 12.6 Bounds that pass or fail G4 (proposed)
+
+All required. One miss fails the package. "Reconciled" means the watcher has
+an empty queue and no full pass running after the scenario's last change.
+
+**Inventory.** After each scenario is reconciled, each uid's derived index
+equals that uid's oracle: 0 missing entries, 0 extra entries, 0 `sha256`
+differences, 0 entries of another model, 0 vector differences.
+
+**Nothing obsolete served.** During and after every scenario, a derived
+search returns 0 items whose returned bytes differ from the entry they were
+scored with, 0 deleted keys once reconciled, and, after E9's switch, 0 items
+scored with a `hash64-v1` vector. During E9 a memory not yet re-embedded is
+absent from derived results; the count of such absences is recorded.
+
+**Revocation.** After E5 and E6 are reconciled, uid 1001's index holds 0
+entries for the revoked files and its derived searches return 0 of them,
+neither as a value nor as a ranked key. Between the change and its
+reconciliation, the item may be scored and then dropped because `open`
+fails; those drops are counted and do not fail the case. No value of a
+revoked file reaches uid 1001 after its `open` would fail. Content a process
+already read before the revocation is not retracted.
+
+**Protected cache.** Uid 1002's `open` of uid 1001's cache directory and
+files fails, and the reverse. No cache file contains a value's canonical
+JSON or its `note` string.
+
+**Freshness, live (F1).** With the watcher running and one writer, over E1,
+E2 and E3: from the return of the adapter's `put` (or of `unlink` for E3) to
+the moment the other uid's index reflects it, p99 at most 1 s and maximum at
+most 5 s, in each of 3 runs. 0 changes never reflected. The live sidecar of
+journal [0071](history/0071-client-stage2-live-mirror.md) set attributes 17.9
+ms after mtime at p99 and 306 ms at most; the bound leaves room for hashing
+and embedding in Python. It is a workload choice, not a guarantee.
+
+**Freshness, recovery (F2).** After E7, E8, E9 and E10, the start or overflow
+pass of uid 1001 (6 000 eligible files, plus E2's new keys) reaches the
+inventory bound above in at most 60 s, in each of 3 runs.
+
+**Real overflow.** E8 records at least one `IN_Q_OVERFLOW`. A run with none
+is not a pass of E8; the queue size is not adjusted after a result.
+
+### 12.7 Recorded and not bounded
+
+The size of each uid's cache, the watcher's `VmHWM`, re-embeds per scenario
+(E4 is expected to reuse vectors), the duplicate `team` work of two uids,
+derived-search latency, and whether E10's running watcher saw the lower-tree
+writes. None of these can pass or fail G4 or G6.
+
+Still unbound after this amendment: G5's relevance floor and recall@k, any
+derived-search latency ceiling, and the G2 latency ceiling. A change of the
+concurrency or the corpus is a new dated amendment, before its run.

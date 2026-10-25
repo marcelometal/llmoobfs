@@ -18,6 +18,24 @@
   by one. Packages are not published before the stage 2 gates (journal
   0196). Documentation only.
 
+- G4 protocol amendment proposed (journal 0194, protocol section 12): a
+  per-uid derived index (one vector per memory, SHA-256 content version,
+  deterministic stand-in model) in a `0700` cache outside the data
+  directory, kept by a state-based inotify watcher with full passes at
+  start and on queue overflow. Eleven scenarios and proposed bounds:
+  inventory equal to a fresh scan, nothing obsolete served, revocation and
+  cache protection, live freshness p99 at most 1 s, recovery within 60 s.
+  Accepted by the maintainer the same day.
+
+- G4 derived-index package (journal 0195): `bench/client/g4_derived.py`
+  (watcher, reconciler, exact derived search) and `bench/client/g4_mounted.py`.
+  On the dedicated Debian host, ext4, three runs passed every bound of
+  protocol section 12.6: inventories equal to a fresh scan after each of
+  E1–E11, nothing obsolete served, revocation and cache protection held,
+  live freshness p99 0.098–0.444 s (max 0.454 s), recovery after restart,
+  queue overflow, model change and lower-tree writes in 0.77–1.08 s. No
+  change to the layer, the UAPI or the G1 adapter. G5 not started.
+
 - Merged per-mount `index_build_work` policy (PR 138, ADR-0020,
   journals 0187 and 0193):
   retain the 32,768-unit default; let a mounter choose 1,024–65,536

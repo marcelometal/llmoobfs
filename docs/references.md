@@ -403,7 +403,26 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   uses to see the QUERY2 waiting; `/proc/<pid>/stack` and `wchan` gave no
   function names in the guest kernel.
 
-## 9. Consumable path (ADR-0022, journal 0196)
+## 9. G4 derived-index protocol (journal 0194, proposed)
+
+- Linux v6.12.112, `fs/notify/notification.c` `fsnotify_insert_event()` and
+  `fs/notify/inotify/inotify_user.c` (`max_queued_events`, default 16 384,
+  read by `inotify_new_group()`), GPL-2.0: once a group's queue holds
+  `max_events` events, one `IN_Q_OVERFLOW` event replaces further events. E8
+  of protocol section 12 lowers the sysctl to cause that. Read from the
+  stable tree at the tag, not built.
+- [inotify(7)](https://man7.org/linux/man-pages/man7/inotify.7.html):
+  overflow and the need for a rescan; with the fanotify entry above.
+- Weinberger et al., [Feature Hashing for Large Scale Multitask
+  Learning](https://arxiv.org/abs/0902.2206), ICML 2009. The stand-in model
+  `hash64-v1` hashes tokens into a fixed number of signed components.
+- [FIPS 180-4, Secure Hash Standard](https://csrc.nist.gov/pubs/fips/180-4/upd1/final),
+  NIST 2015: SHA-256 as the content version, through Python's `hashlib`.
+- Git, [racy-git](https://git-scm.com/docs/racy-git): why a stat comparison
+  alone can miss a change made within one timestamp tick; reason the content
+  version is a hash, not mtime and size.
+
+## 10. Consumable path (ADR-0022, journal 0196)
 
 - [OpenZFS](https://github.com/openzfs/zfs), CDDL: an out-of-tree Linux filesystem module
   distributed through DKMS (Debian's `zfs-dkms`), whose build checks a stated range of

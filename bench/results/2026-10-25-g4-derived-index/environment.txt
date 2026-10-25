@@ -1,0 +1,5 @@
+6.12.111+deb13-amd64
+Python 3.13.5
+model name	: Intel(R) Core(TM) i7-2635QM CPU @ 2.00GHz
+8
+/dev/sda1        20G  2.1G   17G  12% /srv/moob/ext4
