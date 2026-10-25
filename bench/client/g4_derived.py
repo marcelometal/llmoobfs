@@ -233,6 +233,9 @@ class Watcher:
         self.dirty, self.applied = set(), []
         self.overflows, self.passes, self.embeds = 0, 0, 0
         self.dropped = {}
+        self._open_inotify()
+
+    def _open_inotify(self):
         libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
         self._add = libc.inotify_add_watch
         self._add.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32]

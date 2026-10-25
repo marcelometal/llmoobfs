@@ -581,6 +581,11 @@ The maintainer has not accepted it, nothing below has run, and no number in
 this section was measured for it. Once accepted, sections 13.1 to 13.6 are
 fixed under the rule of section 1. Until then G5 stays unstarted.
 
+Acceptance note, 2026-10-25 (journal [0197](history/0197-g5-hybrid-retrieval-package.md)):
+the maintainer accepted this section as written, before any download or
+run. Sections 13.1 to 13.6 are fixed from that point. The heading keeps its
+original wording.
+
 ### 13.1 What G5 is in this batch, and what it does not change
 
 Hybrid retrieval in user space: a structured filter answered by `QUERY2`, a
