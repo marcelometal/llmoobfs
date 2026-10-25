@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- G5 protocol amendment proposed (journal 0196, protocol section 13):
+  LongMemEval labels (110 instances, one file per turn), exact
+  `all-MiniLM-L6-v2`, SQLite FTS5 BM25 and reciprocal rank fusion, the
+  MoobFS path against the same engines over plain files with a metadata
+  table, and bounds for identical answers, authorization, a relative
+  relevance floor and latency. Not accepted and not run.
+
 - G4 protocol amendment proposed (journal 0194, protocol section 12): a
   per-uid derived index (one vector per memory, SHA-256 content version,
   deterministic stand-in model) in a `0700` cache outside the data

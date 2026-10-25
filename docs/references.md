@@ -421,3 +421,21 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 - Git, [racy-git](https://git-scm.com/docs/racy-git): why a stat comparison
   alone can miss a change made within one timestamp tick; reason the content
   version is a hash, not mtime and size.
+
+## 10. G5 retrieval protocol (journal 0196, proposed)
+
+- Wu, Wang, Yu, Zhang, Chang and Yu, [LongMemEval: Benchmarking Chat
+  Assistants on Long-Term Interactive Memory](https://arxiv.org/abs/2410.10813),
+  ICLR 2025; code [xiaowu0162/LongMemEval](https://github.com/xiaowu0162/LongMemEval)
+  (MIT) and data
+  [xiaowu0162/longmemeval-cleaned](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned)
+  (MIT). The labeled questions of protocol section 13; fields as in the
+  repository's README, read 2026-10-25.
+- [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2),
+  Apache-2.0, 384 dimensions, truncation at 256 word pieces (model card read
+  2026-10-25); Reimers and Gurevych, [Sentence-BERT](https://arxiv.org/abs/1908.10084),
+  EMNLP 2019. The vector branch; not yet downloaded.
+- Järvelin and Kekäläinen, [Cumulated gain-based evaluation of IR
+  techniques](https://doi.org/10.1145/582415.582418), ACM TOIS 2002. nDCG@10.
+- SQLite FTS5 `bm25()` and reciprocal rank fusion are the entries of the
+  algorithm-fit assessment above.
