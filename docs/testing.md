@@ -64,8 +64,19 @@ first sample is not claimed to have incurred physical reads.
 excluded from the full suite to keep its default run bounded.
 `MOOB_ONLY=buildcostevict` is a separate opt-in probe: private domains for
 uids 1001 and 1002 each fit a budget sized from one measured domain, but
-not together. Alternating unprivileged queries must expose the shared-budget
-release and rebuild through `GET_INFO` and tracepoints.
+not together. uid 1002's query must return `ENOMEM` without releasing uid
+1001's domain, and uid 1001's following query must not rebuild
+([ADR-0021](decisions/0021-budget-release-keeps-the-builders-domain.md)).
+On 2026-10-25 that step passed under native KVM on the dedicated host and
+printed `BUILD_COST_CROSS_USER_HELD` with budget 1762216. The same step
+against the pre-filter module stopped at `bce-second-user`. It is not a
+complete suite. The same morning, `release`, `overbudget` and
+`buildcostevict` passed under KASAN, UBSAN and lockdep
+(`MOOBFS_KASAN_ONLY_PASS`). The complete KASAN, UBSAN and lockdep suite of
+this change then exited 0 (`MOOBFS_KASAN_PASS`). The complete native-KVM
+suite of this change was not run. Journal
+0182 recorded the older result, in which the second query released the
+first domain. Journal 0192 records these rounds.
 `MOOB_ONLY=buildlimit` is an opt-in and slower issue 118 regression. It
 reformats the disposable ext4 test device with enough inodes, builds a
 17,000-file domain that must fail with `E2BIG` without publishing output,

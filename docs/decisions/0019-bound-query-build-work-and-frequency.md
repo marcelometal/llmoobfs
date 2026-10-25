@@ -11,7 +11,7 @@ passed on head `94dc454`. The earlier status describes the local checkpoint.
 The numerical policy remains experimental; the 17,000-file denial and the
 absence of strict CPU-time or physical-I/O bounds remain known limitations.
 
-*Status update, 2026-10-25 (journal 0188):* ADR-0020 supersedes this ADR's
+*Status update, 2026-10-25 (journal 0193):* ADR-0020 supersedes this ADR's
 fixed 32,768-unit choice with a bounded per-mount `index_build_work` option,
 merged by PR 138 after twelve green checks. The default stays 32,768;
 the admission, accounting, deadline and output-on-error decisions here

@@ -91,4 +91,4 @@ PR 138 passed all twelve reported checks on head `6621b21` and merged as
 `b7ae1b8`, publishing this mount option in `main`. The preceding paragraph
 records the pre-merge review state. The compatibility choice remains the
 32,768 default with a bounded operator opt-in; issue 118 remains open for
-real slow lower-device and large single-project evidence (journal 0188).
+real slow lower-device and large single-project evidence (journal 0193).

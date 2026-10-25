@@ -398,7 +398,7 @@ paragraphs describe the fixed-policy checkpoint; this note records the
 proposal as written before PR 138 merged it and does not establish a
 strict CPU/I/O bound.
 
-*2026-10-25 publication, PR 138 and journal 0188:* The option described
+*2026-10-25 publication, PR 138 and journal 0193:* The option described
 above merged in `main` as `b7ae1b8` after twelve green PR checks. The
 earlier fixed-policy paragraphs and proposal note remain dated checkpoints;
 the published behavior is the 32,768 default with a 1,024–65,536

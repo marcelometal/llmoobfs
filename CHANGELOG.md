@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Merged per-mount `index_build_work` policy (PR 138, ADR-0020,
-  journals 0187–0188):
+  journals 0187 and 0193):
   retain the 32,768-unit default; let a mounter choose 1,024–65,536
   cumulative work units. A dedicated VM opt-in test admitted a valid
   17,000-file attributed domain at the upper bound while the default
@@ -11,6 +11,62 @@
   passed locally; all twelve PR checks passed, including Native Linux VM
   and KASAN/lockdep. The deadline and admission limits are unchanged;
   issue 118 stays open for broader evidence.
+
+- Budget release (journal 0192, ADR-0021): a build that does not fit
+  `index_budget` may release only a domain last built by the same filesystem
+  uid. On the dedicated Debian host, ext4 and `index_budget=1M`, uid 1002's
+  search of a second 2 000-file domain returned `ENOMEM` and left uid 1001's
+  domain built (`domain_builds` stayed 1, `domain_releases` stayed 0).
+  Uid 1001's following search did not rebuild. Two domains of the same uid
+  still released one another. The same script exited 2 on the previous
+  module, which did release across uids. A first filter keyed on the real
+  uid did too, because the harness keeps real uid 0. The opt-in native-KVM
+  step `buildcostevict` then passed on the dedicated host
+  (`BUILD_COST_CROSS_USER_HELD`, budget 1762216) and failed on the
+  pre-filter module. The steps `release`, `overbudget` and `buildcostevict`
+  then passed under KASAN, UBSAN and lockdep (`MOOBFS_KASAN_ONLY_PASS`).
+  The complete `vm/kasan-local.sh` run of this change then exited 0
+  (`MOOBFS_KASAN_PASS`, `MOOBFS_LAYER_PASS`, `MOOBFS_ACCEPTANCE_PASS`,
+  `FAULT_INJECTION_PASS`), with `RELEASE_PASS` and `OVERBUDGET_PASS` on
+  ext4, btrfs and XFS. The complete native-KVM suite was not run. No reserved per-user fraction and
+  no latency ceiling. G2 stays open. The shrinker can still drop any idle
+  domain.
+
+- Baseline (journal 0191): on the module recorded that day, ext4 and `index_budget=1M`,
+  a second domain of 2 000 files released the first. The same release happened
+  between uid 1001 and uid 1002 and between two domains of one uid. Each search
+  still returned its files, and only one domain stayed built. This does not
+  implement fair shares and does not pass G2. No latency ceiling was set.
+
+- Restore drill (journal 0190): `bench/client/g3_restore.py` copies a lower
+  tree with `rsync -aHAX --numeric-ids` and refuses a destination that already
+  has entries. On the dedicated Debian host the G1 ext4 corpus restored with
+  matching bytes, typed attributes and numeric identity. `moobfs-check` exited
+  0, `QUERY2` answers matched, an illegal type byte made `moobfs-check` exit 2,
+  and `user.moob.format` set to 2 refused the mount. A second run did not write.
+  No new archive format and no kernel change. btrfs, XFS and a non-identity
+  UID map were not part of this run.
+
+- Adapter (journal 0189): the LangGraph store package publishes a file the
+  homogeneity rule can index. A publisher who is not the domain owner cannot
+  chown the file to that owner, so the mode gains other-read (`0664` on the
+  root-owned `2770` domain). The first mounted run returned zero `team` hits
+  with `0660` and was not a pass. The second run, on the dedicated Debian host
+  (kernel 6.12.111, ext4), printed `G1_MOUNTED_PASS`: twelve shapes against
+  `InMemoryStore`, two `QUERY2` pages on 5 000 files, client pages, confined
+  search, `salary.json` omitted for both uids and root, plain-ext4 fallback,
+  and `ENOMEM` from a separate `index_budget=1M` mount of 5 000 files. After
+  the searches, `GET_INFO` reported `index_used=2883508` and `index_inodes=7000`
+  inside the default 128 MiB budget. No latency claim, no VM and no KASAN in
+  this run. No kernel or UAPI change. G3 is not started.
+
+- Documentation (journal 0188): write the G6 evaluation protocol and the G1
+  scope before any client package. The client is the existing LangGraph store
+  adapter, with a fixed 7 000-file corpus, two OS identities, pass/fail counts
+  for answer equality and integration burden, and registered bounds for the
+  later G3 restore drill. No adapter, kernel, VM, benchmark or restore run was
+  part of this batch. Latency, memory, freshness and relevance ceilings stay
+  unset, so G2, G4, G5 and the G6 final evaluation cannot pass yet.
 
 - Investigation (journal 0186, PR 136 merged; issue 118 open): a real
   ai-memory MCP workload wrote 2,000 requested pages in ten projects

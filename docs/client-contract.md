@@ -179,4 +179,9 @@ of `client-test-plan.md` stage 2. Client-specific handling belongs in that clien
 Decided on 2026-10-13 (journal [0081](history/0081-second-client-and-outside-review.md)): the
 second client is the **LangGraph store** (`BaseStore`), through an adapter in `bench/client/`.
 It was chosen because it does not fit perfectly; the plan and the known mismatches are in that
-journal.
+journal. The scoped batch for that adapter is
+[the G6 protocol](g6-evaluation-protocol.md) (journal
+[0188](history/0188-g6-protocol-and-g1-scope.md)). The adapter package is in
+`bench/client/` (journal [0189](history/0189-g1-adapter-package.md)). The mounted
+gate passed on the dedicated Debian host the same evening. The counters and
+the limits are in that journal.

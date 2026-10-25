@@ -2,26 +2,27 @@
 # SPDX-License-Identifier: GPL-2.0-only
 """A LangGraph store kept in a MoobFS layer (second test client, journal 0089).
 
-MoobStore implements langgraph.store.base.BaseStore on a directory of a mounted layer:
+MoobStore implements langgraph.store.base.BaseStore on a directory. With the layer
+mounted, a search whose prefix reaches a domain is one MOOB_IOC_QUERY2 per domain.
+Without the layer, the same search reads the files the caller can open. Either way
+the results are checked again against the whole filter.
 
-  namespace ("a", "b", "c")  ->  directory  <root>/a/b/c        (each label percent-encoded)
-  key                        ->  file       <dir>/<key>.json    (percent-encoded)
-  value                      ->  the file's content, JSON, with created_at and updated_at
-  top-level scalar keys      ->  typed attributes user.moob.v.<key> (string, bool, double)
+What the kernel does not answer stays in this file and is not a kernel query:
+``$ne``, lists, nested objects, invalid attribute names, client offset, concurrent
+publishers of one key, disjunctions, counts and full text (client contract section 8).
+Two publishers of the same key are last-rename-wins. Each final name is one complete
+file, not a mix of two publications.
 
-The first `domain_depth` labels of a namespace are the layer's domain; a search whose prefix is
-at least that long is one MOOB_IOC_QUERY2 per domain, and the results are then read and checked
-again against the whole filter, so the answer never depends on what could be indexed. A shorter
-prefix visits every domain below it.
-
-Nothing here is in the layer or its interface: what LangGraph needs and the layer does not have
-is done in this file, and counted (self.stats) so that a test can report it.
+Nothing here is in the layer or its interface.
 """
 import ctypes
+import errno
 import fcntl
 import json
 import os
+import stat
 import struct
+import sys
 from datetime import datetime, timezone
 from urllib.parse import quote, unquote
 
@@ -34,6 +35,24 @@ NAME_MAX, VALUE_MAX, PATH_MAX, MAX_TERMS, MAX_LIMIT, CURSOR = 64, 1024, 256, 4, 
 RES_PATH_UNKNOWN, RES_PATH_TRUNCATED = 1, 2
 PREFIX = "user.moob."
 NAME_OK = set("abcdefghijklmnopqrstuvwxyz0123456789_.")
+RESOURCE_ERRNO = frozenset({errno.ENOMEM, errno.E2BIG, errno.ETIMEDOUT, errno.EDQUOT})
+ABSENT_ERRNO = frozenset({errno.ENOTTY, errno.ENODEV})
+
+
+class MoobQueryError(OSError):
+    """QUERY2 refused for a resource limit. No result list from that call is usable."""
+
+
+class ModuleAbsent(OSError):
+    """This descriptor does not serve QUERY2."""
+
+
+class PublicationStopped(Exception):
+    """A test stopped the publication sequence. The final name was not left mixed."""
+
+    def __init__(self, step):
+        super().__init__(step)
+        self.step = step
 
 
 class Term(ctypes.Structure):
@@ -62,6 +81,23 @@ def _iowr(nr, size):
 
 
 IOC_QUERY2 = _iowr(3, ctypes.sizeof(Query2))
+
+
+def file_mode_for(directory_mode):
+    """Mode of a file that is not more private than this directory.
+
+    A class that can enter the directory can read and write the file. Execute stays
+    off: a memory is not a program. The setgid bit is not copied onto the file.
+    """
+    mode = stat.S_IMODE(directory_mode)
+    out = 0
+    if mode & 0o700:
+        out |= 0o600
+    if mode & 0o070:
+        out |= 0o060
+    if mode & 0o007:
+        out |= 0o006
+    return out
 
 
 def _enc(label):
@@ -128,9 +164,15 @@ class MoobStore(BaseStore):
     def __init__(self, root, domain_depth=1):
         self.root = os.path.abspath(root)
         self.depth = domain_depth
+        self.stop_after = None
         self.stats = {"query2_calls": 0, "candidates": 0, "returned": 0, "files_read": 0,
                       "post_filtered_out": 0, "terms_indexed": 0, "terms_not_indexed": 0,
-                      "domains_visited": 0, "truncated_paths": 0, "files_above_domain": 0}
+                      "domains_visited": 0, "truncated_paths": 0, "files_above_domain": 0,
+                      "fallback_domains": 0}
+
+    def _checkpoint(self, step):
+        if self.stop_after == step:
+            raise PublicationStopped(step)
 
     # ---- paths ---------------------------------------------------------------------------
     def _dir(self, namespace):
@@ -138,6 +180,26 @@ class MoobStore(BaseStore):
 
     def _file(self, namespace, key):
         return os.path.join(self._dir(namespace), _enc(key) + ".json")
+
+    def _prepare_dirs(self, namespace):
+        """Create missing namespace directories. Return the domain's mode, owner and,
+        when the group can enter it, the domain's group id. A directory that already
+        exists keeps the mode the test gave it. A directory created below the domain is
+        chmod'd to that mode so it is not more private than the domain (journal 0089)."""
+        cur = self.root
+        domain_mode, domain_uid, domain_gid = 0o700, os.geteuid(), None
+        for index, label in enumerate(namespace, start=1):
+            cur = os.path.join(cur, _enc(label))
+            if not os.path.isdir(cur):
+                os.mkdir(cur, 0o700)
+                if index > self.depth:
+                    os.chmod(cur, domain_mode)
+            if index == self.depth and os.path.isdir(cur):
+                st = os.stat(cur)
+                domain_mode = stat.S_IMODE(st.st_mode)
+                domain_uid = st.st_uid
+                domain_gid = st.st_gid if domain_mode & 0o070 else None
+        return domain_mode, domain_uid, domain_gid
 
     # ---- single operations -----------------------------------------------------------------
     def _load(self, path, namespace=None, key=None):
@@ -163,39 +225,72 @@ class MoobStore(BaseStore):
                 pass
             return
         d = os.path.dirname(path)
-        # One mode for every directory: os.makedirs gives its mode to the last one only, and a
-        # directory more private than the domain directory takes its files out of QUERY2
-        # answers (the homogeneity rule, client contract section 3).
-        cur = self.root
-        for label in op.namespace:
-            cur = os.path.join(cur, _enc(label))
-            try:
-                os.mkdir(cur, 0o700)
-            except FileExistsError:
-                pass
+        domain_mode, domain_uid, domain_gid = self._prepare_dirs(op.namespace)
+        mode = file_mode_for(domain_mode)
         now = datetime.now(timezone.utc)
         old = self._load(path, op.namespace, op.key)
         doc = {"value": op.value, "created_at": (old.created_at if old else now).isoformat(),
                "updated_at": now.isoformat()}
-        tmp = os.path.join(d, f".tmp.{os.getpid()}.{id(op)}")
+        tmp = os.path.join(d, f".tmp.{os.getpid()}.{os.urandom(8).hex()}")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         try:
             os.write(fd, json.dumps(doc).encode())
+            self._checkpoint("content")
             os.setxattr(fd, PREFIX + "lg.updated",
                         bytes([T_TIME]) + struct.pack("<q", int(now.timestamp() * 1e9)))
             for k, v in op.value.items():
                 name, typed = _attr_name(k), _typed(v)
                 if name and typed:
                     os.setxattr(fd, PREFIX + name, bytes([typed[0]]) + typed[1])
+            self._checkpoint("attributes")
+            self._publish_identity(fd, mode, domain_uid, domain_gid)
             os.fsync(fd)
-        finally:
+            self._checkpoint("file_fsync")
+        except PublicationStopped:
+            raise
+        except Exception:
             os.close(fd)
+            fd = -1
+            try:
+                os.unlink(tmp)
+            except FileNotFoundError:
+                pass
+            raise
+        finally:
+            if fd >= 0:
+                os.close(fd)
         os.rename(tmp, path)
+        self._checkpoint("rename")
         dfd = os.open(d, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(dfd)
         finally:
             os.close(dfd)
+        self._checkpoint("dir_fsync")
+
+    def _publish_identity(self, fd, mode, domain_uid, domain_gid):
+        """Mode and owner the homogeneity rule can index.
+
+        reach_ok accepts a file that shares the domain directory's owner and group
+        and is readable by every class that can enter that directory. It also
+        accepts a file readable by owner, group and other, whatever the owner is.
+        A publisher who is not the domain owner cannot chown the file to that
+        owner, so the mode then gains other-read. The group is still set when
+        this process may do so.
+        """
+        owns = os.geteuid() in (0, domain_uid)
+        if not owns:
+            mode |= 0o444
+        os.fchmod(fd, mode)
+        uid = domain_uid if owns else -1
+        gid = domain_gid if domain_gid is not None else -1
+        if uid == -1 and gid == -1:
+            return
+        try:
+            os.fchown(fd, uid, gid)
+        except PermissionError:
+            if owns:
+                raise
 
     # ---- search ----------------------------------------------------------------------------
     def _terms(self, flt):
@@ -209,7 +304,6 @@ class MoobStore(BaseStore):
             for op, v in conds:
                 code = {"$eq": OP_EQ, "$gt": OP_GT, "$gte": OP_GE, "$lt": OP_LT, "$lte": OP_LE}.get(op)
                 typed = _typed(v)
-                # a range in LangGraph coerces both sides to float; only numbers index the same way
                 usable = (name and code and typed and len(terms) < MAX_TERMS
                           and (code == OP_EQ or typed[0] == T_DOUBLE))
                 if usable:
@@ -219,11 +313,19 @@ class MoobStore(BaseStore):
         self.stats["terms_indexed"] += len(terms)
         self.stats["terms_not_indexed"] += left
         if not terms:
-            terms.append(("lg.updated", OP_EXISTS, 0, b""))    # EXISTS carries no type
+            terms.append(("lg.updated", OP_EXISTS, 0, b""))
         return terms
 
+    def _matches(self, item, flt):
+        return all(_compare(item.value.get(k), v) for k, v in flt.items())
+
     def _query2(self, domain_dir, terms):
-        """Every path of the domain that matches the terms, relative to the domain directory."""
+        """Every path of the domain that matches the terms, relative to the domain directory.
+
+        A resource refusal raises MoobQueryError and does not return the pages already
+        copied. ENOTTY or ENODEV on the first call raises ModuleAbsent so the caller can
+        fall back; the same error after a page raises, and that page is not returned.
+        """
         try:
             fd = os.open(domain_dir, os.O_RDONLY | os.O_DIRECTORY)
         except FileNotFoundError:
@@ -238,18 +340,91 @@ class MoobStore(BaseStore):
         paths = []
         try:
             while True:
-                fcntl.ioctl(fd, IOC_QUERY2, q)
+                try:
+                    fcntl.ioctl(fd, IOC_QUERY2, q)
+                except OSError as err:
+                    if err.errno in RESOURCE_ERRNO:
+                        raise MoobQueryError(err.errno, "QUERY2 resource refusal") from err
+                    if err.errno in ABSENT_ERRNO and not paths:
+                        raise ModuleAbsent(err.errno, "QUERY2 is not offered here") from err
+                    raise
                 self.stats["query2_calls"] += 1
+                page = []
                 for r in buf[:q.count]:
                     if r.flags & RES_PATH_TRUNCATED:
                         self.stats["truncated_paths"] += 1
                     elif not r.flags & RES_PATH_UNKNOWN:
-                        paths.append(r.path.decode())
+                        page.append(r.path.decode())
+                paths.extend(page)
                 if not q.truncated:
                     break
+            return paths
         finally:
             os.close(fd)
-        return paths
+
+    def _readable(self, path):
+        """True when this process can open the file. Used by the no-module walk only.
+        It is not a filter on a path QUERY2 already returned."""
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except (PermissionError, FileNotFoundError):
+            return False
+        os.close(fd)
+        return True
+
+    def _scan_domain(self, domain_dir, below, op):
+        items = []
+        if not os.path.isdir(domain_dir):
+            return items
+        self.stats["fallback_domains"] += 1
+        for dirpath, dirnames, filenames in os.walk(domain_dir):
+            dirnames[:] = [name for name in dirnames if not name.startswith(".")]
+            for name in filenames:
+                if not name.endswith(".json") or name.startswith(".tmp."):
+                    continue
+                path = os.path.join(dirpath, name)
+                rel = os.path.relpath(path, domain_dir)
+                if below and not (rel == below or rel.startswith(below + "/")):
+                    continue
+                if not self._readable(path):
+                    continue
+                item = self._load(path)
+                if item is None:
+                    continue
+                if op.filter and not self._matches(item, op.filter):
+                    self.stats["post_filtered_out"] += 1
+                    continue
+                items.append(item)
+        return items
+
+    def _take(self, domain_dir, terms, below, op):
+        if not os.path.isdir(domain_dir):
+            return []
+        if layer_mounted(domain_dir):
+            try:
+                rels = self._query2(domain_dir, terms)
+            except ModuleAbsent:
+                return self._scan_domain(domain_dir, below, op)
+        else:
+            return self._scan_domain(domain_dir, below, op)
+        items = []
+        for rel in rels:
+            self.stats["candidates"] += 1
+            if not rel.endswith(".json") or "/.tmp." in "/" + rel:
+                continue
+            if below and not (rel == below or rel.startswith(below + "/")):
+                continue
+            try:
+                item = self._load(os.path.join(domain_dir, rel))
+            except PermissionError:
+                continue
+            if item is None:
+                continue
+            if op.filter and not self._matches(item, op.filter):
+                self.stats["post_filtered_out"] += 1
+                continue
+            items.append(item)
+        return items
 
     def _domains(self, prefix):
         """Domain directories at or below a namespace prefix shorter than the domain depth."""
@@ -274,8 +449,6 @@ class MoobStore(BaseStore):
             domains, below = self._domains(prefix), ""
         items = []
         if len(prefix) < self.depth:
-            # Namespaces shorter than the domain depth keep their files above every domain,
-            # where QUERY2 does not look (client contract section 2): read those directories.
             level = [self._dir(prefix)]
             for _ in range(self.depth - len(prefix)):
                 nxt = []
@@ -289,27 +462,18 @@ class MoobStore(BaseStore):
                             nxt.append(e.path)
                         elif e.name.endswith(".json") and not e.name.startswith(".tmp."):
                             self.stats["files_above_domain"] += 1
-                            item = self._load(e.path)
-                            if item and (not op.filter or all(
-                                    _compare(item.value.get(k), v) for k, v in op.filter.items())):
+                            if not self._readable(e.path):
+                                continue
+                            try:
+                                item = self._load(e.path)
+                            except PermissionError:
+                                continue
+                            if item and (not op.filter or self._matches(item, op.filter)):
                                 items.append(item)
                 level = nxt
         for d in domains:
             self.stats["domains_visited"] += 1
-            for rel in self._query2(d, terms):
-                self.stats["candidates"] += 1
-                if not rel.endswith(".json") or "/.tmp." in "/" + rel:
-                    continue
-                if below and not (rel.startswith(below + "/")):
-                    continue
-                item = self._load(os.path.join(d, rel))
-                if item is None:
-                    continue    # removed between the query and the read
-                if op.filter and not all(_compare(item.value.get(k), v) for k, v in op.filter.items()):
-                    self.stats["post_filtered_out"] += 1
-                    continue
-                items.append(item)
-        # no order is promised without a text query; newest first, as the Postgres store does
+            items.extend(self._take(d, terms, below, op))
         items.sort(key=lambda it: (it.updated_at, it.namespace, it.key), reverse=True)
         out = items[op.offset:op.offset + op.limit]
         self.stats["returned"] += len(out)
@@ -343,7 +507,7 @@ class MoobStore(BaseStore):
                 results.append(self._put(op))
             elif isinstance(op, SearchOp):
                 if op.query:
-                    raise NotImplementedError("text search stays in the client (contract §8)")
+                    raise NotImplementedError("text search stays in the client (contract section 8)")
                 results.append(self._search(op))
             elif isinstance(op, ListNamespacesOp):
                 results.append(self._list_namespaces(op))
@@ -356,7 +520,13 @@ class MoobStore(BaseStore):
 
 
 def layer_mounted(path):
-    """True when path is inside a mounted moobfs_layer (statfs type 0x4d4f4f42)."""
+    """True when path is inside a mounted moobfs_layer (statfs type 0x4d4f4f42).
+
+    On other platforms the module is absent, so this is false and search uses the
+    open-what-you-can-read walk. Detection does not open the mount root.
+    """
+    if sys.platform != "linux":
+        return False
     libc = ctypes.CDLL(None, use_errno=True)
     buf = ctypes.create_string_buffer(256)
     if libc.statfs(os.fsencode(path), buf) != 0:
@@ -365,7 +535,6 @@ def layer_mounted(path):
 
 
 if __name__ == "__main__":
-    import sys
     print("sizeof(struct moob_query2) =", ctypes.sizeof(Query2), "ioctl =", hex(IOC_QUERY2))
     if len(sys.argv) > 1:
         print("layer mounted at", sys.argv[1], ":", layer_mounted(sys.argv[1]))

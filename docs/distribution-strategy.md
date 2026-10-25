@@ -217,8 +217,13 @@ The lower is the source of truth; the only format of our own is the versioned xa
   `user.moob.*` attributes are lost; `-A` preserves ACLs). `git` versions content, **not** arbitrary
   xattrs; use it with an export of the attributes (FUTURE). A read-only btrfs snapshot of the
   lower does not modify it and is consistent per subvolume. Device image only when unmounted.
-- **Restore:** copy to a new directory, `moobfs-check`, mount, compare `QUERY` with the
-  `moobfs-index` oracle. The tools EXIST; an automated runbook is FUTURE.
+- **Restore:** `bench/client/g3_restore.py` copies to a new directory with
+  `rsync -aHAX --numeric-ids` and exits without writing when the destination is
+  not empty. Journal 0190 ran that script on the G1 ext4 corpus: bytes, typed
+  attributes and numeric identity matched, `moobfs-check` exited 0, `QUERY2`
+  answers matched, an illegal type byte made `moobfs-check` exit 2, and
+  `user.moob.format` set to 2 refused the mount. A non-identity UID map, and a
+  comparison against the `moobfs-index` oracle, remain FUTURE.
 - **Recover:** after a crash, `fsck` of the lower, `moobfs-check`, remount (the index is
   rebuilt). Invalid attribute: `moobfs-check` lists path and reason (exit 2), manual
   fix with `moobfs-attr`; it does not repair. Without the module: mount the lower directly

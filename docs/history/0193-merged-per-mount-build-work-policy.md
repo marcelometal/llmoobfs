@@ -1,7 +1,12 @@
-# 0188 — Reconcile the merged per-mount query-build work policy
+# 0193 — Reconcile the merged per-mount query-build work policy
 
 Date: 2026-10-25. Status: local documentation reconciliation complete;
-publication pending.
+publication follows the merge with PR 139.
+
+*Numbering note, 2026-10-25:* this record was drafted as journal 0188.
+PR 139 had already published journals 0188–0192 (the G6 protocol through
+the same-fsuid budget release, ADR-0021), so this reconciliation is 0193.
+The body below was written against `main` at `b7ae1b8`, before that merge.
 Work started and ended: 2026-10-25. Labor time was not measured.
 
 ## Goal and observed result
@@ -122,6 +127,11 @@ dated notes and were left as history.
 
 The evidence remains limited to the recorded native and CI kernels,
 filesystems and workloads. Issue 118 remains open for slow lower-device
-and large single-project client evidence. Review and publish this
-documentation reconciliation as a separate unit; it does not change the
-module or the `index_build_work` range.
+and large single-project client evidence. This documentation
+reconciliation does not change the module or the `index_build_work`
+range.
+
+*Merge addendum, 2026-10-25:* while the pull request for this unit was
+open, PR 139 merged as `e57d8c5`. The conflict kept both this policy text
+and the budget-release record (ADR-0021, journal 0192). This unit does
+not retest that kernel change. The F14 advisory stays unpublished.

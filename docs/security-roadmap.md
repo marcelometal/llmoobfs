@@ -261,7 +261,7 @@ KASAN/lockdep. Issue 118 remains open for numerical-policy review and
 broader workloads; a valid 17,000-file domain is denied. This is not a
 strict CPU or physical-I/O cap and does not solve fair index-memory shares.
 
-*Integration update, 2026-10-25 (ADR-0020; journal 0188):* PR 138 merged
+*Integration update, 2026-10-25 (ADR-0020; journal 0193):* PR 138 merged
 the bounded `index_build_work` option after twelve green checks. The
 32,768-unit default still denies the measured 17,000-file domain, while
 an administrative 65,536-unit choice completed it in a dedicated VM.
@@ -269,6 +269,26 @@ The earlier paragraph records the fixed-policy checkpoint. Issue 118
 remains open for real slow lower-device and large single-project evidence;
 the option does not strictly cap CPU time or physical I/O or solve fair
 index-memory shares.
+
+*Baseline, 2026-10-24 (journal 0191):* on the module of that day, ext4,
+`index_budget=1M` and 2 000 files per domain, a second domain's build
+released the first. The same ping-pong happened between uid 1001 and uid
+1002 and between two domains of uid 1001. Searches still returned every
+file, because the released domain was rebuilt from the lower tree. One
+domain stayed resident. This records F2 on that module. It does not choose
+a share algorithm and it does not pass G2.
+
+*Host regression, 2026-10-25 (journal 0192, ADR-0021):* a budget release
+now drops only a domain last built by the same filesystem uid. On the same
+shape, uid 1002's search returned `ENOMEM`, uid 1001's domain stayed
+built, and uid 1001's next search did not rebuild. Two domains of one uid
+still released one another. There is no reserved fraction. The shrinker
+can still drop any idle domain. The opt-in native-KVM step then passed
+on the dedicated host and failed on the pre-filter module. The steps
+`release`, `overbudget` and `buildcostevict` then passed under KASAN,
+UBSAN and lockdep. The complete KASAN, UBSAN and lockdep suite of this
+change then exited 0 (`MOOBFS_KASAN_PASS`). The complete native-KVM suite
+of this change was not run. G2 remains open.
 
 - Issue 116 / ADR-0018 accounts user-triggered query and index allocations to
   the allocating task's memory cgroup; journal 0180 records negative controls,

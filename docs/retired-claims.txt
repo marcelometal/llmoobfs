@@ -110,7 +110,7 @@ mitigation still under validation
 Publication and issue closure remain pending
 An initial fixed policy is implemented locally
 
-# Merged per-mount query-build work policy, 2026-10-25 (journal 0188).
+# Merged per-mount query-build work policy, 2026-10-25 (journal 0193).
 A proposed per-mount `index_build_work` range
 for its dedicated-VM validation and pending PR checks
 PR checks remain
@@ -124,7 +124,7 @@ A CI do pull request é uma etapa separada e obrigatória antes do merge
 corrections are implemented in the review batch
 têm correções no lote de revisão
 
-# Plan page and help list, second pass on 2026-10-25 (journal 0188).
+# Plan page and help list, second pass on 2026-10-25 (journal 0193).
 Nothing has been released
 nothing is measured yet (M4)
 the UAPI is version 1 and may change
@@ -133,3 +133,20 @@ their report is in progress
 M4 is not started
 what is pending (M4)
 not yet exercised
+
+# Cross-user budget release, stopped on the host 2026-10-25 (journal 0192).
+a query by one uid also evicted another uid's built private domain under a
+também expulsou o índice de um domínio privado construído por outro uid sob um orçamento
+one uid's query can evict another uid's built domain under a small
+one uid's query can release another uid's built domain
+its VM probe and KASAN were not run
+a prova em VM e o KASAN dessa mudança não rodaram
+The VM probe and KASAN of ADR-0020 were not run
+The VM probe and KASAN of ADR-0021 were not run
+The guest step was updated to that expectation and has not been run since.
+KASAN was not run for this change
+O KASAN dessa mudança não rodou
+KASAN of that change was not run
+That is not the complete KASAN suite
+Não é a suíte KASAN completa
+The complete KASAN suite was not run

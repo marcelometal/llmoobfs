@@ -109,6 +109,6 @@ had occurred when this journal update was committed.
 PR 138's exact head `6621b21` passed twelve reported checks, including
 Native Linux VM and KASAN/lockdep, then merged as `b7ae1b8`. The merge
 tree equals that validated head. The preceding sections preserve the
-pre-publication checkpoint; journal 0188 records the current-state
+pre-publication checkpoint; journal 0193 records the current-state
 reconciliation. Issue 118 remains open for the untested lower-device and
 single-project client shapes.

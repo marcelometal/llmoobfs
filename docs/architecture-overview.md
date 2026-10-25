@@ -119,11 +119,14 @@ to disk. Structures:
   layer inode when one exists.
 
 Memory is accounted against `index_budget` (`charge()` returns `ENOMEM` when `used + bytes >
-budget`). If the budget is exceeded while building a domain, the built domains queried least
-recently are released until it fits; a domain that does not fit alone fails its query with
-`ENOMEM` and nothing of it is kept. A shrinker also releases built domains under memory
-pressure, except those queried in the last `index_idle` seconds (journal 0101,
-[spec-query-v2.md](spec-query-v2.md) §9). If an index
+budget`). If the budget is exceeded while building a domain, domains last built by the
+same filesystem uid and queried least recently are released until it fits. A domain last
+built by another filesystem uid stays; if the remainder is still too small, the query
+returns `ENOMEM` and nothing of the new domain is kept
+([ADR-0021](decisions/0021-budget-release-keeps-the-builders-domain.md)). A domain that
+does not fit alone fails its query with `ENOMEM`. A shrinker can still release any built
+domain under memory pressure, except those queried in the last `index_idle` seconds
+(journal 0101, [spec-query-v2.md](spec-query-v2.md) §9). If an index
 update fails after a lower write has already succeeded, only that domain is affected: it is
 built again by its next query, or that query fails with `ENOMEM` if the domain does not fit
 the budget alone ([ADR-0016](decisions/0016-failed-index-update-rebuilds-its-domain.md);

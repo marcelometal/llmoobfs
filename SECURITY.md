@@ -142,9 +142,8 @@ fstests, syzkaller, hostile-lower handling and the other open items.
 Known availability limit (issue 118): an authorized, unprivileged `QUERY2`
 can build a whole domain with the mounter's credentials, again after a
 directory rename. The mount's memory budget does not cap the CPU or lower
-I/O of that scan. A bounded KVM probe measured the work and demonstrated
-that one uid's query can evict another uid's built domain under a small
-shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
+I/O of that scan. A bounded KVM probe measured the work
+([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
 The maintainer chose the resource-limit direction; `main` includes
 experimental work and rebuild-frequency limits
 ([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md))
@@ -154,6 +153,17 @@ and a per-mount `index_build_work` choice of 1,024–65,536 units, default
 They do not strictly cap CPU time or physical I/O, nor provide fair index
 memory shares. The default still denies the measured valid 17,000-file
 domain with `E2BIG`; 65,536 completed that fixture in a dedicated VM.
-Issue 118 remains open for a real slow lower device and a large
-single-project client. Avoid untrusted multi-user query workloads while
-this issue is open.
+A later change stops a budget release from dropping a domain
+last built by another filesystem uid: the query returns `ENOMEM` when the
+remainder is too small, and one uid can still fill the whole budget
+([ADR-0021](docs/decisions/0021-budget-release-keeps-the-builders-domain.md),
+[journal 0192](docs/history/0192-same-fsuid-budget-release.md)).
+That host regression passed, and the opt-in native-KVM probe passed on the
+dedicated host. The steps `release`, `overbudget` and `buildcostevict`
+also passed there under KASAN, UBSAN and lockdep. The complete KASAN, UBSAN
+and lockdep suite of this change then exited 0 (`MOOBFS_KASAN_PASS`). The
+complete native-KVM suite of this change was not run. Local VM and KASAN
+suites and all eleven PR checks passed for the earlier guard.
+Issue 118 remains open for a real slow lower device, a large
+single-project client and broader-workload validation. Avoid untrusted
+multi-user query workloads while this issue is open.
