@@ -1,6 +1,6 @@
 # ADR-0020 — Configure the bounded query-build work per mount
 
-Date: 2026-10-25. Status: locally validated proposal; maintainer policy review pending.
+Date: 2026-10-25. Status: accepted for PR; local validation passed, PR CI pending.
 Supersedes the fixed-work-number part of [ADR-0019](0019-bound-query-build-work-and-frequency.md),
 while retaining its admission, cumulative accounting, error, deadline and
 output-on-error decisions.
@@ -80,3 +80,7 @@ These runs validate the local implementation, not the operator-policy
 choice or behavior on a real slow lower device. The opt-in 17,000-file
 path ran on the native kernel; the complete KASAN suite exercised the
 unchanged default policy.
+
+The maintainer approved this range, default and PR publication on
+2026-10-25. Issue 118 remains open for the broader evidence described
+above; PR CI and review have not yet completed.

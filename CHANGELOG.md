@@ -7,7 +7,7 @@
   cumulative work units. A dedicated VM opt-in test admitted a valid
   17,000-file attributed domain at the upper bound while the default
   refused it. The complete native VM and KASAN/UBSAN/lockdep suites
-  passed locally. Maintainer policy review and PR checks remain; the deadline,
+  passed locally. The maintainer approved the range for a PR; PR checks remain. The deadline,
   admission limits and issue-118 status are unchanged.
 
 - Investigation (journal 0186, PR 136 merged; issue 118 open): a real

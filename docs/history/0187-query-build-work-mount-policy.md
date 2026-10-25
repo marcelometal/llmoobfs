@@ -1,6 +1,6 @@
 # 0187 — Per-mount query-build work policy
 
-Date: 2026-10-25. Status: local implementation validated; policy review pending.
+Date: 2026-10-25. Status: local implementation validated; approved for PR, CI pending.
 Work started and ended: 2026-10-25. Labor time was not measured.
 
 ## Goal and decision
@@ -12,9 +12,8 @@ domain very late in its build on the measured host. The real client
 workload passed only for much smaller per-project domains, so it does not
 justify raising the default for every mount. ADR-0020 proposes a bounded
 `index_build_work` mount option, 1,024–65,536 units, with the existing
-32,768-unit default and all other guards unchanged. This is a proposed
-compatibility decision even after local VM validation; maintainer policy
-review is still pending.
+32,768-unit default and all other guards unchanged. The maintainer approved
+this compatibility decision for PR on 2026-10-25 after local VM validation.
 
 ## Initial plan and evidence boundary
 
@@ -99,7 +98,8 @@ format or ioctl ABI changed. The actual cost on a real slow lower device
 and one real 17,000-file client project remain untested. The upper bound
 is an operator policy choice, not a universal resource guarantee; the
 ten-second cooperative deadline and admission limits still apply.
-Maintainer review of the compatibility/range decision is the next gate.
-After authorization, push the branch, open a PR, and run its required CI.
-Issue 118 stays open for the broader evidence. No push or PR occurred in
-this round.
+The maintainer explicitly approved the range/default choice and push/PR
+on 2026-10-25. `make test` then exited zero on macOS: 60 attribute checks
+and nine image tests passed. Push the branch, open the PR and run its
+required CI. Issue 118 stays open for the broader evidence. No push or PR
+had occurred when this journal update was committed.
