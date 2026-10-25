@@ -43,9 +43,11 @@ of that path; they are proposals, marked FUTURE, and nothing schedules them.
    freeze.
 4. **Installable packages are prepared, not published.** DKMS configuration, `.deb` packages
    and signing instructions may be written and tested in dedicated VMs. Publishing them in a
-   package repository, or announcing installation outside a VM, stays behind the stage 2 gates
-   of `docs/distribution-strategy.md` §8 and the "Public release" row of `ROADMAP.md`. The
-   README warning ("Experimental. Not for production.") stays until those gates pass.
+   package repository, or recommending installation on any host other than a dedicated test
+   host or VM, stays behind the stage 2 gates of `docs/distribution-strategy.md` §8 and the
+   "Public release" row of `ROADMAP.md`. A from-source guide for a dedicated test host (item
+   C2) is not such a recommendation. The README warning ("Experimental. Not for production.")
+   stays until those gates pass.
 5. **Client neutrality applies.** The library and the adapters serve any client; ai-memory is
    test evidence, not the target. Client-specific behavior lives in an adapter.
 
