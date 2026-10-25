@@ -9,7 +9,9 @@
   kernels outside `scripts/supported-kernels`, never overwrite without
   `FORCE=1`) and `make install-test`, which followed the guide in a
   disposable Debian 13 VM and ended in `MOOBFS_INSTALL_PASS`. Finding: a
-  fresh Debian 13 runs 6.12.113, outside the kernel list. No module change.
+  fresh Debian 13 runs 6.12.113, outside the kernel list (issue 142). The site
+  guide gains "Install on a dedicated test host"; "never load the modules on
+  your host" became "on a machine used for anything else". No module change.
 
 - Roadmap: a user-space "Consumable path" (items C1–C7: first contact,
   install and mount, container recipe, `moobfs` CLI, client library, DKMS

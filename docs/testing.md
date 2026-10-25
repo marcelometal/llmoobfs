@@ -4,8 +4,9 @@ What each test in MoobFS runs, what its success markers prove and, as important,
 what they do not prove. Environment setup, build commands and how to add a test
 are in [development.md](development.md).
 
-Never load `moobfs.ko` or `moobfs_layer.ko` on your host. The harness boots a
-disposable QEMU guest; that is the only supported way to run the module.
+Never load `moobfs.ko` or `moobfs_layer.ko` on a machine you use for anything else. The suite
+runs in a disposable QEMU guest. Installing the layer on a dedicated test host is described in
+[operations.md](operations.md), and `make install-test` follows that guide in a disposable VM.
 
 ## 1. Prerequisites
 

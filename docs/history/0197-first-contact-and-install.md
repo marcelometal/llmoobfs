@@ -1,7 +1,7 @@
 # 0197 — First contact and installation on a test host (roadmap C1 and C2)
 
 Date: 2026-10-25. Status: C1 written; C2 written and its guide passed `make install-test` in a
-disposable Debian 13 VM. Branch `claudiofp/CONSUMABLE`, not published. Work started and ended:
+disposable Debian 13 VM. Branch `claudiofp/CONSUMABLE`, published for review with journal 0196. Work started and ended:
 2026-10-25, one session; the two VM runs took about 19 minutes each under emulation, plus the
 image download. Labor time was not measured. Numbering: as journal 0196, after the evolution
 front's 0194 and 0195.
@@ -54,7 +54,7 @@ kernel is 6.12.111, still installable by exact version from the Debian archive. 
 installs Debian 13 today therefore has to boot an older kernel, forgoing the fixes of later
 ones, before `make install` accepts it. The guide says so. Making a current Debian kernel
 supported needs it in CI under the rules of `docs/compatibility.md` §1, which is work for the
-core front, not for this path.
+core front, not for this path. It is filed as issue 142.
 
 As information only, the forced build (`MOOB_ALLOW_UNSUPPORTED=1`, staged with `DESTDIR`)
 compiled against the 6.12.113 headers. The module was not loaded on 6.12.113 and nothing about
@@ -114,10 +114,14 @@ Updated: both READMEs, the new status pages, `ROADMAP.md`, `docs/README.md`,
 reworded before publication so that a from-source guide for a dedicated test host is not read as
 the installation announcement it keeps behind stage 2.
 
-Left as they are on purpose: the site's test guide and landing page (`site/guide.html`,
-`site/index.html`) do not yet mention the installation route; they follow when the maintainer
-approves publishing this unit. The GitHub description and discussions state nothing this unit
-changes.
+The maintainer approved publication the same day. The site's guide gained section 5, "Install on a
+dedicated test host", and the landing page links it. Several places said never to load the
+modules "on your host", and `docs/testing.md` called the VM "the only supported way to run the
+module". That contradicted the new guide. `CONTRIBUTING.md`, both READMEs, `docs/testing.md` and
+the site now say never to load them on a machine used for anything else, and point to
+`docs/operations.md`. The old phrases are in `docs/retired-claims.txt`. The status pages still say
+"tested in a VM only", which remains true. The GitHub description and discussions state nothing
+this unit changes.
 
 ## Limitations
 
@@ -132,6 +136,6 @@ changes.
 
 ## Next step
 
-The maintainer reviews C1 and C2 and decides on publication (one pull request with journals
-0196 and 0197). Then C3 (container recipe) or C4 (`moobfs` CLI). The kernel-list finding goes
-to the core front as a question: add a current Debian 6.12 kernel to CI.
+The pull request with journals 0196 and 0197 waits for its checks and the maintainer's merge.
+Then C3 (container recipe) or C4 (`moobfs` CLI). The core front owns issue 142, which asks to add
+the current Debian 6.12 kernel to CI and to `scripts/supported-kernels`.

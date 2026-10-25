@@ -377,7 +377,8 @@ grep '^DEMO| ' build/vm/console.log
 
 A execução completa compila as ferramentas Linux e os dois módulos e depois sobe uma VM QEMU
 x86-64 dedicada com o kernel Debian **6.12.111+deb13-amd64**. Não precisa de contêiner
-privilegiado nem de carregar módulos no host; nunca carregue os módulos no seu host. No Apple
+privilegiado nem de carregar módulos no host; nunca carregue os módulos numa máquina usada para
+qualquer outra coisa (um host de teste dedicado está em [docs/operations.md](docs/operations.md)). No Apple
 Silicon usa emulação de CPU; a primeira compilação baixa pacotes do kernel e demora mais. A
 preparação do ambiente está em [docs/development.md](docs/development.md); o que cada marcador
 prova e não prova está em [docs/testing.md](docs/testing.md). Uma execução bem-sucedida termina

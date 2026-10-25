@@ -358,7 +358,8 @@ grep '^DEMO| ' build/vm/console.log
 
 The full run builds the Linux tools and both modules, then boots a dedicated QEMU x86-64 VM using
 Debian kernel **6.12.111+deb13-amd64**. No privileged container or host module loading is
-required; never load the modules on your host. On Apple Silicon it uses CPU emulation; the
+required; never load the modules on a machine you use for anything else (a dedicated test host
+is covered by [docs/operations.md](docs/operations.md)). On Apple Silicon it uses CPU emulation; the
 first build downloads kernel packages and takes longer. Environment setup is in
 [docs/development.md](docs/development.md); what each marker proves and does not prove is in
 [docs/testing.md](docs/testing.md). A successful run ends with:
