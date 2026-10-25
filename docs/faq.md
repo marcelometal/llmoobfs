@@ -1,6 +1,6 @@
 # Frequently asked questions
 
-Short, factual answers about MoobFS as of 2026-10-20. Each answer names the file it is taken
+Short, factual answers about MoobFS as of 2026-10-25. Each answer names the file it is taken
 from; when a file and this page disagree, the file wins and this page needs a correction.
 Rendered copy: [studiomoob.github.io/llmoobfs/faq.html](https://studiomoob.github.io/llmoobfs/faq.html).
 
@@ -147,20 +147,25 @@ kernel panic or data loss; the project's tests and two source reviews by AI assi
 kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011, all but the fairness
 part of F2 fixed). Run it only in a disposable VM with synthetic data.
 
-The [current review](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md)
+The [review of 2026-10-20](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0144-independent-review.md)
 found stale backing-file flags after `F_SETFL` and silently skipped lower `getxattr` errors.
-Both defects remain in `v0.4.1-experimental`; corrections are implemented in the review batch.
+Both defects remain in `v0.4.1-experimental`. Corrections are on `main`.
 R1 synchronizes mutable flags before delegated I/O, and R2 propagates operational read errors.
 The full integrated VM suite at `49098aa` passed: clearing and setting append on ext4, btrfs
 and XFS, R2 injected-error regression, and acceptance/layer suites. Negative rounds detected
-both original defects. The local batch KASAN/UBSAN/lockdep suite also passed on Linux 6.12.112;
-pull-request CI is a separate pre-merge gate. An injected value-read error does
+both original defects. The local batch KASAN/UBSAN/lockdep suite also passed on Linux 6.12.112,
+and the required pull-request checks passed before that batch merged. An injected value-read error does
 not establish behavior under a real lower-filesystem I/O fault.
 A later review ([0151](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0151-review-d110d4e.md))
 found that a chmod during the first build of a domain could leave the file in `QUERY2` answers to
 users who can no longer read it; it is fixed in
 [0152](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0152-chmod-during-build-fixed.md),
 with a suite test that fails without the fix.
+Since that tag, `main` also bounds an unprivileged domain build.
+`index_build_work` defaults to 32,768 cumulative units, and a mounter may choose
+1,024–65,536 ([ADR-0020](https://github.com/studiomoob/llmoobfs/blob/main/docs/decisions/0020-configurable-query-build-work-per-mount.md),
+[PR 138](https://github.com/studiomoob/llmoobfs/pull/138)). The default denies the measured
+17,000-file domain. Issue 118 stays open; this is not a strict CPU or I/O cap.
 See [R1 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0149-sync-backing-file-flags.md)
 and [R2 validation](https://github.com/studiomoob/llmoobfs/blob/main/docs/history/0150-propagate-index-xattr-read-errors.md).
 [`SECURITY.md`; `docs/decisions/0011-threat-and-credential-model.md`; `CHANGELOG.md`; journal 0144]

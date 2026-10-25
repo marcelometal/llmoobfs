@@ -4,6 +4,14 @@ Status: **proposal** (branch `m3/3b-query-authz`). Nothing marked FUTURE or DEPE
 implemented. It does not change ADRs, format, UAPI or code. Basis: ADR-0001, ADR-0007, M2/M3 specs,
 `docs/security-roadmap.md`, journals `docs/history/0015` to `0020`.
 
+*Note, 2026-10-25.* This proposal is not the current contract. The index is built by the
+first query on a domain, not at every mount (ADR-0012). A directory rename marks the
+domain stale and the next query rebuilds it; `MOOB_FLAG_PATHS_STALE` does not mean the
+answers stay incomplete until remount. User-triggered index and query allocations are
+charged to the memory cgroup where that controller exists (ADR-0018). The current
+description is [architecture-overview.md](architecture-overview.md) and
+[spec-query-v2.md](spec-query-v2.md).
+
 Legend:
 
 - **EXISTS**: it is in the repository and was exercised by the suite described in `docs/testing.md`.

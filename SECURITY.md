@@ -110,9 +110,9 @@ These are targets for a single volunteer maintainer, not guarantees:
 The [review of 2026-10-20](docs/history/0144-independent-review.md) found two defects beyond
 ADR-0011: stale backing-file flags after `F_SETFL` (R1), and operational lower `getxattr`
 errors skipped during indexing (R2). Both affect `v0.4.1-experimental`. Corrections are
-implemented in the review batch. The full integrated VM suite and local
-KASAN/UBSAN/lockdep run at `49098aa` passed; pull-request CI is a separate
-pre-merge gate. R1 synchronizes mutable lower flags before delegated I/O
+on `main`. The full integrated VM suite and local
+KASAN/UBSAN/lockdep run at `49098aa` passed, and the required pull-request
+checks passed before that batch merged. R1 synchronizes mutable lower flags before delegated I/O
 ([0149](docs/history/0149-sync-backing-file-flags.md)). R2 propagates operational read errors
 through the existing build/adoption failure paths, while preserving the exclusions for
 missing, oversized or malformed attributes ([0150](docs/history/0150-propagate-index-xattr-read-errors.md)).
@@ -147,9 +147,13 @@ that one uid's query can evict another uid's built domain under a small
 shared budget ([journal 0182](docs/history/0182-query-build-resource-cost-investigation.md)).
 The maintainer chose the resource-limit direction; `main` includes
 experimental work and rebuild-frequency limits
-([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md)).
+([ADR-0019](docs/decisions/0019-bound-query-build-work-and-frequency.md))
+and a per-mount `index_build_work` choice of 1,024–65,536 units, default
+32,768 ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
+[PR 138](https://github.com/studiomoob/llmoobfs/pull/138)).
 They do not strictly cap CPU time or physical I/O, nor provide fair index
-memory shares. Local VM and KASAN suites and all eleven PR checks passed;
-policy review, broader workload validation and issue closure remain pending.
-The experimental cap denied a valid 17,000-file domain with `E2BIG`. Avoid
-untrusted multi-user query workloads while this issue is open.
+memory shares. The default still denies the measured valid 17,000-file
+domain with `E2BIG`; 65,536 completed that fixture in a dedicated VM.
+Issue 118 remains open for a real slow lower device and a large
+single-project client. Avoid untrusted multi-user query workloads while
+this issue is open.

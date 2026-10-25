@@ -3,9 +3,10 @@
 How the MoobFS memory layer is built, in English, with a pointer to the source file or
 document behind each statement. This page describes the code on the `main` of 2026-10-10
 (M2 phases 2a to 2e and M3 phase 3b), revised on 2026-10-18 for the index built on demand
-(ADR-0012) and the review status; `QUERY2` and the domains are specified in
+(ADR-0012) and the review status, and on 2026-10-25 for the mount options and
+the directory-rename rebuild; `QUERY2` and the domains are specified in
 [spec-query-v2.md](spec-query-v2.md), the security findings in ADR-0011. It is a description of an **experimental research
-module**, not a compatibility promise: the UAPI is version 1 and may change, and the module
+module**, not a compatibility promise: the UAPI versions are 1 (`QUERY`) and 2 (`QUERY2`) and may change, and the module
 has been tested on one kernel series only (Debian 6.12.111 in QEMU; upstream 6.12.112 under
 KASAN/UBSAN/lockdep). The specifications are [spec-m2.md](spec-m2.md) and
 [spec-m3.md](spec-m3.md); the design decision is [ADR-0007](decisions/0007-stacked-memory-layer.md).
@@ -16,7 +17,7 @@ KASAN/UBSAN/lockdep). The specifications are [spec-m2.md](spec-m2.md) and
 It is mounted over a directory of an existing, mature filesystem (the "lower"):
 
 ```sh
-mount -t moobfs_layer -o lower=/srv/memory[,nolinks][,noindex][,index_budget=<bytes>][,index_idle=<seconds>] none /mnt/memory
+mount -t moobfs_layer -o lower=/srv/memory[,nolinks][,noindex][,index_budget=<bytes>][,index_idle=<seconds>][,domain_depth=<0-8>][,index_build_work=<1024-65536>] none /mnt/memory
 ```
 
 Every file and directory visible under the mount is a real file or directory in the lower
@@ -39,6 +40,8 @@ Mount contract (`layer/main.c`, `moobl_fill_super` and `moobl_parse_param`):
 | `noindex` disables the index; `QUERY` and `QUERY2` then return `EOPNOTSUPP` (`ENOSYS` until journal 0050) | `layer/index.c` (`if (!ix->enabled) return -EOPNOTSUPP`) |
 | `index_budget` accepts 1M to 4G; the default is 128 MiB | `MOOBL_INDEX_BUDGET_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
 | `index_idle` accepts 0 to 86400 seconds; the default is 60: a domain queried more recently is not released by the shrinker | `MOOBL_INDEX_IDLE_DEFAULT` in `layer/moobl.h`; range check in `moobl_parse_param` |
+| `domain_depth` accepts 0 to 8; the default is 1, so each first-level directory is a domain. 0 turns domains off | range check in `moobl_parse_param`; applied in `moobl_index_init` |
+| `index_build_work` accepts 1,024 to 65,536 cumulative work units per domain build; the default is 32,768. A non-default value is shown in the mount options | `MOOBL_BUILD_WORK_MIN`, `MOOBL_BUILD_WORK_MAX` and `MOOBL_BUILD_WORK_DEFAULT` in `layer/moobl.h`; `moobl_show_options` |
 
 Modifying the lower tree from outside while the layer is mounted is undefined, as in
 overlayfs; changes made while unmounted are picked up when each domain is built after the next
@@ -168,8 +171,9 @@ operational failures (`ENOMEM`, `EFAULT`) return an error. The contract, from
 [spec-m3.md](spec-m3.md) §3.1: authorization holds at the instant of the query; a result is
 not a grant of access; the client calls `open()` normally and must accept `EACCES` or `ENOENT`
 if permissions or names changed afterwards; UAPI v1 promises no absence of a
-time-of-check/time-of-use window; after a directory rename, entries without a cached dentry
-may be missing from answers until the next mount (a documented false negative, not a leak).
+time-of-check/time-of-use window. A directory rename marks that domain stale, and the
+next query builds it again (`domain_fresh` in `layer/index.c`). `MOOB_FLAG_PATHS_STALE`
+still reports that a rename happened since mount.
 Evidence: two uids, two namespaces, mode bits and POSIX ACLs, remount, a five-second race of
 `chmod`/`rename`/`unlink` against `QUERY`, over the three lower filesystems, in the Debian VM
 and under KASAN on 6.12.112 ([journal 0020](history/0020-phase-3b-query-authorization.md)).
@@ -180,7 +184,10 @@ The timing channel was measured (`QUERY2` against v1, journal
 limits above, capabilities advertised from the lower filesystem type (`MOOB_CAP_REFLINK`,
 `MOOB_CAP_DATA_CHECKSUMS`, `MOOB_CAP_SNAPSHOTS`, `MOOB_CAP_XATTR`), the flags `NOLINKS`,
 `INDEX_OFF`, `PATHS_STALE`, `INDEX_INCOMPLETE`, the index budget, bytes used, entry and inode
-counts, and the lower filesystem type name.
+counts, and the lower filesystem type name. The same struct also carries
+`domain_depth`, `heterogeneous`, `fallback_domains`, `domains_built`, `domain_builds`
+and `domain_releases` ([spec-query-v2.md](spec-query-v2.md) §9).
+`MOOB_FLAG_INDEX_INCOMPLETE` is reserved and is not set (ADR-0016).
 
 ## 6. What is delegated and what the layer adds
 
@@ -189,7 +196,7 @@ counts, and the lower filesystem type name.
 | Blocks, directories, journaling, crash consistency, `fsync` semantics | Validation of `user.moob.*` on write |
 | Mode bits, ownership, POSIX ACLs, the permission decision itself | The in-memory attribute index |
 | Reflink, deduplication, data checksums, snapshots (as capabilities) | `QUERY` with per-result authorization, `GET_INFO` |
-| Page cache, mmap, locks | Mount options `nolinks`, `noindex`, `index_budget` |
+| Page cache, mmap, locks | Mount options `nolinks`, `noindex`, `index_budget`, `index_idle`, `domain_depth`, `index_build_work` |
 
 Atomicity between a file's content and its attributes is the lower filesystem's; there is no
 transaction covering both. The client convention used in the tests is: write a temporary file,

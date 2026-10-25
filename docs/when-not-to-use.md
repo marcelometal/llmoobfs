@@ -62,8 +62,9 @@ errors ([0150](history/0150-propagate-index-xattr-read-errors.md)). Positive and
 evidence exists for clearing append and for injected value-read errors, respectively.
 The full integrated VM suite at `49098aa` passed, including clearing and setting append on
 ext4, btrfs and XFS, the R2 injected-error regression, and the acceptance/layer suites.
-The local batch KASAN/UBSAN/lockdep suite passed on Linux 6.12.112; pull-request CI is a
-separate pre-merge gate.
+The local batch KASAN/UBSAN/lockdep suite passed on Linux 6.12.112, and the
+required pull-request checks passed before that batch merged. The corrections
+are on `main`.
 Injecting a value-read result is not a reproduction of
 an actual lower-filesystem I/O fault. Keep using disposable test environments. The released
 tag does not contain these corrections.
@@ -104,9 +105,11 @@ These limits update the cases discussed in the value assessment, §9.6.
   are in [journal 0182](history/0182-query-build-resource-cost-investigation.md);
   `main` includes experimental work and frequency limits
   ([ADR-0019](decisions/0019-bound-query-build-work-and-frequency.md)),
-  but not a strict CPU/I/O cap or fair memory shares. A valid 17,000-file
-  domain is denied under the experimental cap. Issue 118 remains open for
-  policy review and broader-workload validation.
+  but not a strict CPU/I/O cap or fair memory shares. The 32,768-unit
+  default denies the measured valid 17,000-file domain; an administrator
+  can opt into up to 65,536 units per mount under the merged ADR-0020
+  policy, which admitted that fixture in a dedicated VM. Issue 118 remains
+  open for slow lower-device and larger real-client evidence.
 - **You need it in production today, or in any critical setting.** Only source pre-release tags exist; the
   module is one author's code; its own tests and two source reviews by AI assistants found
   kernel-side defects, security ones among them (findings F1 to F14 of ADR-0011); there is no

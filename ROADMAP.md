@@ -145,6 +145,13 @@ control passed; the complete KVM suite, KASAN, performance comparison and
 publication are separate gates. This does not implement S9 fair index-memory
 shares or guarantee strict CPU-time or physical-I/O-byte limits.
 
+*Integration update, 2026-10-25 ([0188](docs/history/0188-merged-per-mount-build-work-policy.md)):*
+PR 138 merged the bounded `index_build_work` mount option after twelve green
+checks. The 32,768-unit default remains, with an administrative 1,024–65,536
+choice. Issue 118 stays open for real slow lower-device and large
+single-project client evidence; S9 fair sharing remains separate. The
+preceding 2026-10-23 paragraph is the earlier local checkpoint.
+
 Planned from ADR-0017 (accepted 2026-10-20, journal 0156), the answers to the design objections of
 review round 2:
 - **Per-result checks as the default?** Measure every query answered with per-result permission

@@ -75,7 +75,7 @@ window. Its success marker is `BUILD_LIMIT_PASS`; it is not part of the
 default full suite. It repeats the 17,000-file over-limit check on btrfs and
 XFS. A negative control on `neg/issue118-buildlimits-0182`
 uses the same guest step against the prior module and must fail.
-`MOOB_ONLY=buildwork` is a separate opt-in regression for the proposed
+`MOOB_ONLY=buildwork` is a separate opt-in regression for the merged
 `index_build_work` mount policy (ADR-0020). It plants one 17,000-file
 domain with six typed attributes per file on disposable ext4, rejects
 invalid option values, checks denial under the 32,768 default and the
@@ -461,8 +461,8 @@ sudo rmmod moobfs
 ```
 
 For the layer: `make layer`, `insmod layer/moobfs_layer.ko`, then
-`mount -t moobfs_layer -o lower=<dir>[,nolinks][,noindex][,index_budget=<n>][,index_build_work=<1024-65536>][,domain_depth=<0-8>] none <mnt>`.
-`domain_depth` defaults to 1 (first-level directories are domains for `MOOB_IOC_QUERY2`); 0 turns
+`mount -t moobfs_layer -o lower=<dir>[,nolinks][,noindex][,index_budget=<n>][,index_idle=<0-86400>][,index_build_work=<1024-65536>][,domain_depth=<0-8>] none <mnt>`.
+`index_idle` defaults to 60 seconds. `domain_depth` defaults to 1 (first-level directories are domains for `MOOB_IOC_QUERY2`); 0 turns
 domains off and keeps the v1 `QUERY` open to every user (`docs/spec-query-v2.md`).
 `index_build_work` defaults to 32,768 cumulative units per build. Raising it
 can admit larger domains at a cost in synchronous work; the cooperative

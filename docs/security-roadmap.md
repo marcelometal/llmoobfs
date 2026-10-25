@@ -60,6 +60,10 @@ Its negative control failed on ext4; targeted KVM, complete Docker VM, native
 KVM and KASAN/UBSAN/lockdep runs passed on the corrected module. PR CI and
 integration remain pending; this does not provide S9 fair sharing.
 
+*Status correction, 2026-10-23 (journals 0179 and 0181):* PR 127 merged
+that correction after eleven green checks. The preceding paragraph is the
+pre-merge checkpoint. S9 fair sharing remains open.
+
 *Status, 2026-10-18:* findings F1 to F12 recorded; all fixed but part of F2 (fair shares, S9; its silent partial answers fixed in journal 0130); F4 completed in journal 0132. Two source
 reviews by AI assistants (journals 0111, 0114) found F9 to F12, fixed in pull request #80 with
 private advisories published afterwards; no outside human review yet.
@@ -256,6 +260,15 @@ All eleven PR checks passed on head `94dc454`, including Native Linux VM and
 KASAN/lockdep. Issue 118 remains open for numerical-policy review and
 broader workloads; a valid 17,000-file domain is denied. This is not a
 strict CPU or physical-I/O cap and does not solve fair index-memory shares.
+
+*Integration update, 2026-10-25 (ADR-0020; journal 0188):* PR 138 merged
+the bounded `index_build_work` option after twelve green checks. The
+32,768-unit default still denies the measured 17,000-file domain, while
+an administrative 65,536-unit choice completed it in a dedicated VM.
+The earlier paragraph records the fixed-policy checkpoint. Issue 118
+remains open for real slow lower-device and large single-project evidence;
+the option does not strictly cap CPU time or physical I/O or solve fair
+index-memory shares.
 
 - Issue 116 / ADR-0018 accounts user-triggered query and index allocations to
   the allocating task's memory cgroup; journal 0180 records negative controls,

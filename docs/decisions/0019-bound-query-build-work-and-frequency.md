@@ -1,6 +1,6 @@
 # ADR-0019 — Bound QUERY2 domain-build work and frequency
 
-Date: 2026-10-23. Status: **experimental implementation locally validated; not published**.
+Date: 2026-10-23. Status: **merged by PR 135; the fixed work number is superseded by ADR-0020**. The opening status originally read “experimental implementation locally validated; not published”.
 Estimated effort: L (a week or more) for implementation, negative tests,
 performance comparison and KVM/KASAN validation. This is an estimate, not
 recorded labor time.
@@ -10,6 +10,13 @@ merged into `main` by PR 135 at `2396c16`, after all eleven reported checks
 passed on head `94dc454`. The earlier status describes the local checkpoint.
 The numerical policy remains experimental; the 17,000-file denial and the
 absence of strict CPU-time or physical-I/O bounds remain known limitations.
+
+*Status update, 2026-10-25 (journal 0188):* ADR-0020 supersedes this ADR's
+fixed 32,768-unit choice with a bounded per-mount `index_build_work` option,
+merged by PR 138 after twelve green checks. The default stays 32,768;
+the admission, accounting, deadline and output-on-error decisions here
+remain in force. The earlier checkpoints below retain their dates and
+do not describe the new opt-in setting. Issue 118 stays open.
 
 ## Context
 

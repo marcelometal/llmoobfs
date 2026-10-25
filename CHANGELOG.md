@@ -2,13 +2,15 @@
 
 ## Unreleased
 
-- Proposed per-mount `index_build_work` policy (ADR-0020, journal 0187):
+- Merged per-mount `index_build_work` policy (PR 138, ADR-0020,
+  journals 0187–0188):
   retain the 32,768-unit default; let a mounter choose 1,024–65,536
   cumulative work units. A dedicated VM opt-in test admitted a valid
   17,000-file attributed domain at the upper bound while the default
   refused it. The complete native VM and KASAN/UBSAN/lockdep suites
-  passed locally. The maintainer approved the range for a PR; PR checks remain. The deadline,
-  admission limits and issue-118 status are unchanged.
+  passed locally; all twelve PR checks passed, including Native Linux VM
+  and KASAN/lockdep. The deadline and admission limits are unchanged;
+  issue 118 stays open for broader evidence.
 
 - Investigation (journal 0186, PR 136 merged; issue 118 open): a real
   ai-memory MCP workload wrote 2,000 requested pages in ten projects
@@ -203,7 +205,9 @@
   or updating the index. Injected `EIO`/`ENOMEM` tests and the full VM suite
   pass on the correction branch; the negative branch confirms the old silent
   omission. The integrated full VM suite and local KASAN/UBSAN/lockdep run pass
-  at `49098aa`; pull-request CI remains a separate pre-merge gate.
+  at `49098aa`. That local checkpoint preceded merge; the review batch later
+  merged after its required checks passed. `v0.4.1-experimental` still
+  contains both defects.
 - Documentation: correct stale `MOOB_ONLY` instructions in `docs/testing.md`
   and `docs/development.md` with dated notes (journal 0149).
 

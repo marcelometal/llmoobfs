@@ -1,6 +1,6 @@
 # ADR-0020 — Configure the bounded query-build work per mount
 
-Date: 2026-10-25. Status: accepted for PR; local validation passed, PR CI pending.
+Date: 2026-10-25. Status: accepted and merged by PR 138; issue 118 open.
 Supersedes the fixed-work-number part of [ADR-0019](0019-bound-query-build-work-and-frequency.md),
 while retaining its admission, cumulative accounting, error, deadline and
 output-on-error decisions.
@@ -84,3 +84,11 @@ unchanged default policy.
 The maintainer approved this range, default and PR publication on
 2026-10-25. Issue 118 remains open for the broader evidence described
 above; PR CI and review have not yet completed.
+
+## Publication status, 2026-10-25
+
+PR 138 passed all twelve reported checks on head `6621b21` and merged as
+`b7ae1b8`, publishing this mount option in `main`. The preceding paragraph
+records the pre-merge review state. The compatibility choice remains the
+32,768 default with a bounded operator opt-in; issue 118 remains open for
+real slow lower-device and large single-project evidence (journal 0188).
