@@ -41,7 +41,8 @@ code that issues the ioctl. User space only; no new ioctl.
   `E2BIG`, `ETIMEDOUT`, `EAGAIN`), 77 permission. The table is in `docs/tools.md`.
 - **`check`** runs `moobfs-check` from the same directory, else from `PATH`.
 - **Tests as two users** need a way to run a program under another uid in the VM guest, which has
-  no `runuser`. `tests/asuid.c` does `setgroups`, `setgid`, `setuid` and `exec`. It
+  no `runuser`. `tests/asuid.c` opens the program, then does `setgroups`, `setgid`, `setuid` and
+  `fexecve`. It
   is built by `vm/build-tests.sh` like every test program.
 
 ## Changes
@@ -99,6 +100,16 @@ exit 77`. No `BUG:`, `Oops` or `WARNING:` line appears in its console logs.
 
 KASAN was not run locally. The module did not change; the KASAN job of the pull request runs the
 same suite, with the new steps, under the sanitizers.
+
+That job failed on the first push (run 40226521832) at `cli-query-own-b-ext4`, with
+`build/vng/moobfs: Permission denied`. The KASAN harness keeps its binaries under the runner's
+home directory, `/home/runner`, which belongs to uid 1001 (the runner's own user), so
+`own-a` (uid 1001) passed and uid 1002 could not reach the program. The other tests switch user
+inside an already running program (`query --uid`); `asuid` switched before `exec`. It now opens
+the program first and runs it with `fexecve(3)`, so the user needs no access to its directory.
+Checked in a native arm64 container: uid 1234 ran a program inside a root-owned `0700`
+directory. Under amd64 emulation on the Mac, `fexecve` fails with `ENOENT`, a limit of the
+emulator rather than of the kernel. The guest kernels of the suite run it natively.
 
 Other checks: gcc 14 and clang 18 with the project's `WARN` flags; `mandoc -Tlint -Wwarning` on
 every manual page; shellcheck 0.9.0 and stable; `check-retired-claims`, `check-site`,
