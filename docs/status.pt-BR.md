@@ -1,0 +1,46 @@
+# Estado
+
+> Espelho de cortesia de [status.md](status.md), que prevalece em caso de diferença
+> ([ADR-0010](decisions/0010-english-everywhere.md)).
+
+O estado atual do MoobFS com mais detalhe que o aviso do README. Até 2026-10-25 o texto abaixo
+abria o README; ele veio para cá com o item C1 do roadmap (diário 0197), para que quem chega
+encontre primeiro o que o projeto é e só depois o histórico de estado. Os fatos não mudaram. A
+seção [Estado](../README.pt-BR.md#estado) do README mantém a lista-resumo, e
+[Limitações](../README.pt-BR.md#limitações), os limites.
+
+## Última tag e correções posteriores
+
+**Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
+revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
+diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
+código anterior às correções que hoje estão na `main`. Os dois achados da
+[revisão independente](history/0144-independent-review.md) têm correções na
+`main`. Esse lote passou na suíte completa integrada em VM e na
+KASAN/UBSAN/lockdep local; as verificações obrigatórias do PR passaram antes do merge.
+A `v0.4.1-experimental` ainda contém
+ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
+construção do índice que deixava o arquivo nas respostas do `QUERY2`; corrigido no diário 0152.
+Veja [Limitações](../README.pt-BR.md#limitações).
+
+As correções posteriores para renomeação de domínio e orçamento do índice
+foram integradas pela [PR 126](https://github.com/studiomoob/llmoobfs/pull/126)
+após suas 11 verificações passarem; as issues 110 e 111 foram fechadas. Uma
+rodada KVM nativa posterior encontrou outra recusa concorrente de orçamento.
+A tentativa de liberar outro domínio elegível quando o mais antigo está em
+construção, junto com o teste restante de falha de alocação sem privilégios
+(T9), entrou pela [PR 127](https://github.com/studiomoob/llmoobfs/pull/127)
+após as onze verificações passarem, inclusive KASAN/lockdep ([diários 0178](history/0178-unprivileged-allocation-fault-queries.md)
+e [0179](history/0179-kvm-overbudget-race-followup.md)). A issue 114 foi
+fechada. A correção da cobrança ao cgroup de memória entrou pela
+[PR 129](https://github.com/studiomoob/llmoobfs/pull/129) após as onze
+verificações passarem, e a issue 116 foi fechada. A proteção experimental
+de custo da issue 118 entrou pela [PR 135](https://github.com/studiomoob/llmoobfs/pull/135)
+após onze verificações verdes; a issue e a divisão justa S9 continuam
+abertas ([diário 0182](history/0182-query-build-resource-cost-investigation.md),
+[roadmap](../ROADMAP.md)). Ainda não houve comparação controlada de desempenho
+antes e depois da cobrança ao cgroup de memória ([diário 0180](history/0180-memcg-accounting-investigation.md)).
+A opção de limite de trabalho por montagem entrou depois pela
+[PR 138](https://github.com/studiomoob/llmoobfs/pull/138), com as doze
+verificações aprovadas ([diário 0193](history/0193-merged-per-mount-build-work-policy.md));
+a issue 118 continua aberta para ampliar as evidências.

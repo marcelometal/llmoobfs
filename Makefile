@@ -7,7 +7,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
 
-.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext
+.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext install uninstall install-test install-unit
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -25,6 +25,11 @@ help:
 	@echo 'Kernel (inside the VM container, not on your host):'
 	@echo '  make vm-test       full native suite in a disposable QEMU VM; needs only Docker'
 	@echo '  make module/layer  build the kernel modules against KDIR'
+	@echo 'Installing on a Linux host with a supported kernel (docs/operations.md):'
+	@echo '  sudo make install  build the layer module and tools, copy them, depmod (refuses other kernels)'
+	@echo '  sudo make uninstall  remove what install copied; lower directories are untouched'
+	@echo '  make install-test  follow docs/operations.md in a disposable Debian 13 VM; needs only Docker'
+	@echo '  make install-unit  install.sh never replaces an existing entry without FORCE=1 (Linux)'
 	@echo 'Details: docs/development.md and docs/testing.md'
 tools: $(BUILD)/mkfs.moobfs $(BUILD)/fsck.moobfs $(BUILD)/attr_test
 # SQL over a domain, no database (ADR-0013, journal 0108): load with .load or load_extension
@@ -99,3 +104,12 @@ layer:
 	$(MAKE) -C $(KDIR) M=$(CURDIR)/layer modules
 vm-test:
 	sh vm/run.sh
+# Roadmap item C2: install and remove on the host's running kernel (scripts/supported-kernels).
+install:
+	sh scripts/install.sh install
+uninstall:
+	sh scripts/install.sh uninstall
+install-test:
+	sh vm/install-test/run.sh
+install-unit:
+	sh scripts/test-install.sh

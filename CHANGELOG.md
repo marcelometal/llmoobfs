@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- First contact and installation (roadmap C1 and C2, journal 0197): the
+  READMEs open with a short warning, "Is it for you?" and "Ways to try it";
+  the status detail moved to `docs/status.md` (and its Portuguese mirror).
+  New `docs/operations.md`, `sudo make install` / `make uninstall` (refuse
+  kernels outside `scripts/supported-kernels`, never overwrite without
+  `FORCE=1`) and `make install-test`, which followed the guide in a
+  disposable Debian 13 VM and ended in `MOOBFS_INSTALL_PASS`. Finding: a
+  fresh Debian 13 runs 6.12.113, outside the kernel list (issue 142). The site
+  guide gains "Install on a dedicated test host"; "never load the modules on
+  your host" became "on a machine used for anything else". Before merge,
+  `install.sh` was corrected: it replaced a dangling link, wrote through a
+  pre-existing fixed temporary name and could replace an entry created after
+  its check. It now refuses any existing entry without `FORCE=1`, copies to a
+  `mktemp` name and links into place; new `make install-unit` test in CI.
+  No module change.
+
+- Roadmap: a user-space "Consumable path" (items C1–C7: first contact,
+  install and mount, container recipe, `moobfs` CLI, client library, DKMS
+  and packages prepared in VMs, optional agent adapter) and ADR-0022, which
+  keeps the kernel, UAPI and format freeze and lets these items proceed one
+  by one. Packages are not published before the stage 2 gates (journal
+  0196). Documentation only.
+
 - G4 protocol amendment proposed (journal 0194, protocol section 12): a
   per-uid derived index (one vector per memory, SHA-256 content version,
   deterministic stand-in model) in a `0700` cache outside the data

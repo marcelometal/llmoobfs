@@ -421,3 +421,23 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 - Git, [racy-git](https://git-scm.com/docs/racy-git): why a stat comparison
   alone can miss a change made within one timestamp tick; reason the content
   version is a hash, not mtime and size.
+
+## 10. Consumable path (ADR-0022, journal 0196)
+
+- [OpenZFS](https://github.com/openzfs/zfs), CDDL: an out-of-tree Linux filesystem module
+  distributed through DKMS (Debian's `zfs-dkms`), whose build checks a stated range of
+  supported kernels. Precedent for the stage 2 shape of item C6; no code used.
+- [DKMS](https://github.com/dkms-project/dkms), GPL-2.0: `dkms.conf`, including
+  `BUILD_EXCLUSIVE_KERNEL`, for building a module against each installed kernel and refusing
+  kernels outside a range. Proposed for C6; not used yet.
+- Linux v6.12.112, `Documentation/admin-guide/module-signing.rst`, GPL-2.0: module signing,
+  `CONFIG_MODULE_SIG_FORCE` and the constraints Secure Boot puts on an out-of-tree module.
+  Basis of C6's signing criterion.
+- [Debian official cloud images](https://cloud.debian.org/images/cloud/), trixie generic amd64
+  image `20261021-2638`, checked against its `SHA512SUMS`: the clean system of
+  `make install-test` (journal 0197). Configured through
+  [cloud-init NoCloud](https://cloudinit.readthedocs.io/en/latest/reference/datasources/nocloud.html)
+  served over HTTP.
+- systemd [`systemd.mount(5)`](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html):
+  `x-systemd.requires-mounts-for=` in `fstab`, `RequiresMountsFor=` and unit naming after the
+  mount point, used by `docs/operations.md` section 4.

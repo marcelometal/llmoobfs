@@ -29,7 +29,8 @@ turnaround on every issue. See the status banner in [README.md](README.md).
 - For vulnerabilities, follow [SECURITY.md](SECURITY.md); never a public issue.
 
 Never upload real agent memories, credentials or personal data as fixtures or
-in logs. Never load the module on your host; use the disposable VM.
+in logs. Never load the module on a machine you use for anything else: use the disposable VM,
+or a dedicated test host as described in [docs/operations.md](docs/operations.md).
 
 ## Language policy
 

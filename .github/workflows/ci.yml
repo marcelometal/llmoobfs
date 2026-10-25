@@ -19,6 +19,8 @@ jobs:
         with:
           persist-credentials: false
       - run: make test
+      - name: install.sh refuses existing entries without FORCE=1 (journal 0197)
+        run: make install-unit
       - name: Address and undefined behavior sanitizers
         run: >-
           make test CC=clang BUILD=build/asan

@@ -150,3 +150,7 @@ KASAN of that change was not run
 That is not the complete KASAN suite
 Não é a suíte KASAN completa
 The complete KASAN suite was not run
+only supported way to run the module
+never load the modules on your host
+Never load the module on your host
+nunca carregue os módulos no seu host

@@ -32,7 +32,9 @@ are tracked in [security-roadmap](docs/security-roadmap.md).
 ## Agreed sequence: completed work and follow-ups
 
 Updated on 2026-10-21. This keeps the order agreed on 2026-10-12 and records what subsequently
-finished. New features wait for project review and the maintainer's decision.
+finished. New features wait for project review and the maintainer's decision; since
+2026-10-25, ADR-0022 keeps that freeze for the kernel, UAPI and format and lets the user-space
+"Consumable path" items proceed one by one.
 
 | Item | Current evidence | Remaining work |
 | --- | --- | --- |
@@ -235,6 +237,34 @@ It does not select an algorithm or authorize implementation.
    evidence gates below. No backend, new disk format or revised UAPI is selected
    by adding this plan.
 
+## Consumable path — planned, user space only (ADR-0022)
+
+Added on 2026-10-25 ([ADR-0022](docs/decisions/0022-kernel-freeze-and-user-space-consumable-track.md),
+[journal 0196](docs/history/0196-consumable-path-roadmap.md)). The kernel freeze stays: these items
+change no code in `layer/`, no UAPI and no format. They turn what exists into something a
+technical user can install, mount and reach from an application, and they reuse stage 2 of
+[distribution-strategy](docs/distribution-strategy.md) §8 and risks 5, 6, 10 and 11 of
+[adoption-risks](docs/adoption-risks.md). Each needs the maintainer's go-ahead; C1 and C2 were started on 2026-10-25.
+Packages are prepared and tested in VMs, not published, until the stage 2 gates pass.
+
+**Definition of done for the path.** On a clean Debian 13 VM with the matrix kernel, someone who
+did not write the documents follows them and, within 15 minutes of their own time, installs the module, mounts it,
+writes and queries memories from Python as two OS users with no leak between them, and
+uninstalls it, leaving an ordinary tree with its attributes. The run is recorded with its time.
+
+Three fronts run in parallel: the core (kernel fixes, S9/G2), the evolution track (G1–G6) and
+this path. C5 builds on G1's adapter package and is scheduled with that front.
+
+| Item | Priority / effort | Scope and dependencies | Validation required before completion |
+| --- | --- | --- | --- |
+| **C1 — First contact** | P1 / S, written 2026-10-25 ([0197](docs/history/0197-first-contact-and-install.md)), not published | Both READMEs open with what MoobFS is, for whom, its warning and one path to try it; the running status paragraph moves to a status page that the READMEs link. Same facts, both languages, every public surface in step. | A reader reaches "what it is", "is it for me" and "how to try" without scrolling past status history; `scripts/check-retired-claims.sh`, the site checks and the public-surfaces walk pass. |
+| **C2 — Install and mount outside the test harness** | P1 / M, written 2026-10-25; `make install-test` passed in an emulated Debian 13 VM ([0197](docs/history/0197-first-contact-and-install.md)); not published | `docs/operations.md`: build against the running kernel's headers, `make install`/`modprobe`, a mount by `fstab` and by a systemd mount unit, `index_budget` and `index_build_work` choices, upgrade and uninstall. Needs an `install` target, which does not exist today. Matrix kernels only. | Followed step by step on a clean Debian 13 VM: the module loads, mounts at boot, survives a reboot and is removed cleanly; the lower stays readable with `getfattr`. A kernel outside the matrix is refused with a clear message. |
+| **C3 — Container recipe, validated** | P1 / M | `docs/container-integration.md` from distribution strategy §2.5: host mounts, container gets a bind mount with aligned uids. Test the untested alternative there (a read-only bind of the whole root for `QUERY2`) and state the outcome. A kernel change found necessary goes to the core front (ADR-0022, decision 3). | In a dedicated VM with Docker or Podman: read, write and `setxattr` work through the bind mount; `QUERY2` works or fails exactly as documented; a second container under another uid sees nothing of the first. Rootless and user-namespace runtimes stated as refused or untested. |
+| **C4 — `moobfs` command-line tool** | P1 / M | `moobfs info`, `moobfs query` and `moobfs check` over existing ioctls and tools (`tools/query-common.h`, `moobfs-check`), with text and JSON output. User space; no new ioctl. | Answers equal `moobfs-index` (the oracle) on the shapes `QUERY2` supports, paging included; explicit errors for no module, wrong directory, budget exhaustion and `EACCES`; tested as two users in the VM suite. |
+| **C5 — Supported client library** | P1 / M–L, after G1 | Promote G1's adapter (`bench/client/`) into an installable, versioned Python package with capability detection and the scan fallback of [ADR-0013](docs/decisions/0013-user-space-query-library.md) and the [client contract](docs/client-contract.md). Scheduled with the evolution front. | G1's validation carried over to the package; installs with `pip` in a clean environment; the fallback returns the same answers without the module and keeps the caller's access restrictions. |
+| **C6 — DKMS, packages and signing, prepared** | P2 / L | `dkms.conf` that refuses kernels outside the matrix, `moobfs-dkms` and `moobfs-tools` `.deb` packages, MOK signing for Secure Boot, as proposed in distribution strategy §6. Built and tested in VMs only. Publishing stays behind stage 2 and the "Public release" row below. | Stage 2 acceptance 1, 2 and 4 of distribution strategy §8 in a VM: install on clean Debian, upgrade and roll back with `moobfs-check` and `QUERY2` equal to the oracle, kernel outside the matrix refused, signed module loads under lockdown and unsigned one is refused. |
+| **C7 — Agent adapter (optional)** | P2 / M, after C5 | One adapter that exposes the library to agents through a standard protocol (for example a Model Context Protocol server), as an adapter outside `layer/`, client-neutral. Chosen only if C5 is done and a second client is wanted. | Its answers equal the library's; it runs under the agent's own uid and cannot act with another identity (the confused-deputy risk of distribution strategy §2.5); the two-user isolation test passes through it. |
+
 ## Depends on validation
 
 These are deliberately **not** scheduled: each is conditioned on M4 results or
@@ -246,7 +276,7 @@ on the security roadmap, and a negative result may cancel it.
 | Attribute values with query results | Measured in journal 0072: reading the attributes of results costs 2 to 16 µs per file against 0.9 µs per result for the query. Projection is accepted in ADR-0014, not implemented; it remains paused pending project review and the maintainer’s decision. The batch read of content (`READ_BATCH`) is dropped | [spec-m3](docs/spec-m3.md) §4, journal 0072 |
 | Change cursor ("changes since revision") | Decision deferred; needs a client with a measured benefit and answers to the open questions in spec-m3 §5 | [spec-m3](docs/spec-m3.md) §5 |
 | Own filesystem as a lower (the pre-ADR-0007 path) | Returns only as an alternative implementation of the same interface, and only with evidence that the mature lower filesystems are the bottleneck | [ADR-0007](docs/decisions/0007-stacked-memory-layer.md) |
-| Public release (DKMS, `.deb`, kernel matrix) | Stage 2 (technical preview) needs S1, S4, S5, S6, S2 results and S10; stage 3 (public) needs M4 published and S1–S6, S8–S10 done | [distribution-strategy](docs/distribution-strategy.md) §8 |
+| Public release (DKMS, `.deb`, kernel matrix) | Packages may be prepared in VMs under item C6; publishing them follows these gates. Stage 2 (technical preview) needs S1, S4, S5, S6, S2 results and S10; stage 3 (public) needs M4 published and S1–S6, S8–S10 done | [distribution-strategy](docs/distribution-strategy.md) §8 |
 | Security roadmap, remaining items | S3 remaining function-coverage investigation, S7 continuous fuzzing, S8 runtime hardening, S9 resource limits and denial of service, S10 module signing and distribution, S11 M3/M4 surfaces | [security-roadmap](docs/security-roadmap.md) |
 
 The [original architecture](docs/native-mvp.md) explores the full transactional
