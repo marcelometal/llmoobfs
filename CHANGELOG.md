@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Debian 6.12.113 test infrastructure (issue 142, journal 0203): `make vm-test`
+  accepts `MOOB_DEBIAN_KERNEL=6.12.113`, with image and headers pinned to
+  `6.12.113-1`. A separate CI job runs the same suite while the existing
+  `Native Linux VM` check keeps 6.12.111 as its default. CI and fstests results
+  are pending; 6.12.113 is not yet supported or accepted by `make install`.
+
 - Container recipe (roadmap C3, journal 0199): `docs/container-integration.md`
   gives each Docker or Podman container a bind mount of its agent's domain
   directory under the owner's uid; `QUERY2` answers through it, `GET_INFO`

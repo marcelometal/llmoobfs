@@ -15,6 +15,7 @@ There are three interfaces, each with its own version and its own rule.
 | Kernel | Functional suite | KASAN, UBSAN, lockdep | fstests `quick` |
 | --- | --- | --- | --- |
 | Debian 6.12.111+deb13-amd64 | yes, every pull request | no (distribution kernel) | yes, three lower filesystems, by hand |
+| Debian 6.12.113+deb13-amd64 | CI job added; first run pending | no (distribution kernel) | pending on ext4, btrfs and XFS; **unsupported** |
 | Upstream 6.12.112, `vm/kasan.config` | yes, every pull request that touches `layer/` or `vm/` | yes | no |
 | Anything else | no | no | no |
 
@@ -32,6 +33,9 @@ There are three interfaces, each with its own version and its own rule.
 3. A kernel is added by a pull request that adds it to CI and records one fstests `quick` run per
    lower filesystem. It is removed when its upstream series ends or when keeping it needs code the
    maintainer does not want to carry; removal is announced in the changelog one release ahead.
+   *Note, 2026-10-26 (journal 0203):* the CI job for Debian 6.12.113 is configured, but its
+   first CI run and the three fstests `quick` runs are still pending. It is not in
+   `scripts/supported-kernels` and is not yet supported.
 4. Lower filesystems: ext4, btrfs and XFS, on a local block device. A network or FUSE filesystem
    as the lower is unsupported.
 5. Architecture: x86-64 only until another one runs the same two jobs.
