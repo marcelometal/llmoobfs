@@ -9,6 +9,12 @@
   6.12.113 in PR 148's CI; the fstests runs are pending, so 6.12.113 is not yet
   supported or accepted by `make install`.
 
+- Tool JSON schema (issue #7, journal 0202): `moobfs-index --json` emits one
+  document with `dir`, `count` and ordered `{ino, path}` results; its default
+  tab-separated output is unchanged. `docs/tools.md` records the fields and
+  experimental stability of this document and the existing `moobfs-check` JSON.
+  A Linux host test validates both documents and their required types.
+
 - Container recipe (roadmap C3, journal 0199): `docs/container-integration.md`
   gives each Docker or Podman container a bind mount of its agent's domain
   directory under the owner's uid; `QUERY2` answers through it, `GET_INFO`
