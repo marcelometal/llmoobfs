@@ -40,7 +40,7 @@ Measured wall-clock times per machine are not recorded yet; the CI timeouts are
 
 Both Debian kernel image/header pairs are pinned (6.12.111-1 and 6.12.113-1). The existing `Native Linux VM` CI job retains the
 6.12.111 default and its required-check name; `Native Linux VM (Debian 6.12.113)`
-runs the same target on every pull request. Its first CI result is pending.
+runs the same target on every pull request; it first passed in PR 148.
 6.12.113 remains unsupported until fstests `quick` runs on ext4, btrfs and XFS
 are recorded on the dedicated host and the support-list change is approved
 ([compatibility.md](compatibility.md) §1, rule 3; journal 0203).
