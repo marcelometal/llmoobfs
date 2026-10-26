@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Hybrid retrieval of the G5 package (protocol section 13, journal 0197).
+"""Hybrid retrieval of the G5 package (protocol section 13, journal 0201).
 
 Per uid and per path, one SQLite file in the uid's cache, outside the data directory,
 kept by a watcher that reuses the G4 inotify loop (g4_derived.Watcher):
@@ -20,7 +20,7 @@ The eligible set comes from QUERY2 on the layer (path "moob") or from the meta t
 builds its own FTS5 table in memory.
 
 Embedding always uses batch size 1 and two threads, so the same text gives the same bits
-in every process (journal 0197).
+in every process (journal 0201).
 
   g5_retrieval.py watch  --root R --cache C --model M [--meta]
   g5_retrieval.py search --root R --cache C --model M --path moob|plain --queries Q --out O

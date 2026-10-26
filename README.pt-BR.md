@@ -2,7 +2,7 @@
 
 **A memória de um agente como arquivos comuns que o kernel consegue consultar, com as permissões de arquivo decidindo quem vê o quê.**
 
-[Site do projeto](https://studiomoob.github.io/llmoobfs/) · [Medições](docs/history/0088-m4-report.md) · [Experimente numa VM](#experimente-numa-vm) · [Como ajudar](docs/help-wanted.md) · [Índice da documentação](docs/README.md) · [FAQ](docs/faq.md) · [Roadmap](ROADMAP.md) · [English](README.md)
+[Site do projeto](https://studiomoob.github.io/llmoobfs/) · [Medições](docs/history/0088-m4-report.md) · [Experimente numa VM](#experimente-numa-vm) · [Instalar](docs/operations.md) · [Estado](docs/status.pt-BR.md) · [Como ajudar](docs/help-wanted.md) · [Índice da documentação](docs/README.md) · [FAQ](docs/faq.md) · [Roadmap](ROADMAP.md) · [English](README.md)
 
 [![CI](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml/badge.svg)](https://github.com/studiomoob/llmoobfs/actions/workflows/ci.yml)
 [![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
@@ -13,39 +13,10 @@
 > Este arquivo é um espelho de cortesia do [README em inglês](README.md), que prevalece em caso
 > de diferença ([ADR-0010](docs/decisions/0010-english-everywhere.md)).
 
-> **Experimental. Não é para produção.** Uma série de kernel (6.12), testada só em VM; ainda sem
-> revisão humana externa (duas revisões independentes do código, feitas por assistentes de IA,
-> diários 0111 e 0114). A última tag, `v0.4.1-experimental` (2026-10-20), é um retrato do
-> código anterior às correções que hoje estão na `main`. Os dois achados da
-> [revisão independente](docs/history/0144-independent-review.md) têm correções na
-> `main`. Esse lote passou na suíte completa integrada em VM e na
-> KASAN/UBSAN/lockdep local; as verificações obrigatórias do PR passaram antes do merge.
-> A `v0.4.1-experimental` ainda contém
-> ambos os defeitos. Uma revisão posterior (diário 0151) achou um terceiro, um chmod durante a
-> construção do índice que deixava o arquivo nas respostas do `QUERY2`; corrigido no diário 0152.
-> Veja [Limitações](#limitações).
-
-As correções posteriores para renomeação de domínio e orçamento do índice
-foram integradas pela [PR 126](https://github.com/studiomoob/llmoobfs/pull/126)
-após suas 11 verificações passarem; as issues 110 e 111 foram fechadas. Uma
-rodada KVM nativa posterior encontrou outra recusa concorrente de orçamento.
-A tentativa de liberar outro domínio elegível quando o mais antigo está em
-construção, junto com o teste restante de falha de alocação sem privilégios
-(T9), entrou pela [PR 127](https://github.com/studiomoob/llmoobfs/pull/127)
-após as onze verificações passarem, inclusive KASAN/lockdep ([diários 0178](docs/history/0178-unprivileged-allocation-fault-queries.md)
-e [0179](docs/history/0179-kvm-overbudget-race-followup.md)). A issue 114 foi
-fechada. A correção da cobrança ao cgroup de memória entrou pela
-[PR 129](https://github.com/studiomoob/llmoobfs/pull/129) após as onze
-verificações passarem, e a issue 116 foi fechada. A proteção experimental
-de custo da issue 118 entrou pela [PR 135](https://github.com/studiomoob/llmoobfs/pull/135)
-após onze verificações verdes; a issue e a divisão justa S9 continuam
-abertas ([diário 0182](docs/history/0182-query-build-resource-cost-investigation.md),
-[roadmap](ROADMAP.md)). Ainda não houve comparação controlada de desempenho
-antes e depois da cobrança ao cgroup de memória ([diário 0180](docs/history/0180-memcg-accounting-investigation.md)).
-A opção de limite de trabalho por montagem entrou depois pela
-[PR 138](https://github.com/studiomoob/llmoobfs/pull/138), com as doze
-verificações aprovadas ([diário 0193](docs/history/0193-merged-per-mount-build-work-policy.md));
-a issue 118 continua aberta para ampliar as evidências.
+> **Experimental. Não é para produção.** Código de kernel ainda sem revisão humana externa,
+> testado em uma série de kernel (6.12), em VMs. Use só numa VM descartável ou num host de teste
+> dedicado. O estado atual, o que entrou desde a última tag e os defeitos que essa tag ainda tem
+> estão na [página de estado](docs/status.pt-BR.md); os limites, em [Limitações](#limitações).
 
 ## O problema
 
@@ -78,6 +49,29 @@ prompt ficam na aplicação.
 Nas consultas em lote, use as saídas somente após sucesso; descarte todos os resultados
 e cursores de saída em caso de erro ([contrato do cliente](docs/client-contract.md#6-writing-and-querying),
 [escopo do teste](docs/testing.md), diário 0173).
+
+## É para você?
+
+**Vale experimentar ou avaliar se** você constrói um sistema de memória para agentes, ou qualquer
+programa que guarda registros como arquivos com alguns campos, no Linux, e quer que o sistema
+operacional (donos, modos, ACLs) decida qual usuário ou agente vê qual registro, e que o kernel
+responda "quais arquivos deste diretório têm `kind = decision`" sem um segundo banco mantido em
+sincronia.
+
+**Ainda não se** você precisa de garantias de produção, de um kernel diferente do
+`6.12.111+deb13-amd64` do Debian, de macOS ou Windows, de um container sem root que monte sozinho,
+de busca semântica ou vetorial, ou de um lugar para dados que não pode perder. Nesses casos, SQLite
+ou arquivos comuns são a melhor escolha ([when-not-to-use.md](docs/when-not-to-use.md)).
+
+## Formas de experimentar
+
+| Caminho | Precisa de | Onde |
+| --- | --- | --- |
+| Ver funcionando numa VM descartável; nada é instalado na sua máquina | Docker; 7 a 8 minutos num runner x86-64, mais no Apple Silicon | [Experimente numa VM](#experimente-numa-vm) |
+| Instalar num host de teste dedicado, montar no boot, dar diretórios aos usuários | Debian 13 com kernel `6.12.111+deb13-amd64`, root, Secure Boot desligado | [docs/operations.md](docs/operations.md) (em inglês) |
+| Dar a cada agente num container Docker ou Podman a sua própria memória | Uma montagem no host; o container recebe o seu diretório de domínio com o uid do dono | [docs/container-integration.md](docs/container-integration.md) (em inglês) |
+| Consultar pelo terminal ou por um script | O comando `moobfs`, instalado pelo guia do host de teste: `moobfs query <domínio> kind eq string decision` | [docs/tools.md](docs/tools.md#moobfs) (em inglês) |
+| Usar a partir do seu programa | Arquivos, `setxattr` e um ioctl; ainda sem biblioteca | [client-contract.md](docs/client-contract.md) |
 
 ## Quatro números
 
@@ -385,7 +379,8 @@ grep '^DEMO| ' build/vm/console.log
 
 A execução completa compila as ferramentas Linux e os dois módulos e depois sobe uma VM QEMU
 x86-64 dedicada com o kernel Debian **6.12.111+deb13-amd64**. Não precisa de contêiner
-privilegiado nem de carregar módulos no host; nunca carregue os módulos no seu host. No Apple
+privilegiado nem de carregar módulos no host; nunca carregue os módulos numa máquina usada para
+qualquer outra coisa (um host de teste dedicado está em [docs/operations.md](docs/operations.md)). No Apple
 Silicon usa emulação de CPU; a primeira compilação baixa pacotes do kernel e demora mais. A
 preparação do ambiente está em [docs/development.md](docs/development.md); o que cada marcador
 prova e não prova está em [docs/testing.md](docs/testing.md). Uma execução bem-sucedida termina
@@ -508,8 +503,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).
   O orçamento do índice ainda é compartilhado pela montagem e não garante divisão justa por usuário (S9).
 - Montar exige `CAP_SYS_ADMIN` no namespace de usuário inicial; montagens em namespace de usuário
-  e idmapped são recusadas, assim como uma montagem idmapped como `lower=`; não há contêineres sem
-  root.
+  e idmapped são recusadas, assim como uma montagem idmapped como `lower=`. Um contêiner sem root não
+  monta o layer; pode usar um que o host montou (Podman `--userns=keep-id`,
+  [container-integration.md](docs/container-integration.md)).
 - As UAPIs v1 e v2 podem mudar, sem promessa de compatibilidade ([compatibility.md](docs/compatibility.md)); as tags `-experimental` são instantâneos do código-fonte, sem binários, empacotamento nem suporte.
 - Os números iniciais contra SQLite e com o cliente são pilotos: duas máquinas, uma semente de
   dados, no máximo três repetições (diários 0025 a 0085). Comparações posteriores entre módulos
@@ -583,7 +579,7 @@ experimento M1 está congelado e roda como regressão na mesma VM.
 | Correções de segurança dos achados F9 a F12 (regra de homogeneidade, checagens sem o semáforo de consulta, acesso de escrita na montagem de baixo, lower idmapped recusado), cada uma com teste e rodada negativa | [0116](docs/history/0116-homogeneity-classes-and-checks-without-query-sem.md), [0117](docs/history/0117-lower-mount-write-access.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 
 Não implementado: índice persistente, montagens em namespace de usuário ou idmapped, leituras em
-lote, cursor de mudanças, revisões, empacotamento, UAPI estável, CLI, a suíte xfstests completa e
+lote, cursor de mudanças, revisões, empacotamento, UAPI estável, a suíte xfstests completa e
 o método M4 completo (só existem campanhas de nível piloto, em
 [bench/results/](bench/results/README.md); veja [O que foi medido](#o-que-foi-medido)). Veja o
 [ROADMAP.md](ROADMAP.md) para os itens planejados e os que dependem de validação.

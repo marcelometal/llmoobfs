@@ -12,6 +12,11 @@ charged to the memory cgroup where that controller exists (ADR-0018). The curren
 description is [architecture-overview.md](architecture-overview.md) and
 [spec-query-v2.md](spec-query-v2.md).
 
+*Note, 2026-10-25 (journal 0197).* Installation from source on a dedicated test host, with
+`make install` refusing kernels outside `scripts/supported-kernels`, and the `fstab` and mount-unit
+recipes are now [operations.md](operations.md). DKMS, packages, signing and the `moobfs` CLI
+remain FUTURE (roadmap items C4 and C6).
+
 Legend:
 
 - **EXISTS**: it is in the repository and was exercised by the suite described in `docs/testing.md`.
@@ -195,6 +200,16 @@ root of the superblock (`ENOTTY` otherwise). A bind mount of a subdirectory **ca
 | Client scans the tree and xattrs (`find` + `moobfs-attr list`) | loses the index; linear cost | EXISTS |
 
 Container in a mapped userns: not tested.
+
+> **Note of 2026-10-25 (roadmap C3, journal 0199).** Tested in a disposable Debian 13 VM with
+> Docker 26 and Podman 5: the limitation above is about `QUERY` and `GET_INFO`. `QUERY2`, added
+> later, judges a directory by its depth in the layer, not by the mount point, so a bind mount of
+> the agent's **domain directory** answers `QUERY2` inside the container. The read-only bind of the
+> whole root was also tested: `QUERY2` and `GET_INFO` work through it and writes fail. In a
+> mapped user namespace the files keep their host owners, so a remapped uid is refused; Podman's
+> `:idmap` falls back to a plain bind without translation; rootless Podman with
+> `--userns=keep-id` works, because it keeps the user's uid. The recipe and its limits are in [container-integration.md](container-integration.md). The table
+> above is kept as written.
 
 ### 2.6 Installation on distributions
 

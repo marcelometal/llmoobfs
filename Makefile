@@ -7,7 +7,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
 
-.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext
+.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext install uninstall install-test install-unit container-test
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -18,13 +18,19 @@ help:
 	@echo '  make man-lint      lint the manual pages in man/ with mandoc'
 	@echo '  make fuzz          libFuzzer over the attribute encoding (LLVM clang with libFuzzer)'
 	@echo 'Linux-only targets:'
-	@echo '  make attr-tools    moobfs-attr, moobfs-check, moobfs-index'
+	@echo '  make attr-tools    moobfs, moobfs-attr, moobfs-check, moobfs-index'
 	@echo '  make bench-tools   M4 harness binaries; make bench-smoke runs its smoke test'
 	@echo '  make hostile-test  adversarial lower trees through moobfs-check and moobfs-index (S4)'
 	@echo '  make sqlite-ext    the moobfs SQLite extension, $$(BUILD)/moobfs.so (needs libsqlite3-dev >= 3.38)'
 	@echo 'Kernel (inside the VM container, not on your host):'
 	@echo '  make vm-test       full native suite in a disposable QEMU VM; needs only Docker'
 	@echo '  make module/layer  build the kernel modules against KDIR'
+	@echo 'Installing on a Linux host with a supported kernel (docs/operations.md):'
+	@echo '  sudo make install  build the layer module and tools, copy them, depmod (refuses other kernels)'
+	@echo '  sudo make uninstall  remove what install copied; lower directories are untouched'
+	@echo '  make install-test  follow docs/operations.md in a disposable Debian 13 VM; needs only Docker'
+	@echo '  make install-unit  install.sh never replaces an existing entry without FORCE=1 (Linux)'
+	@echo '  make container-test  docs/container-integration.md with Docker and Podman in a disposable VM'
 	@echo 'Details: docs/development.md and docs/testing.md'
 tools: $(BUILD)/mkfs.moobfs $(BUILD)/fsck.moobfs $(BUILD)/attr_test
 # SQL over a domain, no database (ADR-0013, journal 0108): load with .load or load_extension
@@ -40,13 +46,15 @@ $(BUILD)/fsck.moobfs: tools/fsck.c $(COMMON) $(HEADERS) | $(BUILD)
 $(BUILD)/attr_test: tests/attr_test.c common/attr.c include/moobfs_attr.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tests/attr_test.c common/attr.c $(LDFLAGS) -o $@
 # Linux-only tools over the xattr API (built statically inside the VM container too).
-attr-tools: $(BUILD)/moobfs-attr $(BUILD)/moobfs-check $(BUILD)/moobfs-index
+attr-tools: $(BUILD)/moobfs-attr $(BUILD)/moobfs-check $(BUILD)/moobfs-index $(BUILD)/moobfs
 $(BUILD)/moobfs-attr: tools/moobfs-attr.c common/attr.c include/moobfs_attr.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-attr.c common/attr.c $(LDFLAGS) -o $@
 $(BUILD)/moobfs-check: tools/moobfs-check.c common/attr.c include/moobfs_attr.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-check.c common/attr.c $(LDFLAGS) -o $@
 $(BUILD)/moobfs-index: tools/moobfs-index.c tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs-index.c common/attr.c $(LDFLAGS) -o $@
+$(BUILD)/moobfs: tools/moobfs.c tools/query-common.h common/attr.c include/moobfs_attr.h include/moobfs_ioctl.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -Iinclude tools/moobfs.c common/attr.c $(LDFLAGS) -o $@
 # M4 benchmark harness (docs/benchmark-harness.md). gen is portable; load is Linux-only.
 bench-tools: $(BUILD)/bench-gen $(BUILD)/bench-load $(BUILD)/bench-sqlclient $(BUILD)/bench-aimem-latency $(BUILD)/bench-readcost
 $(BUILD)/bench-gen: bench/gen.c bench/common.h | $(BUILD)
@@ -99,3 +107,14 @@ layer:
 	$(MAKE) -C $(KDIR) M=$(CURDIR)/layer modules
 vm-test:
 	sh vm/run.sh
+# Roadmap item C2: install and remove on the host's running kernel (scripts/supported-kernels).
+install:
+	sh scripts/install.sh install
+uninstall:
+	sh scripts/install.sh uninstall
+install-test:
+	sh vm/install-test/run.sh
+install-unit:
+	sh scripts/test-install.sh
+container-test:
+	MOOB_TEST=container sh vm/install-test/run.sh

@@ -80,7 +80,9 @@ These limits update the cases discussed in the value assessment, §9.6.
   vector retrieval belong in the client or a database.
 - **The host is not Linux, or you do not have root.** Mounting requires `CAP_SYS_ADMIN` in
   the initial user namespace; user-namespace and idmapped mounts are refused. Hosted CI,
-  rootless containers, serverless, macOS and Windows are out.
+  serverless, macOS and Windows are out, and so is a rootless container on a host where nobody
+  with root mounts the layer for it. A rootless Podman container can use a layer the host mounted,
+  under its user's own uid ([container-integration.md](container-integration.md)).
 - **The host runs SELinux enforcing and you cannot add a policy rule.** The shipped policies
   have no rule for `moobfs_layer`, so every file through the layer is unlabelled and confined
   processes are refused everything. With the rule `fs_use_xattr moobfs_layer`

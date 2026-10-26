@@ -1,0 +1,228 @@
+# Installing and operating MoobFS on a Linux host
+
+Status: roadmap item C2 ([ADR-0022](decisions/0022-kernel-freeze-and-user-space-consumable-track.md)).
+What was actually run is in [journal 0197](history/0197-first-contact-and-install.md); the
+section [What was tested](#what-was-tested) at the end summarizes it.
+
+> **Experimental. Not for production.** MoobFS is kernel code with no outside human review yet.
+> A defect is a kernel crash for the whole machine. Install it only on a **dedicated test host
+> or VM** whose data you can lose. For anything else, SQLite or plain files remain the
+> recommendation ([when-not-to-use.md](when-not-to-use.md)).
+
+This page installs the module on the host's own kernel, mounts it by hand and at boot, gives
+users their directories, and removes it again. To try MoobFS without installing anything, use
+[Try it in a VM](../README.md#try-it-in-a-vm) instead.
+
+## 1. Requirements
+
+| Requirement | Why |
+| --- | --- |
+| x86-64, Debian 13, kernel **`6.12.111+deb13-amd64`** exactly | The only distribution kernel the suite runs on ([compatibility.md](compatibility.md)). `make install` refuses any other kernel. |
+| Root (`sudo`) | Loading a module and mounting need `CAP_SYS_ADMIN` in the initial user namespace. |
+| A directory on ext4, btrfs or XFS, on a local disk | The lower tree that holds the files. Network and FUSE filesystems are unsupported. |
+| Secure Boot off, or your own MOK to sign the module | The module is not signed; with Secure Boot on, the kernel refuses to load it. |
+
+**The kernel version is the first obstacle.** A Debian 13 system installed today runs a newer
+6.12 kernel (the 2026-10-21 cloud image ships `6.12.113+deb13-amd64`), which is outside the
+list. Until the list grows (docs/compatibility.md, rule 3), a test host has to run the listed
+kernel:
+
+```sh
+uname -r                                   # must print 6.12.111+deb13-amd64
+sudo apt install linux-image-6.12.111+deb13-amd64=6.12.111-1 \
+                 linux-headers-6.12.111+deb13-amd64=6.12.111-1
+# make it the default boot entry, then reboot into it:
+sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Debian GNU\/Linux>Debian GNU\/Linux, with Linux 6.12.111+deb13-amd64"/' /etc/default/grub
+sudo update-grub && sudo reboot
+```
+
+Staying on an older kernel forgoes the security fixes of later ones. That is one more reason to
+use a dedicated host, never a machine that holds anything else.
+
+`MOOB_ALLOW_UNSUPPORTED=1` makes `make install` build for another kernel anyway. It prints a
+warning and nothing about the result is tested or supported: the module uses in-kernel
+interfaces that change without notice, even between 6.12 builds.
+
+## 2. Build and install
+
+```sh
+sudo apt install build-essential git attr acl linux-headers-$(uname -r)
+git clone https://github.com/studiomoob/llmoobfs.git
+cd llmoobfs
+sudo make install
+```
+
+`make install` checks the kernel, builds `moobfs_layer.ko` against `/lib/modules/$(uname -r)/build`,
+and copies:
+
+| File | Destination |
+| --- | --- |
+| `moobfs_layer.ko` | `/lib/modules/$(uname -r)/updates/moobfs/` (then `depmod`) |
+| `moobfs`, `moobfs-attr`, `moobfs-check`, `moobfs-index` | `/usr/local/bin/` |
+| Their manual pages | `/usr/local/share/man/man1/` |
+
+It refuses to replace anything already at a destination, a symbolic link included; `FORCE=1`
+replaces a file or link (see Upgrade), never a directory. `make uninstall` removes only regular
+files.
+`PREFIX` changes `/usr/local`; `DESTDIR` stages everything in another root without `depmod`.
+
+Load it and check that the kernel knows the filesystem type:
+
+```sh
+sudo modprobe moobfs_layer
+grep moobfs_layer /proc/filesystems        # prints: nodev	moobfs_layer
+```
+
+## 3. Prepare the lower tree and mount
+
+The lower tree must not be written behind the layer while it is mounted (as with overlayfs):
+changes made there reach the index only at the next mount ([ADR-0011](decisions/0011-threat-and-credential-model.md),
+non-promise 2). Keep it where ordinary users cannot reach it, inside a directory only root can
+enter:
+
+```sh
+sudo install -d -m 0700 /srv/moobfs                 # only root can reach what is inside
+sudo install -d -m 0755 /srv/moobfs/lower           # becomes the root of the mount
+sudo install -d -m 0755 /srv/memory                 # the mount point users work in
+sudo mount -t moobfs_layer -o lower=/srv/moobfs/lower,nolinks none /srv/memory
+findmnt /srv/memory
+```
+
+The mount root carries the lower root's owner and mode. Keep it `0755`: a client that opens the
+mount root needs to enter it.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `lower=<dir>` | required | The lower directory. |
+| `nolinks` | off | Refuse hard and symbolic links (`EPERM`). Recommended for memory clients. |
+| `noindex` | off | Attributes are validated but not indexed; queries are unavailable. |
+| `domain_depth=<0–8>` | 1 | Depth of the permission domains: 1 means each top-level directory is a domain. |
+| `index_budget=<1M–4G>` | 128M | Kernel memory the index may use, for the whole mount. |
+| `index_idle=<0–86400>` | 60 | Seconds before an unused domain's index may be released. |
+| `index_build_work=<1024–65536>` | 32768 | Work an unprivileged query may spend building a domain's index ([ADR-0020](decisions/0020-configurable-query-build-work-per-mount.md)). |
+
+No option can change on remount. The full semantics are in [spec-m2.md](spec-m2.md) and
+[spec-query-v2.md](spec-query-v2.md).
+
+## 4. Mount at boot
+
+With `/etc/fstab`:
+
+```text
+none  /srv/memory  moobfs_layer  lower=/srv/moobfs/lower,nolinks,x-systemd.requires-mounts-for=/srv/moobfs/lower  0  0
+```
+
+`x-systemd.requires-mounts-for` orders the mount after the filesystem that holds the lower
+tree. The kernel loads the module by itself on the first mount of the type, through the
+`fs-moobfs_layer` alias that `depmod` registered. After editing:
+
+```sh
+sudo systemctl daemon-reload
+sudo mount /srv/memory      # or reboot
+```
+
+Or, without `fstab`, a systemd mount unit named after the mount point,
+`/etc/systemd/system/srv-memory.mount`:
+
+```ini
+[Unit]
+Description=MoobFS layer over /srv/moobfs/lower
+RequiresMountsFor=/srv/moobfs/lower
+
+[Mount]
+What=none
+Where=/srv/memory
+Type=moobfs_layer
+Options=lower=/srv/moobfs/lower,nolinks
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload && sudo systemctl enable --now srv-memory.mount
+```
+
+## 5. Give users their directories
+
+Each top-level directory is a permission domain. Create them through the mount, with ordinary
+owners and modes; the kernel then decides who sees what ([client-contract.md](client-contract.md),
+distribution strategy §2.2):
+
+```sh
+sudo install -d -o alice -g alice -m 0700 /srv/memory/alice
+sudo -u alice sh -c 'echo "use the staging cluster" > /srv/memory/alice/note.md'
+sudo -u alice moobfs-attr set /srv/memory/alice/note.md kind string decision
+sudo -u alice moobfs-attr list /srv/memory/alice/note.md     # kind	string	decision
+sudo -u bob cat /srv/memory/alice/note.md                    # Permission denied
+```
+
+Query a domain through the kernel's index with `moobfs` ([tools.md](tools.md#moobfs)):
+
+```sh
+sudo -u alice moobfs query /srv/memory/alice kind eq string decision   # note.md
+sudo -u bob moobfs query /srv/memory/alice kind eq string decision     # permission denied (exit 77)
+moobfs info /srv/memory                                                # the mount's settings
+```
+
+A directory shared by a group is `root:<group>` with mode `2770` and a default ACL; the recipe is
+in [distribution-strategy.md](distribution-strategy.md) §2.2. Containers: §2.5 of the same
+document, until item C3 validates a recipe.
+
+## 6. Check, upgrade, back up
+
+- **Check** the attributes of a tree, mounted or not: `moobfs check /srv/memory` (or
+  `moobfs-check`) prints a JSON
+  report and exits 0 when clean, 2 when it found problems. It never repairs.
+- **Upgrade** the module: stop the clients, then
+
+  ```sh
+  sudo umount /srv/memory && sudo rmmod moobfs_layer
+  git pull && sudo make install FORCE=1
+  sudo mount /srv/memory
+  ```
+
+  The module refuses to mount a tree whose `user.moob.format` it does not know, so an older
+  module cannot misread a newer tree.
+- **Back up** the lower tree with `rsync -aHAX --numeric-ids /srv/moobfs/lower/ <target>/`.
+  `-X` is mandatory: without it the `user.moob.*` attributes are lost. Recovery is described in
+  distribution strategy §2.7.
+
+## 7. Uninstall
+
+```sh
+sudo umount /srv/memory
+sudo sed -i '\|^none  */srv/memory  *moobfs_layer|d' /etc/fstab   # or disable srv-memory.mount
+sudo rmmod moobfs_layer
+sudo make uninstall
+```
+
+`make uninstall` refuses while the module is loaded. It removes only what `make install`
+copied. The lower tree stays an ordinary directory, readable without the module:
+
+```sh
+sudo getfattr -d -m '^user\.moob\.' /srv/moobfs/lower/alice/note.md
+```
+
+## 8. When something fails
+
+| Symptom | Cause and action |
+| --- | --- |
+| `kernel ... is not supported` from `make install` | The running kernel is not in `scripts/supported-kernels`; see section 1. |
+| `no kernel headers at ...` | `sudo apt install linux-headers-$(uname -r)`. |
+| `modprobe: ERROR: could not insert 'moobfs_layer': Key was rejected by service` | Secure Boot refuses the unsigned module. Turn Secure Boot off on the test host, or sign the module with your own MOK (`Documentation/admin-guide/module-signing.rst`); packaged signing is item C6. |
+| `mount: ... unknown filesystem type 'moobfs_layer'` | The module is not installed for this kernel: `ls /lib/modules/$(uname -r)/updates/moobfs/`, then `sudo depmod -a`. |
+| `mount` fails with `EPERM` inside a container or user namespace | Deliberate: mount on the host and bind-mount into the container (ADR-0011). |
+| `lower= is required`, or `... must be between ...` in `dmesg` | A missing or out-of-range mount option; see the table in section 3. |
+| A query returns `ENOTTY` | `QUERY` needs the mount root, `QUERY2` a domain directory; a bind mount of a subdirectory cannot issue `QUERY` (distribution strategy §2.5). |
+
+## What was tested
+
+`make install-test` (`vm/install-test/`) follows sections 1 to 7 in order in a disposable QEMU
+VM booted from the Debian 13 generic cloud image of 2026-10-21. On 2026-10-25 it passed
+(`MOOBFS_INSTALL_PASS`, [journal 0197](history/0197-first-contact-and-install.md)): install
+refused on the image's 6.12.113 kernel, installed on 6.12.111, mounted by hand, by `fstab` at
+boot with the module loaded through its alias, and by the mount unit; alice's directory closed to
+bob; attribute kept across a reboot; uninstalled with the lower still readable. It was not run
+on real hardware, with Secure Boot on, with btrfs or XFS as the lower, or on any distribution
+other than Debian 13.

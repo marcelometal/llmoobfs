@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Kernel releases (uname -r) that `make install` accepts without MOOB_ALLOW_UNSUPPORTED=1.
+# The rule is docs/compatibility.md section 1: a kernel is supported when the full suite and
+# the KASAN job pass on it in CI. The upstream 6.12.112 KASAN kernel is a test build, not an
+# installation target, so it is not listed. One release per line.
+6.12.111+deb13-amd64

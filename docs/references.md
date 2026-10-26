@@ -422,7 +422,39 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   alone can miss a change made within one timestamp tick; reason the content
   version is a hash, not mtime and size.
 
-## 10. G5 retrieval protocol (journal 0196, proposed)
+## 10. Consumable path (ADR-0022, journal 0196)
+
+- [OpenZFS](https://github.com/openzfs/zfs), CDDL: an out-of-tree Linux filesystem module
+  distributed through DKMS (Debian's `zfs-dkms`), whose build checks a stated range of
+  supported kernels. Precedent for the stage 2 shape of item C6; no code used.
+- [DKMS](https://github.com/dkms-project/dkms), GPL-2.0: `dkms.conf`, including
+  `BUILD_EXCLUSIVE_KERNEL`, for building a module against each installed kernel and refusing
+  kernels outside a range. Proposed for C6; not used yet.
+- Linux v6.12.112, `Documentation/admin-guide/module-signing.rst`, GPL-2.0: module signing,
+  `CONFIG_MODULE_SIG_FORCE` and the constraints Secure Boot puts on an out-of-tree module.
+  Basis of C6's signing criterion.
+- [Debian official cloud images](https://cloud.debian.org/images/cloud/), trixie generic amd64
+  image `20261021-2638`, checked against its `SHA512SUMS`: the clean system of
+  `make install-test` (journal 0197). Configured through
+  [cloud-init NoCloud](https://cloudinit.readthedocs.io/en/latest/reference/datasources/nocloud.html)
+  served over HTTP.
+- systemd [`systemd.mount(5)`](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html):
+  `x-systemd.requires-mounts-for=` in `fstab`, `RequiresMountsFor=` and unit naming after the
+  mount point, used by `docs/operations.md` section 4.
+- FreeBSD [sysexits(3)](https://man.freebsd.org/cgi/man.cgi?query=sysexits&sektion=3), also
+  shipped by glibc as `<sysexits.h>`: the exit codes 64, 65, 69, 75 and 77 of the `moobfs` tool
+  (journal 0198), as the other tools already use 64 and 65. Defined in the tool, not included.
+- Podman, [podman-run(1)](https://docs.podman.io/en/latest/markdown/podman-run.1.html): `--user`,
+  `--uidmap`, `--userns=keep-id` and the `idmap` bind option, which needs rootful Podman and a
+  filesystem that allows idmapped mounts. Used by `vm/container-test/guest.sh` (journal 0199).
+- Docker, [docker run](https://docs.docker.com/reference/cli/docker/container/run/) `--user`
+  and bind mounts, Debian's `docker.io` 26.1.5: the same recipe as Podman's.
+- Linux v6.12.112, `fs/namespace.c` (`can_idmap_mount()`, which refuses a superblock whose type
+  lacks `FS_ALLOW_IDMAP`) and `layer/index.c` `query2_target()` (domain from the dentry's depth,
+  not the mount): why a bind of a domain directory answers `QUERY2` and an idmapped bind is
+  refused (journal 0199).
+
+## 11. G5 retrieval protocol (journal 0200)
 
 - Wu, Wang, Yu, Zhang, Chang and Yu, [LongMemEval: Benchmarking Chat
   Assistants on Long-Term Interactive Memory](https://arxiv.org/abs/2410.10813),

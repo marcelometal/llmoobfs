@@ -2,12 +2,53 @@
 
 ## Unreleased
 
-- G5 protocol amendment proposed (journal 0196, protocol section 13):
+- G5 protocol amendment proposed (journal 0200, protocol section 13):
   LongMemEval labels (110 instances, one file per turn), exact
   `all-MiniLM-L6-v2`, SQLite FTS5 BM25 and reciprocal rank fusion, the
   MoobFS path against the same engines over plain files with a metadata
   table, and bounds for identical answers, authorization, a relative
   relevance floor and latency. Not accepted and not run.
+
+- Container recipe (roadmap C3, journal 0199): `docs/container-integration.md`
+  gives each Docker or Podman container a bind mount of its agent's domain
+  directory under the owner's uid; `QUERY2` answers through it, `GET_INFO`
+  does not. A read-only bind of the whole root, a remapped user namespace,
+  Podman's `:idmap` (the kernel refuses the idmapping; Podman falls back to a
+  plain bind with no translation) and rootless Podman with `--userns=keep-id`
+  were tested with `make container-test`, a new target that reuses the
+  install-test VM; `MOOB_HOST_QEMU=1` runs either test under KVM on a Linux
+  host. The not-implemented lists no longer name a CLI (C4 shipped one).
+
+- `moobfs` command-line tool (roadmap C4, journal 0198): `moobfs info`,
+  `moobfs query` (QUERY2 with the cursor followed, or the mount-wide QUERY
+  without domains; text or JSON; paths sorted like `moobfs-index` without
+  `--order`) and `moobfs check`, with an explicit message and a sysexits(3)
+  status for each refusal. Installed by `make install`; tested in the VM
+  suite as two users against the oracle (`CLI_PASS`, `CLI_E2BIG_PASS`) and
+  in `make install-test` (`CLI_QUERY`). User space only; no new ioctl.
+
+- First contact and installation (roadmap C1 and C2, journal 0197): the
+  READMEs open with a short warning, "Is it for you?" and "Ways to try it";
+  the status detail moved to `docs/status.md` (and its Portuguese mirror).
+  New `docs/operations.md`, `sudo make install` / `make uninstall` (refuse
+  kernels outside `scripts/supported-kernels`, never overwrite without
+  `FORCE=1`) and `make install-test`, which followed the guide in a
+  disposable Debian 13 VM and ended in `MOOBFS_INSTALL_PASS`. Finding: a
+  fresh Debian 13 runs 6.12.113, outside the kernel list (issue 142). The site
+  guide gains "Install on a dedicated test host"; "never load the modules on
+  your host" became "on a machine used for anything else". Before merge,
+  `install.sh` was corrected: it replaced a dangling link, wrote through a
+  pre-existing fixed temporary name and could replace an entry created after
+  its check. It now refuses any existing entry without `FORCE=1`, copies to a
+  `mktemp` name and links into place; new `make install-unit` test in CI.
+  No module change.
+
+- Roadmap: a user-space "Consumable path" (items C1–C7: first contact,
+  install and mount, container recipe, `moobfs` CLI, client library, DKMS
+  and packages prepared in VMs, optional agent adapter) and ADR-0022, which
+  keeps the kernel, UAPI and format freeze and lets these items proceed one
+  by one. Packages are not published before the stage 2 gates (journal
+  0196). Documentation only.
 
 - G4 protocol amendment proposed (journal 0194, protocol section 12): a
   per-uid derived index (one vector per memory, SHA-256 content version,

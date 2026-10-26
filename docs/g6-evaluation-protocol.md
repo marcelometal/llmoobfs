@@ -576,15 +576,24 @@ concurrency or the corpus is a new dated amendment, before its run.
 
 ## 13. G5 amendment, 2026-10-25 — proposed, not accepted
 
-Status: proposed by journal [0196](history/0196-g5-protocol-amendment.md).
+Status: proposed by journal [0200](history/0200-g5-protocol-amendment.md).
 The maintainer has not accepted it, nothing below has run, and no number in
 this section was measured for it. Once accepted, sections 13.1 to 13.6 are
 fixed under the rule of section 1. Until then G5 stays unstarted.
 
-Acceptance note, 2026-10-25 (journal [0197](history/0197-g5-hybrid-retrieval-package.md)):
+Acceptance note, 2026-10-25 (journal [0201](history/0201-g5-hybrid-retrieval-package.md)):
 the maintainer accepted this section as written, before any download or
 run. Sections 13.1 to 13.6 are fixed from that point. The heading keeps its
 original wording.
+
+Harness note, 2026-10-26 (journal [0201](history/0201-g5-hybrid-retrieval-package.md)):
+the first full run stopped at its first search, after every index was built,
+because `QUERY2` refused the two private domains (about 25,000 files each)
+with `E2BIG` under the default `index_build_work`. The gate now mounts with
+`index_build_work=65536`, the administrative maximum of
+[ADR-0020](decisions/0020-configurable-query-build-work-per-mount.md), and
+issues one `QUERY2` per domain before indexing. No bound, corpus or engine of
+this section changed.
 
 ### 13.1 What G5 is in this batch, and what it does not change
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Mounted G5 gate (protocol section 13, journal 0197). Run as root on the dedicated Linux
+"""Mounted G5 gate (protocol section 13, journal 0201). Run as root on the dedicated Linux
 host, in the venv that holds the pinned packages.
 
 Draws the LongMemEval sample, publishes one adapter file per turn on the layer, copies the

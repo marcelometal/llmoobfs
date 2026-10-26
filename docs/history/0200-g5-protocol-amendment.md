@@ -1,4 +1,4 @@
-# 0196 — G5 protocol amendment proposed, before any package
+# 0200 — G5 protocol amendment proposed, before any package
 
 Date: 2026-10-25. Status: amendment proposed; not accepted; nothing run.
 Work started: 2026-10-25 10:20 America/Sao_Paulo, when the maintainer said to

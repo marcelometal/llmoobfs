@@ -17,7 +17,7 @@ until a coordinated disclosure) is named in the journal of the change, with the 
 
 | Surface | States | Update when |
 | --- | --- | --- |
-| `README.md` and `README.pt-BR.md` (mirror, same facts) | status box, numbers, review status, maintainers, how to help, quick start | any change of status, tests run, review, numbers, maintainers |
+| `README.md` and `README.pt-BR.md` (mirror, same facts), with `docs/status.md` and `docs/status.pt-BR.md` (the status detail moved out of the README opening, journal 0197) | status box, numbers, review status, maintainers, how to help, quick start, who it is for and ways to try it | any change of status, tests run, review, numbers, maintainers |
 | `site/` (`index.html`, `guide.html`, `plan.html`, `faq.html`) | landing page, test guide, plan, FAQ | same as the README; new markers or steps for the guide |
 | `scripts/site-journey.py` → `site/journey.html`, `status.html`, `research.html`, `how.html` and `site/pt/` (ADR-0015) | milestones, status against `adding-new-filesystems.rst`, research topics, how the project is made | a milestone, a status answer or a research topic changes; both languages |
 | `CHANGELOG.md` | changes since the last tag | every relevant change |
@@ -25,7 +25,7 @@ until a coordinated disclosure) is named in the journal of the change, with the 
 | `docs/decisions/` (ADR status lines, ADR-0011 findings) | decisions and findings | a decision is taken or replaced; a finding is found or fixed |
 | `docs/history/README.md` | journal index | every journal |
 | `docs/help-wanted.md`, `CONTRIBUTING.md` | what help is wanted | a call opens or closes |
-| `docs/testing.md`, `docs/faq.md`, `docs/when-not-to-use.md`, `docs/compatibility.md` | what tests prove, answers, limits, compatibility | a test step, a limit or a compatibility decision changes |
+| `docs/testing.md`, `docs/faq.md`, `docs/when-not-to-use.md`, `docs/compatibility.md`, `docs/operations.md`, `docs/container-integration.md` | what tests prove, answers, limits, compatibility | a test step, a limit or a compatibility decision changes |
 | `SECURITY.md` | reporting channel, supported versions | the channel or the supported versions change |
 | `docs/references.md` | works used | something new is used (same commit) |
 

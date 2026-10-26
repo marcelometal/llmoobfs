@@ -91,7 +91,7 @@ source = Path('/lib/modules') / sys.argv[1] / 'kernel/drivers/block/loop.ko.xz'
 Path(sys.argv[2]).write_bytes(lzma.decompress(source.read_bytes()))
 PY
 make attr-tools BUILD=build/linux CFLAGS="-O2 -g -static"
-cp build/linux/moobfs-attr build/linux/moobfs-check build/linux/moobfs-index "$STAGE/"
+cp build/linux/moobfs build/linux/moobfs-attr build/linux/moobfs-check build/linux/moobfs-index "$STAGE/"
 make bench-tools BUILD=build/linux CFLAGS="-O2 -g -static" SQLITE_LIBS="-lsqlite3 -ldl -lpthread"
 cp build/linux/bench-gen build/linux/bench-load build/linux/bench-sqlclient "$STAGE/" && cp bench/queries-w3.txt "$STAGE/bench-queries-w3.txt"
 cp bench/sqlbase.sh "$STAGE/bench-sqlbase.sh" && cp bench/equiv.sh "$STAGE/bench-equiv.sh" && cp bench/run.sh "$STAGE/bench-run.sh"

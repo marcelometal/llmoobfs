@@ -7,7 +7,9 @@ set -eu
 files="README.md README.pt-BR.md SECURITY.md CONTRIBUTING.md ROADMAP.md
 docs/faq.md docs/help-wanted.md docs/testing.md docs/when-not-to-use.md docs/compatibility.md
 docs/architecture-overview.md docs/development.md docs/tools.md docs/accessibility.md
-docs/public-surfaces.md site/*.html site/pt/*.html"
+docs/public-surfaces.md docs/status.md docs/status.pt-BR.md docs/operations.md
+docs/container-integration.md
+site/*.html site/pt/*.html"
 found=0
 while IFS= read -r claim; do
 	case "$claim" in ''|'#'*) continue ;; esac
