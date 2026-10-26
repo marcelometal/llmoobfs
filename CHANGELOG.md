@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Container recipe (roadmap C3, journal 0199): `docs/container-integration.md`
+  gives each Docker or Podman container a bind mount of its agent's domain
+  directory under the owner's uid; `QUERY2` answers through it, `GET_INFO`
+  does not. A read-only bind of the whole root, a remapped user namespace,
+  Podman's `:idmap` (the kernel refuses the idmapping; Podman falls back to a
+  plain bind with no translation) and rootless Podman with `--userns=keep-id`
+  were tested with `make container-test`, a new target that reuses the
+  install-test VM; `MOOB_HOST_QEMU=1` runs either test under KVM on a Linux
+  host. The not-implemented lists no longer name a CLI (C4 shipped one).
+
 - `moobfs` command-line tool (roadmap C4, journal 0198): `moobfs info`,
   `moobfs query` (QUERY2 with the cursor followed, or the mount-wide QUERY
   without domains; text or JSON; paths sorted like `moobfs-index` without

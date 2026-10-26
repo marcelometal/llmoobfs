@@ -90,7 +90,7 @@ injection and syzkaller provide additional coverage.
 A persistent index (it lives in RAM and each domain's part is built by its first query),
 user-namespace and idmapped mounts (both refused, as is an idmapped mount as `lower=`), batch
 reads of results, a change cursor, revisions, values returned with the results (specified by
-ADR-0014, not implemented), packaging (DKMS, `.deb`), a stable UAPI, a CLI, and the full
+ADR-0014, not implemented), packaging (DKMS, `.deb`), a stable UAPI, and the full
 xfstests suite.
 [`docs/spec-m3.md`; `docs/distribution-strategy.md`; `ROADMAP.md`]
 

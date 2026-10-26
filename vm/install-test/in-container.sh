@@ -2,10 +2,25 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Runs inside the moobfs-install-test container (vm/install-test/run.sh). Boots the Debian 13
 # generic cloud image under QEMU with a throwaway overlay, configures it through cloud-init
-# NoCloud over HTTP, and drives vm/install-test/guest.sh over SSH across two reboots.
+# NoCloud over HTTP, and drives a guest script over SSH, rebooting between its phases.
+#   MOOB_TEST=install (default)  vm/install-test/guest.sh, phases 0 1 2 (roadmap C2)
+#   MOOB_TEST=container          vm/container-test/guest.sh, phases 0 1 (roadmap C3)
+# With /dev/kvm writable the guest runs under KVM, otherwise under TCG emulation. MOOB_WORK is the
+# repository root (default /work, the container's bind mount; run.sh sets it for MOOB_HOST_QEMU=1).
 set -eu
-cd /work
-OUT=build/install-test
+cd "${MOOB_WORK:-/work}"
+if [ -w /dev/kvm ]; then
+	ACCEL="-accel kvm -cpu host" ACCEL_NAME=KVM
+else
+	ACCEL="-accel tcg,thread=multi -cpu max" ACCEL_NAME="TCG emulation"
+fi
+case ${MOOB_TEST:-install} in
+install) OUT=build/install-test GUEST=vm/install-test/guest.sh PHASES="0 1 2" NAME=INSTALL ;;
+container) OUT=build/container-test GUEST=vm/container-test/guest.sh PHASES="0 1" NAME=CONTAINER ;;
+*) echo "unknown MOOB_TEST ${MOOB_TEST}" >&2; exit 64 ;;
+esac
+CACHE=build/install-test	# the base image is shared by both tests
+mkdir -p "$OUT" "$CACHE"
 IMG_DATE=20261021-2638
 IMG=debian-13-generic-amd64-$IMG_DATE.qcow2
 URL=https://cloud.debian.org/images/cloud/trixie/$IMG_DATE/$IMG
@@ -15,15 +30,15 @@ LOG=$OUT/log.txt
 : >"$LOG"
 log() { echo "$*" | tee -a "$LOG"; }
 
-if [ ! -f "$OUT/$IMG" ]; then
-	curl -fsSL -o "$OUT/$IMG.part" "$URL"
-	mv "$OUT/$IMG.part" "$OUT/$IMG"
+if [ ! -f "$CACHE/$IMG" ]; then
+	curl -fsSL -o "$CACHE/$IMG.part" "$URL"
+	mv "$CACHE/$IMG.part" "$CACHE/$IMG"
 fi
-echo "$SUM  $OUT/$IMG" | sha512sum -c - >/dev/null || { log "MOOBFS_INSTALL_FAIL: image checksum"; exit 1; }
+echo "$SUM  $CACHE/$IMG" | sha512sum -c - >/dev/null || { log "MOOBFS_${NAME}_FAIL: image checksum"; exit 1; }
 
 # A fresh overlay every run: the base image is never written.
 rm -f "$OUT/disk.qcow2" "$OUT"/console-*.log
-qemu-img create -q -f qcow2 -F qcow2 -b "$IMG" "$OUT/disk.qcow2" 16G
+qemu-img create -q -f qcow2 -F qcow2 -b "$(pwd)/$CACHE/$IMG" "$OUT/disk.qcow2" 16G
 
 # The key stays in the container: a bind mount from macOS may not keep mode 0600.
 SEED=$(mktemp -d)
@@ -53,7 +68,8 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory "$SEED" >/dev/null 2>&1
 HPID=$!
 
 boot() {
-	qemu-system-x86_64 -accel tcg,thread=multi -cpu max -smp 4 -m 4096 \
+	# shellcheck disable=SC2086   # $ACCEL holds several options
+	qemu-system-x86_64 $ACCEL -smp 4 -m 4096 \
 		-drive file="$OUT/disk.qcow2",if=virtio,format=qcow2 \
 		-smbios 'type=1,serial=ds=nocloud;s=http://10.0.2.2:8000/' \
 		-nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2222-:22 \
@@ -66,7 +82,7 @@ wait_ssh() {
 	i=0
 	while ! $SSH true 2>/dev/null; do
 		i=$((i + 1))
-		[ "$i" -lt 180 ] || { log "MOOBFS_INSTALL_FAIL: no ssh after boot $1"; exit 1; }
+		[ "$i" -lt 180 ] || { log "MOOBFS_${NAME}_FAIL: no ssh after boot $1"; exit 1; }
 		sleep 10
 	done
 	log "BOOTED: $1 after about $((i * 10)) s"
@@ -79,18 +95,25 @@ reboot_guest() {
 }
 phase() {
 	$SSH "sudo sh guest.sh $1" 2>&1 | tee -a "$LOG" || true
-	grep -q "PHASE_DONE: $1" "$LOG" || { log "MOOBFS_INSTALL_FAIL: phase $1"; exit 1; }
+	grep -q "PHASE_DONE: $1" "$LOG" || { log "MOOBFS_${NAME}_FAIL: phase $1"; exit 1; }
 }
 
 START=$(date +%s)
 boot 1
 wait_ssh 1
+cp "$GUEST" "$SEED/guest.sh"
 scp -q -i "$KEY" -P 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-	"$OUT/src.tar" vm/install-test/guest.sh tester@127.0.0.1:
-phase 0
-reboot_guest 2
-phase 1
-reboot_guest 3
-phase 2
-log "ELAPSED: $(($(date +%s) - START)) s under TCG emulation"
-log "MOOBFS_INSTALL_PASS: docs/operations.md followed on Debian 13; refused 6.12.113, installed on 6.12.111, mounted by hand, by fstab at boot and by a mount unit, two users isolated, uninstalled with the lower readable"
+	"$OUT/src.tar" "$SEED/guest.sh" tester@127.0.0.1:
+n=1
+for p in $PHASES; do
+	if [ "$n" -gt 1 ]; then
+		reboot_guest "$n"
+	fi
+	phase "$p"
+	n=$((n + 1))
+done
+log "ELAPSED: $(($(date +%s) - START)) s under $ACCEL_NAME"
+case $NAME in
+INSTALL) log "MOOBFS_INSTALL_PASS: docs/operations.md followed on Debian 13; refused 6.12.113, installed on 6.12.111, mounted by hand, by fstab at boot and by a mount unit, two users isolated, uninstalled with the lower readable" ;;
+CONTAINER) log "MOOBFS_CONTAINER_PASS: docs/container-integration.md followed on Debian 13 with Docker and Podman" ;;
+esac

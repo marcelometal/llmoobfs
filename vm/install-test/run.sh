@@ -6,9 +6,18 @@
 # nothing on the host is installed or loaded. Log: build/install-test/log.txt; final marker MOOBFS_INSTALL_PASS.
 set -eu
 cd "$(dirname "$0")/../.."
-docker build --platform linux/amd64 -t moobfs-install-test -f vm/install-test/Dockerfile vm/install-test
-mkdir -p build/install-test
+# MOOB_TEST=container runs the container recipe instead (roadmap C3, build/container-test/)
+out=build/install-test
+[ "${MOOB_TEST:-install}" = container ] && out=build/container-test
+mkdir -p "$out"
 # --no-xattrs: macOS tar would otherwise store its provenance attribute in every entry
 git ls-files -z --cached --others --exclude-standard |
-	COPYFILE_DISABLE=1 tar --no-xattrs --null -T - -cf build/install-test/src.tar
-docker run --rm --platform linux/amd64 -v "$PWD:/work" moobfs-install-test sh vm/install-test/in-container.sh
+	COPYFILE_DISABLE=1 tar --no-xattrs --null -T - -cf "$out/src.tar"
+# MOOB_HOST_QEMU=1: run QEMU on this Linux host (KVM when /dev/kvm is writable) instead of in the
+# container; needs qemu-system-x86, qemu-utils, openssh-client, python3 and curl. Nothing of
+# MoobFS is installed or loaded on the host either way.
+if [ "${MOOB_HOST_QEMU:-}" = 1 ]; then
+	MOOB_WORK=$PWD MOOB_TEST="${MOOB_TEST:-install}" exec sh vm/install-test/in-container.sh
+fi
+docker build --platform linux/amd64 -t moobfs-install-test -f vm/install-test/Dockerfile vm/install-test
+docker run --rm --platform linux/amd64 -e MOOB_TEST="${MOOB_TEST:-install}" -v "$PWD:/work" moobfs-install-test sh vm/install-test/in-container.sh

@@ -25,7 +25,7 @@ until a coordinated disclosure) is named in the journal of the change, with the 
 | `docs/decisions/` (ADR status lines, ADR-0011 findings) | decisions and findings | a decision is taken or replaced; a finding is found or fixed |
 | `docs/history/README.md` | journal index | every journal |
 | `docs/help-wanted.md`, `CONTRIBUTING.md` | what help is wanted | a call opens or closes |
-| `docs/testing.md`, `docs/faq.md`, `docs/when-not-to-use.md`, `docs/compatibility.md`, `docs/operations.md` | what tests prove, answers, limits, compatibility | a test step, a limit or a compatibility decision changes |
+| `docs/testing.md`, `docs/faq.md`, `docs/when-not-to-use.md`, `docs/compatibility.md`, `docs/operations.md`, `docs/container-integration.md` | what tests prove, answers, limits, compatibility | a test step, a limit or a compatibility decision changes |
 | `SECURITY.md` | reporting channel, supported versions | the channel or the supported versions change |
 | `docs/references.md` | works used | something new is used (same commit) |
 
