@@ -49,6 +49,9 @@ class Plain(unittest.TestCase):
         os.mkdir(self.dom, 0o700)
 
     def tearDown(self):
+        for dirpath, dirnames, _ in os.walk(self.root):
+            for d in dirnames:
+                os.chmod(os.path.join(dirpath, d), 0o700)
         shutil.rmtree(self.root)
 
     def test_publish_and_read_back(self):
@@ -93,9 +96,9 @@ class Plain(unittest.TestCase):
         os.mkdir(sub, 0o700)
         moobfs.publish(sub, "deep", b"", {"k": 1}, domain=self.dom)
         closed = os.path.join(self.dom, "closed")
-        os.mkdir(closed, 0o600)                   # cannot be traversed by the domain's owner
-        moobfs.publish(self.dom, "x", b"", {"k": 1})
-        os.rename(os.path.join(self.dom, "x"), os.path.join(closed, "x"))
+        os.mkdir(closed, 0o700)
+        moobfs.publish(closed, "x", b"", {"k": 1}, domain=self.dom)
+        os.chmod(closed, 0o600)                   # cannot be traversed by the domain's owner
         os.setxattr(self.dom + "/shared", "user.moob.bad", b"\x04\x07")   # invalid: not indexed
         got = sorted(m.path for m in Domain(self.dom).query(Term("k", "==", 1)))
         self.assertEqual(got, ["shared", "sub/deep"])

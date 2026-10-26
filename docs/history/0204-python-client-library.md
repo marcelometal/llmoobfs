@@ -88,6 +88,11 @@ layout test not skipped. The unit tests also pass on macOS with Python 3.15.0 (t
   so they were not affected, and it is left as it ran.
 - The first random generator produced 8 requests with answers out of 400; requests now draw
   values from the corpus and use fewer terms.
+- First CI run of the pull request, two failures, both in the tests. "Tools and sanitizers":
+  `test_linux.py` moved a file into a `0600` directory, which only root can do; the file is now
+  published there before the directory is closed, and the test passed as an ordinary user and
+  as root. KASAN: the `pylib` step was placed after the suite unloads the module, so its mount
+  found no `moobfs_layer`; it now runs before the unload.
 
 ## Limitations
 

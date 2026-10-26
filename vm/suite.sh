@@ -1984,11 +1984,6 @@ echo 61 > "$knob" || fail "xr-arm-enodata"
 umount "$LAYER" && umount "$LOWER" || fail "xr-unmount"
 echo "XATTRREAD_PASS: EIO/ENOMEM build errors, retry, adoption rebuild and ENODATA race"
 fi
-rmmod moobfs_layer || fail layer-unload
-"$BIN/moobfs" query /tmp kind eq string note > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail cli-unloaded-status
-grep -q 'module is not loaded' /tmp/e.txt || { cat /tmp/e.txt; fail cli-unloaded-message; }
-# under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
-# the layer; the initramfs harness has no KCSAN and keeps the plain grep
 if want pylib && ! command -v python3 > /dev/null 2>&1; then
     echo "PYLIB_SKIPPED: no python3 in this guest (the KASAN harness boots the host's root)"
 elif want pylib; then
@@ -2006,6 +2001,11 @@ grep -q '^MOOBFS_PYLIB_PASS:' /tmp/pylib.txt && [ $rc -eq 0 ] || fail "pylib (py
 umount "$LAYER" && rm -rf "$LOWER/py" "$LOWER/py-refusal" && umount "$LOWER" || fail "py-cleanup"
 rmdir "$LAYER-refusal" 2>/dev/null || true
 fi
+rmmod moobfs_layer || fail layer-unload
+"$BIN/moobfs" query /tmp kind eq string note > /dev/null 2> /tmp/e.txt; [ $? -eq 69 ] || fail cli-unloaded-status
+grep -q 'module is not loaded' /tmp/e.txt || { cat /tmp/e.txt; fail cli-unloaded-message; }
+# under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
+# the layer; the initramfs harness has no KCSAN and keeps the plain grep
 if command -v kdiag > /dev/null 2>&1; then
     dmesg > /tmp/kdiag-layer.txt
     kdiag /tmp/kdiag-layer.txt 'BUG:|Oops:|^WARNING:|Kernel panic|KASAN:' || fail kernel-diagnostic-layer
