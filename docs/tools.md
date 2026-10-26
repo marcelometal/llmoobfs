@@ -88,3 +88,58 @@ out of `QUERY2` answers, `left_out`, which are not problems).
 | 1 | the tree could not be walked (the reason is printed) |
 | 2 | problems found (listed in `problems`) |
 | 64 | usage, or `--domain-depth` outside 1..32 |
+
+### JSON document
+
+`moobfs-check` always emits one JSON object on a completed walk. The required members are:
+
+| Member | Type | Meaning |
+| --- | --- | --- |
+| `format` | object | Format marker: `state` string (`missing`, `unreadable`, `invalid`, `newer`, or `ok`), `version` integer (0 when unknown), `supported` integer. |
+| `problems` | array of objects | Each has `path`, `attribute`, and `problem` strings. Paths are relative to the checked directory; an empty `attribute` means the problem is not tied to one typed attribute. |
+| `files`, `typed_attributes`, `identities`, `identity_conflicts`, `same_id_other_namespace`, `problem_count` | integers | Walk and identity counts. `problem_count` equals the length of `problems`. |
+| `domain_depth`, `left_out_count`, `left_out` | integer, integer, array of objects | Present only with `--domain-depth`. Each `left_out` object has a relative `path` string and a `reason` string. These entries do not count as problems. |
+
+For example, a clean one-file tree with a version-1 marker and one typed attribute can report:
+
+```json
+{"format":{"state":"ok","version":1,"supported":1},"problems":[],"files":2,"typed_attributes":1,"identities":0,"identity_conflicts":0,"same_id_other_namespace":0,"problem_count":0}
+```
+
+## moobfs-index
+
+```
+moobfs-index [--uid N] [--domain] [--json] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]
+```
+
+By default, each result remains an `inode<TAB>path` line, sorted by inode unless `--order`
+selects value order. `--json` emits one object after the walk and after `--limit` is applied:
+
+| Member | Type | Meaning |
+| --- | --- | --- |
+| `dir` | string | Directory argument, as supplied. |
+| `count` | integer | Number of emitted results; equals the length of `results`. |
+| `results` | array of objects | Each has an `ino` integer and a `path` string relative to `dir`, in the same order as text output. The root entry, when included, has an empty path. |
+
+For example (the inode number depends on the lower filesystem):
+
+```json
+{"dir":"/srv/memories/alice","count":1,"results":[{"ino":1234,"path":"note.md"}]}
+```
+
+These tool JSON shapes are **experimental and may change** in later experimental releases,
+consistent with [the compatibility policy](compatibility.md). Existing tab-separated text
+output and exit statuses retain that policy's compatibility promise. `dir`, `count`, `results`,
+`ino`, and `path` use the same names and types as `moobfs query --json` where they represent
+the same values. The oracle has no kernel path-unknown or path-truncated flags.
+
+Strings carry the bytes of the name as stored: `"`, `\` and control characters are escaped,
+and nothing else is converted. Linux names need not be UTF-8, so a tree with such a name
+produces a document that strict JSON parsers reject; `moobfs query --json` behaves the same.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | success |
+| 1 | privilege change or walk failed |
+| 64 | usage error |
+| 65 | invalid query terms |

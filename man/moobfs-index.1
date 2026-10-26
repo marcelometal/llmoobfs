@@ -9,6 +9,7 @@
 .Nm
 .Op Fl -uid Ar N
 .Op Fl -domain
+.Op Fl -json
 .Op Fl -order Ar name type Cm asc | desc
 .Op Fl -limit Ar N
 .Ar directory
@@ -23,6 +24,21 @@ queries as the MoobFS layer's QUERY and QUERY2, printing
 lines.
 It is the oracle the test suite compares the kernel with.
 MoobFS is an experimental research project.
+.Pp
+With
+.Fl -json ,
+print one JSON object with the directory argument
+.Dq dir ,
+the number of emitted entries
+.Dq count ,
+and an ordered
+.Dq results
+array.
+Each result has an integer
+.Dq ino
+and a path relative to the directory
+.Dq path .
+The JSON shape is experimental and may change; see docs/tools.md.
 .Pp
 A
 .Ar term
@@ -47,6 +63,8 @@ treat
 .Ar directory
 as a domain directory: its own attributes are left out and an entry is listed only when it
 passes the homogeneity rule, evaluated independently of the kernel
+.It Fl -json
+print the results as one JSON document
 .It Fl -order Ar name type Cm asc | desc
 list only entries whose
 .Ar name
