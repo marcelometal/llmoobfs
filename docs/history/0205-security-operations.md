@@ -69,6 +69,10 @@ not run.
 - Branch numbering: journal 0204 and references section 12 are taken by the C5 branch
   (`claudiofp/C5-LIBRARY`), not yet merged; this batch uses 0205 and section 13.
 - `security.txt` expires on 2027-04-26; CI fails after that date until it is renewed.
-- Not done, would need the maintainer's decision: Dependabot security-update pull requests, a
-  workflow attaching the SBOM to releases, and enforcing protection for administrators.
-- Next: open a pull request for this batch once the maintainer approves it.
+- After review the maintainer approved Dependabot security-update pull requests for this
+  repository only; enabled the same day (`PUT repos/studiomoob/llmoobfs/automated-security-fixes`,
+  read back as `enabled: true`). Deferred: a workflow attaching the SBOM to releases (the tags are
+  source snapshots; the on-demand export suffices until a real release) and enforcing protection
+  for administrators (with one maintainer it would block repository maintenance; revisit with a
+  second maintainer).
+- Next: the pull request for this batch, approved by the maintainer.

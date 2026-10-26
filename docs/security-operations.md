@@ -22,7 +22,7 @@ of that organization; the project changes only what belongs to its own repositor
 | Site | The `github-pages` environment, deployed from `main` by `.github/workflows/pages.yml` with an OIDC token (`id-token: write`). |
 | Private vulnerability reporting | Enabled. |
 | Secret scanning and push protection | Enabled. |
-| Dependabot | Alerts enabled; version updates for actions by `.github/dependabot.yml`; automatic security-fix pull requests disabled. |
+| Dependabot | Alerts enabled; version updates for actions by `.github/dependabot.yml`; automatic security-fix pull requests enabled on 2026-10-26 (journal 0205). |
 | Outside GitHub | The maintainer's own kernel.org account and patch-signing key, used for upstream kernel patches, not for this repository. The dedicated benchmark host is reached by an SSH key the maintainer holds; CI has no access to it, and its address is not published. |
 
 Re-read this table when an owner, a collaborator, a secret, a key or a protection rule changes,

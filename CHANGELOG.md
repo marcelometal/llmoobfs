@@ -6,7 +6,8 @@
   a safe-harbor section in `SECURITY.md`; `security.txt` under the project site, checked by
   `scripts/check-site.py` (fails once it expires) and published with hidden files on; and
   `docs/security-operations.md` with access read from the GitHub API, an incident procedure,
-  advisory sources, third-party components and the SBOM export. Nothing changed at
+  advisory sources, third-party components and the SBOM export. Dependabot
+  security-update pull requests enabled for this repository. Nothing changed at
   organization level.
 
 - CI: every `github/codeql-action` step moves to v4.39.1 together (replaces
