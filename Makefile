@@ -7,7 +7,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 BUILD ?= build/host
 
 
-.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext install uninstall install-test install-unit container-test
+.PHONY: all help tools attr-tools bench-tools userspace-tools bench-smoke hostile-test json-test test fuzz lint man-lint checkpatch module layer vm-test sqlite-ext install uninstall install-test install-unit container-test
 all: tools
 help:
 	@echo 'Host targets (macOS or Linux; never load a module on the host):'
@@ -82,6 +82,9 @@ $(BUILD)/hostile: tests/hostile.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Wall -Wextra -Werror tests/hostile.c $(LDFLAGS) -o $@
 hostile-test: attr-tools $(BUILD)/hostile
 	sh tests/hostile-user.sh $(BUILD) $(HOSTILE_SEEDS)
+	sh tests/tools-json.sh $(BUILD)
+json-test: attr-tools $(BUILD)/hostile
+	sh tests/tools-json.sh $(BUILD)
 test: tools
 	$(BUILD)/attr_test
 	MOOB_BUILD_DIR=$(BUILD) python3 tests/test_images.py
