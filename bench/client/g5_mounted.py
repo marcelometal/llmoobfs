@@ -29,6 +29,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FLOOR, Q1_P95, Q3_P95 = 0.02, 0.300, 2.0
 BOOT, SEED = 10000, 1
 SETTLE_TIMEOUT = 6 * 3600
+# The private domains hold about 25,000 files each. The default index_build_work (32,768
+# units) refuses them with E2BIG, as it refuses the 17,000-file domain of issue 118, so the
+# gate mounts with the administrative maximum of ADR-0020 (journal 0201).
+BUILD_WORK = 65536
 
 
 def draw(instances):
@@ -188,6 +192,26 @@ def plant(gate, mnt, picked, assign):
     gate.note("PLANT", files=n, seconds=f"{time.time() - t:.1f}")
 
 
+def preflight(gate, mnt, picked, assign):
+    """One QUERY2 per domain as its reader, before hours of embedding: a refusal fails now."""
+    for domain, uid in (("alice", ALICE), ("bob", BOB), ("team", BOB)):
+        qid = next(x["question_id"] for x in picked if assign[x["question_id"]] == domain)
+
+        def probe(domain=domain, qid=qid):
+            store = mod.MoobStore(mnt, domain_depth=1)
+            t = time.time()
+            try:
+                n = len(store._query2(os.path.join(mnt, domain), store._terms({"question_id": qid})))
+            except OSError as err:
+                return f"refused errno {err.errno}"
+            return f"{n} results in {time.time() - t:.2f}s"
+
+        got = as_user(uid, gate.gids[uid], [gate.team_gid], probe)
+        print(f"G5_PREFLIGHT {domain} {got}", flush=True)
+        if got.startswith("refused"):
+            raise SystemExit(f"G5_MOUNTED_FAIL QUERY2 on {domain} {got} before indexing")
+
+
 def queries_for(picked, assign, uid):
     own = "alice" if uid == ALICE else "bob"
     out = []
@@ -287,10 +311,11 @@ def main():
         picked = picked[:2] + picked[50:52] + picked[100:102]
         gate.note("SMOKE", instances=len(picked))
 
-    mount_layer(args.lower, args.mnt, "")
+    mount_layer(args.lower, args.mnt, f"index_build_work={BUILD_WORK}")
     os.chmod(args.mnt, 0o755)
     prepare_domains(args.mnt, team_gid)
     plant(gate, args.mnt, picked, assign)
+    preflight(gate, args.mnt, picked, assign)
     t = time.time()
     run(["rsync", "-aHAX", "--numeric-ids", args.lower + "/", args.plain + "/"])
     os.chmod(args.plain, 0o755)
