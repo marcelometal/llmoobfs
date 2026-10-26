@@ -402,6 +402,11 @@ the final evaluation stay unbound.
 Later the same day, section 13 proposed the G5 amendment. G5's implementation
 waits for its acceptance.
 
+The maintainer accepted section 13 as written. On 2026-10-26 the G5 package
+met every bound of section 13.6 on the dedicated host (journal
+[0201](history/0201-g5-hybrid-retrieval-package.md)). The final evaluation
+and the G2 latency ceiling stay unbound.
+
 ## 12. G4 amendment, 2026-10-25 — proposed, not accepted
 
 Status: proposed by journal [0194](history/0194-g4-protocol-amendment.md).
@@ -594,6 +599,12 @@ with `E2BIG` under the default `index_build_work`. The gate now mounts with
 [ADR-0020](decisions/0020-configurable-query-build-work-per-mount.md), and
 issues one `QUERY2` per domain before indexing. No bound, corpus or engine of
 this section changed.
+
+Result note, 2026-10-26 (journal [0201](history/0201-g5-hybrid-retrieval-package.md)):
+the mounted gate met every bound of section 13.6. The two paths and the
+oracle gave the same top 10 everywhere; fusion's Q1 `recall_all@10` was
+0.845 against lexical's 0.809; Q1 p95 at most 0.135 s and Q3 p95 at most
+1.525 s across the 3 runs; 0 revoked turns returned.
 
 ### 13.1 What G5 is in this batch, and what it does not change
 

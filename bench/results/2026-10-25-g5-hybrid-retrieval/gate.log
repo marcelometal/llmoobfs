@@ -1,0 +1,38 @@
+G5_SAMPLE instances=110 per_type={"knowledge-update": 17, "multi-session": 28, "single-session-assistant": 13, "single-session-preference": 7, "single-session-user": 15, "temporal-reasoning": 30}
+G5_PLANT alice total=24063
+G5_PLANT bob total=49205
+G5_PLANT team total=54017
+G5_PLANT files=54017 seconds=587.8
+G5_PREFLIGHT alice 484 results in 0.38s
+G5_PREFLIGHT bob 506 results in 0.33s
+G5_PREFLIGHT team 504 results in 0.05s
+G5_PLAIN_COPY seconds=9.8
+G5_BUILD 1001_moob_s=17860 1001_moob_embeds=27886 1001_moob_truncated=9745
+G5_BUILD 1001_plain_s=17879 1001_plain_embeds=27886 1001_plain_truncated=9745
+G5_BUILD 1002_moob_s=18011 1002_moob_embeds=28817 1002_moob_truncated=9838
+G5_BUILD 1002_plain_s=18037 1002_plain_embeds=28817 1002_plain_truncated=9838
+G5_ORACLE 1001_ready_s=17862 1001_embeds=28056
+G5_ORACLE 1002_ready_s=18044 1002_embeds=28987
+G5_ANSWERS dropped=0 lexical_below_10=0 moob_vs_oracle=0 moob_vs_plain=0 outside=0 plain_vs_oracle=0 short_fusion=0 short_vector=0 unindexed=0
+G5_RELEVANCE vector_any10=0.964[0.927,0.991]n=110
+G5_RELEVANCE vector_all10=0.791[0.709,0.864]n=110
+G5_RELEVANCE vector_ndcg10=0.479[0.419,0.538]n=110
+G5_RELEVANCE lexical_any10=0.973[0.936,1.000]n=110
+G5_RELEVANCE lexical_all10=0.809[0.736,0.882]n=110
+G5_RELEVANCE lexical_ndcg10=0.621[0.555,0.688]n=110
+G5_RELEVANCE fusion_any10=0.982[0.955,1.000]n=110
+G5_RELEVANCE fusion_all10=0.845[0.773,0.909]n=110
+G5_RELEVANCE fusion_ndcg10=0.602[0.543,0.660]n=110
+G5_FLOOR fusion_all10=0.845 best_branch=lexical best_all10=0.809 paired_diff=0.036[-0.018,0.091]
+G5_LATENCY run1_q1_p50=0.071 run1_q1_p95=0.129 run1_q3_p50=1.211 run1_q3_p95=1.413
+G5_LATENCY run2_q1_p50=0.074 run2_q1_p95=0.135 run2_q3_p50=1.310 run2_q3_p95=1.481
+G5_LATENCY run3_q1_p50=0.073 run3_q1_p95=0.131 run3_q3_p50=1.350 run3_q3_p95=1.525
+G5_PLAIN_LATENCY q1_p50=0.058 q1_p95=0.095 q3_p50=0.967 q3_p95=1.087
+G5_REVOCATION question=c960da58 revoked=1 returned_before=6 inflight_dropped=0 inflight_returned=0 after_returned=0
+G5_RESOURCES 1001_moob_watcher_vmhwm_kb=626580 1001_moob_db_bytes=117583872
+G5_RESOURCES 1001_plain_watcher_vmhwm_kb=629284 1001_plain_db_bytes=119463936
+G5_RESOURCES 1001_search_moob_maxrss_kb=819956 1001_search_moob_cpu_s=151 1001_search_plain_maxrss_kb=821192 1001_oracle_maxrss_kb=958500
+G5_RESOURCES 1002_moob_watcher_vmhwm_kb=627868 1002_moob_db_bytes=120819712
+G5_RESOURCES 1002_plain_watcher_vmhwm_kb=627208 1002_plain_db_bytes=122699776
+G5_RESOURCES 1002_search_moob_maxrss_kb=834008 1002_search_moob_cpu_s=159 1002_search_plain_maxrss_kb=835216 1002_oracle_maxrss_kb=975024
+G5_MOUNTED_PASS

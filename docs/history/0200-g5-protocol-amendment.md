@@ -80,6 +80,9 @@ install the pinned packages and model on the dedicated host only, draw and
 record the sample, extend the G4 watcher with the real model and the FTS5
 table, write the mounted test and run it three times.
 
+Follow-up, 2026-10-26: the maintainer accepted section 13 as written, and
+the package met its bounds (journal [0201](0201-g5-hybrid-retrieval-package.md)).
+
 ## Checks of this commit
 
 Completed 2026-10-25 at 10:21 America/Sao_Paulo. `git diff --check`,

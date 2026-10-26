@@ -1,0 +1,13 @@
+G5_SAMPLE instances=110 per_type={"knowledge-update": 17, "multi-session": 28, "single-session-assistant": 13, "single-session-preference": 7, "single-session-user": 15, "temporal-reasoning": 30}
+G5_PLANT alice total=24063
+G5_PLANT bob total=49205
+G5_PLANT team total=54017
+G5_PLANT files=54017 seconds=590.4
+G5_PLAIN_COPY seconds=9.8
+G5_BUILD 1001_moob_s=17855 1001_moob_embeds=27886 1001_moob_truncated=9745
+G5_BUILD 1001_plain_s=17874 1001_plain_embeds=27886 1001_plain_truncated=9745
+G5_BUILD 1002_moob_s=18034 1002_moob_embeds=28817 1002_moob_truncated=9838
+G5_BUILD 1002_plain_s=18034 1002_plain_embeds=28817 1002_plain_truncated=9838
+G5_ORACLE 1001_ready_s=17827 1001_embeds=28056
+G5_ORACLE 1002_ready_s=18033 1002_embeds=28987
+G5_MOUNTED_FAIL job /srv/moob/ext4/g5-0197-work/search-1001-moob-1.json exited 1

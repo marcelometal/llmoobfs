@@ -1,0 +1,1982 @@
+{
+ "0a995998": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.46927872602275644
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.7039180890341347
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.46927872602275644
+  },
+  "type": "multi-session"
+ },
+ "gpt4_e414231e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "type": "temporal-reasoning"
+ },
+ "6456829e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.39780880120575696
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6509209298071326
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "type": "multi-session"
+ },
+ "61f8c8f8": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3065735963827292
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6131471927654584
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "multi-session"
+ },
+ "27016adc": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3065735963827292
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5714285040141098
+  },
+  "type": "multi-session"
+ },
+ "gpt4_7abb270c": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.24738635904833423
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3026024134988135
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.39806284658828084
+  },
+  "type": "temporal-reasoning"
+ },
+ "dfde3500": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6131471927654584
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "knowledge-update"
+ },
+ "5c40ec5b": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5012658353418871
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "type": "knowledge-update"
+ },
+ "eac54add": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_59c863d7": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.48522855511632257
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3391602052736161
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.5922216874835863
+  },
+  "type": "multi-session"
+ },
+ "6c49646a": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5714285040141098
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "type": "multi-session"
+ },
+ "3ba21379": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.17723928678404774
+  },
+  "type": "knowledge-update"
+ },
+ "gpt4_0b2f1d21": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.36181498356361597
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.448643819352159
+  },
+  "type": "temporal-reasoning"
+ },
+ "0100672e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6052602440527057
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "type": "multi-session"
+ },
+ "0a34ad58": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "type": "single-session-preference"
+ },
+ "bc149d6b": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6131471927654584
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3065735963827292
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "multi-session"
+ },
+ "32260d93": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.43067655807339306
+  },
+  "type": "single-session-preference"
+ },
+ "18bc8abd": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8175295903539445
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.41183384043543503
+  },
+  "type": "knowledge-update"
+ },
+ "41275add": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "311778f1": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "92a0aa75": {
+  "vector": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "type": "multi-session"
+ },
+ "b320f3f8": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "1b9b7252": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "gpt4_d6585ce8": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.24816574496561808
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.2090905274901754
+  },
+  "type": "temporal-reasoning"
+ },
+ "2ce6a0f2": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.2741708125981702
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.13905617951077562
+  },
+  "type": "multi-session"
+ },
+ "72e3ee87": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "type": "knowledge-update"
+ },
+ "46a3abf7": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.15642624200758548
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.1480409554829326
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.16716045496620227
+  },
+  "type": "multi-session"
+ },
+ "778164c6": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "7405e8b1": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8175295903539445
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5912352048230277
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "type": "multi-session"
+ },
+ "71315a70": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5109559939712153
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "type": "knowledge-update"
+ },
+ "a3332713": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.21840743681816419
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.7903864795495061
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.2640681225725909
+  },
+  "type": "multi-session"
+ },
+ "19b5f2b3": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "gpt4_e072b769": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.43067655807339306
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "temporal-reasoning"
+ },
+ "d3ab962e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.17723928678404774
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8175295903539445
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "type": "multi-session"
+ },
+ "c4ea545c": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6131471927654584
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5912352048230277
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "type": "knowledge-update"
+ },
+ "ba358f49": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6131471927654584
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6131471927654584
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6131471927654584
+  },
+  "type": "multi-session"
+ },
+ "gpt4_76048e76": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.2640681225725909
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8065735963827293
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6131471927654584
+  },
+  "type": "temporal-reasoning"
+ },
+ "a9f6b44c": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.23599633571930026
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.24630238874073
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6436579276931672
+  },
+  "type": "multi-session"
+ },
+ "b46e15ee": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3333333333333333
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6309297535714575
+  },
+  "type": "temporal-reasoning"
+ },
+ "c8090214": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6131471927654584
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.7977228895450266
+  },
+  "type": "temporal-reasoning"
+ },
+ "dad224aa": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.18457569677956817
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.20438239758848611
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.19342640361727081
+  },
+  "type": "knowledge-update"
+ },
+ "db467c8c": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5802792108518124
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6509209298071326
+  },
+  "type": "knowledge-update"
+ },
+ "af8d2e46": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "2bf43736": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "gpt4_d31cdae3": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.18457569677956817
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "temporal-reasoning"
+ },
+ "65240037": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3333333333333333
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3562071871080222
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3333333333333333
+  },
+  "type": "single-session-assistant"
+ },
+ "2318644b": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3065735963827292
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "type": "multi-session"
+ },
+ "e3038f8c": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.13905617951077562
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.13905617951077562
+  },
+  "type": "multi-session"
+ },
+ "6aeb4375": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "type": "knowledge-update"
+ },
+ "157a136e": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.38268031849431083
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.49818925746641285
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.5307212739772434
+  },
+  "type": "multi-session"
+ },
+ "e493bb7c": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3065735963827292
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6240505200038379
+  },
+  "type": "knowledge-update"
+ },
+ "gpt4_7ca326fa": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.20210734650054757
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9469024295259745
+  },
+  "type": "temporal-reasoning"
+ },
+ "8c18457d": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6713860725233041
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9674679834891693
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.86034433104172
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_2f91af09": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.4367467095119258
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6257049680303419
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6196686079396531
+  },
+  "type": "multi-session"
+ },
+ "2ebe6c92": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.42177340954886444
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_2c50253f": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_fa19884c": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6052602440527057
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_85da3956": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_1d80365e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5109559939712153
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_7a0daae1": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_4edbafa2": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5437713091520254
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "type": "temporal-reasoning"
+ },
+ "3d86fd0a": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "2788b940": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.2442584792702138
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.3362374957109626
+  },
+  "type": "multi-session"
+ },
+ "1d4da289": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "gpt4_e414231f": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.43067655807339306
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3333333333333333
+  },
+  "type": "temporal-reasoning"
+ },
+ "d01c6aa8": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.23719771276929622
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.37800210039683896
+  },
+  "type": "temporal-reasoning"
+ },
+ "e8a79c70": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.31546487678572877
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3562071871080222
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3333333333333333
+  },
+  "type": "single-session-assistant"
+ },
+ "gpt4_93159ced": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.617319681505689
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5307212739772434
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6713860725233041
+  },
+  "type": "temporal-reasoning"
+ },
+ "gpt4_a2d1d1f6": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "temporal-reasoning"
+ },
+ "18dcd5a5": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "b6025781": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-preference"
+ },
+ "50635ada": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5109559939712153
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "type": "knowledge-update"
+ },
+ "c4f10528": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.2890648263178879
+  },
+  "type": "single-session-assistant"
+ },
+ "4adc0475": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "multi-session"
+ },
+ "f4f1d8a4": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "1faac195": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "b01defab": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.4911492931622974
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "type": "knowledge-update"
+ },
+ "gpt4_9a159967": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.35853358850813305
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.36926780146674987
+  },
+  "type": "temporal-reasoning"
+ },
+ "4baee567": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "type": "single-session-assistant"
+ },
+ "f9e8c073": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.42177340954886444
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5912352048230277
+  },
+  "type": "knowledge-update"
+ },
+ "86b68151": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "9a707b82": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.31546487678572877
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "type": "temporal-reasoning"
+ },
+ "6d550036": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "type": "multi-session"
+ },
+ "0edc2aef": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "type": "single-session-preference"
+ },
+ "352ab8bd": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.43067655807339306
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "type": "single-session-assistant"
+ },
+ "a82c026e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.31546487678572877
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "type": "single-session-user"
+ },
+ "1f2b8d4f": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.37800210039683896
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.42177340954886444
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3889580943680543
+  },
+  "type": "multi-session"
+ },
+ "bc8a6e93": {
+  "vector": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3333333333333333
+  },
+  "type": "single-session-user"
+ },
+ "16c90bf4": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-assistant"
+ },
+ "gpt4_88806d6e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.45560514958746035
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6131471927654584
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5912352048230277
+  },
+  "type": "temporal-reasoning"
+ },
+ "853b0a1d": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "single-session-user"
+ },
+ "25e5aa4f": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3010299956639812
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "type": "single-session-user"
+ },
+ "gpt4_d12ceb0e": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.617319681505689
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.7461976723150332
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.617319681505689
+  },
+  "type": "multi-session"
+ },
+ "ce6d2d27": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.2640681225725909
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.9197207891481876
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8065735963827293
+  },
+  "type": "knowledge-update"
+ },
+ "b5ef892d": {
+  "vector": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.38685280723454163
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 0.0,
+   "ndcg": 0.6131471927654584
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "type": "multi-session"
+ },
+ "1d4e3b97": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.0
+  },
+  "type": "single-session-preference"
+ },
+ "gpt4_6ed717ea": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6131471927654584
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5706417189553201
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5912352048230277
+  },
+  "type": "temporal-reasoning"
+ },
+ "2311e44b": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8772153153380493
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5714285040141098
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8315546295836225
+  },
+  "type": "multi-session"
+ },
+ "a3045048": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.2640681225725909
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8175295903539445
+  },
+  "type": "temporal-reasoning"
+ },
+ "e48988bc": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3333333333333333
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.43067655807339306
+  },
+  "type": "single-session-assistant"
+ },
+ "c960da58": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "dccbc061": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-user"
+ },
+ "d52b4f67": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.31546487678572877
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6309297535714575
+  },
+  "type": "single-session-user"
+ },
+ "f0853d11": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.3065735963827292
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.48247555939075504
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.38685280723454163
+  },
+  "type": "temporal-reasoning"
+ },
+ "a346bb18": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.20438239758848611
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8315546295836225
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5249810332008933
+  },
+  "type": "multi-session"
+ },
+ "a2f3aa27": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.8503449055347546
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.6934264036172708
+  },
+  "type": "knowledge-update"
+ },
+ "d6233ab6": {
+  "vector": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "type": "single-session-preference"
+ },
+ "0f05491a": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.448643819352159
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.42177340954886444
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.448643819352159
+  },
+  "type": "knowledge-update"
+ },
+ "gpt4_8279ba03": {
+  "vector": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "lexical": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "fusion": {
+   "any": 0.0,
+   "all": 0.0,
+   "ndcg": 0.0
+  },
+  "type": "temporal-reasoning"
+ },
+ "54026fce": {
+  "vector": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "lexical": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 0.5
+  },
+  "fusion": {
+   "any": 1.0,
+   "all": 1.0,
+   "ndcg": 1.0
+  },
+  "type": "single-session-preference"
+ }
+}

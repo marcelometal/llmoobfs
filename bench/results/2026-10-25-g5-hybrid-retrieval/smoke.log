@@ -1,0 +1,34 @@
+G5_SAMPLE instances=110 per_type={"knowledge-update": 17, "multi-session": 28, "single-session-assistant": 13, "single-session-preference": 7, "single-session-user": 15, "temporal-reasoning": 30}
+G5_SMOKE instances=6
+G5_PLANT alice total=991
+G5_PLANT bob total=2013
+G5_PLANT team total=3022
+G5_PLANT files=3022 seconds=29.9
+G5_PLAIN_COPY seconds=0.6
+G5_BUILD 1001_moob_s=1280 1001_moob_embeds=1987 1001_moob_truncated=678
+G5_BUILD 1001_plain_s=1280 1001_plain_embeds=1987 1001_plain_truncated=678
+G5_BUILD 1002_moob_s=1285 1002_moob_embeds=2028 1002_moob_truncated=694
+G5_BUILD 1002_plain_s=1286 1002_plain_embeds=2028 1002_plain_truncated=694
+G5_ORACLE 1001_ready_s=1273 1001_embeds=1997
+G5_ORACLE 1002_ready_s=1286 1002_embeds=2038
+G5_ANSWERS dropped=0 lexical_below_10=0 moob_vs_oracle=0 moob_vs_plain=0 outside=0 plain_vs_oracle=0 short_fusion=0 short_vector=0 unindexed=0
+G5_RELEVANCE vector_any10=1.000[1.000,1.000]n=6
+G5_RELEVANCE vector_all10=0.667[0.333,1.000]n=6
+G5_RELEVANCE vector_ndcg10=0.638[0.372,0.887]n=6
+G5_RELEVANCE lexical_any10=1.000[1.000,1.000]n=6
+G5_RELEVANCE lexical_all10=1.000[1.000,1.000]n=6
+G5_RELEVANCE lexical_ndcg10=0.905[0.807,0.980]n=6
+G5_RELEVANCE fusion_any10=1.000[1.000,1.000]n=6
+G5_RELEVANCE fusion_all10=1.000[1.000,1.000]n=6
+G5_RELEVANCE fusion_ndcg10=0.823[0.646,0.974]n=6
+G5_FLOOR fusion_all10=1.000 best_branch=lexical best_all10=1.000 paired_diff=0.000[0.000,0.000]
+G5_LATENCY run1_q1_p50=0.048 run1_q1_p95=0.089 run1_q3_p50=0.091 run1_q3_p95=0.095
+G5_PLAIN_LATENCY q1_p50=0.031 q1_p95=0.042 q3_p50=0.041 q3_p95=0.049
+G5_REVOCATION question=c960da58 revoked=1 inflight_dropped=0 inflight_returned=0 after_returned=0
+G5_RESOURCES 1001_moob_watcher_vmhwm_kb=563348 1001_moob_db_bytes=8531968
+G5_RESOURCES 1001_plain_watcher_vmhwm_kb=594140 1001_plain_db_bytes=8671232
+G5_RESOURCES 1001_search_moob_maxrss_kb=534236 1001_search_moob_cpu_s=11 1001_search_plain_maxrss_kb=536172 1001_oracle_maxrss_kb=571780
+G5_RESOURCES 1002_moob_watcher_vmhwm_kb=564336 1002_moob_db_bytes=8503296
+G5_RESOURCES 1002_plain_watcher_vmhwm_kb=563536 1002_plain_db_bytes=8638464
+G5_RESOURCES 1002_search_moob_maxrss_kb=533992 1002_search_moob_cpu_s=11 1002_search_plain_maxrss_kb=535144 1002_oracle_maxrss_kb=572384
+G5_MOUNTED_PASS

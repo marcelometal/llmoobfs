@@ -2,12 +2,23 @@
 
 ## Unreleased
 
-- G5 protocol amendment proposed (journal 0200, protocol section 13):
-  LongMemEval labels (110 instances, one file per turn), exact
+- G5 hybrid-retrieval package (journal 0201): `bench/client/g5_retrieval.py`
+  and `g5_mounted.py` filter with `QUERY2`, then rank with exact
+  `all-MiniLM-L6-v2`, SQLite FTS5 BM25 and reciprocal rank fusion, against
+  the same engines over plain files with a metadata table and an oracle that
+  reads no index. The mounted gate passed on the dedicated host: identical
+  top 10 on both paths and the oracle, 0 results outside the eligible set, 0
+  revoked turns returned, fusion `recall_all@10` 0.845 against lexical's
+  0.809, Q1 p95 at most 0.135 s and Q3 p95 at most 1.525 s in 3 runs. A
+  25,000-file domain needs `index_build_work=65536`. No change to the layer,
+  the UAPI or the G1 adapter.
+
+- G5 protocol amendment (journal 0200, protocol section 13), accepted as
+  written: LongMemEval labels (110 instances, one file per turn), exact
   `all-MiniLM-L6-v2`, SQLite FTS5 BM25 and reciprocal rank fusion, the
   MoobFS path against the same engines over plain files with a metadata
   table, and bounds for identical answers, authorization, a relative
-  relevance floor and latency. Not accepted and not run.
+  relevance floor and latency.
 
 - Debian 6.12.113 test infrastructure (issue 142, journal 0203): `make vm-test`
   accepts `MOOB_DEBIAN_KERNEL=6.12.113`, with image and headers pinned to

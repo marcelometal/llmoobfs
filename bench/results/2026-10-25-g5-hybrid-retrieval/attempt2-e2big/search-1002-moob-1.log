@@ -1,0 +1,24 @@
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4442.75it/s]
+Traceback (most recent call last):
+  File "/srv/moob/ext4/g5-0197-bin/langgraph_store.py", line 344, in _query2
+    fcntl.ioctl(fd, IOC_QUERY2, q)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 7] Argument list too long
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/srv/moob/ext4/g5-0197-bin/g5_retrieval.py", line 404, in <module>
+    main()
+    ~~~~^^
+  File "/srv/moob/ext4/g5-0197-bin/g5_retrieval.py", line 392, in main
+    results = {q["id"]: engine.search(q["question"], q["domain"], q["filter"]) for q in queries}
+                        ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/srv/moob/ext4/g5-0197-bin/g5_retrieval.py", line 309, in search
+    ids, n_eligible, unindexed = self.eligible(domain, flt)
+                                 ~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/srv/moob/ext4/g5-0197-bin/g5_retrieval.py", line 277, in eligible
+    rels = self.store._query2(os.path.join(self.root, domain), terms)
+  File "/srv/moob/ext4/g5-0197-bin/langgraph_store.py", line 347, in _query2
+    raise MoobQueryError(err.errno, "QUERY2 resource refusal") from err
+langgraph_store.MoobQueryError: [Errno 7] QUERY2 resource refusal

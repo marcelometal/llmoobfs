@@ -1,0 +1,6 @@
+G5_SAMPLE instances=110 per_type={"knowledge-update": 17, "multi-session": 28, "single-session-assistant": 13, "single-session-preference": 7, "single-session-user": 15, "temporal-reasoning": 30}
+G5_PLANT alice total=24063
+G5_PLANT bob total=49205
+G5_PLANT team total=54017
+G5_PLANT files=54017 seconds=589.2
+G5_PLAIN_COPY seconds=12.8
