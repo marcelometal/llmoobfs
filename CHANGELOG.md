@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CI: every `github/codeql-action` step moves to v4.39.1 together (replaces
+  Dependabot PRs 131 to 133, which bumped one step each and so failed CodeQL's
+  same-version check). Dependabot now groups those actions in one PR.
+
 - G5 hybrid-retrieval package (journal 0201): `bench/client/g5_retrieval.py`
   and `g5_mounted.py` filter with `QUERY2`, then rank with exact
   `all-MiniLM-L6-v2`, SQLite FTS5 BM25 and reciprocal rank fusion, against
