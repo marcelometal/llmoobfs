@@ -36,6 +36,8 @@
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
 #   xattrread           a listed typed value that fails getxattr must fail a build or invalidate
 #                       a built domain; an attribute removed between list/get is skipped
+#   pylib               the Python library's kernel and scan backends give equal answers (C5);
+#                       needs python3 in the guest, so it runs under KASAN and not in vm-test
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
 # be taken for a complete run.
 set -u
@@ -54,7 +56,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildwork|buildtime|buildmoved|stall|lowerro|bigdir|xattrread) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildwork|buildtime|buildmoved|stall|lowerro|bigdir|xattrread|pylib) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1987,6 +1989,23 @@ rmmod moobfs_layer || fail layer-unload
 grep -q 'module is not loaded' /tmp/e.txt || { cat /tmp/e.txt; fail cli-unloaded-message; }
 # under the KASAN harness kdiag (vm/kdiag.sh) leaves out KCSAN reports with no racing access in
 # the layer; the initramfs harness has no KCSAN and keeps the plain grep
+if want pylib && ! command -v python3 > /dev/null 2>&1; then
+    echo "PYLIB_SKIPPED: no python3 in this guest (the KASAN harness boots the host's root)"
+elif want pylib; then
+# Roadmap C5 (journal 0204): python/tests/kernel_equal.py builds a random corpus through the
+# layer and compares QUERY2 and QUERY2_BATCH with the library's scan of the same directory and
+# of the lower one, as root, as the domain's owner and as a team member; another uid is refused
+# by both backends; a domain over index_build_work=1024 raises QueryRefused or is answered by
+# the scan. -B: the repository may be read-only.
+mount -t ext4 "$DEV_EXT4" "$LOWER" || fail "py-lower-mount"
+rm -rf "$LOWER/py" "$LOWER/py-refusal" && mkdir -m 755 "$LOWER/py" || fail "py-mkdir"
+mount -t moobfs_layer -o lower="$LOWER/py",domain_depth=1 none "$LAYER" || fail "py-mount"
+python3 -B "${REPO:-.}/python/tests/kernel_equal.py" "$LAYER" "$LOWER/py" > /tmp/pylib.txt 2>&1; rc=$?
+cat /tmp/pylib.txt
+grep -q '^MOOBFS_PYLIB_PASS:' /tmp/pylib.txt && [ $rc -eq 0 ] || fail "pylib (python/tests/kernel_equal.py)"
+umount "$LAYER" && rm -rf "$LOWER/py" "$LOWER/py-refusal" && umount "$LOWER" || fail "py-cleanup"
+rmdir "$LAYER-refusal" 2>/dev/null || true
+fi
 if command -v kdiag > /dev/null 2>&1; then
     dmesg > /tmp/kdiag-layer.txt
     kdiag /tmp/kdiag-layer.txt 'BUG:|Oops:|^WARNING:|Kernel panic|KASAN:' || fail kernel-diagnostic-layer

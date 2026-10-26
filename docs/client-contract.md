@@ -162,6 +162,14 @@ Not decided; proposed in `adoption-risks.md` (risk 5) so that a client never req
 Open point: step 2 needs a descriptor of the mount root, which a client confined to its domain may
 not be able to open. A way to learn the same state from the domain directory does not exist yet.
 
+*Implemented, 2026-10-26 (journal 0204, ADR-0023):* the Python library in `python/` does step 1,
+offers step 2 (`get_info`, `usable_info`) for callers that can open the root, and otherwise
+decides from the domain directory alone: `QUERY2` there fails with `ENOTTY`, `ENODEV` or
+`EOPNOTSUPP` when it is not served, and the library then walks the directory. Its walk is not
+"the client's own index": it applies the kernel's matching and homogeneity rules, so it returns
+what `QUERY2` returns. A resource refusal raises `QueryRefused` unless the caller asks for the
+walk.
+
 ## 8. What stays in the client's own store
 
 Full-text and vector search; joins, aggregates and OR across different attributes; history and
