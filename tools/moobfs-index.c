@@ -4,7 +4,7 @@
  * reads every typed attribute with the shared encoding and answers the same
  * conjunctive queries, printing "<ino>\t<path>" lines sorted by inode number.
  *
- *   moobfs-index [--uid N] [--domain] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]
+ *   moobfs-index [--uid N] [--domain] [--json] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]
  * --uid N drops privileges first, so the walk sees only what that user may reach.
  * --domain treats <dir> as a domain directory (docs/spec-query-v2.md §3): its own
  * attributes are left out, and an entry is listed only when it passes the homogeneity
@@ -14,6 +14,7 @@
  * --order lists only entries whose NAME attribute has TYPE, sorted by (value, ino) ascending
  * or descending (the QUERY2 order); terms may then be empty. --limit keeps the first N.
  * An operator ending in '?' (for example "gt?") also matches files without the attribute.
+ * --json prints one object with dir, count and ordered {ino, path} results.
  */
 #define _GNU_SOURCE
 #include <ftw.h>
@@ -84,6 +85,21 @@ static size_t nhits, cap;
 static char order_name[MOOB_QUERY_NAME_MAX + 1];
 static int order_type, order_desc;
 static long out_limit = -1;
+static int json_output;
+
+static void json_str(const char *s)
+{
+	putchar('"');
+	for (; *s; s++) {
+		if (*s == '"' || *s == '\\')
+			putchar('\\');
+		if ((unsigned char)*s < 0x20)
+			printf("\\u%04x", (unsigned char)*s);
+		else
+			putchar(*s);
+	}
+	putchar('"');
+}
 
 static int value_cmp(int type, const ma_u8 *a, size_t alen, const ma_u8 *b, size_t blen)
 {
@@ -198,17 +214,19 @@ int main(int argc, char **argv)
 {
 	size_t i;
 
-	if (argc >= 3 && !strcmp(argv[1], "--uid")) {
-		uid_t u = (uid_t)strtoul(argv[2], NULL, 10);
-		if (setgid(u) || setuid(u)) { perror("setuid"); return 1; }
-		argv += 2; argc -= 2;
-	}
-	if (argc >= 2 && !strcmp(argv[1], "--domain")) {
-		domain_mode = 1;
-		argv++; argc--;
-	}
 	for (;;) {
-		if (argc >= 5 && !strcmp(argv[1], "--order")) {
+		if (argc >= 3 && !strcmp(argv[1], "--uid")) {
+			uid_t u = (uid_t)strtoul(argv[2], NULL, 10);
+
+			if (setgid(u) || setuid(u)) { perror("setuid"); return 1; }
+			argv += 2; argc -= 2;
+		} else if (argc >= 2 && !strcmp(argv[1], "--domain")) {
+			domain_mode = 1;
+			argv++; argc--;
+		} else if (argc >= 2 && !strcmp(argv[1], "--json")) {
+			json_output = 1;
+			argv++; argc--;
+		} else if (argc >= 5 && !strcmp(argv[1], "--order")) {
 			size_t olen = strlen(argv[2]);
 
 			order_type = parse_type(argv[3]);
@@ -224,7 +242,7 @@ int main(int argc, char **argv)
 		}
 	}
 	if (argc < (order_name[0] ? 2 : 6)) {
-		fprintf(stderr, "usage: moobfs-index [--uid N] [--domain] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]\n");
+		fprintf(stderr, "usage: moobfs-index [--uid N] [--domain] [--json] [--order NAME TYPE asc|desc] [--limit N] <dir> [terms...]\n");
 		return 64;
 	}
 	nterms = parse_terms(argc, argv, 2, terms);
@@ -248,7 +266,19 @@ int main(int argc, char **argv)
 		qsort(hits, nhits, sizeof *hits, order_name[0] ? by_order : by_ino);
 	if (out_limit >= 0 && (size_t)out_limit < nhits)
 		nhits = (size_t)out_limit;
-	for (i = 0; i < nhits; i++)
-		printf("%" PRIu64 "\t%s\n", hits[i].ino, hits[i].path);
+	if (json_output) {
+		printf("{\"dir\": ");
+		json_str(argv[1]);
+		printf(", \"count\": %zu, \"results\": [", nhits);
+		for (i = 0; i < nhits; i++) {
+			printf("%s\n  {\"ino\": %" PRIu64 ", \"path\": ", i ? "," : "", hits[i].ino);
+			json_str(hits[i].path);
+			putchar('}');
+		}
+		printf("%s]}\n", nhits ? "\n" : "");
+	} else {
+		for (i = 0; i < nhits; i++)
+			printf("%" PRIu64 "\t%s\n", hits[i].ino, hits[i].path);
+	}
 	return 0;
 }

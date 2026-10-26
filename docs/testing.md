@@ -32,13 +32,20 @@ Measured wall-clock times per machine are not recorded yet; the CI timeouts are
 | `make fuzz FUZZ_TIME=30` | libFuzzer over `common/attr.c` from `tests/fuzz_attr.c`, seeded by `tests/fuzz-corpus/attr` | `build/host/fuzz_attr`, `build/host/fuzz-corpus/` |
 | `make attr-tools` | Linux-only `moobfs-attr`, `moobfs-check`, `moobfs-index` | `build/host/` |
 | `make module` / `make layer` | `kernel/moobfs.ko` / `layer/moobfs_layer.ko` against `KDIR` | in-tree (`kernel/`, `layer/`) |
-| `make vm-test` | Docker image, both modules, tests and the full guest run (M1 regression, layer suite, acceptance) on Debian **6.12.111+deb13-amd64** under QEMU TCG | `build/vm/` |
+| `make vm-test` | Docker image, both modules, tests and the full guest run (M1 regression, layer suite, acceptance) on Debian **6.12.111+deb13-amd64** by default under QEMU TCG; `MOOB_DEBIAN_KERNEL=6.12.113 make vm-test` selects **6.12.113+deb13-amd64** | `build/vm/` |
 | `make install-test` | Follows [operations.md](operations.md) in a disposable Debian 13 VM (official generic cloud image of 2026-10-21, QEMU TCG): `make install` refused on the image's 6.12.113 kernel, then installed on 6.12.111, mounted by hand, by `fstab` at boot and by a mount unit, two users checked, including `moobfs query` (`CLI_QUERY`), uninstalled. Ends in `MOOBFS_INSTALL_PASS`; any step prints `MOOBFS_INSTALL_FAIL: <why>`. Proves the guide's commands on that image only; not real hardware, Secure Boot or another distribution (journal 0197) | `build/install-test/` |
 | `make install-unit` | `scripts/test-install.sh`, as an ordinary user in a scratch `DESTDIR` (Linux, GNU coreutils; CI job "Tools and sanitizers"): `install.sh` refuses a regular file, a dangling or live symbolic link, a FIFO and a directory at a destination without `FORCE=1`, and a directory even with it; ignores a link planted at the old fixed temporary name; does not replace an entry created after its existence check; with `FORCE=1` replaces a link itself, not its target; leaves no temporary file; `uninstall` removes only regular files. Ends in `INSTALL_UNIT_PASS`. |
 | `make container-test` | Follows [container-integration.md](container-integration.md) in the VM of `make install-test` (`MOOB_TEST=container`), with Docker and Podman: read, write and `setxattr` through a bind of the agent's domain under its uid, an invalid value refused by the kernel, `QUERY2` answered inside the container, `GET_INFO` refused there (exit 69), a second agent under another uid isolated, a wrong uid refused (exit 77), the read-only bind of the whole root (`QUERY2` and `GET_INFO` work, writes refused), remapped user namespaces and idmapped binds (no translation), and rootless Podman with `--userns=keep-id` reported (journal 0199). Ends in `MOOBFS_CONTAINER_PASS`. `MOOB_HOST_QEMU=1` runs either test with QEMU on a Linux host, under KVM when available | `build/container-test/` |
 | KASAN workflow | Upstream **6.12.112** with `vm/kasan.config` (KASAN, UBSAN, lockdep), the same `vm/suite.sh` inside virtme-ng | `build/vng/`, `build/linux/` |
 
-The Debian base digest and kernel package are pinned, but auxiliary apt packages
+Both Debian kernel image/header pairs are pinned (6.12.111-1 and 6.12.113-1). The existing `Native Linux VM` CI job retains the
+6.12.111 default and its required-check name; `Native Linux VM (Debian 6.12.113)`
+runs the same target on every pull request; it first passed in PR 148.
+6.12.113 remains unsupported until fstests `quick` runs on ext4, btrfs and XFS
+are recorded on the dedicated host and the support-list change is approved
+([compatibility.md](compatibility.md) §1, rule 3; journal 0203).
+
+The Debian base digest and kernel packages are pinned, but auxiliary apt packages
 are not fully locked: this is not a claim of bit-for-bit toolchain
 reproducibility. If the pinned Debian package disappears, update image and
 kernel together through a reviewed change and rerun the suite; do not substitute
@@ -505,6 +512,7 @@ kernel versions are unverified.
 GitHub Actions runs `Tools and sanitizers` (host tests, ASan/UBSan, 30 s of
 fuzzing, site link check), `Lint` (shellcheck, SPDX headers, DCO sign-off on
 pull requests) and `Native Linux VM` on pushes to `main` and on pull requests;
+`Native Linux VM (Debian 6.12.113)` runs on the same pushes and pull requests;
 `KASAN and lockdep` runs on pull requests touching `layer/` or `vm/`, weekly and
 on demand. Logs are temporary Actions artifacts; permanent conclusions belong
 in the journal with links to the run. The Pages workflow publishes only `site/`.

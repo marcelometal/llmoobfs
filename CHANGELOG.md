@@ -9,6 +9,19 @@
   table, and bounds for identical answers, authorization, a relative
   relevance floor and latency. Not accepted and not run.
 
+- Debian 6.12.113 test infrastructure (issue 142, journal 0203): `make vm-test`
+  accepts `MOOB_DEBIAN_KERNEL=6.12.113`, with image and headers pinned to
+  `6.12.113-1`. A separate CI job runs the same suite while the existing
+  `Native Linux VM` check keeps 6.12.111 as its default. The suite passed on
+  6.12.113 in PR 148's CI; the fstests runs are pending, so 6.12.113 is not yet
+  supported or accepted by `make install`.
+
+- Tool JSON schema (issue #7, journal 0202): `moobfs-index --json` emits one
+  document with `dir`, `count` and ordered `{ino, path}` results; its default
+  tab-separated output is unchanged. `docs/tools.md` records the fields and
+  experimental stability of this document and the existing `moobfs-check` JSON.
+  A Linux host test validates both documents and their required types.
+
 - Container recipe (roadmap C3, journal 0199): `docs/container-integration.md`
   gives each Docker or Podman container a bind mount of its agent's domain
   directory under the owner's uid; `QUERY2` answers through it, `GET_INFO`

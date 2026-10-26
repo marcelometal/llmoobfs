@@ -31,6 +31,33 @@ it also lists under
 the files carrying typed attributes that QUERY2 does not return, with the reason: they fail the
 homogeneity rule, or sit above every domain.
 These are not problems and do not change the exit status.
+.Pp
+The JSON object also includes
+.Dq files ,
+.Dq typed_attributes ,
+.Dq identities ,
+.Dq identity_conflicts ,
+.Dq same_id_other_namespace
+and
+.Dq problem_count
+integer counts.
+Each problem has string
+.Dq path ,
+.Dq attribute
+and
+.Dq problem
+members.
+With
+.Fl -domain-depth ,
+the object also has integer
+.Dq domain_depth
+and
+.Dq left_out_count ,
+plus a
+.Dq left_out
+array of path and reason strings.
+The full schema and example are in docs/tools.md.
+The JSON shape is experimental and may change.
 .Sh EXIT STATUS
 .Bl -tag -width 2n -compact
 .It 0
