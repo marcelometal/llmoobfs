@@ -103,6 +103,11 @@ While updating the surfaces, `scripts/check-retired-claims.sh` with the new clai
 a CLI," found that PR 144 had left "a CLI" in the not-implemented lists of the README, its
 Portuguese mirror, `docs/faq.md` and `site/faq.html`. They are corrected here.
 
+Because `vm/install-test/in-container.sh` was refactored for both tests, `make install-test`
+was run again on the Mac mini under KVM (`MOOB_HOST_QEMU=1 MOOB_TEST=install`, the same `vm/`
+tree): `MOOBFS_INSTALL_PASS` with `CLI_QUERY`, 467 s, no `BUG:`, `Oops` or call trace on the
+console.
+
 The background watcher that was to report the end of G5 never fired: `pgrep -fc` run through
 `ssh … 'cmd'` counts the remote shell whose command line contains the pattern, so it never
 reached 0. The end of G5 was found by hand (load 0.00).
