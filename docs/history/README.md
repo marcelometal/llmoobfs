@@ -219,3 +219,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0197 — First contact and installation on a test host (C1, C2; install test passed in a VM)](0197-first-contact-and-install.md)
 - [0198 — The `moobfs` command-line tool (C4)](0198-moobfs-command-line-tool.md)
 - [0199 — Container recipe, validated (C3)](0199-container-recipe.md)
+- [0202 — JSON output for moobfs-index and tool JSON schemas (issue #7)](0202-tools-json-schema.md)
