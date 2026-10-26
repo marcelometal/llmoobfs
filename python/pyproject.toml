@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moobfs"
+version = "0.1.0"
+description = "Client library for the MoobFS stacked layer: typed attributes, publishing and QUERY2 with a directory-walk fallback"
+readme = "README.md"
+license = "LGPL-2.1-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Filesystems",
+]
+
+[project.urls]
+Source = "https://github.com/studiomoob/llmoobfs"
+
+[tool.setuptools.packages.find]
+where = ["src"]
