@@ -223,3 +223,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0201 — G5 hybrid-retrieval package; mounted gate passed](0201-g5-hybrid-retrieval-package.md)
 - [0202 — JSON output for moobfs-index and tool JSON schemas (issue #7)](0202-tools-json-schema.md)
 - [0203 — Debian 6.12.113 added to VM CI; support pending fstests](0203-debian-6-12-113-in-ci.md)
+- [0205 — Security operations from the OSTIF best-practices guide (S22)](0205-security-operations.md)

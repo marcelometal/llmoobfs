@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Security operations (roadmap S22, journal 0205), from the OSTIF best-practices guide:
+  a safe-harbor section in `SECURITY.md`; `security.txt` under the project site, checked by
+  `scripts/check-site.py` (fails once it expires) and published with hidden files on; and
+  `docs/security-operations.md` with access read from the GitHub API, an incident procedure,
+  advisory sources, third-party components and the SBOM export. Nothing changed at
+  organization level.
+
 - CI: every `github/codeql-action` step moves to v4.39.1 together (replaces
   Dependabot PRs 131 to 133, which bumped one step each and so failed CodeQL's
   same-version check). Dependabot now groups those actions in one PR.

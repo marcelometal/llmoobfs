@@ -105,6 +105,41 @@ These are targets for a single volunteer maintainer, not guarantees:
   `CHANGELOG.md`, with the reporter's consent and in the form they choose.
 - There is no bug bounty or other financial reward.
 
+## Safe harbor
+
+Security research on MoobFS done in good faith under this policy is authorized
+by the MoobFS maintainers. We will not initiate or support legal action against
+you for accidental, good-faith violations of this policy, and if a third party
+takes action against you over research that followed it, we will make it known
+that you acted under it. You are still expected to comply with applicable law.
+This applies only to claims under the maintainers' control and does not bind
+anyone else. If you are unsure whether something is covered, ask through the
+channels above before going further.
+
+Good faith here means:
+
+- you test the code on machines and virtual machines you own or are allowed to
+  use, with synthetic data;
+- you report privately through the channels above and give us a reasonable time
+  to fix before disclosing, as described under *Coordinated disclosure*;
+- you stop and report as soon as you reach data that is not yours, and do not
+  keep or share it.
+
+This authorization covers the MoobFS code only. It does not cover GitHub, the
+project site's hosting, Studio Moob's other systems or anyone else's machines,
+and we cannot authorize testing of them; denial-of-service or social-engineering
+attempts against people or services are out of scope. The wording is adapted
+from the disclose.io safe-harbor terms, CC0 (see `docs/references.md`).
+
+## Operations
+
+How incidents other than a reported vulnerability are handled (a compromised
+account or token, a malicious dependency or action, a tampered tag), who has
+access to what, which advisories are watched and which third-party components
+the project uses: [docs/security-operations.md](docs/security-operations.md).
+The same contact is published at
+`https://studiomoob.github.io/llmoobfs/.well-known/security.txt`.
+
 ## Current boundaries
 
 The [review of 2026-10-20](docs/history/0144-independent-review.md) found two defects beyond

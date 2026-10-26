@@ -25,3 +25,5 @@ to protection. Force pushes and deletion are disabled. No numeric approval quota
 is enforced while the project has a single maintainer; maintainers still review
 contributions. Administrators currently retain bypass for repository maintenance.
 GitHub Pages deploys the versioned static site from main through Actions.
+Who has access to what, and the incident procedure, are in
+`docs/security-operations.md`.
