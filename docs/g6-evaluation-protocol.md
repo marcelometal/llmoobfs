@@ -399,6 +399,14 @@ every bound of section 12.6 in three runs on the dedicated host (journal
 [0195](history/0195-g4-derived-index-package.md)). G5's relevance floor and
 the final evaluation stay unbound.
 
+Later the same day, section 13 proposed the G5 amendment. G5's implementation
+waits for its acceptance.
+
+The maintainer accepted section 13 as written. On 2026-10-26 the G5 package
+met every bound of section 13.6 on the dedicated host (journal
+[0201](history/0201-g5-hybrid-retrieval-package.md)). The final evaluation
+and the G2 latency ceiling stay unbound.
+
 ## 12. G4 amendment, 2026-10-25 — proposed, not accepted
 
 Status: proposed by journal [0194](history/0194-g4-protocol-amendment.md).
@@ -570,3 +578,180 @@ writes. None of these can pass or fail G4 or G6.
 Still unbound after this amendment: G5's relevance floor and recall@k, any
 derived-search latency ceiling, and the G2 latency ceiling. A change of the
 concurrency or the corpus is a new dated amendment, before its run.
+
+## 13. G5 amendment, 2026-10-25 — proposed, not accepted
+
+Status: proposed by journal [0200](history/0200-g5-protocol-amendment.md).
+The maintainer has not accepted it, nothing below has run, and no number in
+this section was measured for it. Once accepted, sections 13.1 to 13.6 are
+fixed under the rule of section 1. Until then G5 stays unstarted.
+
+Acceptance note, 2026-10-25 (journal [0201](history/0201-g5-hybrid-retrieval-package.md)):
+the maintainer accepted this section as written, before any download or
+run. Sections 13.1 to 13.6 are fixed from that point. The heading keeps its
+original wording.
+
+Harness note, 2026-10-26 (journal [0201](history/0201-g5-hybrid-retrieval-package.md)):
+the first full run stopped at its first search, after every index was built,
+because `QUERY2` refused the two private domains (about 25,000 files each)
+with `E2BIG` under the default `index_build_work`. The gate now mounts with
+`index_build_work=65536`, the administrative maximum of
+[ADR-0020](decisions/0020-configurable-query-build-work-per-mount.md), and
+issues one `QUERY2` per domain before indexing. No bound, corpus or engine of
+this section changed.
+
+Result note, 2026-10-26 (journal [0201](history/0201-g5-hybrid-retrieval-package.md)):
+the mounted gate met every bound of section 13.6. The two paths and the
+oracle gave the same top 10 everywhere; fusion's Q1 `recall_all@10` was
+0.845 against lexical's 0.809; Q1 p95 at most 0.135 s and Q3 p95 at most
+1.525 s across the 3 runs; 0 revoked turns returned.
+
+### 13.1 What G5 is in this batch, and what it does not change
+
+Hybrid retrieval in user space: a structured filter answered by `QUERY2`, a
+lexical branch, an exact vector branch and their fusion, over memories the
+caller can read. The question is whether that path returns the same ranked
+results as the same engines over plain files with a user-space metadata
+index, and whether fusion is worth keeping over either branch alone.
+
+No change to `layer/`, the UAPI, the disk format or the G1 adapter's
+`put`. No vector or approximate-nearest-neighbour code in the kernel. Both
+derived indexes (lexical and vector) follow the lifecycle of section 12,
+kept by the G4 watcher, in each uid's cache outside the data directory. No
+approximate mode is in this batch: HNSW or another one is tried only if the
+exact path misses section 13.6's latency bound, and only after a further
+amendment sets its recall threshold.
+
+### 13.2 Questions, corpus and labels
+
+The labeled set is LongMemEval (Wu et al., ICLR 2025), file
+`longmemeval_s_cleaned` from the dataset `xiaowu0162/longmemeval-cleaned`
+(MIT), pinned by its revision hash when downloaded, before the first run.
+Each instance has a question, a dated history of about 40 sessions and the
+ids of the sessions that hold the evidence (`answer_session_ids`); turns that
+hold evidence carry `has_answer`.
+
+Sample: 110 instances drawn with `Random(1)` from the instances whose
+`question_id` does not end in `_abs`, stratified by `question_type` in
+proportion to the file, rounding by largest remainder. The draw is made from
+the file's order and recorded before any embedding runs. If the pinned file
+cannot be obtained, the run is blocked; another dataset needs a new
+amendment.
+
+One memory per turn. Each turn is one adapter file, key
+`<question_id>-s<session>-t<turn>`, value `{role, content, session_id,
+date}`, with typed attributes `question_id` (string), `role` (string) and
+`date` (time, from `haystack_dates`). The text that is indexed and embedded
+is `content` only.
+
+| Domain | Owner : group, mode | Instances | Published by |
+| --- | --- | --- | --- |
+| `alice` | 1001, `0700` | first 50 of the draw | uid 1001 |
+| `bob` | 1002, `0700` | next 50 | uid 1002 |
+| `team` | root : `moobteam`, `2770` | last 10 | uid 1002, `0664` |
+
+Uid 1001 asks the questions of `alice` and `team`; uid 1002 those of `bob`
+and `team`.
+
+### 13.3 Engines, chosen before the comparison
+
+- **Vector:** `sentence-transformers/all-MiniLM-L6-v2` (Apache-2.0, 384
+  dimensions, input truncated at 256 word pieces), through
+  `sentence-transformers`, with the model revision and package versions
+  pinned in the run's `environment.txt` before the first run. Cosine
+  similarity on normalized vectors, scored for every eligible turn: exact.
+  The number of truncated turns is recorded.
+- **Lexical:** SQLite FTS5 with its `bm25()` function and default
+  parameters, default `unicode61` tokenizer, from the Python `sqlite3` of
+  the host. One FTS5 table per uid, holding every memory that uid can
+  read, so its term statistics come from what that uid can read and never
+  from another uid's files. A filter restricts the rows scored, not the
+  statistics.
+- **Fusion:** reciprocal rank fusion with k = 60 (Cormack et al. 2009) over
+  each branch's top 100.
+- Ties in every branch are broken by key. Top k is 10.
+
+These are the candidates of [research-algorithm-fit](research-algorithm-fit.md)
+sections 2.3 and 2.4. No other engine is compared in this batch.
+
+### 13.4 The two paths and the oracle
+
+- **MoobFS path:** the eligible set is the `QUERY2` answer for the filter on
+  the mounted layer, with every page followed. The branches score only that
+  set.
+- **Plain-files path:** the same files on a plain ext4 directory, not
+  mounted through the layer, with a SQLite metadata table per uid (`key,
+  question_id, role, date`) kept by the same watcher, answering the same
+  filter. Same branches; its derived indexes are built the same way over
+  that directory.
+- **Oracle:** for each query, the eligible set walked from the files as the
+  caller and every eligible turn scored by the vector model, embedded afresh;
+  for the lexical branch, an FTS5 table built fresh from every memory the
+  caller can read, queried for the eligible rows only. It reads no
+  maintained index.
+
+Filters, each run for every question of the caller:
+
+| Id | Filter | Eligible set |
+| --- | --- | --- |
+| Q1 | `question_id` = the question's | one instance, about 500 turns |
+| Q2 | Q1 and `role` = `user` | about half of Q1 |
+| Q3 | none, the caller's whole private domain | about 25 000 turns, more than one `QUERY2` page |
+
+Q3 is scored but has no relevance label of its own: its evidence is the
+question's instance, mixed with the other 49 instances. It tests paging,
+scale and the latency bound.
+
+### 13.5 Metrics
+
+Session level, from the sessions of the top 10 turns: `recall_any@10` (at
+least one evidence session) and `recall_all@10` (every evidence session).
+Turn level: nDCG@10 with `has_answer` as binary relevance (Järvelin and
+Kekäläinen 2002). Each is averaged over the questions, per branch, for Q1
+and Q2, with a 95% paired bootstrap interval of 10 000 resamples, seed 1.
+The primary metric is `recall_all@10` on Q1.
+
+### 13.6 Bounds that pass or fail G5 (proposed)
+
+All required. One miss fails the package.
+
+**Same answers on both paths.** For every question, filter and branch, the
+MoobFS path's top 10 equals the plain-files path's top 10, keys and order:
+0 differences.
+
+**Exact.** Each branch's top 10 equals the oracle's for that branch: 0
+differences, Q1 to Q3.
+
+**Authorization.** 0 results, in any branch or filter, outside the caller's
+eligible set. Uid 1001 gets 0 `bob` turns; uid 1002 gets 0 `alice` turns.
+Revocation: uid 1002 changes the evidence turns of one `team` instance to
+`0600`; once the watcher has reconciled, uid 1001 gets 0 of them in any
+branch. The in-flight window is counted, as in section 12.6. Scores, counts
+and timing are not claimed to be hidden (ROADMAP rule 4).
+
+**Usable results.** Every query returns min(10, eligible) results. A
+resource error from `QUERY2` fails the query with the error and no list, as
+in section 5.
+
+**Relevance floor.** On Q1, fusion's mean `recall_all@10` is at least the
+better single branch's minus 0.02. If not, the result is published, G5 does
+not pass as hybrid retrieval, and the branch that did better is recorded as
+the recommendation for a later decision. No absolute recall number passes or
+fails G5; all are published.
+
+**Latency, warm, MoobFS path, fusion, including query embedding.** Q1 p95 at
+most 300 ms. Q3 p95 at most 2 s. In each of 3 runs. These are this host's
+workload choices, not guarantees, and they do not compare the two paths.
+
+### 13.7 Recorded and not bounded
+
+Plain-files path latency and its difference from the MoobFS path (a
+comparison needs the method of section 7 and is not claimed here), CPU time
+and peak RSS of the searching process and of each watcher, index sizes,
+embedding time of the corpus, truncated turns, Q2's and Q3's metrics, the
+per-type breakdown, and the integration burden of each path: the plain-files
+path's metadata table and its synchronization, which the MoobFS path does not
+need.
+
+Still unbound after this amendment: any approximate mode and its recall
+threshold, the G2 latency ceiling, and the G6 final evaluation.
