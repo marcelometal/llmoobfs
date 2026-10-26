@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Debian 6.12.113 test infrastructure (issue 142, journal 0203): `make vm-test`
+  accepts `MOOB_DEBIAN_KERNEL=6.12.113`, with image and headers pinned to
+  `6.12.113-1`. A separate CI job runs the same suite while the existing
+  `Native Linux VM` check keeps 6.12.111 as its default. The suite passed on
+  6.12.113 in PR 148's CI; the fstests runs are pending, so 6.12.113 is not yet
+  supported or accepted by `make install`.
+
 - Tool JSON schema (issue #7, journal 0202): `moobfs-index --json` emits one
   document with `dir`, `count` and ordered `{ino, path}` results; its default
   tab-separated output is unchanged. `docs/tools.md` records the fields and

@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: GPL-2.0-only
 set -eu
 cd /work
-KERNEL=6.12.111+deb13-amd64
+MOOB_DEBIAN_KERNEL=${MOOB_DEBIAN_KERNEL:-6.12.111}
+case "$MOOB_DEBIAN_KERNEL" in
+    6.12.111|6.12.113) KERNEL="$MOOB_DEBIAN_KERNEL+deb13-amd64" ;;
+    *) echo "Unsupported Debian VM kernel: $MOOB_DEBIAN_KERNEL" >&2; exit 1 ;;
+esac
 test -d "/lib/modules/$KERNEL/build"
 make tools BUILD=build/linux
 MOOB_BUILD_DIR=build/linux python3 tests/test_images.py

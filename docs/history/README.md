@@ -220,3 +220,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0198 — The `moobfs` command-line tool (C4)](0198-moobfs-command-line-tool.md)
 - [0199 — Container recipe, validated (C3)](0199-container-recipe.md)
 - [0202 — JSON output for moobfs-index and tool JSON schemas (issue #7)](0202-tools-json-schema.md)
+- [0203 — Debian 6.12.113 added to VM CI; support pending fstests](0203-debian-6-12-113-in-ci.md)

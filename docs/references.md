@@ -438,6 +438,11 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   `make install-test` (journal 0197). Configured through
   [cloud-init NoCloud](https://cloudinit.readthedocs.io/en/latest/reference/datasources/nocloud.html)
   served over HTTP.
+- [Debian trixie-security package index](https://deb.debian.org/debian-security/dists/trixie-security/main/binary-amd64/Packages.xz):
+  `apt-cache policy` inside the pinned `debian:trixie-slim` image reported
+  `linux-image-6.12.113+deb13-amd64` and `linux-headers-6.12.113+deb13-amd64`
+  at exact version `6.12.113-1` on 2026-10-26; the CI image pins that pair
+  (journal 0203).
 - systemd [`systemd.mount(5)`](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html):
   `x-systemd.requires-mounts-for=` in `fstab`, `RequiresMountsFor=` and unit naming after the
   mount point, used by `docs/operations.md` section 4.

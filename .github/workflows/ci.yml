@@ -143,3 +143,26 @@ jobs:
             build/vm/kernel.config
           if-no-files-found: warn
           retention-days: 30
+  native_113:
+    name: Native Linux VM (Debian 6.12.113)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make vm-test
+        env:
+          MOOB_DEBIAN_KERNEL: 6.12.113
+      - name: Preserve VM evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-vm-612113-evidence
+          path: |
+            build/vm/console.log
+            build/vm/image-report.json
+            build/vm/environment.txt
+            build/vm/kernel.config
+          if-no-files-found: warn
+          retention-days: 30
