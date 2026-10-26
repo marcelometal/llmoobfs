@@ -201,6 +201,16 @@ root of the superblock (`ENOTTY` otherwise). A bind mount of a subdirectory **ca
 
 Container in a mapped userns: not tested.
 
+> **Note of 2026-10-25 (roadmap C3, journal 0199).** Tested in a disposable Debian 13 VM with
+> Docker 26 and Podman 5: the limitation above is about `QUERY` and `GET_INFO`. `QUERY2`, added
+> later, judges a directory by its depth in the layer, not by the mount point, so a bind mount of
+> the agent's **domain directory** answers `QUERY2` inside the container. The read-only bind of the
+> whole root was also tested: `QUERY2` and `GET_INFO` work through it and writes fail. In a
+> mapped user namespace the files keep their host owners, so a remapped uid is refused; Podman's
+> `:idmap` falls back to a plain bind without translation; rootless Podman with
+> `--userns=keep-id` works, because it keeps the user's uid. The recipe and its limits are in [container-integration.md](container-integration.md). The table
+> above is kept as written.
+
 ### 2.6 Installation on distributions
 
 | Aspect | Proposal | Status |

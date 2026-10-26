@@ -154,3 +154,8 @@ only supported way to run the module
 never load the modules on your host
 Never load the module on your host
 nunca carregue os módulos no seu host
+no rootless containers
+não há contêineres sem root
+rootless containers, serverless, macOS and Windows are out
+a stable UAPI, a CLI,
+UAPI estável, CLI,

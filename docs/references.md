@@ -444,3 +444,12 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 - FreeBSD [sysexits(3)](https://man.freebsd.org/cgi/man.cgi?query=sysexits&sektion=3), also
   shipped by glibc as `<sysexits.h>`: the exit codes 64, 65, 69, 75 and 77 of the `moobfs` tool
   (journal 0198), as the other tools already use 64 and 65. Defined in the tool, not included.
+- Podman, [podman-run(1)](https://docs.podman.io/en/latest/markdown/podman-run.1.html): `--user`,
+  `--uidmap`, `--userns=keep-id` and the `idmap` bind option, which needs rootful Podman and a
+  filesystem that allows idmapped mounts. Used by `vm/container-test/guest.sh` (journal 0199).
+- Docker, [docker run](https://docs.docker.com/reference/cli/docker/container/run/) `--user`
+  and bind mounts, Debian's `docker.io` 26.1.5: the same recipe as Podman's.
+- Linux v6.12.112, `fs/namespace.c` (`can_idmap_mount()`, which refuses a superblock whose type
+  lacks `FS_ALLOW_IDMAP`) and `layer/index.c` `query2_target()` (domain from the dentry's depth,
+  not the mount): why a bind of a domain directory answers `QUERY2` and an idmapped bind is
+  refused (journal 0199).

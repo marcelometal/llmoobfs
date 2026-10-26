@@ -63,6 +63,7 @@ then ([when-not-to-use.md](docs/when-not-to-use.md)).
 | --- | --- | --- |
 | Watch it run in a disposable VM; nothing is installed on your machine | Docker; 7 to 8 minutes on an x86-64 runner, longer on Apple Silicon | [Try it in a VM](#try-it-in-a-vm) |
 | Install it on a dedicated test host, mount it at boot, give users their directories | Debian 13 with kernel `6.12.111+deb13-amd64`, root, Secure Boot off | [docs/operations.md](docs/operations.md) |
+| Give each agent in a Docker or Podman container its own memory | A host mount; the container gets its domain directory under the owner's uid | [docs/container-integration.md](docs/container-integration.md) |
 | Query it from the shell or a script | The `moobfs` command, installed by the test-host guide: `moobfs query <domain> kind eq string decision` | [docs/tools.md](docs/tools.md#moobfs) |
 | Use it from your own program | Files, `setxattr` and one ioctl; no library yet | [client-contract.md](docs/client-contract.md) |
 
@@ -478,7 +479,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   task's memory cgroup where supported (issue 116, journal 0180). The mount-wide index
   budget is still shared, so this does not provide per-user fair sharing (S9).
 - Mounting needs `CAP_SYS_ADMIN` in the initial user namespace; user-namespace and idmapped
-  mounts are refused, and so is an idmapped mount as `lower=`; no rootless containers.
+  mounts are refused, and so is an idmapped mount as `lower=`. A rootless container cannot mount
+  the layer; it can use one the host mounted (Podman `--userns=keep-id`,
+  [container-integration.md](docs/container-integration.md)).
 - UAPI v1 and v2 may change, with no compatibility promise ([compatibility.md](docs/compatibility.md)); the `-experimental` tags are source snapshots, with no binaries, packaging or support.
 - Early SQLite/client figures are pilots: two hosts, one data-set seed, three repetitions at
   most (journals 0025 to 0085). Later module comparisons use 40 repetitions and intervals
@@ -548,7 +551,7 @@ as a regression in the same VM.
 | Security fixes of findings F9 to F12 (homogeneity rule, checks without the query semaphore, write access on the lower mount, idmapped lower refused), each with a test and a negative round | [0116](docs/history/0116-homogeneity-classes-and-checks-without-query-sem.md), [0117](docs/history/0117-lower-mount-write-access.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 
 Not implemented: a persistent index, user-namespace or idmapped mounts, batch reads, a change
-cursor, revisions, packaging, a stable UAPI, a CLI, the full xfstests suite, and the complete
+cursor, revisions, packaging, a stable UAPI, the full xfstests suite, and the complete
 M4 method (only pilot-grade campaigns exist, in [bench/results/](bench/results/README.md);
 see [What was measured](#what-was-measured)). See [ROADMAP.md](ROADMAP.md) for the planned and validation-dependent items.
 

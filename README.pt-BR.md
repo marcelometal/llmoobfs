@@ -69,6 +69,7 @@ ou arquivos comuns são a melhor escolha ([when-not-to-use.md](docs/when-not-to-
 | --- | --- | --- |
 | Ver funcionando numa VM descartável; nada é instalado na sua máquina | Docker; 7 a 8 minutos num runner x86-64, mais no Apple Silicon | [Experimente numa VM](#experimente-numa-vm) |
 | Instalar num host de teste dedicado, montar no boot, dar diretórios aos usuários | Debian 13 com kernel `6.12.111+deb13-amd64`, root, Secure Boot desligado | [docs/operations.md](docs/operations.md) (em inglês) |
+| Dar a cada agente num container Docker ou Podman a sua própria memória | Uma montagem no host; o container recebe o seu diretório de domínio com o uid do dono | [docs/container-integration.md](docs/container-integration.md) (em inglês) |
 | Consultar pelo terminal ou por um script | O comando `moobfs`, instalado pelo guia do host de teste: `moobfs query <domínio> kind eq string decision` | [docs/tools.md](docs/tools.md#moobfs) (em inglês) |
 | Usar a partir do seu programa | Arquivos, `setxattr` e um ioctl; ainda sem biblioteca | [client-contract.md](docs/client-contract.md) |
 
@@ -502,8 +503,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   do cgroup de memória da tarefa que os alocou, quando disponível (issue 116, diário 0180).
   O orçamento do índice ainda é compartilhado pela montagem e não garante divisão justa por usuário (S9).
 - Montar exige `CAP_SYS_ADMIN` no namespace de usuário inicial; montagens em namespace de usuário
-  e idmapped são recusadas, assim como uma montagem idmapped como `lower=`; não há contêineres sem
-  root.
+  e idmapped são recusadas, assim como uma montagem idmapped como `lower=`. Um contêiner sem root não
+  monta o layer; pode usar um que o host montou (Podman `--userns=keep-id`,
+  [container-integration.md](docs/container-integration.md)).
 - As UAPIs v1 e v2 podem mudar, sem promessa de compatibilidade ([compatibility.md](docs/compatibility.md)); as tags `-experimental` são instantâneos do código-fonte, sem binários, empacotamento nem suporte.
 - Os números iniciais contra SQLite e com o cliente são pilotos: duas máquinas, uma semente de
   dados, no máximo três repetições (diários 0025 a 0085). Comparações posteriores entre módulos
@@ -577,7 +579,7 @@ experimento M1 está congelado e roda como regressão na mesma VM.
 | Correções de segurança dos achados F9 a F12 (regra de homogeneidade, checagens sem o semáforo de consulta, acesso de escrita na montagem de baixo, lower idmapped recusado), cada uma com teste e rodada negativa | [0116](docs/history/0116-homogeneity-classes-and-checks-without-query-sem.md), [0117](docs/history/0117-lower-mount-write-access.md) | KASAN 6.12.112; ext4, btrfs, XFS |
 
 Não implementado: índice persistente, montagens em namespace de usuário ou idmapped, leituras em
-lote, cursor de mudanças, revisões, empacotamento, UAPI estável, CLI, a suíte xfstests completa e
+lote, cursor de mudanças, revisões, empacotamento, UAPI estável, a suíte xfstests completa e
 o método M4 completo (só existem campanhas de nível piloto, em
 [bench/results/](bench/results/README.md); veja [O que foi medido](#o-que-foi-medido)). Veja o
 [ROADMAP.md](ROADMAP.md) para os itens planejados e os que dependem de validação.
