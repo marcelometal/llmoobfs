@@ -39,3 +39,9 @@ The bounded per-mount work choice was subsequently merged by
 [PR 138](https://github.com/studiomoob/llmoobfs/pull/138) after twelve green
 checks ([journal 0193](history/0193-merged-per-mount-build-work-policy.md));
 issue 118 remains open for broader evidence.
+*Update, 2026-10-27 ([journal 0210](history/0210-security-batch-1-domain-records-and-slow-lower.md)):*
+issue 118 is closed. Over an ext4 lower slowed by `dm-delay` the first build of a 5,000-file
+domain took 0.3 s with no delay and 9.8 s at 200 ms per I/O; at 400 ms it stopped at the deadline
+with `ETIMEDOUT` and no partial answer, and the next query answered in full. G5's domains of about
+25,000 real memories built at `index_build_work=65536`. Issue 113 (domain records kept until
+unmount) is fixed in the same batch.

@@ -372,6 +372,7 @@ Read these coverage exclusions even when the aggregate marker passes:
 | --- | --- |
 | `CASEFOLD_SKIPPED` | No casefold-refusal test: kernel or `mke2fs` cannot prepare the fixture |
 | `STALL_SKIPPED` | No stalled-FUSE test: `/dev/fuse` is unavailable; KASAN has FUSE built in |
+| `DOMAINRECS_PASS` | `MOOB_ONLY=domainrecs`: 200 domain directories created, queried and removed on btrfs and on ext4 leave no domain record (`domain_records` test counter) and each new one answers with its own files; 50 chmod-then-rmdir leave no fallback mark; `QUERY2` through a removed directory's descriptor returns `ENOENT` and records nothing (issue #113, journal 0210) |
 | `PYLIB_SKIPPED` | No Python library test: the guest has no `python3` (the `vm-test` initramfs); the KASAN guest boots the host's root and runs it, ending in `MOOBFS_PYLIB_PASS`; since journal 0209 the KASAN job runs only for kernel-side changes, so a change to `python/` alone is checked by `make pylib-test` and not by this step |
 | `LOWERRO_PASS: ... idmapped lower: not tested ...` | Read-only/freeze checks ran, but an idmapped bind lower could not be created; only `idmapped lower: refused` proves that case |
 | `ipc` binary present | Built/staged only, not invoked by the suite; no `IPC_PRIMITIVES_PASS` evidence |

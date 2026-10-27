@@ -177,9 +177,11 @@ Fatos em 2026-10-25:
   (padrão de 32.768 unidades acumuladas; quem monta pode escolher de 1.024 a
   65.536), por um prazo cooperativo de dez segundos e por limites de
   frequência de reconstrução. O padrão recusa o domínio medido de 17 mil
-  arquivos. A issue 118 continua aberta
+  arquivos. A issue 118 foi fechada: com o disco inferior atrasado em
+  400 ms por E/S, o build para no prazo com `ETIMEDOUT` e sem resposta parcial,
+  e os domínios de 25 mil arquivos do G5 se constroem com 65.536
   ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
-  [diário 0193](docs/history/0193-merged-per-mount-build-work-policy.md)).
+  [diário 0210](docs/history/0210-security-batch-1-domain-records-and-slow-lower.md)).
 - Montar exige **`CAP_SYS_ADMIN` no namespace de usuário inicial**.
 - **A interface pode mudar**, sem promessa de compatibilidade.
 
@@ -495,8 +497,9 @@ sob KASAN (o arnês KASAN roda a suíte da camada), e não existe benchmark dele
   o padrão; o domínio medido completou com 65.536 em VM dedicada
   ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
   [diário 0193](docs/history/0193-merged-per-mount-build-work-policy.md)).
-  A issue 118 segue aberta para testes com dispositivo inferior realmente
-  lento e projeto real maior. Não exponha uma montagem multiusuário a
+  A issue 118 foi fechada depois de um teste com disco inferior lento e dos
+  domínios maiores do G5 (diário 0210); os limites ainda não são um teto
+  estrito de CPU ou de E/S. Não exponha uma montagem multiusuário a
   consultas não confiáveis.
 - `QUERY2` pode manter um buffer de resultados de até 1.114.112 bytes por descritor aberto.
   Esse buffer e as alocações de índice/consulta acionadas pelo usuário são cobrados

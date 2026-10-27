@@ -2,6 +2,8 @@
 /* Shared declarations of the MoobFS memory layer (main.c and index.c). */
 #ifndef MOOBL_H
 #define MOOBL_H
+#include <linux/refcount.h>
+#include <linux/rcupdate.h>
 #include <linux/fs.h>
 #include <linux/rbtree.h>
 #include <linux/xarray.h>
@@ -38,6 +40,15 @@ enum { MOOBL_DOM_NONE, MOOBL_DOM_BUILDING, MOOBL_DOM_BUILT };
 
 struct moobl_domain {
 	struct mutex build;
+	/*
+	 * References: one from ix->domains while the record is in it, one per holder that uses the
+	 * record without the index lock or query_sem (a build, a release). Freed with RCU when the
+	 * last one goes, so a walk under rcu_read_lock() may still read it (issue #113).
+	 */
+	refcount_t ref;
+	struct rcu_head rcu;
+	u64 key;			/* its index in ix->domains: the domain directory's inode */
+	bool gone;			/* its directory was removed: drop it once nobody holds it */
 	u8 state;
 	struct list_head moved;		/* directories renamed in it during its build (index lock) */
 	bool restart;			/* one of them could not be recorded: build again */
@@ -66,7 +77,8 @@ struct moobl_index {
 	bool fallback_all;		/* a domain could not be recorded above: check every domain */
 	u32 hetero_count;		/* indexed inodes failing the homogeneity rule */
 	siphash_key_t cursor_key;	/* per-mount key authenticating QUERY2 cursors */
-	struct xarray domains;		/* domain ino -> struct moobl_domain, never removed */
+	struct xarray domains;		/* domain ino -> struct moobl_domain, until its directory goes */
+	u32 domains_gone;		/* records marked gone and not yet dropped */
 	struct moobl_domain outside;	/* what belongs to no domain (everything with domain_depth=0) */
 	struct rw_semaphore query_sem;	/* read: a query runs; write: a built domain is taken down */
 	u64 drop_gen;			/* bumped when a built domain is taken down */
@@ -147,6 +159,7 @@ int moobl_index_set(struct super_block *sb, struct dentry *dentry, const char *n
 		    const void *value, size_t size);
 void moobl_index_remove(struct super_block *sb, u64 ino, const char *name);
 void moobl_index_drop_inode(struct super_block *sb, u64 ino);
+void moobl_index_dir_removed(struct super_block *sb, u64 ino);
 void moobl_index_renamed(struct super_block *sb, struct dentry *moved, struct dentry *where);
 void moobl_index_linked(struct super_block *sb, struct dentry *new_dentry);
 void moobl_index_inode_cached(struct super_block *sb, struct inode *inode);
