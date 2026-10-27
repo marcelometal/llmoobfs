@@ -10,6 +10,18 @@
   slowed by `dm-delay` the build completes up to 200 ms per I/O and stops at the deadline with
   `ETIMEDOUT` and no partial answer at 400 ms (`bench/client/issue118_slow_lower.py`).
 
+- Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
+  touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
+  the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs
+  only for kernel-side paths and caches the built kernel.
+
+- MCP adapter (roadmap C7, ADR-0024, journal 0208): `python -m moobfs.mcp --root <dir>` serves
+  `info`, `query`, `read`, `write` and `delete` over stdio, as the agent's own uid; it refuses
+  root and setuid, has no network transport, and refuses absolute paths, `..` and symbolic
+  links. On the dedicated host, through stdio servers started as two users, its answers equal
+  the library's for 143 random requests per domain, each user is refused on the other's domain,
+  a shared domain works both ways, and a start as root is refused.
+
 - Python client library, phase 2 (roadmap C5 done, journal 0207): `moobfs.langgraph.MoobStore`,
   a LangGraph store on the library with the files of the G1 adapter (either reads the other's).
   `bench/client/g1_mounted.py --store package` runs G1's mounted gate on it; it passed three

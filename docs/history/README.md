@@ -227,4 +227,6 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0205 — Security operations from the OSTIF best-practices guide (S22)](0205-security-operations.md)
 - [0206 — Debian 6.12.113 supported: fstests quick passed on three lowers (issue 142)](0206-debian-6-12-113-supported.md)
 - [0207 — Python library, phase 2: LangGraph store, G1 gate carried over (C5 done)](0207-python-library-langgraph-store.md)
+- [0208 — MCP adapter over stdio, as the agent's own uid (C7)](0208-mcp-agent-adapter.md)
+- [0209 — A faster check cycle: focused steps per correction, the full suite per batch](0209-faster-check-cycle.md)
 - [0210 — Security batch 1: domain records dropped on rmdir (#113), QUERY2 over a slow lower (#118)](0210-security-batch-1-domain-records-and-slow-lower.md)
