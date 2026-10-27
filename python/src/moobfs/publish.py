@@ -8,11 +8,11 @@ index it: by default the mode of file_mode_for(domain directory mode), and the d
 and group where this process may set them.
 """
 import ctypes
-import ctypes.util
 import errno
 import os
 import stat
 
+from ._libc import libc
 from .attrs import Value, check_name, validate
 
 _RENAME_NOREPLACE = 1
@@ -31,8 +31,7 @@ def file_mode_for(directory_mode):
 
 
 def _rename_noreplace(src, dst):
-    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
-    fn = getattr(libc, "renameat2", None)
+    fn = getattr(libc(), "renameat2", None)
     if fn is None:
         raise OSError(errno.ENOSYS, "renameat2 is not available in this C library")
     if fn(_AT_FDCWD, os.fsencode(src), _AT_FDCWD, os.fsencode(dst), _RENAME_NOREPLACE) != 0:

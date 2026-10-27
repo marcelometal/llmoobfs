@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Python library input checks (journal 0212): a `Term` validates any `Value`, including one
+  built by hand, before its payload is copied into the request (a wrong-sized payload wrote past
+  the term's 1024-byte field); integers and times outside 64 bits raise `ValueError` instead of
+  `struct.error`; `publish()` and `layer_mounted()` no longer start `ldconfig` or a compiler to
+  find the C library; the scan judges the directory itself, not a symbolic link to it.
+
 - Harness hygiene (journal 0211): the manual KCSAN and arm64 KASAN runs refuse a `steps` input
   that is not a list of suite step names, since it is quoted inside the guest's command line;
   `make uninstall` removes each installed path as one word, so a `PREFIX` or `DESTDIR` with a
