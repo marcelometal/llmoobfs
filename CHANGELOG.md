@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Security batch 1 (journal 0210). Issue #113 fixed: a domain record and a fallback mark are
+  dropped when their directory is removed (reference-counted records freed with RCU, removal
+  with tried locks), and `QUERY2` or a chmod through a removed directory's descriptor records
+  nothing (`ENOENT` for the query). New suite step `domainrecs`; its regression test fails
+  without the fix (200 records after 200 domains on btrfs). Issue #118 closed: over a lower
+  slowed by `dm-delay` the build completes up to 200 ms per I/O and stops at the deadline with
+  `ETIMEDOUT` and no partial answer at 400 ms (`bench/client/issue118_slow_lower.py`).
+
 - Python client library, phase 2 (roadmap C5 done, journal 0207): `moobfs.langgraph.MoobStore`,
   a LangGraph store on the library with the files of the G1 adapter (either reads the other's).
   `bench/client/g1_mounted.py --store package` runs G1's mounted gate on it; it passed three

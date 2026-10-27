@@ -165,9 +165,11 @@ Facts as of 2026-10-25:
 - An unprivileged build is also bounded by `index_build_work` (default
   32,768 cumulative units; a mounter may choose 1,024–65,536), a ten-second
   cooperative deadline and rebuild-frequency limits. The default denies the
-  measured 17,000-file domain. Issue 118 stays open
+  measured 17,000-file domain. Issue 118 is closed: over a lower slowed to
+  400 ms per I/O the build stops at the deadline with `ETIMEDOUT` and no
+  partial answer, and G5's 25,000-file domains build at 65,536
   ([ADR-0020](docs/decisions/0020-configurable-query-build-work-per-mount.md),
-  [journal 0193](docs/history/0193-merged-per-mount-build-work-policy.md)).
+  [journal 0210](docs/history/0210-security-batch-1-domain-records-and-slow-lower.md)).
 - Mounting needs **`CAP_SYS_ADMIN` in the initial user namespace**.
 - **The interface may change**, with no compatibility promise.
 
@@ -466,9 +468,9 @@ KASAN harness runs the layer suite), and no benchmark exists.
   60,000-page stage-2 bulk client shape in ten domains with this guard; all 60 SQLite-versus-QUERY2
   answer checks agreed. That run did not test MCP writes, a live mirror or
   latency. A valid 17,000-file domain was denied with `E2BIG` under the
-  32,768-unit default. Issue 118 remains open for slow lower-device and
-  broader-workload validation. Do not expose a multi-user mount to untrusted
-  query workloads.
+  32,768-unit default. Issue 118 was closed after a slow-lower run and G5's
+  larger domains (journal 0210); the limits are still not a strict CPU or I/O
+  cap. Do not expose a multi-user mount to untrusted query workloads.
   The merged `index_build_work` option lets a mounter choose 1,024–65,536
   units while keeping 32,768 as the default. The measured 17,000-file
   attributed domain completed at 65,536 in a dedicated VM; see

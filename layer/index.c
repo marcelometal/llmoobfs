@@ -845,6 +845,127 @@ static bool domain_fresh(struct moobl_index *ix, const struct moobl_domain *dom)
 	       !READ_ONCE(dom->lost) && READ_ONCE(dom->top_gen) == READ_ONCE(ix->top_gen);
 }
 
+/*
+ * Domain records of every mount, for tests only: issue #113 is that removing a domain directory
+ * left its record until unmount.
+ */
+static atomic_long_t domain_records = ATOMIC_LONG_INIT(0);
+
+static int domain_records_get(char *buf, const struct kernel_param *kp)
+{
+	return sysfs_emit(buf, "%ld\n", atomic_long_read(&domain_records));
+}
+
+static const struct kernel_param_ops domain_records_ops = { .get = domain_records_get };
+module_param_cb(domain_records, &domain_records_ops, NULL, 0444);
+MODULE_PARM_DESC(domain_records, "tests only: domain records held by every mount");
+
+static void domain_takedown(struct moobl_index *ix, struct moobl_domain *dom, u64 domain);
+
+static void domain_put(struct moobl_index *ix, struct moobl_domain *dom)
+{
+	if (dom == &ix->outside)
+		return;
+	if (refcount_dec_and_test(&dom->ref)) {
+		atomic_long_dec(&domain_records);
+		kfree_rcu(dom, rcu);
+	}
+}
+
+/*
+ * Drops the record of a removed domain directory if nobody holds it: no build, no release in
+ * progress, no query (query_sem for writing). Every lock is only tried, since the caller may be
+ * rmdir with the directory locks of the VFS held while a build of this domain waits for them; a
+ * busy record stays marked gone and is dropped by its last holder or by a later attempt.
+ */
+static bool domain_reap(struct moobl_index *ix, u64 key)
+{
+	struct moobl_domain *dom;
+	unsigned int nofs;
+	bool erased = false;
+
+	rcu_read_lock();
+	dom = xa_load(&ix->domains, (unsigned long)key);
+	if (dom && !refcount_inc_not_zero(&dom->ref))
+		dom = NULL;
+	rcu_read_unlock();
+	if (!dom)
+		return false;
+	if (!mutex_trylock(&dom->build))
+		goto out;
+	if (!down_write_trylock(&ix->query_sem))
+		goto unlock_build;
+	nofs = memalloc_nofs_save();
+	if (!down_write_trylock(&ix->lock))
+		goto unlock_query;
+	/* two references: ix->domains and ours; any other is a holder still using it */
+	if (dom->gone && refcount_read(&dom->ref) == 2 &&
+	    xa_load(&ix->domains, (unsigned long)key) == dom) {
+		if (dom->state == MOOBL_DOM_BUILT)
+			domain_takedown(ix, dom, key);
+		WARN_ON_ONCE(dom->state != MOOBL_DOM_NONE || !list_empty(&dom->moved));
+		xa_erase(&ix->domains, (unsigned long)key);
+		ix->domains_gone--;
+		erased = true;
+	}
+	up_write(&ix->lock);
+unlock_query:
+	memalloc_nofs_restore(nofs);
+	up_write(&ix->query_sem);
+unlock_build:
+	mutex_unlock(&dom->build);
+out:
+	if (erased)
+		domain_put(ix, dom);	/* the reference of ix->domains */
+	domain_put(ix, dom);
+	return erased;
+}
+
+/* Releases a holder's reference; the last holder of a removed domain drops it. No lock held. */
+static void domain_unpin(struct moobl_index *ix, struct moobl_domain *dom)
+{
+	u64 key;
+	bool gone;
+
+	if (dom == &ix->outside)
+		return;
+	key = dom->key;
+	gone = READ_ONCE(dom->gone);
+	domain_put(ix, dom);
+	if (gone)
+		domain_reap(ix, key);
+}
+
+#define MOOBL_REAP_BATCH 8
+
+/* Before a new record: try to drop a few removed ones a busy moment left behind. No lock held. */
+static void domain_reap_some(struct moobl_index *ix)
+{
+	struct moobl_domain *dom;
+	unsigned long idx;
+	u64 keys[MOOBL_REAP_BATCH];
+	unsigned int n = 0, i;
+
+	if (!READ_ONCE(ix->domains_gone))
+		return;
+	rcu_read_lock();
+	xa_for_each(&ix->domains, idx, dom) {
+		if (READ_ONCE(dom->gone))
+			keys[n++] = idx;
+		if (n == MOOBL_REAP_BATCH)
+			break;
+	}
+	rcu_read_unlock();
+	for (i = 0; i < n; i++)
+		domain_reap(ix, keys[i]);
+}
+
+/*
+ * The record of a domain, created on first use, with a reference the caller releases with
+ * domain_unpin(). A record found marked gone belongs to a directory that reuses the inode
+ * number of a removed one (ext4 and XFS reuse them): it is taken back, and a built one is
+ * built again by the next query, since it described the removed directory.
+ */
 static struct moobl_domain *domain_get(struct moobl_index *ix, u64 domain)
 {
 	struct moobl_domain *dom, *cur;
@@ -852,24 +973,52 @@ static struct moobl_domain *domain_get(struct moobl_index *ix, u64 domain)
 
 	if (!domain)
 		return &ix->outside;
+	rcu_read_lock();
 	dom = xa_load(&ix->domains, (unsigned long)domain);
-	if (dom)
+	if (dom && !refcount_inc_not_zero(&dom->ref))
+		dom = NULL;
+	rcu_read_unlock();
+	if (dom) {
+		if (READ_ONCE(dom->gone)) {
+			nofs = ix_write_lock(ix);
+			if (dom->gone) {
+				dom->gone = false;
+				ix->domains_gone--;
+				if (dom->state == MOOBL_DOM_BUILT)
+					WRITE_ONCE(dom->lost, true);
+			}
+			ix_write_unlock(ix, nofs);
+		}
 		return dom;
+	}
+	domain_reap_some(ix);
 	dom = kzalloc(sizeof(*dom), GFP_KERNEL_ACCOUNT);
 	if (!dom)
 		return NULL;
 	mutex_init(&dom->build);
 	INIT_LIST_HEAD(&dom->moved);
+	refcount_set(&dom->ref, 2);	/* ix->domains and the caller */
+	dom->key = domain;
 	nofs = ix_write_lock(ix);
 	cur = xa_load(&ix->domains, (unsigned long)domain);
 	if (!cur && xa_err(xa_store(&ix->domains, (unsigned long)domain, dom,
 				     GFP_KERNEL_ACCOUNT)))
 		cur = ERR_PTR(-ENOMEM);
+	else if (cur) {
+		refcount_inc(&cur->ref);	/* under the write lock: not being erased */
+		if (cur->gone) {
+			cur->gone = false;
+			ix->domains_gone--;
+			if (cur->state == MOOBL_DOM_BUILT)
+				WRITE_ONCE(cur->lost, true);
+		}
+	}
 	ix_write_unlock(ix, nofs);
 	if (cur) {
 		kfree(dom);
 		return IS_ERR(cur) ? NULL : cur;
 	}
+	atomic_long_inc(&domain_records);
 	return dom;
 }
 
@@ -938,8 +1087,9 @@ static bool builder_matches(const struct moobl_domain *dom, bool same_builder, u
 /*
  * The built domain queried least recently, other than except, and not used in the last idle
  * jiffies; NULL when there is none. The cursor finds the next oldest candidate after a busy
- * build mutex, ordered by (used_at, key). Domains are never removed from ix->domains before
- * unmount, so the walk needs no lock; the state is checked again under domain_release()'s locks.
+ * build mutex, ordered by (used_at, key). The walk runs under rcu_read_lock() without the index
+ * lock (records are freed with RCU since issue #113), and the record returned carries a reference
+ * the caller drops with domain_unpin(); the state is checked again under domain_release()'s locks.
  * A plain walk rather than a list_lru: the domains of one mount are few, and the index memory
  * is not charged to a memory cgroup, so a per-cgroup, per-node list would buy nothing.
  * same_builder restricts the choice to domains last built by uid.
@@ -952,6 +1102,7 @@ static struct moobl_domain *domain_lru(struct moobl_index *ix, struct moobl_doma
 	struct moobl_domain *dom, *best = NULL;
 	unsigned long idx, used, best_used = 0;
 
+	rcu_read_lock();
 	used = READ_ONCE(ix->outside.used_at);
 	if (READ_ONCE(ix->outside.state) == MOOBL_DOM_BUILT && &ix->outside != except &&
 	    builder_matches(&ix->outside, same_builder, uid) &&
@@ -976,6 +1127,9 @@ static struct moobl_domain *domain_lru(struct moobl_index *ix, struct moobl_doma
 			*key = idx;
 		}
 	}
+	if (best && best != &ix->outside && !refcount_inc_not_zero(&best->ref))
+		best = NULL;	/* its last reference went meanwhile: being freed */
+	rcu_read_unlock();
 	if (best)
 		*selected_used = best_used;
 	return best;
@@ -1012,6 +1166,7 @@ static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, 
 		if (!dom)
 			return false;
 		if (!mutex_trylock(&dom->build)) {
+			domain_unpin(ix, dom);
 			after = true;
 			after_used = selected_used;
 			after_key = key;
@@ -1020,6 +1175,7 @@ static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, 
 		if (reclaim) {
 			if (!down_write_trylock(&ix->query_sem)) {
 				mutex_unlock(&dom->build);
+				domain_unpin(ix, dom);
 				return false;
 			}
 			nofs = memalloc_nofs_save();
@@ -1027,6 +1183,7 @@ static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, 
 				memalloc_nofs_restore(nofs);
 				up_write(&ix->query_sem);
 				mutex_unlock(&dom->build);
+				domain_unpin(ix, dom);
 				return false;
 			}
 		} else {
@@ -1045,6 +1202,7 @@ static bool domain_release(struct moobl_index *ix, struct moobl_domain *except, 
 		ix_write_unlock(ix, nofs);
 		up_write(&ix->query_sem);
 		mutex_unlock(&dom->build);
+		domain_unpin(ix, dom);
 		if (owned)
 			return true;
 		after = true;
@@ -1743,12 +1901,11 @@ static u64 rename_gen(struct moobl_index *ix)
  * directory or one above it after that sample leaves the build stale, never fresh under the
  * old name (issue #110).
  */
-static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domain, const char *path,
-			 u64 gen, bool may_release)
+static int domain_ensure_dom(struct super_block *sb, struct moobl_domain *dom, struct dentry *lower,
+			     u64 domain, const char *path, u64 gen, bool may_release)
 {
 	struct moobl_sb *sbi = MOOBL_SB(sb);
 	struct moobl_index *ix = &sbi->index;
-	struct moobl_domain *dom = domain_get(ix, domain);
 	const struct cred *old;
 	struct scan_job job;
 	/*
@@ -1760,8 +1917,6 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	u64 t0, used0, refused = 0;
 	int tries, err;
 
-	if (!dom)
-		return -ENOMEM;
 	if (domain_fresh(ix, dom)) {
 		WRITE_ONCE(dom->used_at, jiffies);
 		return 0;
@@ -1868,6 +2023,21 @@ static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domai
 	return err;
 }
 
+/* domain_ensure_dom() on the record of domain, which it holds for the build (issue #113). */
+static int domain_ensure(struct super_block *sb, struct dentry *lower, u64 domain, const char *path,
+			 u64 gen, bool may_release)
+{
+	struct moobl_index *ix = IX(sb);
+	struct moobl_domain *dom = domain_get(ix, domain);
+	int err;
+
+	if (!dom)
+		return -ENOMEM;
+	err = domain_ensure_dom(sb, dom, lower, domain, path, gen, may_release);
+	domain_unpin(ix, dom);
+	return err;
+}
+
 /* Everything, for the mount-wide QUERY: what is outside the domains, then every domain. */
 static int domain_ensure_all(struct super_block *sb)
 {
@@ -1967,10 +2137,12 @@ static unsigned long moobl_shrink_count(struct shrinker *s, struct shrink_contro
 	if (READ_ONCE(ix->outside.state) == MOOBL_DOM_BUILT &&
 	    time_after_eq(jiffies, READ_ONCE(ix->outside.used_at) + idle))
 		n++;
+	rcu_read_lock();	/* records are freed with RCU (issue #113) */
 	xa_for_each(&ix->domains, idx, dom)
 		if (READ_ONCE(dom->state) == MOOBL_DOM_BUILT &&
 		    time_after_eq(jiffies, READ_ONCE(dom->used_at) + idle))
 			n++;
+	rcu_read_unlock();
 	if (!n)
 		return SHRINK_EMPTY;
 	return max_t(unsigned long, 1, div_u64(READ_ONCE(ix->used), PAGE_SIZE) * n / built);
@@ -2037,8 +2209,10 @@ void moobl_index_destroy(struct super_block *sb)
 	}
 	xa_destroy(&ix->inodes);
 	xa_destroy(&ix->fallback);
-	xa_for_each(&ix->domains, ino, dom)
-		kfree(dom);
+	xa_for_each(&ix->domains, ino, dom) {
+		atomic_long_dec(&domain_records);
+		kfree(dom);	/* no holder is left at unmount */
+	}
 	xa_destroy(&ix->domains);
 	ix_write_unlock(ix, nofs);
 }
@@ -2148,6 +2322,34 @@ void moobl_index_drop_inode(struct super_block *sb, u64 ino)
 		inode_rec_put_if_empty(ix, rec);
 	}
 	ix_write_unlock(ix, nofs);
+}
+
+/*
+ * A directory was removed (rmdir). If it was a domain, its fallback mark and its record go: until
+ * issue #113 both stayed until unmount, so creating, querying and removing domain directories in a
+ * loop grew the index outside its budget. The record is dropped at once when nobody holds it, and
+ * otherwise by its last holder (domain_unpin) or by a later attempt (domain_reap_some).
+ */
+void moobl_index_dir_removed(struct super_block *sb, u64 ino)
+{
+	struct moobl_index *ix = IX(sb);
+	struct moobl_domain *dom;
+	unsigned int nofs;
+
+	if (!ix->enabled || !ix->domain_depth || !ino)
+		return;
+	nofs = ix_write_lock(ix);
+	xa_erase(&ix->fallback, (unsigned long)ino);
+	dom = xa_load(&ix->domains, (unsigned long)ino);
+	if (dom && !dom->gone) {
+		dom->gone = true;
+		ix->domains_gone++;
+		if (dom->state == MOOBL_DOM_BUILT)
+			WRITE_ONCE(dom->lost, true);	/* no answer from it while it waits */
+	}
+	ix_write_unlock(ix, nofs);
+	if (dom)
+		domain_reap(ix, ino);	/* dom may be gone by now: only the key is used */
 }
 
 /* Whether rec holds every attribute of its file: true once the domain it is in is built. */
@@ -2355,7 +2557,8 @@ void moobl_index_perm_changed(struct super_block *sb, struct dentry *dentry)
 
 	if (!ix->enabled || !ix->domain_depth || d_really_is_negative(dentry))
 		return;
-	if (d_is_dir(dentry) && depth_and_domain(ix, dentry, &depth, &domain) &&
+	/* a removed directory has no files to check, and its rmdir already ran (issue #113) */
+	if (d_is_dir(dentry) && !d_unlinked(dentry) && depth_and_domain(ix, dentry, &depth, &domain) &&
 	    depth >= ix->domain_depth && domain)
 		if (xa_err(xa_store(&ix->fallback, (unsigned long)domain, xa_mk_value(1),
 				    GFP_KERNEL_ACCOUNT)))
@@ -3426,28 +3629,34 @@ static long query2_pin(struct super_block *sb, struct file *file, u64 domain)
 	u64 gen;
 
 	for (tries = 0; tries < 8; tries++) {
-		dom = xa_load(&ix->domains, (unsigned long)domain);
-		if (!dom || !domain_fresh(ix, dom)) {
-			buf = (char *)__get_free_pages(GFP_KERNEL_ACCOUNT, 1);
-			if (!buf)
-				return -ENOMEM;
-			gen = rename_gen(ix);
-			p = lower_rel_path(sb, lower, buf);
-			if (IS_ERR(p))
-				err = PTR_ERR(p);
-			else
-				err = domain_ensure(sb, lower, domain, p, gen, true);
-			free_pages((unsigned long)buf, 1);
-			if (err)
-				return err;
-			dom = xa_load(&ix->domains, (unsigned long)domain);
-		}
+		/* the record is read under query_sem: a removed one is dropped only without it */
 		down_read(&ix->query_sem);
+		dom = xa_load(&ix->domains, (unsigned long)domain);
 		if (dom && domain_fresh(ix, dom)) {
 			WRITE_ONCE(dom->used_at, jiffies);
 			return 0;
 		}
 		up_read(&ix->query_sem);
+		/* a removed directory gets no record: nothing would ever drop it (issue #113) */
+		if (d_unlinked(file->f_path.dentry))
+			return -ENOENT;
+		buf = (char *)__get_free_pages(GFP_KERNEL_ACCOUNT, 1);
+		if (!buf)
+			return -ENOMEM;
+		gen = rename_gen(ix);
+		p = lower_rel_path(sb, lower, buf);
+		if (IS_ERR(p))
+			err = PTR_ERR(p);
+		else
+			err = domain_ensure(sb, lower, domain, p, gen, true);
+		free_pages((unsigned long)buf, 1);
+		if (!err && d_unlinked(file->f_path.dentry)) {
+			/* removed while it was built: its rmdir may have found no record yet */
+			moobl_index_dir_removed(sb, domain);
+			err = -ENOENT;
+		}
+		if (err)
+			return err;
 	}
 	return -EAGAIN;	/* directories kept being renamed in it */
 }
