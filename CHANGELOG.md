@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
+  touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
+  the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs
+  only for kernel-side paths and caches the built kernel.
+
 - MCP adapter (roadmap C7, ADR-0024, journal 0208): `python -m moobfs.mcp --root <dir>` serves
   `info`, `query`, `read`, `write` and `delete` over stdio, as the agent's own uid; it refuses
   root and setuid, has no network transport, and refuses absolute paths, `..` and symbolic
