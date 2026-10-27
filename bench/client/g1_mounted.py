@@ -6,6 +6,11 @@ Expects the layer module already built. Loads it if needed, mounts ext4 lowers,
 and runs the protocol's two-uid corpus. Prints G1_MOUNTED_PASS only when every
 mounted check holds, including the 1 MiB budget refusal. A budget that still
 answers is G1_BUDGET_FIT and a non-zero exit: the file count is not changed.
+
+--store package runs the same gate on moobfs.langgraph, the store of the Python library
+(roadmap C5, journal 0207), instead of langgraph_store. Only the fallback case differs, by the
+amendment of protocol section 5 dated 2026-10-27: without the module the library answers what
+QUERY2 would, so salary.json is absent for uid 1002 as well.
 """
 import argparse
 import ctypes
@@ -27,6 +32,7 @@ from g1_protocol import SHAPES, corpus_slots, identity
 from langgraph.store.memory import InMemoryStore
 
 ALICE, BOB = 1001, 1002
+STORE = "adapter"
 STAMP = "2026-01-01T00:00:00+00:00"
 
 
@@ -320,8 +326,12 @@ def fallback(plain, team_gid, alice_gid, bob_gid):
     keys, can = visible(ALICE, alice_gid)
     check(not can and "salary" not in keys, f"alice fallback saw salary {can} {keys}")
     keys, can = visible(BOB, bob_gid)
-    check(can and "salary" in keys, "bob fallback hid a file he can open")
-    print("G1_FALLBACK alice omits salary; bob sees it")
+    if STORE == "package":
+        check(can and "salary" not in keys, f"bob fallback returned salary {can} {keys}")
+        print("G1_FALLBACK alice and bob omit salary, as QUERY2 does; bob can still open it")
+    else:
+        check(can and "salary" in keys, "bob fallback hid a file he can open")
+        print("G1_FALLBACK alice omits salary; bob sees it")
 
 
 def budget(lower, mnt, ko_loaded):
@@ -356,7 +366,14 @@ def main():
     ap.add_argument("--budget-lower", default="/srv/moob/ext4/g1-0189-budget")
     ap.add_argument("--budget-mnt", default="/mnt/g1-0189-budget")
     ap.add_argument("--plain", default="/srv/moob/ext4/g1-0189-plain")
+    ap.add_argument("--store", choices=("adapter", "package"), default="adapter",
+                    help="langgraph_store (the recorded runs) or moobfs.langgraph (C5)")
     args = ap.parse_args()
+    global mod, STORE
+    if args.store == "package":
+        import moobfs.langgraph as mod
+    STORE = args.store
+    print(f"G1_STORE {args.store} {mod.__file__}", flush=True)
     check(sys.platform == "linux" and os.geteuid() == 0, "run as root on Linux")
     loaded = "moobfs_layer" in open("/proc/modules").read()
     if loaded:

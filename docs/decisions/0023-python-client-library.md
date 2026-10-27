@@ -50,6 +50,10 @@ into the client's process, so its licence decides who can use it.
 7. **The LangGraph store moves onto the library in a second phase**, which carries G1's gate
    over (the roadmap's first acceptance criterion). `bench/client/` stays as it is, since the
    recorded gates G1 to G5 ran with it.
+   *Note, 2026-10-27 (journal 0207):* done as `moobfs.langgraph` (extra `langgraph`), with the
+   adapter's files; G1's mounted gate passed three times on it with `--store package`. Its
+   fallback case follows a protocol amendment the maintainer accepted before the run: without
+   the module `salary.json` is absent for uid 1002 too, as for `QUERY2`.
 
 ## Prior art this builds on
 

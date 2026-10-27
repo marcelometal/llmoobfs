@@ -61,6 +61,10 @@ with its default exclusion `--exclude=.[^/]*` no `.well-known` entry is archived
 `./.well-known/security.txt` is. The Pages deploy itself runs only after a merge to `main` and has
 not run.
 
+*Note, 2026-10-27 (journal 0207):* PR 152 was merged as `26ca8a3`; the Pages deploy of that commit
+succeeded, and `https://studiomoob.github.io/llmoobfs/.well-known/security.txt` answered HTTP 200,
+`text/plain; charset=utf-8`, with the file as committed.
+
 ## Limits and next step
 
 - Nothing was run in a VM; no kernel or UAPI code changed.

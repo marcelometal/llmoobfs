@@ -18,6 +18,9 @@ classifiers = [
     "Topic :: System :: Filesystems",
 ]
 
+[project.optional-dependencies]
+langgraph = ["langgraph>=1.2"]
+
 [project.urls]
 Source = "https://github.com/studiomoob/llmoobfs"
 

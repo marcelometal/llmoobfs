@@ -56,7 +56,8 @@ def usable_info(info):
 class Domain:
     """A domain directory. backend is "auto" (kernel when served, else scan), "kernel" (never
     scan) or "scan" (never ask the kernel). With on_refusal="scan", a QueryRefused from the
-    kernel is answered by the scan instead of raised. last_backend says which one answered."""
+    kernel is answered by the scan instead of raised. last_backend says which one answered;
+    stats counts the QUERY2 and QUERY2_BATCH calls ("query2_calls") and the walks ("scans")."""
 
     def __init__(self, path, backend="auto", on_refusal="raise"):
         if backend not in BACKENDS:
@@ -66,6 +67,7 @@ class Domain:
         self.path = os.path.abspath(path)
         self.backend, self.on_refusal = backend, on_refusal
         self.last_backend = None
+        self.stats = {"query2_calls": 0, "scans": 0}
         self.mounted = layer_mounted(self.path) if backend != "scan" else False
 
     def _kernel(self, call):
@@ -75,34 +77,36 @@ class Domain:
         finally:
             os.close(fd)
 
+    def _scan(self, scan_call):
+        self.last_backend = "scan"
+        self.stats["scans"] += 1
+        return scan_call()
+
     def _answer(self, kernel_call, scan_call):
         if self.backend == "scan" or (self.backend == "auto" and not self.mounted):
-            self.last_backend = "scan"
-            return scan_call()
+            return self._scan(scan_call)
         try:
             out = self._kernel(kernel_call)
         except q.KernelUnavailable:
             if self.backend == "kernel":
                 raise
-            self.last_backend = "scan"
-            return scan_call()
+            return self._scan(scan_call)
         except q.QueryRefused:
             if self.on_refusal != "scan":
                 raise
-            self.last_backend = "scan"
-            return scan_call()
+            return self._scan(scan_call)
         self.last_backend = "kernel"
         return out
 
     def query(self, *terms, order=None):
         """Every answer of the terms (all must hold), as a list of Match. Without order the
         order is unspecified."""
-        return self._answer(lambda fd: q.kernel_query(fd, terms, order),
+        return self._answer(lambda fd: q.kernel_query(fd, terms, order, stats=self.stats),
                             lambda: scan.scan_query(self.path, terms, order))
 
     def batch(self, requests):
         """Answers of up to 8 (terms, order) requests, one list each: "in a set" is one request
         per value, and the union is the caller's (contract section 6)."""
         requests = [(tuple(t), o) for t, o in requests]
-        return self._answer(lambda fd: q.kernel_batch(fd, requests),
+        return self._answer(lambda fd: q.kernel_batch(fd, requests, stats=self.stats),
                             lambda: scan.scan_batch(self.path, requests))

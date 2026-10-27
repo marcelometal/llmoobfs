@@ -40,14 +40,18 @@ def _rename_noreplace(src, dst):
         raise OSError(e, os.strerror(e), dst)
 
 
-def publish(directory, name, data, attrs=None, *, domain=None, mode=None, replace=False):
+def publish(directory, name, data, attrs=None, *, domain=None, mode=None, replace=False,
+            _step=None):
     """Write data (bytes) under directory/name with the typed attributes attrs ({name: value}).
 
     domain is the domain directory whose rule the file must meet (default: directory). mode
     overrides file_mode_for(domain's mode). An existing name is refused (FileExistsError) unless
     replace is true, in which case it is replaced in one rename. Every attribute is checked
-    before anything is written. Returns the final path.
+    before anything is written. Returns the final path. _step, for tests only, is called with
+    the name of each completed step ("content", "attributes", "file_fsync", "rename",
+    "dir_fsync"); an exception it raises before "rename" leaves the final name as it was.
     """
+    step = _step or (lambda _name: None)
     if "/" in name or name in ("", ".", ".."):
         raise ValueError(f"invalid file name {name!r}")
     typed = []
@@ -69,10 +73,13 @@ def publish(directory, name, data, attrs=None, *, domain=None, mode=None, replac
         view = memoryview(data)
         while view:
             view = view[os.write(fd, view):]
+        step("content")
         for k, raw in typed:
             os.setxattr(fd, "user.moob." + k, raw)
+        step("attributes")
         _identity(fd, fmode, dom)
         os.fsync(fd)
+        step("file_fsync")
     except BaseException:
         os.close(fd)
         _unlink_quiet(tmp)
@@ -86,11 +93,13 @@ def publish(directory, name, data, attrs=None, *, domain=None, mode=None, replac
     except BaseException:
         _unlink_quiet(tmp)
         raise
+    step("rename")
     dfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(dfd)
     finally:
         os.close(dfd)
+    step("dir_fsync")
     return final
 
 
