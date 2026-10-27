@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Harness hygiene (journal 0211): the manual KCSAN and arm64 KASAN runs refuse a `steps` input
+  that is not a list of suite step names, since it is quoted inside the guest's command line;
+  `make uninstall` removes each installed path as one word, so a `PREFIX` or `DESTDIR` with a
+  space no longer removes other files; the syzkaller image is mounted with `nosymfollow` while
+  root writes into it.
+
 - Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
   touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
   the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs
