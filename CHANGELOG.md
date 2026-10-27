@@ -10,6 +10,13 @@
   security-update pull requests enabled for this repository. Nothing changed at
   organization level.
 
+- Debian 6.12.113 supported (issue 142, journal 0206): fstests `quick` with the exclusion list
+  passed on ext4, btrfs and XFS (631 tests each, 0 failures, no kernel diagnostic) with that
+  kernel booted in the guest by the new `MOOB_KVER` of `vm/fstests-local.sh`.
+  `scripts/supported-kernels` lists it, so `make install` accepts a fresh Debian 13 install
+  from the 2026-10-21 cloud image as it is; `make install-test` now installs on the image's own
+  kernel and checks the refusal with an unlisted release.
+
 - Python client library, phase 1 (roadmap C5, ADR-0023, journal 0204): package `moobfs` in
   `python/`, LGPL-2.1-or-later, standard library only, installable with `pip`, not on PyPI.
   Typed attributes with the layer's validation, publishing by the contract's write sequence

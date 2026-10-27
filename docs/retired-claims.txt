@@ -161,3 +161,5 @@ a stable UAPI, a CLI,
 UAPI estável, CLI,
 no library yet
 ainda sem biblioteca
+The kernel version is the first obstacle
+6.12.113 remains unsupported
