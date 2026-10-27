@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Debian 6.12.113 supported (issue 142, journal 0205): fstests `quick` with the exclusion list
+- Debian 6.12.113 supported (issue 142, journal 0206): fstests `quick` with the exclusion list
   passed on ext4, btrfs and XFS (631 tests each, 0 failures, no kernel diagnostic) with that
   kernel booted in the guest by the new `MOOB_KVER` of `vm/fstests-local.sh`.
   `scripts/supported-kernels` lists it, so `make install` accepts a fresh Debian 13 install

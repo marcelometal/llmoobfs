@@ -23,7 +23,7 @@ users their directories, and removes it again. To try MoobFS without installing 
 | Secure Boot off, or your own MOK to sign the module | The module is not signed; with Secure Boot on, the kernel refuses to load it. |
 
 **Check the kernel first.** A Debian 13 system installed from the 2026-10-21 cloud image runs
-`6.12.113+deb13-amd64`, which is supported (journal 0205); nothing to change:
+`6.12.113+deb13-amd64`, which is supported (journal 0206); nothing to change:
 
 ```sh
 uname -r                                   # 6.12.113+deb13-amd64 or 6.12.111+deb13-amd64
@@ -232,7 +232,7 @@ bob; attribute kept across a reboot; uninstalled with the lower still readable. 
 on real hardware, with Secure Boot on, with btrfs or XFS as the lower, or on any distribution
 other than Debian 13.
 
-*Update, 2026-10-27 ([journal 0205](history/0205-debian-6-12-113-supported.md)):* with 6.12.113
+*Update, 2026-10-27 ([journal 0206](history/0206-debian-6-12-113-supported.md)):* with 6.12.113
 supported, `make install-test` installs on the image's own kernel. It passed again
 (`MOOBFS_INSTALL_PASS`, 397 s under KVM on the dedicated host): `make install` refused an unlisted
 release given through `KVER`, then installed on 6.12.113 without any kernel switch, and every

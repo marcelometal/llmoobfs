@@ -43,9 +43,9 @@ Both Debian kernel image/header pairs are pinned (6.12.111-1 and 6.12.113-1). Th
 6.12.111 default and its required-check name; `Native Linux VM (Debian 6.12.113)`
 runs the same target on every pull request; it first passed in PR 148.
 fstests `quick` with the exclusion list passed on 6.12.113 for ext4, btrfs
-and XFS on the dedicated host (journal 0205), so 6.12.113 is supported and
+and XFS on the dedicated host (journal 0206), so 6.12.113 is supported and
 listed in `scripts/supported-kernels` ([compatibility.md](compatibility.md) §1,
-rule 3; journals 0203 and 0205).
+rule 3; journals 0203 and 0206).
 
 The Debian base digest and kernel packages are pinned, but auxiliary apt packages
 are not fully locked: this is not a claim of bit-for-bit toolchain

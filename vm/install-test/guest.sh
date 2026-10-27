@@ -8,7 +8,7 @@
 set -eu
 cd /home/tester
 SRC=/home/tester/llmoobfs
-KVER=6.12.113+deb13-amd64   # the kernel of the 2026-10-21 cloud image, listed since journal 0205
+KVER=6.12.113+deb13-amd64   # the kernel of the 2026-10-21 cloud image, listed since journal 0206
 mark() { echo "$*"; }
 fail() { echo "MOOBFS_INSTALL_FAIL: $*"; exit 1; }
 as() { u=$1; shift; runuser -u "$u" -- "$@"; }   # sudo -u in the guide; runuser needs no tty

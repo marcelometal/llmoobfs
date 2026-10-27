@@ -346,7 +346,7 @@ Kernel matrix (what was actually run):
 | Kernel | Functional suite (`make vm-test`) | KASAN/UBSAN/lockdep | Status |
 | --- | --- | --- | --- |
 | Debian 6.12.111+deb13-amd64 | yes, in QEMU TCG | no (distro kernel without these detectors) | EXISTS |
-| Debian 6.12.113+deb13-amd64 | yes, in QEMU TCG (since journal 0203) | no (distro kernel without these detectors) | EXISTS, supported since journal 0205 |
+| Debian 6.12.113+deb13-amd64 | yes, in QEMU TCG (since journal 0203) | no (distro kernel without these detectors) | EXISTS, supported since journal 0206 |
 | Upstream 6.12.112 (virtme-ng, `vm/kasan.config`) | full `vm/suite.sh` | yes | EXISTS; for the branch `m3/3b-query-authz`, journal 0020 lists KASAN as pending |
 | Any other kernel, series or architecture (6.1/6.6 LTS, 6.13+, ARM64, other distro 6.12.x) | no | no | not supported; requires a port and the full suite plus KASAN |
 | macOS / Windows | — | — | only the portable M1 tools compile; the module is Linux |

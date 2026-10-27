@@ -17,7 +17,7 @@ the layer in a virtme-ng guest of the host's running kernel, so that a crash sta
    then any arguments of `./check`). Console in `build/fstests/console-ext4.log`, fstests' own
    results in `build/fstests/tree/results/`. `MOOB_KVER=<release>` boots another installed
    kernel in the guest (image in `/boot`, modules and headers under `/lib/modules`) instead of
-   the running one, and the layer is built against its headers (journal 0205).
+   the running one, and the layer is built against its headers (journal 0206).
 
 `moobfs_layer.patch` is the whole port: fstests learns the type in the eight places where it
 already handles filesystems without a block device (virtiofs, 9p). The "devices" are two names,
@@ -106,7 +106,7 @@ guest:
 
 "Passed all 631 tests" on each, no kernel diagnostic.
 
-## Debian 6.12.113 (issue 142, journal 0205)
+## Debian 6.12.113 (issue 142, journal 0206)
 
 The run with the exclusion list, repeated on Debian kernel `6.12.113+deb13-amd64` booted by
 `MOOB_KVER` in the guest on the dedicated host (the host itself runs 6.12.111), module built from
