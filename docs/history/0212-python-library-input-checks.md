@@ -1,4 +1,4 @@
-# 0212: Python library: checked terms, int64 range, no helper processes, scan on the directory
+# 0212 — Python library: checked terms, int64 range, no helper processes, scan on the directory
 
 Date: 2026-10-27. Status: done on `marcelometal/pylib-hardening`. Work started: 2026-10-27
 about 15:35 America/Sao_Paulo; ended about 15:39. Calendar time, not an effort measurement.
@@ -51,6 +51,16 @@ Python 3.14.10 on Debian forky, `TMPDIR` on a filesystem with user extended attr
 Not run as root, so `test_group_domain_and_other_caller` was skipped; not run against a mounted
 layer. `ctypes.CDLL(None)` needs a Python linked dynamically against its C library, as every
 Linux distribution builds it.
+
+## Merge note (2026-10-27, maintainer)
+
+`_fill()` now also refuses a payload longer than the request's 1024-byte field right before
+the copy. `Term` checks its value when it is built, but that check holds only while
+`STRING_MAX` equals `VALUE_MAX` and while nobody replaces `term.value.payload` afterwards; the
+bound at the copy keeps the field safe in both cases. New unit test
+`test_fill_bounds_a_payload_replaced_after_the_term`: 32 tests OK (17 skipped, macOS, Python
+3.14); with the `query.py` of this branch before the change it fails with `ValueError not
+raised`. The index line and the title now use the repository's `0212 —` form.
 
 ## Next step
 

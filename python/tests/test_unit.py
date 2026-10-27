@@ -76,6 +76,13 @@ class Terms(unittest.TestCase):
                 Term("a", "==", v)
         self.assertEqual(Term("a", "==", Value(u.T_INT64, bytes(8))).value, Value.of(0))
 
+    def test_fill_bounds_a_payload_replaced_after_the_term(self):
+        from moobfs.query import _fill
+        t = Term("a", "==", "x")
+        t.value.payload = b"a" * (u.VALUE_MAX + 1)
+        with self.assertRaises(ValueError):
+            _fill(u.Query2(), [t], None, 1, 0)
+
     def test_int64_range(self):
         self.assertEqual(Value.of(2**63 - 1).python(), 2**63 - 1)
         self.assertEqual(Value.of(-2**63).python(), -2**63)

@@ -124,6 +124,9 @@ def _fill(q, terms, order, limit, results):
         c.name, c.op = t.name.encode(), OPS[t.op]
         c.flags = u.TERM_MISSING_OK if t.missing_ok else 0
         if t.value is not None:
+            # Term checked the value, but its payload can be replaced afterwards
+            if len(t.value.payload) > u.VALUE_MAX:
+                raise ValueError(f"term {t.name!r}: value longer than {u.VALUE_MAX} bytes")
             c.type, c.len = t.value.type, len(t.value.payload)
             ctypes.memmove(c.value, t.value.payload, len(t.value.payload))
     if order is not None:
