@@ -57,6 +57,15 @@ The workflows were not run: the change only adds a check before the existing com
 syzkaller script was tested on synthetic images, not on the image syzkaller's
 `create-image.sh` builds.
 
+## Merge note (2026-10-27, maintainer)
+
+At merge the filter's range `a-z` became the explicit list `abcdefghijklmnopqrstuvwxyz`: a
+range depends on the locale's collation, and on macOS bash `Ext4` passed it. A class such as
+`[:lower:]` would let `é` through in a UTF-8 locale. With the list, `ext4` and `buildrace
+release` pass and `Ext4`, `ext4é`, `a-b`, `ext4' ;id #` and `ext4$(id)` are refused under
+`LC_ALL=C`, `en_US.UTF-8` and `pt_BR.UTF-8` (bash 5 on macOS). The index line and the title
+now use the repository's `0211 —` form. The workflows were again linted only, not run.
+
 ## Next step
 
 Review and merge.
