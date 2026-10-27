@@ -35,11 +35,11 @@ jobs:
           if [ "$EVENT" != pull_request ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           if git diff --name-only "$BASE_SHA" HEAD |
-             grep -qE '^(layer|vm|include|common|tests|sqlite|tools|bench|python)/|^Makefile$|^\.github/workflows/kasan\.yml$'; then
+             grep -qE '^(layer|vm|include|common|tests|sqlite|tools)/|^Makefile$|^\.github/workflows/kasan\.yml$'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Nothing under layer/, vm/, include/, common/, tests/, sqlite/, tools/, bench/, python/, the Makefile or this workflow changed: the suite was not run." >> "$GITHUB_STEP_SUMMARY"
+            echo "Nothing under layer/, vm/, include/, common/, tests/, sqlite/, tools/, the Makefile or this workflow changed: the suite was not run." >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Install build and guest dependencies
         if: steps.need.outputs.run == 'true'
@@ -63,8 +63,26 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -la /dev/kvm
           if [ -w /dev/kvm ]; then echo "KVM usable"; else echo "no KVM: QEMU will use TCG"; fi
-      - name: Fetch and verify the kernel source
+      # The KASAN kernel is the same pinned source and config on every run, and building it took
+      # about 16 of the job's 45 minutes. It is cached under a key of version, config, virtme-ng
+      # pins, compiler and runner image. A pull request reads only caches saved on main (the
+      # weekly or a manual run) or on its own branch, so one pull request cannot plant a kernel
+      # another one uses (journal 0209).
+      - name: Key of the built kernel
         if: steps.need.outputs.run == 'true'
+        id: kkey
+        env:
+          CONFIG_HASH: ${{ hashFiles('vm/kasan.config', 'vm/kasan-requirements.txt') }}
+        run: echo "key=kasan-kernel-${KERNEL_VERSION}-gcc$(gcc -dumpfullversion)-${ImageOS}-${ImageVersion}-${CONFIG_HASH}" >> "$GITHUB_OUTPUT"
+      - name: Restore the built kernel
+        if: steps.need.outputs.run == 'true'
+        id: kcache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/linux
+          key: ${{ steps.kkey.outputs.key }}
+      - name: Fetch and verify the kernel source
+        if: steps.need.outputs.run == 'true' && steps.kcache.outputs.cache-hit != 'true'
         run: |
           mkdir -p build
           curl -fsSL -o build/linux.tar.xz "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz"
@@ -72,7 +90,7 @@ jobs:
           mkdir -p build/linux
           tar -xJf build/linux.tar.xz -C build/linux --strip-components=1
       - name: Configure and build the kernel with KASAN and lockdep
-        if: steps.need.outputs.run == 'true'
+        if: steps.need.outputs.run == 'true' && steps.kcache.outputs.cache-hit != 'true'
         run: |
           cd build/linux
           vng --kconfig --config ../../vm/kasan.config

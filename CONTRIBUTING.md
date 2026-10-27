@@ -133,7 +133,7 @@ AI-assisted:
 | Anything | `make test` on the host; CI green (`Tools and sanitizers`, `Lint`). |
 | `tools/`, `common/`, `include/`, `tests/` | `make test` with ASan/UBSan (see `docs/testing.md`), `make fuzz` when the attribute encoding is involved, and `make vm-test`. |
 | `layer/`, `kernel/`, `vm/` | `make vm-test` green locally with the log path in the PR; a new or extended test in `vm/suite.sh` or `tests/` for every behaviour change, including invalid inputs for parsers and ioctls. |
-| `layer/`, `vm/`, `include/`, `common/`, `tests/`, `Makefile` | The KASAN/lockdep workflow (`.github/workflows/kasan.yml`) is a required check of `main`. It runs the suite when the pull request touches these paths, passes at once otherwise, and must finish with `MOOBFS_KASAN_PASS` and no `BUG`, `WARNING`, lockdep or UBSAN report. |
+| `layer/`, `vm/`, `include/`, `common/`, `tests/`, `sqlite/`, `tools/`, `Makefile` | The KASAN/lockdep workflow (`.github/workflows/kasan.yml`) is a required check of `main`. It runs the suite when the pull request touches these paths, passes at once otherwise, and must finish with `MOOBFS_KASAN_PASS` and no `BUG`, `WARNING`, lockdep or UBSAN report. |
 | `docs/`, `site/` | `python3 scripts/check-site.py` for the site; link check for docs. No fabricated kernel runs. |
 
 "Tested" means executed, with a log you can point to. Compiling on macOS tests

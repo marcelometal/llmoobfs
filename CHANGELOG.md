@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
+  touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
+  the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs
+  only for kernel-side paths and caches the built kernel.
+
 - Python client library, phase 2 (roadmap C5 done, journal 0207): `moobfs.langgraph.MoobStore`,
   a LangGraph store on the library with the files of the G1 adapter (either reads the other's).
   `bench/client/g1_mounted.py --store package` runs G1's mounted gate on it; it passed three
