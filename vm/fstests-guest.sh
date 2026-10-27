@@ -44,6 +44,7 @@ export MOUNT_OPTIONS="-o lower=$B/base-scratch,domain_depth=0"
 CFG
 mount -t moobfs_layer -o "lower=$B/base-test,domain_depth=0" moobtest $B/test || fail "mount layer"
 dmesg -C 2>/dev/null || true
+echo "MOOBFS_FSTESTS_KERNEL: $(uname -r)"
 cd "$FST" || fail "cd fstests"
 # shellcheck disable=SC2086  # ARGS is a list of ./check arguments
 ./check $ARGS

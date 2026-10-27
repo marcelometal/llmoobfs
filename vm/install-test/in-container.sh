@@ -114,6 +114,6 @@ for p in $PHASES; do
 done
 log "ELAPSED: $(($(date +%s) - START)) s under $ACCEL_NAME"
 case $NAME in
-INSTALL) log "MOOBFS_INSTALL_PASS: docs/operations.md followed on Debian 13; refused 6.12.113, installed on 6.12.111, mounted by hand, by fstab at boot and by a mount unit, two users isolated, uninstalled with the lower readable" ;;
+INSTALL) log "MOOBFS_INSTALL_PASS: docs/operations.md followed on Debian 13; refused an unlisted kernel release, installed on the image's 6.12.113, mounted by hand, by fstab at boot and by a mount unit, two users isolated, uninstalled with the lower readable" ;;
 CONTAINER) log "MOOBFS_CONTAINER_PASS: docs/container-integration.md followed on Debian 13 with Docker and Podman" ;;
 esac

@@ -2,46 +2,38 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Runs as root inside the disposable Debian 13 guest of vm/install-test/. Each phase follows
 # docs/operations.md with the same commands, in the same order, and prints markers.
-#   phase 0: stock kernel; install refused; switch to the listed kernel (reboot follows)
-#   phase 1: listed kernel; install, load, mount, users, fstab (reboot follows)
+#   phase 0: the image's stock kernel is listed; an unlisted release is refused (reboot follows)
+#   phase 1: stock kernel; install, load, mount, users, fstab (reboot follows)
 #   phase 2: mounted at boot; mount unit; uninstall; lower still readable
 set -eu
 cd /home/tester
 SRC=/home/tester/llmoobfs
-KVER=6.12.111+deb13-amd64
+KVER=6.12.113+deb13-amd64   # the kernel of the 2026-10-21 cloud image, listed since journal 0206
 mark() { echo "$*"; }
 fail() { echo "MOOBFS_INSTALL_FAIL: $*"; exit 1; }
 as() { u=$1; shift; runuser -u "$u" -- "$@"; }   # sudo -u in the guide; runuser needs no tty
 
 phase0() {
 	mark "STOCK_KERNEL: $(uname -r)"
+	[ "$(uname -r)" = "$KVER" ] || fail "the image booted $(uname -r), not $KVER"
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -q >/dev/null
-	# section 2, packages (headers for the stock kernel, as a user would first try)
+	# section 2, packages (headers for the running kernel)
 	apt-get install -y -q build-essential git attr acl "linux-headers-$(uname -r)" >/dev/null
 	mkdir -p "$SRC" && tar -xf src.tar -C "$SRC" && chown -R tester:tester "$SRC"
 	cd "$SRC"
-	if make install >install-stock.log 2>&1; then
-		fail "make install accepted the unlisted kernel $(uname -r)"
+	# section 1: the running kernel must be listed; a release outside the list is refused
+	grep -qx "$KVER" scripts/supported-kernels || fail "$KVER is not in scripts/supported-kernels"
+	if KVER=6.12.999+deb13-amd64 make install >install-unlisted.log 2>&1; then
+		fail "make install accepted an unlisted kernel release"
 	fi
-	grep -q 'is not supported' install-stock.log || fail "refusal without the expected message"
-	mark "UNSUPPORTED_REFUSED: $(uname -r)"
-	# informational only: does it even compile there? Staged, never loaded.
-	if MOOB_ALLOW_UNSUPPORTED=1 DESTDIR=/tmp/stage make install >install-forced.log 2>&1; then
-		mark "UNSUPPORTED_STAGED_BUILD: compiled on $(uname -r), not loaded, not tested"
-	else
-		mark "UNSUPPORTED_STAGED_BUILD_FAILED: $(tail -n 3 install-forced.log | tr '\n' ' ')"
-	fi
-	make -s clean -C "/lib/modules/$(uname -r)/build" M="$SRC/layer" >/dev/null 2>&1 || true
-	# section 1, switch to the listed kernel
-	apt-get install -y -q "linux-image-$KVER=6.12.111-1" "linux-headers-$KVER=6.12.111-1" >/dev/null
-	sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Debian GNU\/Linux>Debian GNU\/Linux, with Linux 6.12.111+deb13-amd64"/' /etc/default/grub
-	update-grub >/dev/null 2>&1
+	grep -q 'is not supported' install-unlisted.log || fail "refusal without the expected message"
+	mark "UNSUPPORTED_REFUSED: 6.12.999+deb13-amd64 (KVER override)"
 	mark "PHASE_DONE: 0"
 }
 
 phase1() {
-	[ "$(uname -r)" = "$KVER" ] || fail "booted $(uname -r), not $KVER (GRUB_DEFAULT did not take)"
+	[ "$(uname -r)" = "$KVER" ] || fail "booted $(uname -r), not $KVER"
 	mark "LISTED_KERNEL: $(uname -r)"
 	cd "$SRC"
 	make install >install.log 2>&1 || { tail -n 20 install.log; fail "make install"; }

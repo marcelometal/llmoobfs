@@ -10,19 +10,23 @@
 # FSTESTS_SRC is a built checkout of xfstests-dev at the tag named in vm/fstests/README.md;
 # LOWERFS is ext4 (default), btrfs or xfs; the check arguments default to "-g quick".
 # Run from the repository root as a user in the kvm group, with vng in PATH and the headers of
-# the running kernel installed. The console goes to build/fstests/console-LOWERFS.log and the
-# results stay in build/fstests/tree/results. Exit status 0 when ./check ran to the end, whatever
-# the tests said: the verdict per test is vm/fstests/README.md's business.
+# the running kernel installed. MOOB_KVER names another installed kernel (image in /boot,
+# modules and headers under /lib/modules) to boot in the guest instead. The console goes to
+# build/fstests/console-LOWERFS.log and the results stay in build/fstests/tree/results. Exit
+# status 0 when ./check ran to the end, whatever the tests said: the verdict per test is
+# vm/fstests/README.md's business.
 set -eu
 PATH=$PATH:/usr/sbin:/sbin
 SRC=$1; LOWERFS=${2:-ext4}
 if [ $# -ge 2 ]; then shift 2; else shift 1; fi
 ARGS=${*:--g quick}
+KVER=${MOOB_KVER:-$(uname -r)}
 R=$(pwd)
 [ -f vm/fstests-guest.sh ] || { echo "fstests-local: run from the repository root" >&2; exit 1; }
 [ -x "$SRC/check" ] && [ -x "$SRC/ltp/fsstress" ] || { echo "fstests-local: $SRC is not a built fstests tree" >&2; exit 1; }
 command -v vng >/dev/null || { echo "fstests-local: vng (virtme-ng) not in PATH" >&2; exit 1; }
-make layer KDIR="/lib/modules/$(uname -r)/build" > build.fstests-layer.log 2>&1 || { tail -20 build.fstests-layer.log; exit 1; }
+[ -f "/boot/vmlinuz-$KVER" ] && [ -d "/lib/modules/$KVER/build" ] || { echo "fstests-local: kernel $KVER is not installed with its headers" >&2; exit 1; }
+make layer KDIR="/lib/modules/$KVER/build" > build.fstests-layer.log 2>&1 || { tail -20 build.fstests-layer.log; exit 1; }
 mkdir -p build/fstests
 rm -rf build/fstests/tree
 cp -a "$SRC" build/fstests/tree
@@ -38,7 +42,9 @@ for d in base-test base-scratch; do
     esac
 done
 printf 'R=%s\nFST=%s\nLOWERFS=%s\nARGS="%s"\n' "$R" "$R/build/fstests/tree" "$LOWERFS" "$ARGS" > build/fstests/env.sh
-vng -r --user root --cpus 4 --memory 4G --verbose \
+if [ "$KVER" = "$(uname -r)" ]; then KIMG=; else KIMG=/boot/vmlinuz-$KVER; fi
+# shellcheck disable=SC2086  # an empty KIMG boots the running kernel
+vng -r $KIMG --user root --cpus 4 --memory 4G --verbose \
     --rwdir "$R/build" --overlay-rwdir /etc --overlay-rwdir /home --overlay-rwdir /var/tmp \
     --disk "$R/build/fstests/base-test.img" --disk "$R/build/fstests/base-scratch.img" \
     --exec "sh $R/vm/fstests-guest.sh" > "build/fstests/console-$LOWERFS.log" 2>&1 || true
