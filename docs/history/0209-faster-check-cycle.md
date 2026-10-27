@@ -54,3 +54,7 @@ full runs per batch and in CI catch that before a merge.
 ## Next step
 
 Security batch 1: issues #113 and #118, under this cycle.
+
+*Note, 2026-10-27 (journal 0210):* PR 159's run built the kernel (12 minutes) and saved the
+cache entry, 1,306 MB, on its own ref; a manual run on `main` after the merge builds and saves the
+entry every pull request reads.

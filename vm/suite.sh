@@ -36,6 +36,7 @@
 #   bigdir              a domain built from a directory larger than one read batch (journal 0120)
 #   xattrread           a listed typed value that fails getxattr must fail a build or invalidate
 #                       a built domain; an attribute removed between list/get is skipped
+#   domainrecs          removed domain directories leave no record and no fallback mark (#113)
 #   pylib               the Python library's kernel and scan backends give equal answers (C5);
 #                       needs python3 in the guest, so it runs under KASAN and not in vm-test
 # A run with MOOB_ONLY ends in MOOBFS_ONLY_PASS, never in the two markers above, so it cannot
@@ -56,7 +57,7 @@ want() {
     return 1
 }
 for step in ${MOOB_ONLY:-}; do
-    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildwork|buildtime|buildmoved|stall|lowerro|bigdir|xattrread|pylib) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
+    case "$step" in ext4|btrfs|xfs|demo|clients|powerloss|ioerror|reserve|casefold|faults|buildrace|release|sqlext|permmatrix|permgaps|rootpath|overbudget|memcg|buildcost|buildcostlarge|builddenial|buildclient|buildcostevict|buildlimit|buildwork|buildtime|buildmoved|stall|lowerro|bigdir|xattrread|domainrecs|pylib) ;; *) fail "unknown MOOB_ONLY step $step" ;; esac
 done
 LOWER=${LOWER:-/lower}
 LAYER=${LAYER:-/mnt/layer}
@@ -1983,6 +1984,53 @@ echo 61 > "$knob" || fail "xr-arm-enodata"
 [ "$(cat "$knob")" = 0 ] || fail "xr-disarmed"
 umount "$LAYER" && umount "$LOWER" || fail "xr-unmount"
 echo "XATTRREAD_PASS: EIO/ENOMEM build errors, retry, adoption rebuild and ENODATA race"
+fi
+if want domainrecs; then
+# Issue #113 (journal 0210): a domain record and a fallback mark used to stay until unmount, so
+# creating, querying and removing domain directories in a loop grew the index outside its budget.
+# btrfs does not reuse inode numbers (one new record per directory before the fix); ext4 does, so
+# there a new directory takes over a removed one's record and must answer with its own files.
+# A QUERY2 or a chmod through a descriptor of a removed directory must not record it again.
+dr_param=/sys/module/moobfs_layer/parameters/domain_records
+[ -r "$dr_param" ] || fail "dr-no-counter (module without the domain_records test counter)"
+dr_fallback() { "$BIN/query" "$LAYER" info | sed -n 's/.*fallback_domains=\([0-9]*\).*/\1/p'; }
+for dr_fs in btrfs ext4; do
+    if [ "$dr_fs" = btrfs ]; then dr_dev=$DEV_BTRFS; else dr_dev=$DEV_EXT4; fi
+    mount -t "$dr_fs" "$dr_dev" "$LOWER" || fail "dr-lower-mount-$dr_fs"
+    rm -rf "$LOWER/dr" && mkdir -m 755 "$LOWER/dr" || fail "dr-mkdir-$dr_fs"
+    mount -t moobfs_layer -o lower="$LOWER/dr",domain_depth=1 none "$LAYER" || fail "dr-mount-$dr_fs"
+    dr_base=$(cat "$dr_param")
+    i=0
+    while [ $i -lt 200 ]; do
+        mkdir "$LAYER/d" && : > "$LAYER/d/f" || fail "dr-make-$dr_fs-$i"
+        "$BIN/moobfs-attr" set "$LAYER/d/f" kind string "v$i" || fail "dr-attr-$dr_fs-$i"
+        [ "$("$BIN/query" "$LAYER/d" q2 kind eq string "v$i" | cut -f2)" = f ] || fail "dr-answer-$dr_fs-$i"
+        rm "$LAYER/d/f" && rmdir "$LAYER/d" || fail "dr-remove-$dr_fs-$i"
+        i=$((i + 1))
+    done
+    dr_after=$(cat "$dr_param")
+    [ $((dr_after - dr_base)) -le 1 ] || fail "dr-records-$dr_fs: $dr_base before, $dr_after after 200 domains"
+    dr_fb0=$(dr_fallback)
+    i=0
+    while [ $i -lt 50 ]; do
+        mkdir "$LAYER/c" && chmod 750 "$LAYER/c" && rmdir "$LAYER/c" || fail "dr-chmod-$dr_fs-$i"
+        i=$((i + 1))
+    done
+    [ "$(dr_fallback)" = "$dr_fb0" ] || fail "dr-fallback-$dr_fs: $dr_fb0 before, $(dr_fallback) after 50 domains"
+    mkdir "$LAYER/z" && : > "$LAYER/z/f" && "$BIN/moobfs-attr" set "$LAYER/z/f" kind string z || fail "dr-dead-make-$dr_fs"
+    exec 3<"$LAYER/z"
+    rm "$LAYER/z/f" && rmdir "$LAYER/z" || fail "dr-dead-remove-$dr_fs"
+    dr_mid=$(cat "$dr_param")
+    [ "$("$BIN/query" /proc/self/fd/3 q2errno kind eq string z)" = "q2 2" ] || fail "dr-dead-query-$dr_fs (want ENOENT)"
+    chmod 700 /proc/self/fd/3 2>/dev/null
+    exec 3<&-
+    [ "$(cat "$dr_param")" -le "$dr_mid" ] || fail "dr-dead-record-$dr_fs"
+    dr_fb1=$(dr_fallback)
+    [ "$dr_fb1" = "$dr_fb0" ] || fail "dr-dead-fallback-$dr_fs"
+    umount "$LAYER" && rm -rf "$LOWER/dr" && umount "$LOWER" || fail "dr-cleanup-$dr_fs"
+    echo "DOMAINRECS_$dr_fs: records $dr_base -> $dr_after after 200 domains; fallback marks $dr_fb0 -> $dr_fb1 after 50 and the removed directory"
+done
+echo "DOMAINRECS_PASS: removed domain directories leave no record and no fallback mark; a removed directory's descriptor gets ENOENT"
 fi
 if want pylib && ! command -v python3 > /dev/null 2>&1; then
     echo "PYLIB_SKIPPED: no python3 in this guest (the KASAN harness boots the host's root)"

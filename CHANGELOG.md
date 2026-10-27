@@ -8,6 +8,14 @@
   space no longer removes other files; the syzkaller image is mounted with `nosymfollow` while
   root writes into it.
 
+- Security batch 1 (journal 0210). Issue #113 fixed: a domain record and a fallback mark are
+  dropped when their directory is removed (reference-counted records freed with RCU, removal
+  with tried locks), and `QUERY2` or a chmod through a removed directory's descriptor records
+  nothing (`ENOENT` for the query). New suite step `domainrecs`; its regression test fails
+  without the fix (200 records after 200 domains on btrfs). Issue #118 closed: over a lower
+  slowed by `dm-delay` the build completes up to 200 ms per I/O and stops at the deadline with
+  `ETIMEDOUT` and no partial answer at 400 ms (`bench/client/issue118_slow_lower.py`).
+
 - Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
   touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
   the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs

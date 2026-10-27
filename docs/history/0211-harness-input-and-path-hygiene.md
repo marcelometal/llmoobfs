@@ -1,4 +1,4 @@
-# 0211: Harness hygiene: workflow steps input, uninstall paths, syzkaller image writes
+# 0211 — Harness hygiene: workflow steps input, uninstall paths, syzkaller image writes
 
 Date: 2026-10-27. Status: done on `marcelometal/ci-harness-hygiene`. Work started: 2026-10-27
 about 15:31 America/Sao_Paulo; ended about 15:35. Calendar time, not an effort measurement.
