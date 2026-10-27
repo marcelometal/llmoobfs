@@ -7,7 +7,8 @@
 set -eu
 IMG=$1; KO=$2
 MNT=$(mktemp -d)
-mount -o loop "$IMG" "$MNT"
+# Run as root on the host: a symbolic link inside the image must not send a write to the host.
+mount -o loop,nosymfollow "$IMG" "$MNT"
 trap 'umount "$MNT"; rmdir "$MNT"' EXIT
 mkdir -p "$MNT/moob"
 cp "$KO" "$MNT/moob/moobfs_layer.ko"

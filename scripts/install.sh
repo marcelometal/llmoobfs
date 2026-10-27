@@ -100,18 +100,24 @@ do_install() {
 	echo "moobfs install: done for kernel $KVER; next: docs/operations.md, Mount"
 }
 
+remove_installed() {   # remove_installed <path>
+	if [ -f "$1" ] && [ ! -L "$1" ]; then
+		rm -f "$1"
+		echo "removed $1"
+	elif [ -e "$1" ] || [ -L "$1" ]; then
+		echo "left $1: not a regular file, so install did not put it there" >&2
+	fi
+}
+
 do_uninstall() {
 	need_root
 	if [ -z "$DESTDIR" ] && grep -q '^moobfs_layer ' /proc/modules 2>/dev/null; then
 		die "moobfs_layer is loaded; unmount every moobfs_layer mount and run rmmod moobfs_layer first"
 	fi
-	for f in "$MODDIR/moobfs_layer.ko" $(for t in $TOOLS; do echo "$BINDIR/$t $MANDIR/$t.1"; done); do
-		if [ -f "$f" ] && [ ! -L "$f" ]; then
-			rm -f "$f"
-			echo "removed $f"
-		elif [ -e "$f" ] || [ -L "$f" ]; then
-			echo "left $f: not a regular file, so install did not put it there" >&2
-		fi
+	remove_installed "$MODDIR/moobfs_layer.ko"
+	for t in $TOOLS; do
+		remove_installed "$BINDIR/$t"
+		remove_installed "$MANDIR/$t.1"
 	done
 	rmdir "$MODDIR" 2>/dev/null || true
 	[ -n "$DESTDIR" ] || depmod -a "$KVER"

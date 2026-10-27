@@ -96,4 +96,17 @@ ln -s "$outside" "$BINDIR/moobfs-attr"
 [ -L "$BINDIR/moobfs-attr" ] && grep -q 'not a regular file' "$T/out" || fail "uninstall removed a link"
 outside_intact "uninstall"
 
+# a space in the staging root: every path stays one word, so nothing else is removed
+(
+	DESTDIR="$T/with space"
+	MODDIR=$DESTDIR/lib/modules/$KVER/updates/moobfs
+	BINDIR=$DESTDIR$PREFIX/bin
+	MANDIR=$DESTDIR$PREFIX/share/man/man1
+	mkdir -p "$BINDIR"
+	printf 'tool\n' >"$BINDIR/moobfs"
+	printf 'decoy\n' >"$T/with"
+	do_uninstall >/dev/null 2>&1 &&
+		[ ! -e "$BINDIR/moobfs" ] && [ "$(cat "$T/with")" = decoy ]
+) || fail "uninstall with a space in DESTDIR"
+
 echo "INSTALL_UNIT_PASS"
