@@ -15,7 +15,7 @@ There are three interfaces, each with its own version and its own rule.
 | Kernel | Functional suite | KASAN, UBSAN, lockdep | fstests `quick` |
 | --- | --- | --- | --- |
 | Debian 6.12.111+deb13-amd64 | yes, every pull request | no (distribution kernel) | yes, three lower filesystems, by hand |
-| Debian 6.12.113+deb13-amd64 | yes, every pull request (first passed in PR 148) | no (distribution kernel) | pending on ext4, btrfs and XFS; **unsupported** |
+| Debian 6.12.113+deb13-amd64 | yes, every pull request (first passed in PR 148) | no (distribution kernel) | yes, three lower filesystems, on the dedicated host (journal 0205) |
 | Upstream 6.12.112, `vm/kasan.config` | yes, every pull request that touches `layer/` or `vm/` | yes | no |
 | Anything else | no | no | no |
 
@@ -36,6 +36,9 @@ There are three interfaces, each with its own version and its own rule.
    *Note, 2026-10-26 (journal 0203):* the full suite passes on Debian 6.12.113 in CI (first in
    PR 148); the three fstests `quick` runs are still pending. It is not in
    `scripts/supported-kernels` and is not yet supported.
+   *Note, 2026-10-27 (journal 0205):* the three runs passed (631 tests each, 0 failures, with the
+   exclusion list), and 6.12.113 was added to `scripts/supported-kernels`. A fresh Debian 13
+   install from the 2026-10-21 cloud image is now accepted by `make install` as it is.
 4. Lower filesystems: ext4, btrfs and XFS, on a local block device. A network or FUSE filesystem
    as the lower is unsupported.
 5. Architecture: x86-64 only until another one runs the same two jobs.

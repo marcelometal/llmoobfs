@@ -17,22 +17,27 @@ users their directories, and removes it again. To try MoobFS without installing 
 
 | Requirement | Why |
 | --- | --- |
-| x86-64, Debian 13, kernel **`6.12.111+deb13-amd64`** exactly | The only distribution kernel the suite runs on ([compatibility.md](compatibility.md)). `make install` refuses any other kernel. |
+| x86-64, Debian 13, kernel **`6.12.113+deb13-amd64`** or **`6.12.111+deb13-amd64`** exactly | The distribution kernels the suite and fstests run on ([compatibility.md](compatibility.md)). `make install` refuses any other kernel. |
 | Root (`sudo`) | Loading a module and mounting need `CAP_SYS_ADMIN` in the initial user namespace. |
 | A directory on ext4, btrfs or XFS, on a local disk | The lower tree that holds the files. Network and FUSE filesystems are unsupported. |
 | Secure Boot off, or your own MOK to sign the module | The module is not signed; with Secure Boot on, the kernel refuses to load it. |
 
-**The kernel version is the first obstacle.** A Debian 13 system installed today runs a newer
-6.12 kernel (the 2026-10-21 cloud image ships `6.12.113+deb13-amd64`), which is outside the
-list. Until the list grows (docs/compatibility.md, rule 3), a test host has to run the listed
-kernel:
+**Check the kernel first.** A Debian 13 system installed from the 2026-10-21 cloud image runs
+`6.12.113+deb13-amd64`, which is supported (journal 0205); nothing to change:
 
 ```sh
-uname -r                                   # must print 6.12.111+deb13-amd64
-sudo apt install linux-image-6.12.111+deb13-amd64=6.12.111-1 \
-                 linux-headers-6.12.111+deb13-amd64=6.12.111-1
+uname -r                                   # 6.12.113+deb13-amd64 or 6.12.111+deb13-amd64
+```
+
+A system that has moved to a later 6.12 kernel through updates is outside the list. Until the
+list grows (docs/compatibility.md, rule 3), such a host has to boot a listed kernel, for
+instance:
+
+```sh
+sudo apt install linux-image-6.12.113+deb13-amd64=6.12.113-1 \
+                 linux-headers-6.12.113+deb13-amd64=6.12.113-1
 # make it the default boot entry, then reboot into it:
-sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Debian GNU\/Linux>Debian GNU\/Linux, with Linux 6.12.111+deb13-amd64"/' /etc/default/grub
+sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Debian GNU\/Linux>Debian GNU\/Linux, with Linux 6.12.113+deb13-amd64"/' /etc/default/grub
 sudo update-grub && sudo reboot
 ```
 
@@ -226,3 +231,9 @@ boot with the module loaded through its alias, and by the mount unit; alice's di
 bob; attribute kept across a reboot; uninstalled with the lower still readable. It was not run
 on real hardware, with Secure Boot on, with btrfs or XFS as the lower, or on any distribution
 other than Debian 13.
+
+*Update, 2026-10-27 ([journal 0205](history/0205-debian-6-12-113-supported.md)):* with 6.12.113
+supported, `make install-test` installs on the image's own kernel. It passed again
+(`MOOBFS_INSTALL_PASS`, 397 s under KVM on the dedicated host): `make install` refused an unlisted
+release given through `KVER`, then installed on 6.12.113 without any kernel switch, and every
+later step as above.

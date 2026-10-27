@@ -15,7 +15,9 @@ the layer in a virtme-ng guest of the host's running kernel, so that a crash sta
    https://git.kernel.org/pub/scm/fs/xfs/xfstests-dev.git ~/fstests && make -C ~/fstests -j8`
 3. From the repository root: `sh vm/fstests-local.sh ~/fstests ext4 -g quick` (lower filesystem,
    then any arguments of `./check`). Console in `build/fstests/console-ext4.log`, fstests' own
-   results in `build/fstests/tree/results/`.
+   results in `build/fstests/tree/results/`. `MOOB_KVER=<release>` boots another installed
+   kernel in the guest (image in `/boot`, modules and headers under `/lib/modules`) instead of
+   the running one, and the layer is built against its headers (journal 0205).
 
 `moobfs_layer.patch` is the whole port: fstests learns the type in the eight places where it
 already handles filesystems without a block device (virtiofs, 9p). The "devices" are two names,
@@ -103,3 +105,24 @@ guest:
 | failed | 0 | 0 | 0 |
 
 "Passed all 631 tests" on each, no kernel diagnostic.
+
+## Debian 6.12.113 (issue 142, journal 0205)
+
+The run with the exclusion list, repeated on Debian kernel `6.12.113+deb13-amd64` booted by
+`MOOB_KVER` in the guest on the dedicated host (the host itself runs 6.12.111), module built from
+`ca035c5` against that kernel's headers, fstests v2026.09.22, 2026-10-26:
+
+| | ext4 | btrfs | XFS |
+| --- | --- | --- | --- |
+| ran | 631 | 631 | 631 |
+| passed | 187 | 281 | 308 |
+| not run | 444 | 350 | 323 |
+| failed | 0 | 0 | 0 |
+| wall time, build included | 101 min | 120 min | 121 min |
+
+"Passed all 631 tests" on each, no kernel diagnostic; fstests' `check.log` records the guest's
+kernel. Per test: [`results-ext4-quick-6.12.113.txt`](results-ext4-quick-6.12.113.txt),
+[`results-btrfs-quick-6.12.113.txt`](results-btrfs-quick-6.12.113.txt),
+[`results-xfs-quick-6.12.113.txt`](results-xfs-quick-6.12.113.txt). Each lower passed one test
+more than the 6.12.111 run of journal 0091 and skipped one fewer; that run kept no per-test list,
+so the test is not identified.
