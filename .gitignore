@@ -8,3 +8,5 @@ Module.symvers
 modules.order
 .DS_Store
 __pycache__/
+/python/build/
+/python/src/*.egg-info/

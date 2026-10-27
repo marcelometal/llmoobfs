@@ -21,6 +21,8 @@ jobs:
       - run: make test
       - name: install.sh refuses existing entries without FORCE=1 (journal 0197)
         run: make install-unit
+      - name: Python library installed with pip in a clean venv, and its tests (roadmap C5)
+        run: make pylib-test
       - name: Address and undefined behavior sanitizers
         run: >-
           make test CC=clang BUILD=build/asan

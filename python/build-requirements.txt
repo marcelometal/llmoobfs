@@ -1,0 +1,4 @@
+# Build backend for `pip install --no-build-isolation ./python` (make pylib-test), pinned by
+# version and SHA-256 so that the install does not fetch an unpinned setuptools.
+setuptools==84.0.0 \
+    --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670

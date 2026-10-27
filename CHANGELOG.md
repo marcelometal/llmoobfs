@@ -10,6 +10,15 @@
   security-update pull requests enabled for this repository. Nothing changed at
   organization level.
 
+- Python client library, phase 1 (roadmap C5, ADR-0023, journal 0204): package `moobfs` in
+  `python/`, LGPL-2.1-or-later, standard library only, installable with `pip`, not on PyPI.
+  Typed attributes with the layer's validation, publishing by the contract's write sequence
+  (an existing name refused unless `replace=True`), and `Domain.query`/`batch` through `QUERY2`
+  or, without the module, a walk that applies the kernel's matching and homogeneity rules. In
+  the suite's new `pylib` step (KASAN job) the two backends gave equal answers for 400 random
+  requests and 60 batches on the dedicated host; `make pylib-test` runs in CI. The LangGraph
+  store and G1's gate move onto it in phase 2.
+
 - CI: every `github/codeql-action` step moves to v4.39.1 together (replaces
   Dependabot PRs 131 to 133, which bumped one step each and so failed CodeQL's
   same-version check). Dependabot now groups those actions in one PR.

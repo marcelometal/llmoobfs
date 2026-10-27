@@ -66,8 +66,8 @@ not run.
 - Nothing was run in a VM; no kernel or UAPI code changed.
 - The subscriptions to linux-cve-announce and the Debian tracker are the maintainer's action;
   the document lists the sources and does not claim they are watched.
-- Branch numbering: journal 0204 and references section 12 are taken by the C5 branch
-  (`claudiofp/C5-LIBRARY`), not yet merged; this batch uses 0205 and section 13.
+- Branch numbering: journal 0204 and references section 12 belong to C5 (PR 151, merged
+  2026-10-27 and merged into this branch); this batch uses 0205 and section 13.
 - `security.txt` expires on 2027-04-26; CI fails after that date until it is renewed.
 - After review the maintainer approved Dependabot security-update pull requests for this
   repository only; enabled the same day (`PUT repos/studiomoob/llmoobfs/automated-security-fixes`,

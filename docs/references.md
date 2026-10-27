@@ -477,6 +477,24 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 - SQLite FTS5 `bm25()` and reciprocal rank fusion are the entries of the
   algorithm-fit assessment above.
 
+## 12. Python client library (ADR-0023, journal 0204)
+
+- Python standard library: [`os` extended-attribute functions](https://docs.python.org/3/library/os.html#linux-extended-attributes)
+  (`setxattr`, `listxattr`, `getxattr`, since 3.3), [`fcntl.ioctl`](https://docs.python.org/3/library/fcntl.html#fcntl.ioctl)
+  and [`ctypes`](https://docs.python.org/3/library/ctypes.html). The UAPI mirror and the
+  attribute calls; no third-party package.
+- [PEP 621](https://peps.python.org/pep-0621/) (project metadata in `pyproject.toml`) and
+  [PEP 639](https://peps.python.org/pep-0639/) (SPDX licence expression), with
+  [setuptools](https://setuptools.pypa.io/) 84.0.0 as the build backend, pinned by hash in
+  `python/build-requirements.txt`.
+- [GNU Lesser General Public License, version 2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html),
+  the licence of `python/` (text from Debian's `common-licenses`).
+- `renameat2(2)` with `RENAME_NOREPLACE` (Linux 3.15, man-pages `rename(2)`): publishing
+  without replacing an existing name.
+- Considered, not used: [pyxattr](https://pypi.org/project/pyxattr/) and
+  [xattr](https://pypi.org/project/xattr/) (C extensions for what `os` now offers) and
+  [ctypeslib](https://github.com/trolldbois/ctypeslib) (ctypes generated from headers).
+
 ## 13. Security operations (journal 0205)
 
 - OSTIF, [Security Best Practices Guide](https://github.com/ostif-org/best-practices-guide),

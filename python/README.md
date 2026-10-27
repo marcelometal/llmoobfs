@@ -1,0 +1,28 @@
+# moobfs — Python client library
+
+Experimental, version 0.x (roadmap item C5, ADR-0023). LGPL-2.1-or-later; the rest of the
+repository is GPL-2.0-only.
+
+- **Typed attributes**: `set_attr`, `get_attrs`, `Value`, with the validation of the layer, so
+  what this library writes is what `QUERY2` indexes.
+- **Publishing**: `publish(directory, name, data, attrs)` follows the write sequence of the
+  [client contract](../docs/client-contract.md) section 6 and the homogeneity rule, and refuses
+  an existing name unless `replace=True`.
+- **Queries**: `Domain(path).query(Term("kind", "==", "note"), order=Order("t", "time", True))`
+  asks the kernel (`QUERY2`, every page followed) when the directory is on a mounted layer, and
+  otherwise walks the directory with the kernel's matching and homogeneity rules. Both give the
+  same answers (`python/tests/kernel_equal.py`). `Domain.batch` sends up to eight requests.
+  `QueryRefused` means a resource limit; `on_refusal="scan"` answers it from the walk instead.
+- **Detection**: `layer_mounted(path)`, `get_info(mount_root)`, `usable_info(info)`.
+
+```sh
+python3 -m venv venv && venv/bin/pip install ./python       # from the repository root
+make pylib-test                                             # the same, in build/, plus the tests
+```
+
+Python 3.9 or later, no dependency outside the standard library. Linux for anything that
+touches files; the encoding and matching code runs anywhere. Not on PyPI.
+
+Without the module the walk costs one `stat`, one `listxattr` and a `getxattr` per typed
+attribute of every file in the domain, for every query; `QUERY2` is the fast path. Full-text
+and vector search stay in the client (contract section 8).

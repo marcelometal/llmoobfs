@@ -159,3 +159,5 @@ não há contêineres sem root
 rootless containers, serverless, macOS and Windows are out
 a stable UAPI, a CLI,
 UAPI estável, CLI,
+no library yet
+ainda sem biblioteca

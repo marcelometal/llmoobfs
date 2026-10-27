@@ -65,7 +65,7 @@ then ([when-not-to-use.md](docs/when-not-to-use.md)).
 | Install it on a dedicated test host, mount it at boot, give users their directories | Debian 13 with kernel `6.12.111+deb13-amd64`, root, Secure Boot off | [docs/operations.md](docs/operations.md) |
 | Give each agent in a Docker or Podman container its own memory | A host mount; the container gets its domain directory under the owner's uid | [docs/container-integration.md](docs/container-integration.md) |
 | Query it from the shell or a script | The `moobfs` command, installed by the test-host guide: `moobfs query <domain> kind eq string decision` | [docs/tools.md](docs/tools.md#moobfs) |
-| Use it from your own program | Files, `setxattr` and one ioctl; no library yet | [client-contract.md](docs/client-contract.md) |
+| Use it from your own program | Files, `setxattr` and one ioctl, or the experimental Python library `moobfs` (`pip install ./python`), which falls back to the same answers without the module | [python/README.md](python/README.md), [client-contract.md](docs/client-contract.md) |
 
 ## Four numbers
 
