@@ -92,3 +92,8 @@ PR 138 passed all twelve reported checks on head `6621b21` and merged as
 records the pre-merge review state. The compatibility choice remains the
 32,768 default with a bounded operator opt-in; issue 118 remains open for
 real slow lower-device and large single-project evidence (journal 0193).
+
+*Note, 2026-10-27 (journal 0210):* issue 118 is closed. The two pieces of evidence it waited for
+were recorded: a lower slowed by `dm-delay` (the deadline returns `ETIMEDOUT` at 400 ms per I/O
+with no partial answer, and below that the build completes), and G5's domains of about 25,000
+real memories, built with `index_build_work=65536`. The default and range are unchanged.

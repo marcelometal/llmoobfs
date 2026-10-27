@@ -44,3 +44,9 @@ A opção de limite de trabalho por montagem entrou depois pela
 [PR 138](https://github.com/studiomoob/llmoobfs/pull/138), com as doze
 verificações aprovadas ([diário 0193](history/0193-merged-per-mount-build-work-policy.md));
 a issue 118 continua aberta para ampliar as evidências.
+*Atualização, 27/10/2026 ([diário 0210](history/0210-security-batch-1-domain-records-and-slow-lower.md)):*
+a issue 118 foi fechada. Com um disco inferior ext4 atrasado por `dm-delay`, o primeiro build de um
+domínio de 5.000 arquivos levou 0,3 s sem atraso e 9,8 s com 200 ms por E/S; com 400 ms parou no
+prazo com `ETIMEDOUT`, sem resposta parcial, e a consulta seguinte respondeu completa. Os domínios
+de cerca de 25 mil memórias reais do G5 se construíram com `index_build_work=65536`. A issue 113
+(registros de domínio mantidos até o umount) foi corrigida no mesmo lote.
