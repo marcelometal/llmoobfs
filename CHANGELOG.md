@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Tool output (journal 0213): `moobfs-check` escapes every string of its JSON document, not only
+  paths; an invalid attribute name or a directory name inside a `left_out` reason could forge
+  problem entries or break the document. `moobfs-index --uid` refuses a non-numeric uid and, as
+  root, drops supplementary groups (so does the test client `tests/query.c`). `moobfs query` and
+  the SQLite table refuse a result count above the request's limit and treat a path without its
+  terminator as unknown.
+
 - Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
   touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
   the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs
