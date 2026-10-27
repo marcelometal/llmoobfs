@@ -2,7 +2,7 @@
 
 Date: 2026-10-27. Status: done on a local branch; closes issues #113 and #118 once merged.
 Work started: 2026-10-27, afternoon (America/Sao_Paulo), when the maintainer set the order
-security, then consumable C6, then evolution G6. Ended: see the checks below. Wall-clock time,
+security, then consumable C6, then evolution G6. Ended: 2026-10-27 13:38. Wall-clock time,
 not an engineering-effort measurement. #113 estimated M; #118's evidence S. First batch under
 the check cycle of journal 0209.
 
@@ -85,7 +85,10 @@ All on the dedicated Debian host. KASAN runs used `vm/kasan-local.sh` with the c
   2,500 results. At 400 ms, `ETIMEDOUT` after 11.07 s with no result list; the second query answered
   all 2,500 in 8.46 s, and with the delay back at 0 in 0.04 s. `dmesg` showed only the expected
   `building the index of a domain failed (-110)`.
-- The full batch suite: recorded below once run.
+- The full batch suite, `sh vm/kasan-local.sh` with no `MOOB_ONLY`, 12:24 to 13:36: `MOOBFS_KASAN_PASS`
+  (no kernel diagnostic), with `MOOBFS_LAYER_PASS` (ext4, btrfs, XFS), `MOOBFS_ACCEPTANCE_PASS`,
+  `DOMAINRECS_PASS` and `MOOBFS_PYLIB_PASS`. It took about 70 minutes, more than the 30 estimated
+  for planning; the CI job's suite step took 23 minutes on PR 159.
 
 ## Errors found on the way
 
@@ -115,4 +118,8 @@ ceiling.
 
 ## Checks of this commit
 
-Recorded below once run.
+Completed 2026-10-27 at 13:38 America/Sao_Paulo. `make checkpatch` and `make layer W=1` reported
+nothing; `git diff --check`, `sh scripts/check-spdx.sh`, `sh scripts/check-retired-claims.sh`,
+`python3 scripts/check-site.py .`, `python3 scripts/site-faq.py --check` and `shellcheck` 0.9.0 on
+every `vm/*.sh` and `scripts/*.sh` are recorded in the pull request. `make vm-test` runs in the
+pull request's CI (Native Linux VM on 6.12.111 and 6.12.113).
