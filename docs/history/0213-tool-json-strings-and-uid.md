@@ -1,4 +1,4 @@
-# 0213: Every moobfs-check string escaped; --uid without root's groups
+# 0213 — Every moobfs-check string escaped; --uid without root's groups
 
 Date: 2026-10-27. Status: done on `marcelometal/check-json-escape`. Numbered 0213 because
 pull requests 160, 161 and 162 took 0210 to 0212 first. Work started: 2026-10-27
@@ -68,6 +68,11 @@ The tools still read attributes by path after `nftw()`: a writer who swaps a dir
 symbolic link between the walk and the read redirects the read when root runs the tools over a
 tree others write. That needs fd-relative reads or a documented restriction, and is left for a
 separate decision.
+
+## Merge note (2026-10-27, maintainer)
+
+The index line and the title now use the repository's `0213 —` form; nothing else changed at
+merge.
 
 ## Next step
 
