@@ -29,7 +29,8 @@ def _ext_acl(path):
     """ext_acl: an access ACL with more than the three minimal entries. An ACL that cannot be
     read counts as extended, as in the kernel."""
     try:
-        raw = os.getxattr(path, _ACL_ACCESS, follow_symlinks=False)
+        raw = (os.getxattr(path, _ACL_ACCESS) if isinstance(path, int)
+               else os.getxattr(path, _ACL_ACCESS, follow_symlinks=False))
     except OSError as err:
         if err.errno in (errno.ENODATA, errno.EOPNOTSUPP, errno.ENOTSUP):
             return False
@@ -60,12 +61,14 @@ def candidates(domain_dir):
     the domain that the kernel would index, with its indexed attributes."""
     domain_dir = os.path.abspath(domain_dir)
     fd = os.open(domain_dir, os.O_RDONLY | os.O_DIRECTORY)
-    os.close(fd)
+    try:
+        dom = os.fstat(fd)          # the directory QUERY2 would be issued on, not a link to it
+        dom_ext = _ext_acl(fd)
+    finally:
+        os.close(fd)
     effective = os.access in os.supports_effective_ids
     if not os.access(domain_dir, os.R_OK | os.X_OK, effective_ids=effective):
         raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), domain_dir)
-    dom = os.lstat(domain_dir)
-    dom_ext = _ext_acl(domain_dir)
     out = []
     stack = [""]
     while stack:

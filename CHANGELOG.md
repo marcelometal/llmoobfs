@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Python library input checks (journal 0212): a `Term` validates any `Value`, including one
+  built by hand, before its payload is copied into the request (a wrong-sized payload wrote past
+  the term's 1024-byte field); integers and times outside 64 bits raise `ValueError` instead of
+  `struct.error`; `publish()` and `layer_mounted()` no longer start `ldconfig` or a compiler to
+  find the C library; the scan judges the directory itself, not a symbolic link to it.
+
 - Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
   touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
   the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs

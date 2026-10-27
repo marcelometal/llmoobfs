@@ -67,6 +67,26 @@ class Terms(unittest.TestCase):
         with self.assertRaises(ValueError):
             Order("a", "bool")
 
+    def test_term_checks_a_value_built_by_hand(self):
+        # the payload is copied into a 1024-byte field of the request, whatever its type says
+        for v in (Value(u.T_INT64, b"x" * 4000), Value(u.T_INT64, b"x" * 7),
+                  Value(u.T_BOOL, b"\x02"), Value(u.T_TIME, b""), Value(u.T_STRING, b"a" * 1025),
+                  Value(9, b"x")):
+            with self.assertRaises(ValueError, msg=v.payload[:8]):
+                Term("a", "==", v)
+        self.assertEqual(Term("a", "==", Value(u.T_INT64, bytes(8))).value, Value.of(0))
+
+    def test_int64_range(self):
+        self.assertEqual(Value.of(2**63 - 1).python(), 2**63 - 1)
+        self.assertEqual(Value.of(-2**63).python(), -2**63)
+        for bad in (2**63, -2**63 - 1):
+            with self.assertRaises(ValueError):
+                Value.of(bad)
+            with self.assertRaises(ValueError):
+                Value.time_ns(bad)
+        with self.assertRaises(ValueError):       # past year 2262 in nanoseconds
+            Value.of(datetime(9999, 1, 1, tzinfo=timezone.utc))
+
     def test_matching(self):
         def m(term, value):
             return term.matches(None if value is None else Value.of(value))

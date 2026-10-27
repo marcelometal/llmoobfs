@@ -104,6 +104,29 @@ class Plain(unittest.TestCase):
         self.assertEqual(got, ["shared", "sub/deep"])
         self.assertNotIn("bad", moobfs.get_attrs(self.dom + "/shared"))
 
+    def test_scan_through_a_link_to_the_domain(self):
+        # 0700 domain, 0600 file of the same owner: homogeneous for the directory itself, not
+        # for the 0777 mode of a symbolic link to it
+        moobfs.publish(self.dom, "own", b"", {"k": 1})
+        link = os.path.join(self.root, "alice-link")
+        os.symlink(self.dom, link)
+        self.assertEqual([m.path for m in Domain(link, backend="scan").query(Term("k", "==", 1))],
+                         ["own"])
+
+    def test_no_helper_process(self):
+        import subprocess
+        from moobfs.domain import layer_mounted
+
+        def refuse(*args, **kwargs):
+            raise AssertionError(f"started {args[0] if args else kwargs.get('args')}")
+        saved = subprocess.Popen
+        subprocess.Popen = refuse
+        try:
+            moobfs.publish(self.dom, "quiet", b"", {"k": 1})
+            self.assertFalse(layer_mounted(self.dom))
+        finally:
+            subprocess.Popen = saved
+
     @unittest.skipUnless(hasattr(os, "geteuid") and os.geteuid() == 0, "needs root")
     def test_group_domain_and_other_caller(self):
         team = os.path.join(self.root, "team")

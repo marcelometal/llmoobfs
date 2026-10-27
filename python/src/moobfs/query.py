@@ -8,13 +8,12 @@ value_cmp), so that the scan of moobfs.scan and the kernel give the same answers
 import ctypes
 import errno
 import fcntl
-import math
 import os
 import struct
 from collections import namedtuple
 
 from . import _uapi as u
-from .attrs import TYPE_NAMES, Value, check_name, utf8_ok
+from .attrs import TYPE_NAMES, Value, check_name, validate
 
 OPS = {"==": u.OP_EQ, "<": u.OP_LT, "<=": u.OP_LE, ">": u.OP_GT, ">=": u.OP_GE,
        "prefix": u.OP_PREFIX, "exists": u.OP_EXISTS}
@@ -58,10 +57,10 @@ class Term:
             raise ValueError("raw values are not indexed and cannot be queried")
         if op == "prefix" and v.type != u.T_STRING:
             raise ValueError("prefix needs a string")
-        if v.type == u.T_STRING and (len(v.payload) > u.VALUE_MAX or not utf8_ok(v.payload)):
-            raise ValueError("string term longer than 1024 bytes or not valid UTF-8")
-        if v.type == u.T_DOUBLE and math.isnan(struct.unpack("<d", v.payload)[0]):
-            raise ValueError("NaN cannot be queried")
+        # a Value built by hand is checked too: _fill copies its payload into a fixed field
+        reason = validate(v.encode())
+        if reason:
+            raise ValueError(f"term {name!r}: {reason}")
         self.value = v
 
     def matches(self, stored):
