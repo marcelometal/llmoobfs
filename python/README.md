@@ -17,6 +17,11 @@ repository is GPL-2.0-only.
 - **LangGraph**: `moobfs.langgraph.MoobStore`, a `BaseStore` on the same files as the G1
   adapter, with filters pushed into `QUERY2` where they can be and checked again after the read.
   Optional: `pip install "./python[langgraph]"`. G1's mounted gate passed on it (journal 0207).
+- **MCP**: `python -m moobfs.mcp --root /srv/memory` serves the tools `info`, `query`, `read`,
+  `write` and `delete` to an agent over stdio (ADR-0024). It runs as the agent's own user and
+  refuses root and setuid, offers no network transport, and keeps every path inside the root;
+  `--read-only` leaves out `write` and `delete`. Optional: `pip install "./python[mcp]"`. An
+  agent host starts it like any stdio MCP server, under the agent's uid.
 
 ```sh
 python3 -m venv venv && venv/bin/pip install ./python       # from the repository root
@@ -24,7 +29,7 @@ make pylib-test                                             # the same, in build
 ```
 
 Python 3.9 or later, no dependency outside the standard library (LangGraph only for
-`moobfs.langgraph`). Linux for anything that
+`moobfs.langgraph`, the MCP SDK only for `moobfs.mcp`). Linux for anything that
 touches files; the encoding and matching code runs anywhere. Not on PyPI.
 
 Without the module the walk costs one `stat`, one `listxattr` and a `getxattr` per typed

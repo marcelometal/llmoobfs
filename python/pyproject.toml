@@ -20,6 +20,7 @@ classifiers = [
 
 [project.optional-dependencies]
 langgraph = ["langgraph>=1.2"]
+mcp = ["mcp>=2.3"]
 
 [project.urls]
 Source = "https://github.com/studiomoob/llmoobfs"

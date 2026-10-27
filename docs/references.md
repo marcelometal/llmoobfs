@@ -515,3 +515,12 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   [Debian security tracker for `linux`](https://security-tracker.debian.org/tracker/source-package/linux)
   and the [SQLite CVE page](https://www.sqlite.org/cves.html): the advisory sources of
   `docs/security-operations.md` §3.
+
+## 14. MCP adapter (ADR-0024, journal 0208)
+
+- [Model Context Protocol specification](https://modelcontextprotocol.io/specification) and the
+  official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) 2.3.0 (`MCPServer`,
+  the stdio transport, `Client` with `StdioServerParameters` for the tests), read through
+  Context7 on 2026-10-27.
+- The MCP project's reference [filesystem server](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem),
+  which also confines its tools to allowed directories.
