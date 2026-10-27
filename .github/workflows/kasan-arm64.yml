@@ -89,6 +89,8 @@ jobs:
         env:
           MOOB_ONLY: ${{ github.event.inputs.steps || 'ext4' }}
         run: |
+          # the value is put inside quotes of the guest's command line below
+          case "$MOOB_ONLY" in *[!abcdefghijklmnopqrstuvwxyz0123456789\ ]*) echo "steps are names of vm/suite.sh steps: $MOOB_ONLY" >&2; exit 1 ;; esac
           cd build/linux
           R="$GITHUB_WORKSPACE"
           # one retry when the debug kernel itself reports a diagnostic while booting under

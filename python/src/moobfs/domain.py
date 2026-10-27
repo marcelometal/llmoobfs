@@ -6,13 +6,13 @@ QUERY2, and otherwise walks the directory with the kernel's rules (moobfs.scan).
 same answers; the kernel is the fast path, the scan the fallback.
 """
 import ctypes
-import ctypes.util
 import fcntl
 import os
 import struct
 import sys
 
 from . import _uapi as u
+from ._libc import libc
 from . import query as q
 from . import scan
 
@@ -24,9 +24,8 @@ def layer_mounted(path):
     other than Linux. Does not open the mount root."""
     if not sys.platform.startswith("linux"):
         return False
-    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
     buf = ctypes.create_string_buffer(256)   # struct statfs; f_type is its first word
-    if libc.statfs(os.fsencode(path), buf) != 0:
+    if libc().statfs(os.fsencode(path), buf) != 0:
         e = ctypes.get_errno()
         raise OSError(e, os.strerror(e), path)
     return struct.unpack_from("l", buf.raw)[0] == u.FS_MAGIC

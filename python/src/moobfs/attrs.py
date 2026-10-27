@@ -18,6 +18,12 @@ TYPE_NAMES = {u.T_STRING: "string", u.T_INT64: "int64", u.T_DOUBLE: "double", u.
               u.T_TIME: "time", u.T_RAW: "raw"}
 
 
+def _int64(n, what):
+    if not -2**63 <= n < 2**63:
+        raise ValueError(f"{n} does not fit a {what} (signed 64 bits)")
+    return struct.pack("<q", n)
+
+
 class Value:
     """A typed attribute value: type code and payload bytes, without the type byte."""
 
@@ -34,7 +40,7 @@ class Value:
         if isinstance(value, bool):
             return cls(u.T_BOOL, bytes([value]))
         if isinstance(value, int):
-            return cls(u.T_INT64, struct.pack("<q", value))
+            return cls(u.T_INT64, _int64(value, "int64"))
         if isinstance(value, float):
             return cls(u.T_DOUBLE, struct.pack("<d", value))
         if isinstance(value, str):
@@ -51,7 +57,7 @@ class Value:
 
     @classmethod
     def time_ns(cls, ns):
-        return cls(u.T_TIME, struct.pack("<q", ns))
+        return cls(u.T_TIME, _int64(ns, "time"))
 
     def encode(self):
         """The bytes stored in the extended attribute."""

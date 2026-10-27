@@ -9,6 +9,26 @@
   the SQLite table refuse a result count above the request's limit and treat a path without its
   terminator as unknown.
 
+- Python library input checks (journal 0212): a `Term` validates any `Value`, including one
+  built by hand, before its payload is copied into the request (a wrong-sized payload wrote past
+  the term's 1024-byte field); integers and times outside 64 bits raise `ValueError` instead of
+  `struct.error`; `publish()` and `layer_mounted()` no longer start `ldconfig` or a compiler to
+  find the C library; the scan judges the directory itself, not a symbolic link to it.
+
+- Harness hygiene (journal 0211): the manual KCSAN and arm64 KASAN runs refuse a `steps` input
+  that is not a list of suite step names, since it is quoted inside the guest's command line;
+  `make uninstall` removes each installed path as one word, so a `PREFIX` or `DESTDIR` with a
+  space no longer removes other files; the syzkaller image is mounted with `nosymfollow` while
+  root writes into it.
+
+- Security batch 1 (journal 0210). Issue #113 fixed: a domain record and a fallback mark are
+  dropped when their directory is removed (reference-counted records freed with RCU, removal
+  with tried locks), and `QUERY2` or a chmod through a removed directory's descriptor records
+  nothing (`ENOENT` for the query). New suite step `domainrecs`; its regression test fails
+  without the fix (200 records after 200 domains on btrfs). Issue #118 closed: over a lower
+  slowed by `dm-delay` the build completes up to 200 ms per I/O and stops at the deadline with
+  `ETIMEDOUT` and no partial answer at 400 ms (`bench/client/issue118_slow_lower.py`).
+
 - Faster check cycle (journal 0209): a kernel correction runs `checkpatch`, the suite steps it
   touches and its negative round, plus KASAN on those steps when it touches locking or lifetime;
   the full `make vm-test` and full KASAN run once per batch (`AGENTS.md`). The KASAN job now runs

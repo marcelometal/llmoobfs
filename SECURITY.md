@@ -189,6 +189,10 @@ and a per-mount `index_build_work` choice of 1,024–65,536 units, default
 They do not strictly cap CPU time or physical I/O, nor provide fair index
 memory shares. The default still denies the measured valid 17,000-file
 domain with `E2BIG`; 65,536 completed that fixture in a dedicated VM.
+Over a lower slowed by `dm-delay` the first build of a 5,000-file domain took
+9.8 s at 200 ms per I/O and stopped at the deadline with `ETIMEDOUT`, with no
+partial answer, at 400 ms; issue 118 was closed with that evidence
+([journal 0210](docs/history/0210-security-batch-1-domain-records-and-slow-lower.md)).
 A later change stops a budget release from dropping a domain
 last built by another filesystem uid: the query returns `ENOMEM` when the
 remainder is too small, and one uid can still fill the whole budget

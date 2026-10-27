@@ -654,6 +654,7 @@ static int moobl_rmdir(struct inode *dir, struct dentry *dentry)
 	moobl_unlock_parent(dentry, lower_dentry, lower_dir);
 	if (!err) {
 		moobl_index_drop_inode(dir->i_sb, d_inode(dentry)->i_ino);
+		moobl_index_dir_removed(dir->i_sb, d_inode(dentry)->i_ino);
 		d_drop(dentry);
 	}
 	return err;
