@@ -14,13 +14,17 @@ repository is GPL-2.0-only.
   same answers (`python/tests/kernel_equal.py`). `Domain.batch` sends up to eight requests.
   `QueryRefused` means a resource limit; `on_refusal="scan"` answers it from the walk instead.
 - **Detection**: `layer_mounted(path)`, `get_info(mount_root)`, `usable_info(info)`.
+- **LangGraph**: `moobfs.langgraph.MoobStore`, a `BaseStore` on the same files as the G1
+  adapter, with filters pushed into `QUERY2` where they can be and checked again after the read.
+  Optional: `pip install "./python[langgraph]"`. G1's mounted gate passed on it (journal 0207).
 
 ```sh
 python3 -m venv venv && venv/bin/pip install ./python       # from the repository root
 make pylib-test                                             # the same, in build/, plus the tests
 ```
 
-Python 3.9 or later, no dependency outside the standard library. Linux for anything that
+Python 3.9 or later, no dependency outside the standard library (LangGraph only for
+`moobfs.langgraph`). Linux for anything that
 touches files; the encoding and matching code runs anywhere. Not on PyPI.
 
 Without the module the walk costs one `stat`, one `listxattr` and a `getxattr` per typed

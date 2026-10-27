@@ -188,6 +188,16 @@ can open. It may return `salary.json` to uid 1002, who can read it, even
 though `QUERY2` omits that file. That difference is documented. It is not a
 failure. Fallback must not return `salary.json` to uid 1001.
 
+*Amendment, 2026-10-27, accepted by the maintainer before the run (journal
+[0207](history/0207-python-library-langgraph-store.md)):* for the store of the
+Python library (`moobfs.langgraph`, gate option `--store package`), the
+fallback applies the kernel's matching and homogeneity rules (ADR-0023), so it
+answers what `QUERY2` answers on a mounted copy. For that store the no-module
+bound of section 6 reads: `salary.json` absent for uid 1001 **and** uid 1002,
+uid 1002's `open` by path still succeeds, and 0 paths the uid cannot open. The
+G1 adapter (`langgraph_store`, the default) keeps the wording above, and its
+recorded runs stand as they are. Every other bound is unchanged for both.
+
 A resource refusal is not a fallback. `ENOMEM`, `E2BIG`, `ETIMEDOUT` and
 `EDQUOT` from `QUERY2` fail the search. The caller receives the error and no
 list. A short successful list after one of those errors fails the case.

@@ -226,3 +226,4 @@ Journals 0001 to 0050 were written in Portuguese and translated to English in pl
 - [0204 — Python client library, phase 1 (C5)](0204-python-client-library.md)
 - [0205 — Security operations from the OSTIF best-practices guide (S22)](0205-security-operations.md)
 - [0206 — Debian 6.12.113 supported: fstests quick passed on three lowers (issue 142)](0206-debian-6-12-113-supported.md)
+- [0207 — Python library, phase 2: LangGraph store, G1 gate carried over (C5 done)](0207-python-library-langgraph-store.md)

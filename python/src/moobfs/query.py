@@ -152,9 +152,10 @@ def _ioctl(fd, request, arg):
         raise
 
 
-def kernel_query(fd, terms, order=None, page=u.MAX_LIMIT):
+def kernel_query(fd, terms, order=None, page=u.MAX_LIMIT, stats=None):
     """Every answer of one QUERY2 on an open domain directory, all pages followed. Raises
-    QueryRefused or KernelUnavailable with no partial list."""
+    QueryRefused or KernelUnavailable with no partial list. stats, a dict, counts the ioctl
+    calls in "query2_calls"."""
     terms = list(terms)
     check_request(terms, order)
     q = u.Query2()
@@ -163,13 +164,15 @@ def kernel_query(fd, terms, order=None, page=u.MAX_LIMIT):
     out = []
     while True:
         _ioctl(fd, u.IOC_QUERY2, q)
+        if stats is not None:
+            stats["query2_calls"] = stats.get("query2_calls", 0) + 1
         out.extend(_matches(buf, q.count))
         if not q.truncated:
             return out
         q.count = q.truncated = 0
 
 
-def kernel_batch(fd, requests, page=u.MAX_LIMIT):
+def kernel_batch(fd, requests, page=u.MAX_LIMIT, stats=None):
     """Answers of up to 8 (terms, order) requests in QUERY2_BATCH calls, all pages followed.
     Only a zero return is used: on any error every output of that call is dropped, and the
     error is raised (spec-query-v2 section 4.3)."""
@@ -190,6 +193,8 @@ def kernel_batch(fd, requests, page=u.MAX_LIMIT):
         b = u.Query2Batch(version=u.QUERY2_VERSION, nqueries=len(pending),
                           queries=ctypes.addressof(qs))
         _ioctl(fd, u.IOC_QUERY2_BATCH, b)
+        if stats is not None:
+            stats["query2_calls"] = stats.get("query2_calls", 0) + 1
         nxt = []
         for slot, i in enumerate(pending):
             answers[i].extend(_matches(bufs[slot], qs[slot].count))

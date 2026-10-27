@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Python client library, phase 2 (roadmap C5 done, journal 0207): `moobfs.langgraph.MoobStore`,
+  a LangGraph store on the library with the files of the G1 adapter (either reads the other's).
+  `bench/client/g1_mounted.py --store package` runs G1's mounted gate on it; it passed three
+  times on the dedicated host. By a protocol amendment accepted before the run, the no-module
+  case expects `salary.json` absent for uid 1002 as well, as `QUERY2` does. `Domain.stats` counts
+  `QUERY2` calls and walks.
+
 - Security operations (roadmap S22, journal 0205), from the OSTIF best-practices guide:
   a safe-harbor section in `SECURITY.md`; `security.txt` under the project site, checked by
   `scripts/check-site.py` (fails once it expires) and published with hidden files on; and

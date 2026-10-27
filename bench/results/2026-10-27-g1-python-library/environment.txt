@@ -1,0 +1,14 @@
+6.12.111+deb13-amd64
+Python 3.13.5
+model name	: Intel(R) Core(TM) i7-2635QM CPU @ 2.00GHz
+8
+langchain-core==1.7.0
+langgraph==1.2.15
+langgraph-checkpoint==4.3.0
+langgraph-prebuilt==1.1.1
+langgraph-sdk==0.4.9
+moobfs @ file:///tmp/c5p2-src
+pydantic==2.14.1
+pydantic_core==2.50.1
+setuptools==84.0.0
+/dev/sdb1 ext4
