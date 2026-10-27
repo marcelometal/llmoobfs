@@ -494,3 +494,24 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
 - Considered, not used: [pyxattr](https://pypi.org/project/pyxattr/) and
   [xattr](https://pypi.org/project/xattr/) (C extensions for what `os` now offers) and
   [ctypeslib](https://github.com/trolldbois/ctypeslib) (ctypes generated from headers).
+
+## 13. Security operations (journal 0205)
+
+- OSTIF, [Security Best Practices Guide](https://github.com/ostif-org/best-practices-guide),
+  chapters 1 to 7, read 2026-10-26 (sections on the reporting pipeline and response policies
+  contributed by Least Authority). The checklist of `docs/security-operations.md` and roadmap
+  item S22.
+- E. Foudil and Y. Shafranovich, [RFC 9116: A File Format to Aid in Security Vulnerability
+  Disclosure](https://www.rfc-editor.org/rfc/rfc9116), 2022. `site/.well-known/security.txt`:
+  `Contact` and one `Expires` required, location at the domain root.
+- disclose.io, [safe-harbor terms](https://github.com/disclose/dioterms/blob/master/terms/safe-harbor/en-US.md),
+  CC0-1.0, read 2026-10-26. Adapted for the safe-harbor section of `SECURITY.md`.
+- GitHub Docs, [Exporting a software bill of materials for your repository](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/exporting-a-software-bill-of-materials-for-your-repository),
+  read 2026-10-26: SPDX export of the dependency graph.
+- `actions/upload-pages-artifact` v5.0.0, `action.yml` at
+  `fc324d3547104276b827a68afc52ff2a11cc49c9`: files and directories starting with a dot are
+  excluded unless `include-hidden-files` is `true` (`.git` and `.github` always are).
+- [linux-cve-announce](https://lore.kernel.org/linux-cve-announce/), the
+  [Debian security tracker for `linux`](https://security-tracker.debian.org/tracker/source-package/linux)
+  and the [SQLite CVE page](https://www.sqlite.org/cves.html): the advisory sources of
+  `docs/security-operations.md` §3.

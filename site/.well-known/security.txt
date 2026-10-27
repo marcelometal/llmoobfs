@@ -1,0 +1,10 @@
+# Security contact for MoobFS (https://github.com/studiomoob/llmoobfs) only.
+# This file sits under the project site, not at the domain root that RFC 9116
+# names, so automated scanners may not find it; SECURITY.md in the repository
+# is the authoritative policy.
+Contact: https://github.com/studiomoob/llmoobfs/security/advisories/new
+Contact: mailto:claudio@studiomoob.com
+Expires: 2027-04-26T00:00:00.000Z
+Preferred-Languages: en, pt
+Canonical: https://studiomoob.github.io/llmoobfs/.well-known/security.txt
+Policy: https://github.com/studiomoob/llmoobfs/blob/main/SECURITY.md

@@ -410,6 +410,25 @@ code and its tests. These items make the test suite itself find that kind of def
   registration and retry against the update hooks, checked for every interleaving. Heavier
   than the others; after S14 to S16.
 
+### S22. Security operations from the OSTIF best-practices guide (added 2026-10-26, journal 0205)
+
+Effort: S. *Status, 2026-10-26:* documented in this batch; the subscriptions of item 3 are the
+maintainer's action.
+
+The OSTIF guide (chapters 2 to 7) checked against the repository. Already in place: private
+reporting, `SECURITY.md` with response targets and disclosure terms, the threat model (S1),
+CodeQL, Scorecard, Dependabot, sanitizers and fuzzing. Added:
+
+1. A safe-harbor section in `SECURITY.md` for good-faith research on the code.
+2. `security.txt` (RFC 9116) under the project site. RFC 9116 places it at the domain root,
+   which belongs to the hosting organization and is not changed by this project, so scanners may
+   not find it; `SECURITY.md` stays authoritative. `scripts/check-site.py` fails once it expires.
+3. [security-operations.md](security-operations.md): access read from the GitHub API, an
+   incident procedure, the advisories that concern the project, the third-party components and
+   how to export the SBOM, and when to raise the security effort.
+
+Done when: the three are on `main` and the access table has been re-read before the next tag.
+
 ## Out of scope for this list
 
 - LLM content guardrails: the layer is storage; control over what an agent reads or writes

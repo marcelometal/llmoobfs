@@ -26,7 +26,7 @@ until a coordinated disclosure) is named in the journal of the change, with the 
 | `docs/history/README.md` | journal index | every journal |
 | `docs/help-wanted.md`, `CONTRIBUTING.md` | what help is wanted | a call opens or closes |
 | `docs/testing.md`, `docs/faq.md`, `docs/when-not-to-use.md`, `docs/compatibility.md`, `docs/operations.md`, `docs/container-integration.md` | what tests prove, answers, limits, compatibility | a test step, a limit or a compatibility decision changes |
-| `SECURITY.md` | reporting channel, supported versions | the channel or the supported versions change |
+| `SECURITY.md`, `docs/security-operations.md`, `site/.well-known/security.txt` | reporting channel, supported versions, safe harbor, access, incident steps, third-party components | the channel, the supported versions, an owner, a secret, a key, a protection rule or a dependency changes; `security.txt` before its `Expires` date |
 | `docs/references.md` | works used | something new is used (same commit) |
 
 ## On GitHub, outside the tree

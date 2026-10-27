@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Security operations (roadmap S22, journal 0205), from the OSTIF best-practices guide:
+  a safe-harbor section in `SECURITY.md`; `security.txt` under the project site, checked by
+  `scripts/check-site.py` (fails once it expires) and published with hidden files on; and
+  `docs/security-operations.md` with access read from the GitHub API, an incident procedure,
+  advisory sources, third-party components and the SBOM export. Dependabot
+  security-update pull requests enabled for this repository. Nothing changed at
+  organization level.
+
 - Debian 6.12.113 supported (issue 142, journal 0206): fstests `quick` with the exclusion list
   passed on ext4, btrfs and XFS (631 tests each, 0 failures, no kernel diagnostic) with that
   kernel booted in the guest by the new `MOOB_KVER` of `vm/fstests-local.sh`.
