@@ -485,7 +485,7 @@ research documents. Two page ranges could not be confirmed and are omitted: Büt
   attribute calls; no third-party package.
 - [PEP 621](https://peps.python.org/pep-0621/) (project metadata in `pyproject.toml`) and
   [PEP 639](https://peps.python.org/pep-0639/) (SPDX licence expression), with
-  [setuptools](https://setuptools.pypa.io/) 84.0.0 as the build backend, pinned by hash in
+  [setuptools](https://setuptools.pypa.io/) as the build backend, pinned by version and hash in
   `python/build-requirements.txt`.
 - [GNU Lesser General Public License, version 2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html),
   the licence of `python/` (text from Debian's `common-licenses`).
